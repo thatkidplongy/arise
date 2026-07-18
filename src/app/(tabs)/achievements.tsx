@@ -7,7 +7,7 @@ import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, text, withAlpha } from '@/theme';
 
 export default function AchievementsScreen() {
   const state = useSystem((s) => s.state);

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { api } from '@/lib/api';
 
+import { link } from './link';
 import { useSystem } from './useSystem';
 
 /**
@@ -15,11 +16,6 @@ interface AvatarStore {
   busy: boolean;
   load: () => Promise<void>;
   save: (uri: string) => Promise<void>; // '' clears it
-}
-
-function link() {
-  const { serverUrl, apiToken } = useSystem.getState();
-  return { serverUrl, apiToken };
 }
 
 export const useAvatar = create<AvatarStore>((set) => ({

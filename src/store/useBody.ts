@@ -10,13 +10,13 @@ import {
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 
-import { useSystem } from './useSystem';
+import { link } from './link';
 
 /**
  * The standalone Body tools (nutrition + skincare) live in their own store,
  * fetched from `/body` on demand — they don't touch the game state in useSystem.
- * Connection settings (server URL + token) are borrowed from useSystem so there's
- * one source of truth for the link.
+ * Connection settings (server URL + token) come from `link`, so there's one
+ * source of truth for the link.
  */
 interface BodyStore {
   body: ApiBody | null;
@@ -35,10 +35,6 @@ interface BodyStore {
   toggleStep: (id: string, done: boolean) => Promise<void>;
 }
 
-function link() {
-  const { serverUrl, apiToken } = useSystem.getState();
-  return { serverUrl, apiToken };
-}
 
 export const useBody = create<BodyStore>((set) => ({
   body: null,

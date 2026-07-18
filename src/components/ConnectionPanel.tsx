@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text } from '@/theme';
+import { accent, feedback, text } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
 

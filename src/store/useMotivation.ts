@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { api, type ApiInsight } from '@/lib/api';
 
+import { link } from './link';
 import { useSystem } from './useSystem';
 
 /** A capture in flight (or one that failed) — shown as a live card in the list. */
@@ -33,11 +34,6 @@ interface MotivationStore {
   retry: (tempId: string) => void;
   dismiss: (tempId: string) => void;
   remove: (id: string) => Promise<void>;
-}
-
-function link() {
-  const { serverUrl, apiToken } = useSystem.getState();
-  return { serverUrl, apiToken };
 }
 
 /** Pull the server's human message out of a thrown request error. */
