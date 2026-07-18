@@ -17,9 +17,8 @@ extra dependencies.
 """
 
 import hashlib
-import json
-import urllib.parse
-import urllib.request
+
+from . import net
 
 # ── Targets (pure) ────────────────────────────────────────────────────────────
 
@@ -176,20 +175,14 @@ def search(query: str, timeout: float = 8.0, limit: int = 20) -> list[dict]:
     q = (query or "").strip()
     if not q:
         return []
-    params = urllib.parse.urlencode({
+    payload = net.get_json(_SEARCH_URL, params={
         "search_terms": q,
         "search_simple": 1,
         "action": "process",
         "json": 1,
         "page_size": limit,
         "fields": "product_name,brands,nutriments,serving_size",
-    })
-    req = urllib.request.Request(
-        f"{_SEARCH_URL}?{params}",
-        headers={"User-Agent": "Arise-Wellness/1.0 (personal use)"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    }, headers={"User-Agent": "Arise-Wellness/1.0 (personal use)"}, timeout=timeout)
     return _parse_products(payload, limit)
 
 

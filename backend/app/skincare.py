@@ -17,9 +17,7 @@ one active at a time and patch-test. Persistent pigmentation (melasma,
 post-inflammatory marks) can have causes that need a dermatologist — see NOTE.
 """
 
-import json
-import urllib.parse
-import urllib.request
+from . import net
 
 # Seeded once per player, in order. Each is (routine, text).
 TEMPLATE: list[tuple[str, str]] = [
@@ -123,18 +121,12 @@ def lookup(query: str, timeout: float = 8.0, limit: int = 8) -> list[dict]:
     q = (query or "").strip()
     if not q:
         return []
-    params = urllib.parse.urlencode({
+    payload = net.get_json(_SEARCH_URL, params={
         "search_terms": q,
         "search_simple": 1,
         "action": "process",
         "json": 1,
         "page_size": limit,
         "fields": "product_name,brands,ingredients_text,ingredients_text_en",
-    })
-    req = urllib.request.Request(
-        f"{_SEARCH_URL}?{params}",
-        headers={"User-Agent": "Arise-Wellness/1.0 (personal use)"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    }, headers={"User-Agent": "Arise-Wellness/1.0 (personal use)"}, timeout=timeout)
     return _parse_products(payload, limit)

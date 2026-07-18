@@ -9,9 +9,7 @@ Two things:
     from Open Library subjects, matched to what this app is about.
 """
 
-import json
-import urllib.parse
-import urllib.request
+from . import net
 
 _SEARCH_URL = "https://openlibrary.org/search.json"
 _SUBJECT_URL = "https://openlibrary.org/subjects/{subject}.json"
@@ -91,21 +89,20 @@ def search(query: str, timeout: float = 8.0, limit: int = 15) -> list[dict]:
     q = (query or "").strip()
     if not q:
         return []
-    params = urllib.parse.urlencode({
+    payload = net.get_json(_SEARCH_URL, params={
         "q": q,
         "fields": "title,author_name,cover_i,number_of_pages_median,first_publish_year",
         "limit": limit,
-    })
-    req = urllib.request.Request(f"{_SEARCH_URL}?{params}", headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return _parse_search(json.load(resp), limit)
+    }, headers=_HEADERS, timeout=timeout)
+    return _parse_search(payload, limit)
 
 
 def _subject(slug: str, timeout: float, per_shelf: int) -> list[dict]:
-    params = urllib.parse.urlencode({"limit": per_shelf})
-    req = urllib.request.Request(f"{_SUBJECT_URL.format(subject=slug)}?{params}", headers=_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return _parse_subject(json.load(resp), per_shelf)
+    payload = net.get_json(
+        _SUBJECT_URL.format(subject=slug), params={"limit": per_shelf},
+        headers=_HEADERS, timeout=timeout,
+    )
+    return _parse_subject(payload, per_shelf)
 
 
 def suggestions(timeout: float = 8.0, per_shelf: int = 6) -> list[dict]:

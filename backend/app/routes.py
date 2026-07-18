@@ -25,6 +25,17 @@ def _valid_day(day: str | None) -> str:
     return day
 
 
+def _external_lookup(db: Session, fn, unavailable: str):
+    """Shared shape for the free-API lookups (books, food, skincare): ensure a
+    player exists, run the search, and turn any transport/parse failure into a
+    clean 502 rather than a bare 500."""
+    state.get_or_create_player(db)
+    try:
+        return fn()
+    except Exception:
+        raise HTTPException(502, unavailable)
+
+
 @router.get("/state", response_model=StateOut)
 def get_state(
     day: str | None = Query(None, description="Client-local date, YYYY-MM-DD"),
@@ -125,11 +136,8 @@ def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(
 @router.get("/books/search", response_model=list[BookOut])
 def books_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     """Search Open Library for a book to set as your current read (free, no key)."""
-    state.get_or_create_player(db)
-    try:
-        return books.search(q)
-    except Exception:
-        raise HTTPException(502, "Book search is unavailable right now — try again, or type the title.")
+    return _external_lookup(db, lambda: books.search(q),
+                            "Book search is unavailable right now — try again, or type the title.")
 
 
 @router.get("/books/suggest", response_model=list[BookShelfOut])
@@ -195,11 +203,8 @@ def set_body_profile(profile: BodyProfileIn, day: str | None = Query(None), db: 
 def food_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     """Look a food up in Open Food Facts (per-100 g values). The client picks one
     and logs the grams eaten. A lookup failure is a clean 502, not a crash."""
-    state.get_or_create_player(db)
-    try:
-        return nutrition.search(q)
-    except Exception:
-        raise HTTPException(502, "Food lookup is unavailable right now — try again, or log it by hand.")
+    return _external_lookup(db, lambda: nutrition.search(q),
+                            "Food lookup is unavailable right now — try again, or log it by hand.")
 
 
 @router.post("/food/analyze", response_model=FoodEstimateOut)
@@ -239,11 +244,8 @@ def skincare_search(q: str = Query(..., min_length=1), db: Session = Depends(get
     """Look a product up in Open Beauty Facts (free, no key) and read its
     ingredients, flagging the actives that help pigmentation & pores. A gentle
     guide, not medical advice. A lookup failure is a clean 502, not a crash."""
-    state.get_or_create_player(db)
-    try:
-        return skincare.lookup(q)
-    except Exception:
-        raise HTTPException(502, "Ingredient lookup is unavailable right now — try again in a bit.")
+    return _external_lookup(db, lambda: skincare.lookup(q),
+                            "Ingredient lookup is unavailable right now — try again in a bit.")
 
 
 @router.post("/skincare/step", response_model=BodyOut)

@@ -11,14 +11,15 @@ Config (environment variables):
   ARISE_LLM_MODEL     default "gemini-flash-latest" — an alias that tracks the
                       current flash model, so a retired pinned version can't 404
 
-Only stdlib is used (urllib) so this works under launchd without extra deps.
+Network I/O goes through `net`; only stdlib is used, so this works under launchd
+without extra deps.
 """
 
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
+
+from . import net
 
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -135,14 +136,7 @@ def generate(slots: list[dict], profile: dict, timeout: float = 20.0) -> dict[st
         },
     }
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    payload = net.post_json(url, body, timeout=timeout)
 
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(text)
@@ -231,14 +225,7 @@ def analyze_food(image_b64: str, mime: str = "image/jpeg", timeout: float = 25.0
         },
     }
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    payload = net.post_json(url, body, timeout=timeout)
     return _parse_estimate(payload)
 
 
@@ -305,14 +292,7 @@ def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
         },
     }
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    payload = net.post_json(url, body, timeout=timeout)
     return _parse_distillation(payload)
 
 

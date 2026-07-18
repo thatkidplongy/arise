@@ -6,15 +6,14 @@ key lives in ARISE_SUPADATA_API_KEY; with no key, `enabled()` is False and the
 "capture a video" feature is simply hidden — like the LLM, it can never break
 the rest of the app.
 
-Only stdlib (urllib) is used, so this runs under launchd with no extra deps —
-the same contract as llm.py, nutrition.py and books.py.
+Network I/O goes through `net`; only the standard library is used, so this runs
+under launchd with no extra deps — the same contract as llm.py and books.py.
 """
 
-import json
 import os
 import re
-import urllib.parse
-import urllib.request
+
+from . import net
 
 _ENDPOINT = "https://api.supadata.ai/v1/transcript"
 
@@ -91,14 +90,7 @@ def fetch(url: str, timeout: float = 30.0) -> dict:
     if not key:
         raise ValueError("no Supadata key")
     target = clean_url(url)
-    q = urllib.parse.urlencode({"url": target})
-    req = urllib.request.Request(
-        f"{_ENDPOINT}?{q}",
-        headers={"x-api-key": key},
-        method="GET",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.load(resp)
+    payload = net.get_json(_ENDPOINT, params={"url": target}, headers={"x-api-key": key}, timeout=timeout)
     out = parse(payload)
     out["source"] = source_of(target)
     return out
