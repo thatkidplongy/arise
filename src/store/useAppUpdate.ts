@@ -37,6 +37,14 @@ export const useAppUpdate = create<AppUpdateStore>((set, get) => ({
   },
 
   reload: () => {
-    if (Platform.OS === 'web') (globalThis as any).location?.reload();
+    if (Platform.OS !== 'web') return;
+    const loc = (globalThis as any).location;
+    if (!loc) return;
+    set({ available: false }); // hide the bar immediately, even before the reload paints
+    // A plain reload() can serve a stale shell in an installed iOS PWA, which
+    // would leave this prompt stuck. Navigating to a fresh, cache-busted URL
+    // forces the browser to refetch index.html (and thus the new bundle). We keep
+    // the current path so a deep route survives the update.
+    loc.replace(`${loc.pathname}?u=${Date.now()}${loc.hash || ''}`);
   },
 }));
