@@ -91,7 +91,11 @@ interface SystemStore {
   saveName: (name: string) => Promise<void>;
   equipTitle: (title: string | null) => Promise<void>;
   saveNorthStar: (northStar: string) => Promise<void>;
-  savePreferences: (preferences: Partial<Record<StatKey, string[]>>) => Promise<void>;
+  savePreferences: (
+    preferences: Partial<Record<StatKey, string[]>>,
+    levels?: Partial<Record<StatKey, string>>,
+  ) => Promise<void>;
+  generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
@@ -117,6 +121,9 @@ export const useSystem = create<SystemStore>()(
         try {
           const fresh = await api.state(serverUrl, apiToken, dateKey());
           set({ state: fresh, status: 'online' });
+          // If the LLM is on, personalise this period in the background — the
+          // pool-based board is already showing; it quietly upgrades when ready.
+          if (fresh.llm_enabled) void get().generate();
         } catch (e) {
           // Passive refresh is silent — the ConnectionPanel communicates the
           // problem (offline vs unauthorized). No pop-up on load.
@@ -244,14 +251,24 @@ export const useSystem = create<SystemStore>()(
         }
       },
 
-      savePreferences: async (preferences) => {
+      savePreferences: async (preferences, levels = {}) => {
         const { serverUrl, apiToken, notices } = get();
         try {
-          const state = await api.updatePreferences(serverUrl, apiToken, preferences, dateKey());
+          const state = await api.updatePreferences(serverUrl, apiToken, preferences, levels, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);
           set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      generate: async () => {
+        const { serverUrl, apiToken } = get();
+        try {
+          const state = await api.generate(serverUrl, apiToken, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          set({ status: errorOutcome(e).status });
         }
       },
 

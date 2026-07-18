@@ -23,6 +23,7 @@ export default function SettingsScreen() {
   const refresh = useSystem((s) => s.refresh);
 
   const prefsKey = JSON.stringify(state?.preferences ?? {});
+  const levelsKey = JSON.stringify(state?.levels ?? {});
   const [nameDraft, setNameDraft] = useState(state?.player.name ?? '');
   const [northStarDraft, setNorthStarDraft] = useState(state?.player.north_star ?? '');
   const [bookDraft, setBookDraft] = useState(state?.player.current_book ?? '');
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   const [tokenDraft, setTokenDraft] = useState(apiToken);
   const [focusDraft, setFocusDraft] = useState<Record<string, string[]>>({});
   const [focusInput, setFocusInput] = useState<Record<string, string>>({});
+  const [levelDraft, setLevelDraft] = useState<Record<string, string>>({});
   const [removedFocus, setRemovedFocus] = useState<{ stat: string; item: string; index: number } | null>(
     null,
   );
@@ -54,6 +56,11 @@ export default function SettingsScreen() {
     setRemovedFocus(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefsKey]);
+  useEffect(() => {
+    const l = state?.levels ?? {};
+    setLevelDraft(Object.fromEntries(STAT_KEYS.map((k) => [k, l[k] ?? ''])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levelsKey]);
 
   const addFocus = (k: string) => {
     const v = (focusInput[k] ?? '').trim();
@@ -129,7 +136,9 @@ export default function SettingsScreen() {
     }
     setFocusDraft(merged);
     setFocusInput({});
-    await savePreferences(merged);
+    const levels: Record<string, string> = {};
+    for (const k of STAT_KEYS) levels[k] = (levelDraft[k] ?? '').trim();
+    await savePreferences(merged, levels);
     settle(setFocusSave);
   };
 
@@ -278,10 +287,13 @@ export default function SettingsScreen() {
       </SystemPanel>
 
       {state ? (
-        <SystemPanel title="Focus areas">
+        <SystemPanel title="Focus areas" sub={state.llm_enabled ? 'AI personalisation on' : undefined}>
           <Text style={styles.help}>
             Optional. Add as many focuses as you like per attribute — each attribute&apos;s side
             quest rotates through them. Adding one keeps the rest; tap × to remove.
+            {state.llm_enabled
+              ? ' “Where I’m at” tells the AI your level so it can prescribe your next step.'
+              : ' “Where I’m at” is used once you turn on AI personalisation.'}
           </Text>
           {STAT_KEYS.map((k) => {
             const items = focusDraft[k] ?? [];
@@ -323,6 +335,14 @@ export default function SettingsScreen() {
                     <Text style={[styles.addBtnText, { color: STAT_META[k].color }]}>Add</Text>
                   </Pressable>
                 </View>
+                <TextInput
+                  value={levelDraft[k] ?? ''}
+                  onChangeText={(v) => setLevelDraft((s) => ({ ...s, [k]: v }))}
+                  style={[styles.input, styles.levelInput]}
+                  placeholder="Where I'm at (for AI) · e.g. Math: fractions"
+                  placeholderTextColor={text.faint}
+                  maxLength={120}
+                />
               </View>
             );
           })}
@@ -489,6 +509,11 @@ const styles = StyleSheet.create({
   addInput: {
     flex: 1,
     marginBottom: 0,
+  },
+  levelInput: {
+    marginTop: 8,
+    marginBottom: 0,
+    fontSize: 13,
   },
   addBtn: {
     borderWidth: 1,

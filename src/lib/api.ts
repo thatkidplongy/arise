@@ -61,6 +61,8 @@ export interface ApiState {
   book_review: { pending: boolean; book: string };
   next_rank: { rank: Rank; level: number; streak: number } | null;
   preferences: Partial<Record<StatKey, string[]>>;
+  levels: Partial<Record<StatKey, string>>;
+  llm_enabled: boolean;
   quests: ApiQuest[];
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
@@ -151,12 +153,16 @@ export const api = {
     base: string,
     token: string,
     preferences: Partial<Record<StatKey, string[]>>,
+    levels: Partial<Record<StatKey, string>>,
     day: string,
   ) =>
     request<ApiState>(base, `/preferences?day=${day}`, token, {
       method: 'PUT',
-      body: JSON.stringify({ preferences }),
+      body: JSON.stringify({ preferences, levels }),
     }),
+
+  generate: (base: string, token: string, day: string) =>
+    request<ApiState>(base, `/quests/generate?day=${day}`, token, { method: 'POST' }),
 
   setBook: (base: string, token: string, currentBook: string, day: string) =>
     request<ApiState>(base, `/book?day=${day}`, token, {
