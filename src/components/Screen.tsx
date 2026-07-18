@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAppUpdate } from '@/store/useAppUpdate';
 import { useBody } from '@/store/useBody';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text, withAlpha } from '@/theme';
+import { accent, surface, text } from '@/theme';
 
 /** The app is phone-shaped, so on a wide browser we cap the content to a single
  * readable column and centre it — no edge-to-edge sprawl. */
@@ -13,11 +12,9 @@ export const CONTENT_MAX_WIDTH = 620;
 
 const PULL_THRESHOLD = 72; // px of drag before releasing triggers a refresh
 
-/** Re-fetch the data the screens render, in place — no page reload, no flash.
- * Also quietly checks whether a newer build has shipped (surfaces the pill). */
+/** Re-fetch the data the screens render, in place — no page reload, no flash. */
 async function softRefresh() {
   await Promise.all([useSystem.getState().refresh(), useBody.getState().fetch()]);
-  void useAppUpdate.getState().check();
 }
 
 /** Web-only pull-to-refresh. react-native-web's RefreshControl is a no-op, so we
@@ -88,15 +85,13 @@ function useWebPullToRefresh(scrollRef: React.RefObject<ScrollView | null>, onRe
   return { pull, refreshing };
 }
 
-/** Shared page: flat warm background, safe-area padding, a smooth pull-to-refresh,
- * and an unobtrusive "update available" bar when a newer build has shipped. */
+/** Shared page: flat warm background, safe-area padding, and a smooth
+ * pull-to-refresh that re-fetches data in place (no page reload). */
 export function Screen({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
   const [nativeRefreshing, setNativeRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { pull, refreshing } = useWebPullToRefresh(scrollRef, softRefresh);
-  const updateAvailable = useAppUpdate((s) => s.available);
-  const reload = useAppUpdate((s) => s.reload);
   const isWeb = Platform.OS === 'web';
 
   const onNativeRefresh = async () => {
@@ -106,38 +101,28 @@ export function Screen({ children }: PropsWithChildren) {
   };
 
   return (
-    <View style={styles.root}>
-      {updateAvailable ? (
-        <Pressable
-          onPress={reload}
-          style={({ pressed }) => [styles.updateBar, { paddingTop: insets.top + 9 }, pressed && { opacity: 0.85 }]}
-        >
-          <Text style={styles.updateText}>A new version is ready — tap to update</Text>
-        </Pressable>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.root}
+      contentContainerStyle={styles.outer}
+      refreshControl={
+        isWeb ? undefined : <RefreshControl refreshing={nativeRefreshing} onRefresh={onNativeRefresh} tintColor={accent} />
+      }
+    >
+      {isWeb && (pull > 0 || refreshing) ? (
+        <View style={[styles.pull, { height: refreshing ? 52 : pull }]}>
+          {refreshing ? (
+            <View style={styles.pullRow}>
+              <ActivityIndicator size="small" color={accent} />
+              <Text style={styles.pullText}>Refreshing…</Text>
+            </View>
+          ) : (
+            <Text style={styles.pullText}>{pull >= PULL_THRESHOLD ? '↑  Release to refresh' : '↓  Pull to refresh'}</Text>
+          )}
+        </View>
       ) : null}
-      <ScrollView
-        ref={scrollRef}
-        style={styles.root}
-        contentContainerStyle={styles.outer}
-        refreshControl={
-          isWeb ? undefined : <RefreshControl refreshing={nativeRefreshing} onRefresh={onNativeRefresh} tintColor={accent} />
-        }
-      >
-        {isWeb && (pull > 0 || refreshing) ? (
-          <View style={[styles.pull, { height: refreshing ? 52 : pull }]}>
-            {refreshing ? (
-              <View style={styles.pullRow}>
-                <ActivityIndicator size="small" color={accent} />
-                <Text style={styles.pullText}>Refreshing…</Text>
-              </View>
-            ) : (
-              <Text style={styles.pullText}>{pull >= PULL_THRESHOLD ? '↑  Release to refresh' : '↓  Pull to refresh'}</Text>
-            )}
-          </View>
-        ) : null}
-        <View style={[styles.column, { paddingTop: (updateAvailable ? 20 : insets.top + 20) }]}>{children}</View>
-      </ScrollView>
-    </View>
+      <View style={[styles.column, { paddingTop: insets.top + 20 }]}>{children}</View>
+    </ScrollView>
   );
 }
 
@@ -146,16 +131,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: surface.base,
   },
-  updateBar: {
-    width: '100%',
-    alignItems: 'center',
-    paddingBottom: 9,
-    paddingHorizontal: 16,
-    backgroundColor: withAlpha(accent, 0.16),
-    borderBottomWidth: 1,
-    borderBottomColor: withAlpha(accent, 0.35),
-  },
-  updateText: { color: accent, fontSize: 13, fontWeight: '700' },
   // Centres the column on wide screens; on a phone it just fills the width.
   outer: {
     alignItems: 'center',
