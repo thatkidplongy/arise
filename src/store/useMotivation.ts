@@ -55,7 +55,9 @@ export const useMotivation = create<MotivationStore>((set, get) => {
     try {
       const insight = await api.addInsight(serverUrl, apiToken, url);
       set((s) => ({
-        insights: [insight, ...s.insights],
+        // Dedupe by id: if this video was already captured (the backend returns
+        // the existing insight), move it to the top rather than listing it twice.
+        insights: [insight, ...s.insights.filter((i) => i.id !== insight.id)],
         pending: s.pending.filter((p) => p.tempId !== tempId),
         loaded: true,
       }));

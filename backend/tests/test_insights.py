@@ -64,6 +64,30 @@ def test_add_and_list_insight(db, monkeypatch):
     assert len(listed) == 1 and listed[0]["id"] == out["id"]
 
 
+def test_add_insight_is_idempotent_per_url(db, monkeypatch):
+    calls = {"fetch": 0, "distill": 0}
+
+    def fake_fetch(url, **kw):
+        calls["fetch"] += 1
+        return {"lang": "en", "text": "Lower the floor, not the ceiling — keep going.", "source": "tiktok"}
+
+    def fake_distill(t, **kw):
+        calls["distill"] += 1
+        return {"summary": "s", "takeaways": ["t"], "quotes": ["Q"]}
+
+    monkeypatch.setattr(transcript, "fetch", fake_fetch)
+    monkeypatch.setattr(llm, "distill_motivation", fake_distill)
+    player = state.get_or_create_player(db)
+    url = "https://www.tiktok.com/@a/video/1?utm_source=copy"
+    first = insights.add_insight(db, player.id, url)
+    # Re-capturing the same video (even via a different share query) returns the
+    # stored insight without re-fetching or re-distilling — no wasted API calls.
+    second = insights.add_insight(db, player.id, url + "&share_app_id=1180")
+    assert second["id"] == first["id"]
+    assert calls == {"fetch": 1, "distill": 1}
+    assert len(insights.list_insights(db, player.id)) == 1
+
+
 def test_add_insight_rejects_empty_transcript(db, monkeypatch):
     _stub(monkeypatch, text="   ")  # music-only / no speech
     player = state.get_or_create_player(db)

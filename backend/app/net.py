@@ -10,6 +10,8 @@ transport/parse error propagate, so each route can turn it into a clean message.
 """
 
 import json
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -25,11 +27,21 @@ def get_json(url: str, params: dict | None = None, headers: dict | None = None,
 
 
 def post_json(url: str, body: dict, headers: dict | None = None,
-              timeout: float = 20.0) -> dict:
-    """POST `body` as JSON to `url` and decode the JSON response."""
+              timeout: float = 20.0, retries: int = 0, backoff: float = 2.0) -> dict:
+    """POST `body` as JSON to `url` and decode the JSON response.
+
+    `retries` > 0 retries only on HTTP 429 (Too Many Requests) with a linear
+    backoff — Gemini's free tier rate-limits bursts, and a short wait clears it."""
     merged = {"content-type": "application/json", **(headers or {})}
-    req = urllib.request.Request(
-        url, data=json.dumps(body).encode(), headers=merged, method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.load(resp)
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(
+            url, data=json.dumps(body).encode(), headers=merged, method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < retries:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            raise

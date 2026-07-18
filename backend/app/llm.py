@@ -292,7 +292,9 @@ def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
         },
     }
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    payload = net.post_json(url, body, timeout=timeout)
+    # Capture runs in the background, so we can afford to ride out Gemini's
+    # free-tier burst limit (429) with a couple of retries rather than failing.
+    payload = net.post_json(url, body, timeout=timeout, retries=2)
     return _parse_distillation(payload)
 
 

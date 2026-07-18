@@ -68,6 +68,18 @@ def add_insight(db: Session, player_id: str, url: str) -> dict:
     - NoTranscript when the video has no usable speech to work from
     - any transport/parse error from Supadata or Gemini
     The route maps each of these to a clean HTTP response."""
+    canonical = transcript.clean_url(url)
+    # Idempotent: if this video is already captured, return it instead of
+    # re-fetching + re-distilling. This makes re-pasting a link a no-op (no wasted
+    # Supadata/Gemini calls, no rate-limit error) — e.g. after the app was closed
+    # mid-capture and the in-flight card was lost.
+    existing = (
+        db.query(Insight)
+        .filter_by(player_id=player_id, source_url=canonical)
+        .first()
+    )
+    if existing is not None:
+        return to_out(existing)
     fetched = transcript.fetch(url)  # raises ValueError when no key
     text = (fetched.get("text") or "").strip()
     if len(text) < 20:  # nothing meaningful to distil (music-only, silent, etc.)
@@ -75,7 +87,7 @@ def add_insight(db: Session, player_id: str, url: str) -> dict:
     distilled = llm.distill_motivation(text)
     row = Insight(
         player_id=player_id,
-        source_url=transcript.clean_url(url),
+        source_url=canonical,
         source=fetched.get("source", "web"),
         title=_title_for(url, fetched.get("source", "web")),
         summary=distilled["summary"],
