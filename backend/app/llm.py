@@ -146,5 +146,19 @@ def generate(slots: list[dict], profile: dict, timeout: float = 20.0) -> dict[st
 
 
 def log_failure(err: Exception) -> None:
-    """A generation failure is non-fatal (we fall back); note it and move on."""
-    print(f"[arise.llm] generation failed, using pools: {err!r}", file=sys.stderr)
+    """A generation failure is non-fatal (we fall back); note it and move on.
+
+    Only the exception type (and HTTP status, if any) is logged — never the
+    request URL, since it carries the API key as a query parameter."""
+    detail = type(err).__name__
+    code = getattr(err, "code", None)
+    if code is not None:
+        detail += f" {code}"
+    body = ""
+    try:  # HTTPError is response-like; Google's error JSON carries no key
+        raw = err.read()  # type: ignore[attr-defined]
+        if raw:
+            body = " " + raw.decode("utf-8", "replace")[:300]
+    except Exception:
+        pass
+    print(f"[arise.llm] generation failed ({detail}); using pools.{body}", file=sys.stderr)
