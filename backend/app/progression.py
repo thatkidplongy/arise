@@ -36,6 +36,7 @@ DAILY_BY_STAT: dict[str, str] = {
     "CHA": "d-connect",
     "INT": "d-read",
     "WLT": "d-wealth",
+    "CFT": "d-craft",
 }
 
 # How many leading steps of a daily quest are the mandatory floor. Doing just
@@ -46,6 +47,7 @@ FLOOR_LEN: dict[str, int] = {
     "d-meditate": 1,
     "d-wealth": 1,
     "d-read": 1,    # read your chapter(s)
+    "d-craft": 1,   # show up to the code — the deliberate-practice minimum
     "d-sketch": 0,
     "d-connect": 0,
 }
@@ -58,6 +60,7 @@ CAP: dict[str, int] = {
     "SPI": 5,
     "WLT": 5,
     "INT": 5,
+    "CFT": 5,  # foundation → building → depth (fluency → patterns → system design)
     "CRE": 4,
     "CHA": 4,
 }

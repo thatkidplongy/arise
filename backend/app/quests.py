@@ -25,14 +25,17 @@ tactics.
 
 The pools are tuned to the hunter's real interests:
   STR  badminton + strength, plyometrics, home workouts; push-ups/plank floor
-  CRE  drawing, music (FL Studio / instruments), photo & video
+  CRE  drawing, dance, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
-  INT  learn-how-to-learn first, then coding, math from scratch, Japanese, and
-       the wider world (politics, history, geography, science); reading is the
-       daily floor (a chapter, at a pace that climbs with level)
+  INT  learn-how-to-learn first, then math from scratch, Japanese, and the wider
+       world (politics, history, geography, science); reading is the daily floor
+       (a chapter, at a pace that climbs with level)
   WLT  making money: money psychology & fundamentals first, then managing, then
        earning — side income, monetising skills
+  CFT  the engineering craft, toward Senior: fluency & fundamentals → patterns &
+       problem-solving → system design & architecture; a small deep-work floor
+       daily, and an interview-mode toggle (INTERVIEW_POOLS) for DSA/mock prep
 
 Personalisation: if the player sets a focus for an attribute (Settings →
 Attribute focus), that attribute's *side quest* becomes their focus for the day.
@@ -117,6 +120,16 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Freewrite 5 min on one image, moment, or feeling",
             "Shape it into a few lines — any form, no rules",
             "Read it aloud once",
+        ]),
+        ("Move Practice", "20 min learning to dance", [
+            "5 min warm-up: roll through neck, shoulders, hips, ankles",
+            "10 min drilling one move or an 8-count — slow, then up to speed",
+            "5 min freestyle to a song you love",
+        ]),
+        ("Rhythm & Groove", "Find the pocket", [
+            "Pick one song and count the beat out loud",
+            "Practise a simple bounce or groove on every count",
+            "Add one move on the offbeat",
         ]),
     ],
     "d-meditate": [  # SPI — calm / focus / reflection / breath
@@ -330,6 +343,11 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Revise: cut weak words, sharpen the images, read it aloud",
             "Call it finished",
         ]),
+        ("Learn a Routine", "Nail a short dance routine", [
+            "Break a 30–60s routine into 8-counts",
+            "Drill each section slow, then up to tempo",
+            "Run it full-out to the music, twice",
+        ]),
     ],
     "w-tome": [  # INT — a weekly learning milestone (reading is owned by the daily
         # floor + the weekly book review, so this slot is the *other* learning)
@@ -441,6 +459,10 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ("Poem from a Prompt", "Stretch your writing", [
             "Pick a random word, object, or line",
             "Write a poem you wouldn't normally write",
+        ]),
+        ("New Style", "Try a dance style you don't do", [
+            "Pick a style outside your comfort — hip-hop, house, contemporary…",
+            "Learn one signature move from a tutorial",
         ]),
     ],
     "s-nature": [  # SPI — grounded, introspective
@@ -608,6 +630,166 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Note the first small step to test it",
         ]),
     ],
+    # ── Craft (CFT) — deliberate practice toward Senior ─────────────────────────
+    # Banded fundamentals-first: fluency (0) → patterns & problem-solving (1) →
+    # system design & architecture (2). The daily floor (deep-work minutes) is
+    # applied on top; interview mode swaps in INTERVIEW_POOLS.
+    "d-craft": [  # daily — one deliberate rep, pitched to your band
+        ("The Forge", "Deliberate coding practice", [
+            "Pick one small problem and solve it from scratch",
+            "Run it, then rewrite it to read cleaner",
+            "Note the one thing you learned",
+        ]),
+        ("Read Good Code", "Study code better than yours", [
+            "Open a well-regarded repo or a colleague's PR",
+            "Read one file closely — trace how it flows",
+            "Note one idea or pattern worth stealing",
+        ]),
+        ("Language Fluency", "Sharpen your main language", [
+            "Pick one feature you use on autopilot (comprehensions, generics, async…)",
+            "Write 3 tiny examples that use it well",
+            "Learn one standard-library thing you didn't know",
+        ]),
+        ("Pattern Drill", "One data-structure / algorithm rep", [
+            "Pick a pattern: two-pointers, hashmap, BFS/DFS, sliding window",
+            "Solve one problem with it, from scratch",
+            "Say out loud why it's the right tool here",
+        ]),
+        ("Refactor Rep", "Make working code better", [
+            "Find one messy function in your own code",
+            "Refactor it — clearer names, smaller pieces",
+            "Add one test that proves it still works",
+        ]),
+        ("Test First", "Practise writing tests", [
+            "Pick one function with no tests",
+            "Write 3: the happy path, an edge case, a failure",
+            "Watch them fail, then make them pass",
+        ]),
+        ("Systems Thinking", "Design something, on paper", [
+            "Pick a system you use (URL shortener, chat, a feed)",
+            "Sketch its components and how data flows",
+            "Name one bottleneck and how you'd scale past it",
+        ]),
+        ("Architecture Read", "Study how real systems are built", [
+            "Read one engineering blog post or design doc",
+            "Note the core tradeoff they made, and why",
+            "Ask: what would I have done differently?",
+        ]),
+        ("Tradeoff Study", "Reason about a real decision", [
+            "Pick one: SQL vs NoSQL, sync vs queue, monolith vs services",
+            "Write the case for each in three lines",
+            "Decide — and name exactly what you're giving up",
+        ]),
+    ],
+    "w-craft": [  # weekly — one bigger piece of real work
+        ("Master Work", "Ship a small thing end to end", [
+            "Pick a tiny scope (a CLI, a script, a page)",
+            "Build it so it actually runs",
+            "Commit it with a short README",
+        ]),
+        ("Fix It for Real", "Close one real issue properly", [
+            "Pick a bug or paper-cut in your project",
+            "Fix the root cause, not the symptom",
+            "Add a test so it can't come back",
+        ]),
+        ("Feature End-to-End", "Own one feature start to finish", [
+            "Design it briefly, then build it",
+            "Write the tests that cover it",
+            "Open a clean PR with a clear description",
+        ]),
+        ("Study a Codebase", "Learn from a real project", [
+            "Clone a well-regarded open-source repo",
+            "Trace one feature from entry point to output",
+            "Write half a page on how it's structured",
+        ]),
+        ("Design a System", "A full system-design rep", [
+            "Pick a prompt (design Twitter, Uber, a rate limiter)",
+            "Work requirements → API → data model → scaling",
+            "Write it up as if explaining it to someone",
+        ]),
+        ("Deep Dive", "Master one hard topic", [
+            "Pick one: consistency, caching, indexing, concurrency",
+            "Read 2–3 solid sources on it",
+            "Explain it out loud, with a diagram",
+        ]),
+    ],
+    "s-craft": [  # side — a quick, optional craft rep
+        ("Sharpen the Axe", "A focused craft rep", [
+            "15 min improving one skill you use daily",
+            "Type every example by hand — no copy-paste",
+        ]),
+        ("Docs Deep-Dive", "Deepen a tool you use", [
+            "Read one docs section you always skip",
+            "Try one thing from it in a scratch file",
+        ]),
+        ("Code Review", "Practise reading critically", [
+            "Review one open PR (yours or open-source)",
+            "Leave one substantive, specific comment",
+        ]),
+        ("One Kata", "A quick problem rep", [
+            "Solve one small problem in 20 minutes",
+            "Then read a cleaner solution and compare",
+        ]),
+        ("Whiteboard It", "Explain your last project", [
+            "Sketch the architecture of something you built",
+            "Name one thing you'd redesign now",
+        ]),
+    ],
+}
+
+# Interview mode (Player.interview_mode): when on, Craft's slots swap to these
+# interview-prep variants — timed DSA, mock system design, behavioural stories.
+# Same banding as POOLS; a beginner prepping still gets band-0 work. Every slot
+# keeps a band-0 variant so pool_variant always finds something when it steps down.
+INTERVIEW_POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
+    "d-craft": [
+        ("Daily DSA", "One interview problem, done right", [
+            "Pick one problem at your level (Blind 75 / NeetCode)",
+            "Solve it in 25 min — narrate your approach out loud",
+            "Read the optimal solution; name the underlying pattern",
+        ]),
+        ("Explain Your Solution", "Practise thinking out loud", [
+            "Solve one easy problem",
+            "Record yourself explaining it as if to an interviewer",
+            "Note where you rambled or went quiet",
+        ]),
+        ("Pattern of the Day", "Drill one interview pattern", [
+            "Pick a pattern: two-pointers, sliding window, BFS/DFS, DP",
+            "Solve two short problems using it",
+            "Write the tell that signals this pattern",
+        ]),
+    ],
+    "w-craft": [
+        ("Behavioural Prep", "Get your stories ready", [
+            "Pick 3 stories (a conflict, a failure, a win)",
+            "Write each as Situation · Task · Action · Result",
+            "Say one out loud in under two minutes",
+        ]),
+        ("Mock Interview", "Simulate the real thing", [
+            "Do a timed mock (Pramp, a friend, or solo)",
+            "One medium problem — talk the entire time",
+            "Write down two things to fix next round",
+        ]),
+        ("Mock System Design", "One full system-design mock", [
+            "Pick a prompt and set a 45-minute timer",
+            "Requirements → high-level → deep-dive → tradeoffs",
+            "Review it against a rubric afterwards",
+        ]),
+    ],
+    "s-craft": [
+        ("Flashcard Fundamentals", "Drill the trivia they ask", [
+            "Review fundamentals: big-O, HTTP, SQL joins, OOP",
+            "Quiz yourself on five, out loud",
+        ]),
+        ("Timed Set", "A quick timed DSA set", [
+            "Three easy/medium problems, 15 min each",
+            "No peeking until the timer's up",
+        ]),
+        ("Review a Design", "Study one system design", [
+            "Read one system-design write-up",
+            "Note the pattern and the single key tradeoff",
+        ]),
+    ],
 }
 
 # Per-attribute framing for a personal-focus side quest.
@@ -618,6 +800,7 @@ FOCUS_TITLES: dict[str, str] = {
     "CHA": "Focused Connection",
     "INT": "Focused Study",
     "WLT": "Focused Earning",
+    "CFT": "Focused Craft",
 }
 
 # Daily non-negotiables, LEVELED. Each daily below has a floor that's prepended
@@ -652,6 +835,14 @@ FLOORS: dict[str, list[list[str]]] = {
         ["Log today's money in and out; note the gap between them"],
         ["Log today's money; nudge a little toward this week's target"],
         ["Quick money check-in: today's in and out, and how the week's tracking"],  # cap
+    ],
+    "d-craft": [  # CFT — a deep-work minimum that grows as the habit sets in
+        ["Show up to the code — 15 focused minutes, one small rep"],
+        ["20 focused minutes — notifications off"],
+        ["25 minutes of real practice — one clear goal"],
+        ["30 minutes of deep work — phone in another room"],
+        ["40 minutes of deep work — one problem, full attention"],
+        ["45 minutes of deep work — sustained and distraction-free"],  # cap
     ],
 }
 
@@ -692,6 +883,10 @@ RESOURCES: dict[str, str] = {
     "Daily Verse": "📖 A Poetry Handbook — Mary Oliver",
     "Finish a Poem": "🌐 Poetry Foundation (poetryfoundation.org)",
     "Poem from a Prompt": "🌐 Poetry Foundation (poetryfoundation.org)",
+    "Move Practice": "🎥 STEEZY (YouTube)",
+    "Rhythm & Groove": "🎥 STEEZY (YouTube)",
+    "Learn a Routine": "🎥 1MILLION Dance Studio (YouTube)",
+    "New Style": "🎥 STEEZY (YouTube)",
     # SPI — meditation
     "Inner Gate": "📖 Mindfulness in Plain English — Bhante Gunaratana",
     "Body Scan": "🎧 Waking Up — Sam Harris",
@@ -737,6 +932,30 @@ RESOURCES: dict[str, str] = {
     "Ship an Offer": "🎥 Ali Abdaal (YouTube)",
     "Build the Funnel": "🎥 Ali Abdaal (YouTube)",
     "Learn & Earn": "🎥 Ali Abdaal (YouTube)",
+    # CFT — craft: fluency & fundamentals (0) → patterns (1) → system design (2)
+    "Read Good Code": "📖 The Pragmatic Programmer — Hunt & Thomas",
+    "Language Fluency": "📖 The Pragmatic Programmer — Hunt & Thomas",
+    "Refactor Rep": "📖 Refactoring — Martin Fowler",
+    "Test First": "📖 Refactoring — Martin Fowler",
+    "Pattern Drill": "🌐 NeetCode (neetcode.io)",
+    "Systems Thinking": "📖 System Design Interview — Alex Xu",
+    "Design a System": "📖 System Design Interview — Alex Xu",
+    "Architecture Read": "🌐 ByteByteGo (bytebytego.com)",
+    "Tradeoff Study": "📖 Designing Data-Intensive Applications — Martin Kleppmann",
+    "Deep Dive": "📖 Designing Data-Intensive Applications — Martin Kleppmann",
+    "Study a Codebase": "🌐 The Odin Project (theodinproject.com)",
+    "Master Work": "🌐 The Odin Project (theodinproject.com)",
+    "Code Review": "📖 The Pragmatic Programmer — Hunt & Thomas",
+    "One Kata": "🌐 NeetCode (neetcode.io)",
+    # CFT — interview mode
+    "Daily DSA": "🌐 NeetCode (neetcode.io)",
+    "Pattern of the Day": "🌐 NeetCode (neetcode.io)",
+    "Timed Set": "🌐 LeetCode (leetcode.com)",
+    "Mock Interview": "🌐 Pramp (pramp.com)",
+    "Mock System Design": "📖 System Design Interview — Alex Xu",
+    "Review a Design": "🌐 ByteByteGo (bytebytego.com)",
+    "Behavioural Prep": "📖 Cracking the Coding Interview — Gayle McDowell",
+    "Flashcard Fundamentals": "🌐 Tech Interview Handbook (techinterviewhandbook.org)",
 }
 
 
@@ -748,10 +967,10 @@ RESOURCES: dict[str, str] = {
 TIER: dict[str, int] = {
     # CRE — technique/quick reps → intentional → finish & stretch
     "Instrument Time": 1, "Beat Lab": 1, "Photo Walk": 1, "Frame Work": 2,
-    "Photo Set": 1, "Learn a Song": 1,
-    "Finish a Beat": 2, "Short Edit": 2, "Full Render": 2, "Finish a Poem": 2,
+    "Photo Set": 1, "Learn a Song": 1, "Rhythm & Groove": 1,
+    "Finish a Beat": 2, "Short Edit": 2, "Full Render": 2, "Finish a Poem": 2, "Learn a Routine": 2,
     "New Sound": 1, "Odd Angle": 1, "New Medium": 1,
-    "Beyond the Comfort Zone": 2, "Cover It": 2, "From Imagination": 2, "Poem from a Prompt": 2,
+    "Beyond the Comfort Zone": 2, "Cover It": 2, "From Imagination": 2, "Poem from a Prompt": 2, "New Style": 2,
     # CHA — show up → quality → depth & reach
     "Check In": 1, "Voice, Not Text": 1, "Good Question": 1, "Make Plans": 2,
     "Guild Night": 1, "Party Gathering": 1, "Deep Talk": 2, "New Table": 2,
@@ -766,6 +985,14 @@ TIER: dict[str, int] = {
     "Ledger Study": 1, "Budget Tune": 1, "Skill to Sell": 2, "Offer Draft": 2, "Micro-Hustle": 2,
     "Money Review": 1, "Invest Plan": 1, "Ship an Offer": 2, "Chase a Lead": 2, "Build the Funnel": 2,
     "Price It Right": 1, "Extra Coin": 2, "Declutter for Cash": 2, "Network Node": 2,
+    # CFT — fluency/fundamentals (0) → patterns & problem-solving (1) → system design (2)
+    "Pattern Drill": 1, "Refactor Rep": 1, "Test First": 1,
+    "Systems Thinking": 2, "Architecture Read": 2, "Tradeoff Study": 2,
+    "Feature End-to-End": 1, "Study a Codebase": 1, "Design a System": 2, "Deep Dive": 2,
+    "Code Review": 1, "One Kata": 1, "Whiteboard It": 2,
+    # CFT — interview mode
+    "Pattern of the Day": 1, "Mock Interview": 1, "Mock System Design": 2,
+    "Timed Set": 1, "Review a Design": 2,
 }
 
 
@@ -814,12 +1041,13 @@ def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters
     return []
 
 
-def pool_variant(quest: QuestDef, day: str, band: int = 0) -> tuple[str, str, list[str]]:
+def pool_variant(quest: QuestDef, day: str, band: int = 0, interview: bool = False) -> tuple[str, str, list[str]]:
     """The raw (title, desc, steps) picked from the handcrafted pool for the
     period — no floor applied. `band` (0 foundation → 2 depth) narrows the pool to
     variants that fit where the hunter is, stepping down if a band is unstocked.
-    Used as the fallback and as a style seed for the LLM prompt."""
-    pool = POOLS.get(quest.id)
+    When `interview` is on and the slot has an interview pool (Craft), that pool is
+    used instead. Used as the fallback and as a style seed for the LLM prompt."""
+    pool = (INTERVIEW_POOLS.get(quest.id) if interview else None) or POOLS.get(quest.id)
     if not pool:
         return quest.title, quest.desc, []  # unknown slot → seeded fallback
     target = max(0, min(band, 2))
@@ -830,7 +1058,8 @@ def pool_variant(quest: QuestDef, day: str, band: int = 0) -> tuple[str, str, li
             chosen = eligible
             break
     pk = _period_key(quest.cadence, day)
-    return chosen[_pick(quest.id, f"{pk}|b{target}", len(chosen))]
+    tag = f"{pk}|b{target}" + ("|iv" if interview else "")
+    return chosen[_pick(quest.id, tag, len(chosen))]
 
 
 def content_for(
@@ -840,19 +1069,21 @@ def content_for(
     book: str | None = None,
     level: int = 0,
     chapters: int = 0,
+    interview: bool = False,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
 
     `focus` is the attribute's set of focuses; a side quest rotates through them
     day to day. `book`/`chapters` drive the reading floor. `level` is the stat's
-    progression level — it climbs the floor and picks the content band. `resource`
-    points at a trusted place to learn (empty when there isn't one)."""
+    progression level — it climbs the floor and picks the content band.
+    `interview` (Craft only) swaps in the interview-prep pool. `resource` points at
+    a trusted place to learn (empty when there isn't one)."""
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", floor_for(quest, book, level, chapters), ""
-    title, desc, steps = pool_variant(quest, day, progression.band_for(level))
+    title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
     steps = floor_for(quest, book, level, chapters) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

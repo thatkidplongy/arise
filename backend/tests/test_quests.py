@@ -79,9 +79,41 @@ def test_resource_matches_variant_title():
 
 
 def test_all_resource_keys_exist_as_variant_titles():
-    titles = {v[0] for pool in quests.POOLS.values() for v in pool}
+    pools = list(quests.POOLS.values()) + list(quests.INTERVIEW_POOLS.values())
+    titles = {v[0] for pool in pools for v in pool}
     missing = [t for t in quests.RESOURCES if t not in titles]
     assert not missing, missing  # every citation maps to a real variant
+
+
+def test_craft_daily_floor_is_deep_work_minutes():
+    # Craft's floor is a deep-work minimum that climbs with level (gentle at Lv0).
+    q = _q("d-craft", "CFT", "daily")
+    lv0 = quests.content_for(q, "2026-07-18", level=0)[2]
+    lv5 = quests.content_for(q, "2026-07-18", level=5)[2]
+    assert lv0[0] == quests.FLOORS["d-craft"][0][0]
+    assert "15 focused minutes" in lv0[0] and "45 minutes" in lv5[0]
+
+
+def test_craft_band_climbs_from_fluency_to_system_design():
+    # Low levels favour fundamentals/fluency; high levels reach system design.
+    q = _q("d-craft", "CFT", "daily")
+    low = {quests.content_for(q, f"2026-07-{d:02d}", level=0)[0] for d in range(1, 28)}
+    high = {quests.content_for(q, f"2026-07-{d:02d}", level=5)[0] for d in range(1, 28)}
+    depth = {"Systems Thinking", "Architecture Read", "Tradeoff Study"}
+    assert not (low & depth)  # beginners never see the depth band
+    assert high & depth  # advanced work reaches system design
+
+
+def test_interview_mode_swaps_craft_pool():
+    # With interview on, Craft draws from the interview pool instead.
+    q = _q("w-craft", "CFT", "weekly")
+    steady = {quests.content_for(q, f"2026-07-{d:02d}", level=l)[0]
+              for d in range(1, 28) for l in range(6)}
+    prep = {quests.content_for(q, f"2026-07-{d:02d}", level=l, interview=True)[0]
+            for d in range(1, 28) for l in range(6)}
+    interview_titles = {"Behavioural Prep", "Mock Interview", "Mock System Design"}
+    assert prep <= interview_titles  # interview mode only shows interview variants
+    assert not (steady & interview_titles)  # steady mode never does
 
 
 def test_all_pool_variants_are_triples_with_text():

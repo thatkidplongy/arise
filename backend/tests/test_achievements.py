@@ -40,3 +40,9 @@ def test_badminton_counts_by_quest_id():
 
 def test_stat_gate_any_attribute():
     assert _check("stat-10", _snap(stat_levels={"STR": 1, "CRE": 10, "SPI": 1, "CHA": 1, "INT": 1}))
+
+
+def test_craft_gate():
+    assert not _check("craft-5", _snap(stat_levels={"CFT": 4}))
+    assert _check("craft-5", _snap(stat_levels={"CFT": 5}))
+    assert _check("craft-15", _snap(stat_levels={"CFT": 15}))

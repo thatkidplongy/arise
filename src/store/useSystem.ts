@@ -99,6 +99,7 @@ interface SystemStore {
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
+  setInterviewMode: (enabled: boolean) => Promise<void>;
   resetAll: () => Promise<void>;
   setServerUrl: (url: string) => void;
   setApiToken: (token: string) => void;
@@ -287,6 +288,17 @@ export const useSystem = create<SystemStore>()(
         const { serverUrl, apiToken, notices } = get();
         try {
           const state = await api.reviewBook(serverUrl, apiToken, finished, nextBook, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      setInterviewMode: async (enabled) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.setInterviewMode(serverUrl, apiToken, enabled, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);

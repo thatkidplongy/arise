@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-STAT_KEYS = ["STR", "CRE", "SPI", "CHA", "INT", "WLT"]
+STAT_KEYS = ["STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"]
 
 DAILY_CLEAR_BONUS = 15
 DAILY_CLEAR_ID = "daily-clear"

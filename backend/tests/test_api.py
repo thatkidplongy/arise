@@ -1,7 +1,7 @@
 """Integration tests: the HTTP API end to end, against a throwaway database."""
 
 DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-wealth"]
+DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-wealth", "d-craft"]
 
 
 def _state(client):
@@ -18,8 +18,8 @@ def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
         assert key in s
-    assert len(s["quests"]) == 18
-    assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT"}
+    assert len(s["quests"]) == 21
+    assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"}
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
@@ -27,9 +27,12 @@ def test_state_shape(client):
     assert "push-ups" in q["steps"][0]
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
+    # Craft opens with its deep-work floor and defaults to steady growth (not interview).
+    assert "minutes" in _quest(s, "d-craft")["steps"][0]
+    assert s["player"]["interview_mode"] is False
     assert s["player"]["total_xp"] == 0
     # Progression starts everyone at Lv0 with a permanent peak of 0.
-    assert set(s["progression"]) == {"STR", "CRE", "SPI", "CHA", "INT", "WLT"}
+    assert set(s["progression"]) == {"STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"}
     assert s["progression"]["STR"]["level"] == 0
     assert s["progression"]["STR"]["peak"] == 0
     assert s["progression"]["STR"]["required"] == 3  # 3 days to earn the first level
@@ -51,6 +54,23 @@ def test_reading_review_flow(client):
     assert body["player"]["books_finished"] == 1
     assert body["player"]["current_book"] == "Deep Work"
     assert body["book_review"]["pending"] is False
+
+
+def test_interview_mode_toggles_craft_quests(client):
+    s = _state(client)
+    assert s["player"]["interview_mode"] is False
+    interview_titles = {"Behavioural Prep", "Mock Interview", "Mock System Design"}
+    assert _quest(s, "w-craft")["title"] not in interview_titles  # pools are disjoint
+    # Turn it on → the player flag flips and Craft shifts to interview prep.
+    body = client.put(f"/interview?day={DAY}", json={"enabled": True}).json()
+    assert body["player"]["interview_mode"] is True
+    assert _quest(body, "w-craft")["title"] in interview_titles
+    # The daily still opens with its deep-work floor, then an interview drill.
+    assert "minutes" in _quest(body, "d-craft")["steps"][0]
+    # Turning it off restores steady craft growth.
+    off = client.put(f"/interview?day={DAY}", json={"enabled": False}).json()
+    assert off["player"]["interview_mode"] is False
+    assert _quest(off, "w-craft")["title"] not in interview_titles
 
 
 def test_llm_off_by_default_and_generate_is_noop(client):

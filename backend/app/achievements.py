@@ -110,6 +110,20 @@ ACHIEVEMENTS: list[AchievementDef] = [
         check=lambda s: s.stat_levels.get("WLT", 0) >= 5,
     ),
     AchievementDef(
+        id="craft-5",
+        name="Journeyman",
+        desc="Raise Craft to level 5.",
+        title_reward="The Craftsman",
+        check=lambda s: s.stat_levels.get("CFT", 0) >= 5,
+    ),
+    AchievementDef(
+        id="craft-15",
+        name="Architect",
+        desc="Raise Craft to level 15.",
+        title_reward="The Architect",
+        check=lambda s: s.stat_levels.get("CFT", 0) >= 15,
+    ),
+    AchievementDef(
         id="xp-1000",
         name="Mana Reservoir",
         desc="Earn 1,000 total XP.",

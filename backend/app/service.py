@@ -250,6 +250,14 @@ def set_book(db: Session, player: Player, current_book: str, day: str, chapters:
     db.commit()
 
 
+def set_interview_mode(db: Session, player: Player, enabled: bool) -> None:
+    """Turn Craft's interview-prep mode on or off. Clears the LLM cache so the
+    next generation reflects the new mode (the pools switch immediately regardless)."""
+    player.interview_mode = bool(enabled)
+    _clear_generated(db, player)
+    db.commit()
+
+
 def review_book(db: Session, player: Player, finished: bool, next_book: str, day: str) -> None:
     """Answer the weekly reading review. Finished → count it and roll to the next
     book; not yet → keep the current one. Either way, don't ask again this week."""
@@ -296,6 +304,7 @@ def _profile(db: Session, player: Player, day: str) -> dict:
         "name": player.name,
         "north_star": player.north_star,
         "current_book": player.current_book,
+        "interview_mode": player.interview_mode,
         "attributes": attrs,
         "recent": ", ".join(f"{k}×{v}" for k, v in sorted(counts.items())),
     }
@@ -316,12 +325,13 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue
         band = prog.get(q.stat, {}).get("band", 0)
-        title, desc, steps = quests.pool_variant(q, day, band)
+        title, desc, steps = quests.pool_variant(q, day, band, player.interview_mode)
         slots.append(
             {"id": q.id, "stat": q.stat, "cadence": q.cadence,
              "theme": title, "example_desc": desc, "example_steps": steps,
              "tier": prog.get(q.stat, {}).get("level", 0),
-             "band": progression.BAND_LABELS.get(band, "foundation")}
+             "band": progression.BAND_LABELS.get(band, "foundation"),
+             "interview": player.interview_mode and q.id in quests.INTERVIEW_POOLS}
         )
     if not slots:
         return build_state(db, player, day)

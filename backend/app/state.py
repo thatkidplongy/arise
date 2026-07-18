@@ -174,7 +174,8 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         return quests.floor_for(quest, player.current_book, level, chapters) + _gen_steps(g.steps)
     prefs = preferences_of(db, player)
     _, _, steps, _ = quests.content_for(
-        quest, day, prefs.get(quest.stat), player.current_book, level, chapters
+        quest, day, prefs.get(quest.stat), player.current_book, level, chapters,
+        interview=player.interview_mode,
     )
     return steps
 
@@ -262,7 +263,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, chapters=0) -> dict:
+               levels=None, chapters=0, interview=False) -> dict:
     level = (levels or {}).get(q.stat, 0)
     pk = quests.period_key(q.cadence, day)
     gen = (gen_by or {}).get((q.id, pk))
@@ -272,7 +273,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         resource = gen["resource"]
     else:
         title, desc, steps, resource = quests.content_for(
-            q, day, prefs.get(q.stat), book, level, chapters
+            q, day, prefs.get(q.stat), book, level, chapters, interview=interview
         )
     checked = checks_by.get((q.id, pk), set())
     return {
@@ -346,6 +347,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "current_book": player.current_book,
             "current_book_chapters": player.current_book_chapters,
             "books_finished": player.books_finished,
+            "interview_mode": player.interview_mode,
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "stats": [
@@ -367,7 +369,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "llm_enabled": llm.enabled(),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
-                       prog_levels, player.current_book_chapters)
+                       prog_levels, player.current_book_chapters, player.interview_mode)
             for q in defs
         ],
         "achievements": [

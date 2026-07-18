@@ -43,18 +43,19 @@ export const RANK_COLORS: Record<Rank, string> = {
   S: '#BE9A57',
 };
 
-export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT'];
+export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT', 'CFT'];
 
 export const STAT_META: Record<
   StatKey,
   { label: string; sub: string; color: string; icon: IconName }
 > = {
   STR: { label: 'Strength', sub: 'Badminton, strength & conditioning', color: '#B0603A', icon: 'barbell' },
-  CRE: { label: 'Creativity', sub: 'Drawing, music & video', color: '#C0863E', icon: 'brush' },
+  CRE: { label: 'Creativity', sub: 'Drawing, dance, music & video', color: '#C0863E', icon: 'brush' },
   SPI: { label: 'Spirit', sub: 'Meditation & reflection', color: '#6F8A57', icon: 'leaf' },
   CHA: { label: 'Charisma', sub: 'Connection', color: '#977A8C', icon: 'people' },
-  INT: { label: 'Intelligence', sub: 'Reading, coding, science & languages', color: '#5E8085', icon: 'book' },
+  INT: { label: 'Intelligence', sub: 'Reading, math, languages & the world', color: '#5E8085', icon: 'book' },
   WLT: { label: 'Wealth', sub: 'Earning, business & money skills', color: '#4E7D6E', icon: 'cash' },
+  CFT: { label: 'Craft', sub: 'Coding, system design & architecture', color: '#5B6C8F', icon: 'code-slash' },
 };
 
 /** '#RRGGBB' + alpha -> 'rgba(...)', for soft tint fills. */

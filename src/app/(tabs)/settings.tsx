@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -18,6 +19,7 @@ export default function SettingsScreen() {
   const saveName = useSystem((s) => s.saveName);
   const saveNorthStar = useSystem((s) => s.saveNorthStar);
   const saveBook = useSystem((s) => s.saveBook);
+  const setInterviewMode = useSystem((s) => s.setInterviewMode);
   const savePreferences = useSystem((s) => s.savePreferences);
   const resetAll = useSystem((s) => s.resetAll);
   const refresh = useSystem((s) => s.refresh);
@@ -42,6 +44,7 @@ export default function SettingsScreen() {
   const [nameSave, setNameSave] = useState<SaveState>('idle');
   const [northStarSave, setNorthStarSave] = useState<SaveState>('idle');
   const [bookSave, setBookSave] = useState<SaveState>('idle');
+  const [interviewSaving, setInterviewSaving] = useState(false);
   const [linkSave, setLinkSave] = useState<SaveState>('idle');
   const [focusSave, setFocusSave] = useState<SaveState>('idle');
   const [resetting, setResetting] = useState(false);
@@ -165,6 +168,13 @@ export default function SettingsScreen() {
     settle(setBookSave);
   };
 
+  const toggleInterview = async () => {
+    if (interviewSaving) return;
+    setInterviewSaving(true);
+    await setInterviewMode(!state?.player.interview_mode);
+    setInterviewSaving(false);
+  };
+
   const statusColor =
     status === 'online'
       ? feedback.success
@@ -243,6 +253,47 @@ export default function SettingsScreen() {
           >
             <Text style={styles.btnText}>
               {bookSave === 'saving' ? 'Saving…' : bookSave === 'done' ? 'Saved ✓' : 'Save book'}
+            </Text>
+          </Pressable>
+        </SystemPanel>
+      ) : null}
+
+      {state ? (
+        <SystemPanel
+          title="Interview mode"
+          sub={state.player.interview_mode ? 'On' : 'Off'}
+        >
+          <Text style={styles.help}>
+            For Craft. Turn this on when an interview is on the horizon: your coding daily adds
+            problem drills, and the weekly and side quests shift to interview prep — timed DSA sets,
+            mock system-design, and behavioural (STAR) stories. Turn it off any time to go back to
+            steady craft growth. Your level and peak carry over either way.
+          </Text>
+          <Pressable
+            disabled={interviewSaving}
+            onPress={toggleInterview}
+            style={({ pressed }) => [
+              styles.toggle,
+              state.player.interview_mode && styles.toggleOn,
+              (pressed || interviewSaving) && { opacity: 0.8 },
+            ]}
+          >
+            <Ionicons
+              name={state.player.interview_mode ? 'checkmark-circle' : 'ellipse-outline'}
+              size={18}
+              color={state.player.interview_mode ? '#FBF5EB' : STAT_META.CFT.color}
+            />
+            <Text
+              style={[
+                styles.toggleText,
+                { color: state.player.interview_mode ? '#FBF5EB' : STAT_META.CFT.color },
+              ]}
+            >
+              {interviewSaving
+                ? 'Saving…'
+                : state.player.interview_mode
+                  ? 'Interview mode is on — tap to turn off'
+                  : 'Turn on interview mode'}
             </Text>
           </Pressable>
         </SystemPanel>
@@ -467,6 +518,26 @@ const styles = StyleSheet.create({
     minHeight: 92,
     textAlignVertical: 'top',
     lineHeight: 20,
+  },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 9,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: withAlpha(STAT_META.CFT.color, 0.5),
+    backgroundColor: withAlpha(STAT_META.CFT.color, 0.08),
+  },
+  toggleOn: {
+    backgroundColor: STAT_META.CFT.color,
+    borderColor: STAT_META.CFT.color,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   btn: {
     backgroundColor: accent,

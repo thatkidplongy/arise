@@ -1,4 +1,4 @@
-export type StatKey = 'STR' | 'CRE' | 'SPI' | 'CHA' | 'INT' | 'WLT';
+export type StatKey = 'STR' | 'CRE' | 'SPI' | 'CHA' | 'INT' | 'WLT' | 'CFT';
 
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 
