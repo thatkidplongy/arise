@@ -8,9 +8,11 @@ handful of rows; when it grows, they become SQL queries with the same contract.
 
 import json
 
+from datetime import date
+
 from sqlalchemy.orm import Session
 
-from . import game, llm, quests
+from . import game, llm, progression, quests
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -30,6 +32,12 @@ def get_or_create_player(db: Session) -> Player:
         db.add(player)
         db.commit()
         db.refresh(player)
+    if not player.progression_start_week:
+        # Anchor progression to now the first time we see this player, so past
+        # history never counts retroactively — every attribute begins at Lv 0.
+        # (Single-user, server-local: date.today() is the hunter's own date.)
+        player.progression_start_week = game.week_key(date.today().isoformat())
+        db.commit()
     return player
 
 
@@ -73,6 +81,62 @@ def levels_of(db: Session, player: Player) -> dict[str, str]:
     return out
 
 
+# ── Progression (earned difficulty) ───────────────────────────────────────────
+
+
+def _progression_inputs(db: Session, player: Player) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """For each attribute, the days its floor was met and the rest days that
+    protected it — the raw material progression.compute replays into levels.
+
+    A day counts as *floor met* if the attribute's daily quest was completed, or
+    (for a floored area) all its floor steps were ticked — so doing just the
+    non-negotiable is enough. A rest day protects an attribute only on a day its
+    floor wasn't independently met, so the two sets stay disjoint."""
+    rows = completions_of(db, player)
+    completed: set[tuple[str, str]] = set()
+    rest_on: set[str] = set()
+    for r in rows:
+        if r.quest_id == game.REST_DAY_ID:
+            rest_on.add(r.day)
+        elif r.quest_id != game.DAILY_CLEAR_ID:
+            completed.add((r.quest_id, r.day))
+
+    checks: dict[tuple[str, str], set[int]] = {}
+    for c in db.query(StepCheck).filter_by(player_id=player.id):
+        checks.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
+
+    real_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
+    rest_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
+    for stat in game.STAT_KEYS:
+        qid = progression.DAILY_BY_STAT[stat]
+        flen = progression.FLOOR_LEN.get(qid, 0)
+        candidate_days = {d for (q, d) in completed if q == qid} | {d for (q, d) in checks if q == qid}
+        for d in candidate_days:
+            met = (qid, d) in completed
+            if not met and flen > 0:
+                met = all(i in checks.get((qid, d), set()) for i in range(flen))
+            if met:
+                real_days[stat].add(d)
+        for d in rest_on:
+            if d not in real_days[stat]:
+                rest_days[stat].add(d)
+    return real_days, rest_days
+
+
+def progression_of(db: Session, player: Player, day: str) -> dict[str, dict]:
+    """Per-attribute progression (level, peak, band, this-week progress) derived
+    from history. Pure read — the anchor week is set once in get_or_create_player."""
+    real_days, rest_days = _progression_inputs(db, player)
+    start_wk = player.progression_start_week or game.week_key(day)
+    start = progression.week_start(start_wk)
+    return progression.compute(real_days, rest_days, start, date.fromisoformat(day))
+
+
+def progression_levels(db: Session, player: Player, day: str) -> dict[str, int]:
+    """Just the current level per attribute — the number that drives floors/bands."""
+    return {stat: info["level"] for stat, info in progression_of(db, player, day).items()}
+
+
 def _gen_steps(raw: str) -> list[str]:
     try:
         val = json.loads(raw)
@@ -97,17 +161,21 @@ def generated_by(db: Session, player: Player) -> dict[tuple[str, str], dict]:
 
 def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
     """The full step list a quest shows today — generated content if present,
-    else the pool — always with the mandatory floor prepended. Shared by the read
-    model and the step-toggle write path so they never disagree."""
+    else the pool — always with the mandatory (leveled) floor prepended. Shared by
+    the read model and the step-toggle write path so they never disagree."""
+    level = progression_levels(db, player, day).get(quest.stat, 0)
+    chapters = player.current_book_chapters
     pk = quests.period_key(quest.cadence, day)
     g = db.get(
         GeneratedQuest,
         {"player_id": player.id, "quest_id": quest.id, "period_key": pk},
     )
     if g is not None:
-        return quests.floor_for(quest, player.current_book) + _gen_steps(g.steps)
+        return quests.floor_for(quest, player.current_book, level, chapters) + _gen_steps(g.steps)
     prefs = preferences_of(db, player)
-    _, _, steps, _ = quests.content_for(quest, day, prefs.get(quest.stat), player.current_book)
+    _, _, steps, _ = quests.content_for(
+        quest, day, prefs.get(quest.stat), player.current_book, level, chapters
+    )
     return steps
 
 
@@ -193,15 +261,19 @@ def snapshot(agg: dict) -> Snapshot:
 # ── State assembly ────────────────────────────────────────────────────────────
 
 
-def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None) -> dict:
+def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
+               levels=None, chapters=0) -> dict:
+    level = (levels or {}).get(q.stat, 0)
     pk = quests.period_key(q.cadence, day)
     gen = (gen_by or {}).get((q.id, pk))
     if gen is not None:  # LLM-personalised, with the mandatory floor re-applied
         title, desc = gen["title"], gen["desc"]
-        steps = quests.floor_for(q, book) + gen["steps"]
+        steps = quests.floor_for(q, book, level, chapters) + gen["steps"]
         resource = gen["resource"]
     else:
-        title, desc, steps, resource = quests.content_for(q, day, prefs.get(q.stat), book)
+        title, desc, steps, resource = quests.content_for(
+            q, day, prefs.get(q.stat), book, level, chapters
+        )
     checked = checks_by.get((q.id, pk), set())
     return {
         "id": q.id,
@@ -224,6 +296,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     rows = completions_of(db, player)
     prefs = preferences_of(db, player)
     levels = levels_of(db, player)
+    prog = progression_of(db, player, day)
+    prog_levels = {stat: info["level"] for stat, info in prog.items()}
     gen_by = generated_by(db, player)
     agg = aggregate(rows, defs)
 
@@ -270,6 +344,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "total_xp": agg["total_xp"],
             "rank": rank,
             "current_book": player.current_book,
+            "current_book_chapters": player.current_book_chapters,
             "books_finished": player.books_finished,
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
@@ -288,9 +363,11 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "next_rank": game.next_gate(li["level"], best),
         "preferences": prefs,
         "levels": levels,
+        "progression": prog,
         "llm_enabled": llm.enabled(),
         "quests": [
-            _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by)
+            _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
+                       prog_levels, player.current_book_chapters)
             for q in defs
         ],
         "achievements": [

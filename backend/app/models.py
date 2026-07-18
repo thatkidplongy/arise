@@ -26,9 +26,13 @@ class Player(Base):
     # Reading loop: one book a week, a chapter a day. current_book is what they're
     # reading now; at each new week the app asks if it's finished and what's next.
     current_book: Mapped[str] = mapped_column(String, default="")
+    current_book_chapters: Mapped[int] = mapped_column(Integer, default=0)  # 0 = unknown
     books_finished: Mapped[int] = mapped_column(Integer, default=0)
     book_started_week: Mapped[str] = mapped_column(String, default="")  # ISO week set
     book_review_week: Mapped[str] = mapped_column(String, default="")  # ISO week last asked
+    # Progression begins the week this is first set (see progression.py), so past
+    # history never counts retroactively — everyone starts each attribute at Lv 0.
+    progression_start_week: Mapped[str] = mapped_column(String, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

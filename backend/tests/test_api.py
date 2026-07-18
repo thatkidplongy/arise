@@ -23,11 +23,16 @@ def test_state_shape(client):
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
-    # The physical daily always carries its non-negotiable core.
-    assert q["steps"][0].startswith("10 push-ups")
+    # The physical daily always carries its non-negotiable floor (Lv0 → 5 push-ups).
+    assert "push-ups" in q["steps"][0]
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
     assert s["player"]["total_xp"] == 0
+    # Progression starts everyone at Lv0 with a permanent peak of 0.
+    assert set(s["progression"]) == {"STR", "CRE", "SPI", "CHA", "INT", "WLT"}
+    assert s["progression"]["STR"]["level"] == 0
+    assert s["progression"]["STR"]["peak"] == 0
+    assert s["progression"]["STR"]["required"] == 3  # 3 days to earn the first level
 
 
 def test_reading_review_flow(client):

@@ -26,6 +26,7 @@ class PlayerIn(BaseModel):
 
 class BookIn(BaseModel):
     current_book: str = ""
+    chapters: int = 0  # optional total chapters — sets the reading pace; 0 = unknown
 
 
 class BookReviewIn(BaseModel):
@@ -54,6 +55,7 @@ class PlayerOut(BaseModel):
     total_xp: int
     rank: str
     current_book: str
+    current_book_chapters: int
     books_finished: int
 
 
@@ -67,6 +69,16 @@ class StatOut(BaseModel):
     level: int
     into: int
     needed: int
+
+
+class ProgressionOut(BaseModel):
+    """Earned difficulty for one attribute (see progression.py)."""
+    level: int  # current difficulty tier — climbs the floor / content band
+    peak: int  # highest tier ever reached; never drops (permanent, SL-style)
+    cap: int  # the ceiling tier for this attribute
+    required: int  # days to clear this week to level up (3 + level, capped at 6)
+    cleared_this_week: int  # days cleared so far this week (progress to next level)
+    band: int  # content band the level maps to: 0 foundation, 1 building, 2 depth
 
 
 class StreakOut(BaseModel):
@@ -126,6 +138,7 @@ class StateOut(BaseModel):
     next_rank: RankGateOut | None
     preferences: dict[str, list[str]]
     levels: dict[str, str]
+    progression: dict[str, ProgressionOut]  # per-attribute earned difficulty (STR, INT, …)
     llm_enabled: bool  # true when a Gemini key is configured (quests are personalised)
     quests: list[QuestOut]
     achievements: list[AchievementOut]

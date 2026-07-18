@@ -67,7 +67,13 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
         "taskmaster — inviting, encouraging, no guilt. Make each quest CONCRETE and",
         "prescriptive: exact reps/sets/counts, named topics, specific prompts — never",
         "vague ('learn something'). Sequence learning to the person's stated level so",
-        "each day is the next step. Keep 2–4 short steps. For learning quests add a",
+        "each day is the next step. Each slot has a difficulty TIER and a BAND",
+        "(foundation → building → depth): pitch the quest at that band. Fundamentals",
+        "before the hard stuff — at the foundation band favour the basics (for",
+        "learning, the craft of learning itself: active recall, mental mapping,",
+        "the Feynman technique; for money, the psychology/principles before tactics),",
+        "and only reach ambitious/advanced work at the depth band. A higher tier means",
+        "aim a little beyond last time — never stagnant. Keep 2–4 short steps. For learning quests add a",
         "'resource': ONE popular, genuinely well-known source (a real book with",
         "author, a real YouTube channel, or a trusted site) — else empty string.",
         "Do NOT include a mandatory 'floor' step (push-ups, read-a-chapter, etc.);",
@@ -87,6 +93,8 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
             bits.append("focus=" + ", ".join(info["focus"]))
         if info.get("level"):
             bits.append("where I'm at=" + info["level"])
+        if info.get("tier") is not None:
+            bits.append(f"tier={info['tier']} ({info.get('band', 'foundation')})")
         if bits:
             lines.append(f"  {stat}: " + "; ".join(bits))
     if profile.get("recent"):
@@ -96,8 +104,10 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
     lines.append("Slots to write (keep the same id, stat and cadence):")
     for s in slots:
         example = " / ".join(s.get("example_steps") or []) or s.get("example_desc", "")
+        band = s.get("band", "foundation")
         lines.append(
             f"  - id={s['id']} stat={s['stat']} cadence={s['cadence']} "
+            f"tier={s.get('tier', 0)} band={band} "
             f"theme='{s.get('theme', '')}' example: {example}"
         )
     lines.append("")

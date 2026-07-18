@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from datetime import date, timedelta
 
-from . import game, llm, quests
+from . import game, llm, progression, quests
 from .achievements import ACHIEVEMENTS
 from .models import (
     AchievementUnlock,
@@ -34,6 +34,7 @@ from .state import (
     has_bonus,
     levels_of,
     preferences_of,
+    progression_of,
     quest_defs,
     resolve_steps,
     snapshot,
@@ -237,10 +238,12 @@ def update_player(
     db.commit()
 
 
-def set_book(db: Session, player: Player, current_book: str, day: str) -> None:
+def set_book(db: Session, player: Player, current_book: str, day: str, chapters: int = 0) -> None:
     """Set (or change) the book being read. Starts the weekly clock so the review
-    only asks once a fresh week has begun."""
+    only asks once a fresh week has begun. `chapters` (optional) sets the reading
+    pace — a longer book asks more per day to keep pace; 0 leaves it unknown."""
     player.current_book = (current_book or "").strip()
+    player.current_book_chapters = max(0, chapters) if player.current_book else 0
     player.book_started_week = game.week_key(day) if player.current_book else ""
     player.book_review_week = ""  # allow the next week's review to fire
     _clear_generated(db, player)  # a new book should re-personalise the reading day
@@ -255,6 +258,7 @@ def review_book(db: Session, player: Player, finished: bool, next_book: str, day
         if player.current_book:
             player.books_finished += 1
         player.current_book = (next_book or "").strip()
+        player.current_book_chapters = 0  # new book, length unknown until set
         player.book_started_week = week if player.current_book else ""
     player.book_review_week = week
     db.commit()
@@ -268,6 +272,7 @@ def _clear_generated(db: Session, player: Player) -> None:
 def _profile(db: Session, player: Player, day: str) -> dict:
     prefs = preferences_of(db, player)
     levels = levels_of(db, player)
+    prog = progression_of(db, player, day)
     attrs: dict[str, dict] = {}
     for stat in game.STAT_KEYS:
         info: dict = {}
@@ -275,6 +280,11 @@ def _profile(db: Session, player: Player, day: str) -> dict:
             info["focus"] = prefs[stat]
         if levels.get(stat):
             info["level"] = levels[stat]
+        p = prog.get(stat)
+        if p:
+            # Earned difficulty — the LLM should pitch each quest at this tier.
+            info["tier"] = p["level"]
+            info["band"] = progression.BAND_LABELS.get(p["band"], "foundation")
         if info:
             attrs[stat] = info
     cutoff = (date.fromisoformat(day) - timedelta(days=7)).isoformat()
@@ -299,15 +309,19 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
     if not llm.enabled():
         return build_state(db, player, day)
     defs = quest_defs(db)
+    prog = progression_of(db, player, day)
     slots = []
     for q in defs:
         pk = quests.period_key(q.cadence, day)
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue
-        title, desc, steps = quests.pool_variant(q, day)
+        band = prog.get(q.stat, {}).get("band", 0)
+        title, desc, steps = quests.pool_variant(q, day, band)
         slots.append(
             {"id": q.id, "stat": q.stat, "cadence": q.cadence,
-             "theme": title, "example_desc": desc, "example_steps": steps}
+             "theme": title, "example_desc": desc, "example_steps": steps,
+             "tier": prog.get(q.stat, {}).get("level", 0),
+             "band": progression.BAND_LABELS.get(band, "foundation")}
         )
     if not slots:
         return build_state(db, player, day)
@@ -380,4 +394,5 @@ def reset_all(db: Session, player: Player) -> None:
     _clear_generated(db, player)
     player.equipped_title = None
     player.created_at = utcnow()
+    player.progression_start_week = ""  # re-anchor: progression restarts from zero
     db.commit()

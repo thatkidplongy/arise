@@ -5,17 +5,8 @@ from sqlalchemy.orm import Session
 
 from . import service, state
 from .db import get_db
-from .schemas import (
-    ActionResult,
-    BookIn,
-    BookReviewIn,
-    CompleteIn,
-    PlayerIn,
-    PreferencesIn,
-    StateOut,
-    StepResult,
-    StepToggleIn,
-)
+from .schemas import (ActionResult, BookIn, BookReviewIn, CompleteIn, PlayerIn,
+                      PreferencesIn, StateOut, StepResult, StepToggleIn)
 
 router = APIRouter()
 
@@ -120,9 +111,10 @@ def generate_quests(day: str | None = Query(None), db: Session = Depends(get_db)
 
 @router.put("/book", response_model=StateOut)
 def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(get_db)):
-    """Set or change the book you're currently reading. Send "" to clear it."""
+    """Set or change the book you're currently reading. Send "" to clear it.
+    Optional `chapters` sets the reading pace (a longer book asks more per day)."""
     player = state.get_or_create_player(db)
-    service.set_book(db, player, body.current_book, _valid_day(day))
+    service.set_book(db, player, body.current_book, _valid_day(day), body.chapters)
     return state.build_state(db, player, _valid_day(day))
 
 

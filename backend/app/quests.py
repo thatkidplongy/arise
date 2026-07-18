@@ -10,19 +10,29 @@ Each variant is (title, desc, steps): the desc is the one-line "what", and steps
 are the specific "how" — concrete instructions (reps × sets, timed segments,
 prompts) so a quest tells you exactly what to do, not just its theme.
 
-Some daily slots also carry a fixed *non-negotiable* core (see ANCHORS): a small
-floor prepended to that day's steps and met every day regardless of the variant
-(e.g. push-ups + plank on the physical daily). And where a quest is about
-learning, it points at a trusted source (see RESOURCES), matched to the variant.
+Some daily slots also carry a *non-negotiable* floor (see FLOORS): a small core
+prepended to that day's steps and met every day regardless of the variant (e.g.
+push-ups + plank on the physical daily). The floor is *leveled* — it starts
+gentle and climbs as the hunter shows up consistently (see progression.py), so
+there's no stagnation. Where a quest is about learning, it points at a trusted
+source (see RESOURCES), matched to the variant.
+
+Progression also shapes the *variety* where "harder" isn't a number: each level
+maps to a content band (0 foundation → 1 building → 2 depth, see TIER), and the
+pool picks from the band that fits where the hunter is. Fundamentals come before
+the complicated stuff — learn-how-to-learn before domains, principles before
+tactics.
 
 The pools are tuned to the hunter's real interests:
   STR  badminton + strength, plyometrics, home workouts; push-ups/plank floor
   CRE  drawing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
-  INT  coding, math from scratch, Japanese (serious study), reading, and the
-       wider world (politics, history, geography, science)
-  WLT  making money: fundamentals, side income, monetising skills, managing money
+  INT  learn-how-to-learn first, then coding, math from scratch, Japanese, and
+       the wider world (politics, history, geography, science); reading is the
+       daily floor (a chapter, at a pace that climbs with level)
+  WLT  making money: money psychology & fundamentals first, then managing, then
+       earning — side income, monetising skills
 
 Personalisation: if the player sets a focus for an attribute (Settings →
 Attribute focus), that attribute's *side quest* becomes their focus for the day.
@@ -30,7 +40,7 @@ Attribute focus), that attribute's *side quest* becomes their focus for the day.
 
 import hashlib
 
-from . import game
+from . import game, progression
 from .models import QuestDef
 
 # slot id -> pool of (title, desc, steps) variants. The seeded content is the
@@ -166,7 +176,27 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "A song, meme, or link that made you think of them",
         ]),
     ],
-    "d-read": [  # INT — coding / math / Japanese / reading / the world
+    "d-read": [  # INT — learn-how-to-learn → domains → the world (reading is the floor)
+        # Foundation: the craft of learning itself, before any hard domain.
+        ("Active Recall", "Learn by testing yourself, not re-reading", [
+            "Read or skim one short piece (or yesterday's notes) for 5 min",
+            "Close it and write everything you remember, from memory",
+            "Open it back up and fill the gaps you missed",
+        ]),
+        ("Mind Map", "Connect a new idea to what you already know", [
+            "Take one thing you learned recently; write it in the centre of a page",
+            "Branch out the ideas it connects to",
+            "Draw one line to something you already knew — that link is the memory",
+        ]),
+        ("Feynman It", "Explain it simply to find the gaps", [
+            "Pick a concept you only half-understand",
+            "Explain it out loud in plain words, like teaching a 12-year-old",
+            "Notice where you stumble — that's the gap; go relearn just that bit",
+        ]),
+        ("Learn How to Learn", "10 min on the craft itself", [
+            "Watch or read one lesson on a learning technique (spacing, chunking, interleaving)",
+            "Try it once, today, on something small you're studying",
+        ]),
         ("Grimoire Study", "20 min in your current book", [
             "Read your current book for 20 minutes",
             "Write one sentence on the idea that stuck",
@@ -590,17 +620,47 @@ FOCUS_TITLES: dict[str, str] = {
     "WLT": "Focused Earning",
 }
 
-# Daily non-negotiables: a small fixed core prepended to a daily quest's rotating
-# steps, so there's a floor you meet every single day no matter which variant
-# shows. Deliberately light — a minimum you never skip, not a second workout. The
-# rotating steps are the "and then some". Only the areas below have one; the rest
-# (Connect, Creativity) are a single rotating action that is itself the day's one
-# commitment, and creativity is better served by variety than a rigid routine.
-ANCHORS: dict[str, list[str]] = {
-    "d-train": ["10 push-ups (or as many as good form allows)", "30–45s plank"],
-    "d-meditate": ["Pause for 5 slow breaths before you begin"],
-    "d-wealth": ["Log today's spending — everything in and out"],
+# Daily non-negotiables, LEVELED. Each daily below has a floor that's prepended
+# to that day's rotating steps and met every day no matter which variant shows —
+# but it *climbs* with the attribute's progression level (see progression.py).
+# FLOORS[slot][level] is the floor at that level; the last entry is the cap, held
+# once you've built the habit. Fundamentals-first: each starts gentle (5 push-ups,
+# 3 breaths, just log the money) so you can begin at zero. Only the areas below
+# have a floor; Creativity and Connection stay floor-free (a single rotating
+# action is the day's commitment) and progress by content band instead.
+FLOORS: dict[str, list[list[str]]] = {
+    "d-train": [  # STR — progressive overload on the daily minimum
+        ["5 push-ups (or knee push-ups — form first)", "20s plank"],
+        ["8 push-ups (good form)", "30s plank"],
+        ["10 push-ups", "40s plank"],
+        ["12 push-ups", "45s plank"],
+        ["15 push-ups", "50s plank"],
+        ["20 push-ups", "60s plank"],  # cap — maintain
+    ],
+    "d-meditate": [  # SPI — from a pause, toward a real sit
+        ["Pause for 3 slow breaths before you begin"],
+        ["Pause for 5 slow breaths before you begin"],
+        ["Settle for 1 minute before you begin"],
+        ["Settle for 2 minutes before you begin"],
+        ["Settle for 3 minutes before you begin"],
+        ["Settle for 5 minutes before you begin"],  # cap
+    ],
+    "d-wealth": [  # WLT — awareness deepening into management
+        ["Log today's spending — everything in and out"],
+        ["Log today's spending, sorted into a few categories"],
+        ["Log today's money in and out; name one expense you could trim"],
+        ["Log today's money in and out; note the gap between them"],
+        ["Log today's money; nudge a little toward this week's target"],
+        ["Quick money check-in: today's in and out, and how the week's tracking"],  # cap
+    ],
 }
+
+# Reading (INT) floor climbs by *pace*: how fast you finish a book. Higher level
+# → fewer days to finish → more per day. It's book-dependent — a longer book asks
+# more per day than a short one to keep pace. Days-to-finish per reading level:
+_READING_PACE_DAYS: list[int] = [14, 10, 8, 7, 6, 5]
+# Fallback when the book's length is unknown: chapters/day per reading level.
+_READING_CHAPTERS: list[int] = [1, 1, 1, 2, 2, 3]
 
 # Where a quest is about *learning* something, point at a popular, well-trusted
 # source. Keyed by the variant's title, so the pointer matches the day's focus.
@@ -641,7 +701,11 @@ RESOURCES: dict[str, str] = {
     "Good Question": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Listen Fully": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Deep Talk": "🎥 Charisma on Command (YouTube)",
-    # INT — code, math, Japanese, the world
+    # INT — learn how to learn (foundation), then code, math, Japanese, the world
+    "Active Recall": "📖 Make It Stick — Brown, Roediger & McDaniel",
+    "Mind Map": "🎥 Justin Sung (YouTube)",
+    "Feynman It": "🎥 Ali Abdaal — the Feynman Technique (YouTube)",
+    "Learn How to Learn": "🌐 Learning How to Learn — Barbara Oakley (Coursera)",
     "Growth Read": "📖 Atomic Habits — James Clear",
     "Code Kata": "📖 Automate the Boring Stuff with Python — Al Sweigart",
     "Arcane Study: Code": "🎥 freeCodeCamp (YouTube)",
@@ -676,6 +740,35 @@ RESOURCES: dict[str, str] = {
 }
 
 
+# Content band per variant, where "harder" isn't a number: 0 foundation → 1
+# building → 2 depth. Fundamentals before tactics — a level's band (see
+# progression.band_for) picks which variants are in play, so the pool grows in
+# ambition as the hunter climbs. Anything unlisted is band 0 (always available),
+# so STR/SPI variety stays flat — their difficulty lives in the leveled FLOOR.
+TIER: dict[str, int] = {
+    # CRE — technique/quick reps → intentional → finish & stretch
+    "Instrument Time": 1, "Beat Lab": 1, "Photo Walk": 1, "Frame Work": 2,
+    "Photo Set": 1, "Learn a Song": 1,
+    "Finish a Beat": 2, "Short Edit": 2, "Full Render": 2, "Finish a Poem": 2,
+    "New Sound": 1, "Odd Angle": 1, "New Medium": 1,
+    "Beyond the Comfort Zone": 2, "Cover It": 2, "From Imagination": 2, "Poem from a Prompt": 2,
+    # CHA — show up → quality → depth & reach
+    "Check In": 1, "Voice, Not Text": 1, "Good Question": 1, "Make Plans": 2,
+    "Guild Night": 1, "Party Gathering": 1, "Deep Talk": 2, "New Table": 2,
+    "Reconnect": 1, "Listen Fully": 1, "New Ally": 2, "First Contact": 2,
+    # INT — learn-how-to-learn (0) → apply to domains (1) → depth (2)
+    "Growth Read": 1, "Code Kata": 1, "Math from Zero": 1, "Kana Drill": 1, "Current Affairs": 1,
+    "Kanji & Grammar": 2, "Into History": 2, "Map the World": 2, "Science Dive": 2, "Problem Set": 2,
+    "Math Milestone": 1, "Japanese Checkpoint": 1, "Ship Something": 2, "Understand the World": 2,
+    "Arcane Study: Code": 1, "Math Reps": 1, "Japanese Study": 1,
+    "Debug Something": 2, "Down the Rabbit Hole": 2,
+    # WLT — money psychology/principles (0) → manage (1) → earn (2)
+    "Ledger Study": 1, "Budget Tune": 1, "Skill to Sell": 2, "Offer Draft": 2, "Micro-Hustle": 2,
+    "Money Review": 1, "Invest Plan": 1, "Ship an Offer": 2, "Chase a Lead": 2, "Build the Funnel": 2,
+    "Price It Right": 1, "Extra Coin": 2, "Declutter for Cash": 2, "Network Node": 2,
+}
+
+
 def period_key(cadence: str, day: str) -> str:
     """Weekly quests rotate per ISO week; daily and side rotate per day. Also the
     scope a quest's step-checks belong to."""
@@ -692,26 +785,52 @@ def _pick(slot_id: str, period_key: str, n: int) -> int:
     return int(digest, 16) % n
 
 
-def floor_for(quest: QuestDef, book: str | None = None) -> list[str]:
-    """The mandatory non-negotiable steps for a slot — the floor met every day
-    regardless of the day's variant or whether an LLM wrote it. Grow always opens
-    with reading a chapter; other daily anchors come from ANCHORS. Empty for
-    non-daily slots."""
-    anchor = list(ANCHORS.get(quest.id, []))
-    if quest.id == "d-read":  # reading a chapter is the mandatory daily floor
-        chapter = f"Read a chapter of {book}" if book else "Read a chapter of your current book"
-        anchor = [chapter] + anchor
-    return anchor
+def reading_floor(book: str | None, level: int, chapters: int = 0) -> str:
+    """The reading non-negotiable — a chapter a day, but at a pace that climbs.
+
+    Higher reading level → fewer days to finish → more per day. When the book's
+    chapter count is known the target is book-dependent (a longer book asks more
+    to keep pace); otherwise it falls back to a chapters/day curve."""
+    where = f" of {book}" if book else " of your current book"
+    lvl = max(0, min(level, len(_READING_PACE_DAYS) - 1))
+    if chapters and chapters > 0:
+        per = max(1, round(chapters / _READING_PACE_DAYS[lvl]))
+    else:
+        per = _READING_CHAPTERS[lvl]
+    return f"Read {per} chapters{where}" if per > 1 else f"Read a chapter{where}"
 
 
-def pool_variant(quest: QuestDef, day: str) -> tuple[str, str, list[str]]:
+def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters: int = 0) -> list[str]:
+    """The mandatory non-negotiable steps for a slot at the given progression
+    `level` — the floor met every day regardless of the day's variant or whether
+    an LLM wrote it. Leveled floors (STR/SPI/WLT) climb through FLOORS; Grow opens
+    with the reading floor (pace scales with level + book length). Empty for slots
+    with no floor (Creativity, Connection, and all non-daily slots)."""
+    tiers = FLOORS.get(quest.id)
+    if tiers is not None:
+        return list(tiers[max(0, min(level, len(tiers) - 1))])
+    if quest.id == "d-read":
+        return [reading_floor(book, level, chapters)]
+    return []
+
+
+def pool_variant(quest: QuestDef, day: str, band: int = 0) -> tuple[str, str, list[str]]:
     """The raw (title, desc, steps) picked from the handcrafted pool for the
-    period — no floor applied. Used as the fallback and as a style seed for the
-    LLM prompt."""
+    period — no floor applied. `band` (0 foundation → 2 depth) narrows the pool to
+    variants that fit where the hunter is, stepping down if a band is unstocked.
+    Used as the fallback and as a style seed for the LLM prompt."""
     pool = POOLS.get(quest.id)
     if not pool:
         return quest.title, quest.desc, []  # unknown slot → seeded fallback
-    return pool[_pick(quest.id, _period_key(quest.cadence, day), len(pool))]
+    target = max(0, min(band, 2))
+    chosen = pool
+    for b in range(target, -1, -1):
+        eligible = [v for v in pool if TIER.get(v[0], 0) == b]
+        if eligible:
+            chosen = eligible
+            break
+    pk = _period_key(quest.cadence, day)
+    return chosen[_pick(quest.id, f"{pk}|b{target}", len(chosen))]
 
 
 def content_for(
@@ -719,18 +838,21 @@ def content_for(
     day: str,
     focus: list[str] | None = None,
     book: str | None = None,
+    level: int = 0,
+    chapters: int = 0,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
 
     `focus` is the attribute's set of focuses; a side quest rotates through them
-    day to day. `book` is the player's current book (drives the reading floor).
-    `resource` points at a trusted place to learn (empty when there isn't one)."""
+    day to day. `book`/`chapters` drive the reading floor. `level` is the stat's
+    progression level — it climbs the floor and picks the content band. `resource`
+    points at a trusted place to learn (empty when there isn't one)."""
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
-        return title, f"Your focus: {chosen}", floor_for(quest, book), ""
-    title, desc, steps = pool_variant(quest, day)
-    steps = floor_for(quest, book) + steps  # non-negotiables first, then variety
+        return title, f"Your focus: {chosen}", floor_for(quest, book, level, chapters), ""
+    title, desc, steps = pool_variant(quest, day, progression.band_for(level))
+    steps = floor_for(quest, book, level, chapters) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")
