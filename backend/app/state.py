@@ -138,14 +138,15 @@ def snapshot(agg: dict) -> Snapshot:
 # ── State assembly ────────────────────────────────────────────────────────────
 
 
-def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by) -> dict:
-    title, desc, steps = quests.content_for(q, day, prefs.get(q.stat))
+def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="") -> dict:
+    title, desc, steps, resource = quests.content_for(q, day, prefs.get(q.stat), book)
     pk = quests.period_key(q.cadence, day)
     checked = checks_by.get((q.id, pk), set())
     return {
         "id": q.id,
         "title": title,
         "desc": desc,
+        "resource": resource,
         "steps": steps,
         "steps_done": [i in checked for i in range(len(steps))],
         "stat": q.stat,
@@ -171,6 +172,16 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(r.quest_id == game.REST_DAY_ID and r.day == day for r in rows)
 
+    # Reading review: once a new week has begun since the book was started, ask
+    # (once that week) whether it's finished and what's next.
+    week = game.week_key(day)
+    review_pending = bool(
+        player.current_book
+        and player.book_started_week
+        and week > player.book_started_week
+        and player.book_review_week != week
+    )
+
     checks_by: dict[tuple[str, str], set[int]] = {}
     for c in db.query(StepCheck).filter_by(player_id=player.id):
         checks_by.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
@@ -195,7 +206,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "xp_needed": li["needed"],
             "total_xp": agg["total_xp"],
             "rank": rank,
+            "current_book": player.current_book,
+            "books_finished": player.books_finished,
         },
+        "book_review": {"pending": review_pending, "book": player.current_book},
         "stats": [
             {"key": k, **game.stat_level_info(agg["by_stat"][k])} for k in game.STAT_KEYS
         ],
@@ -210,7 +224,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "next_rank": game.next_gate(li["level"], best),
         "preferences": prefs,
-        "quests": [_quest_out(q, day, rows, prefs, undoable_id, checks_by) for q in defs],
+        "quests": [
+            _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book)
+            for q in defs
+        ],
         "achievements": [
             {
                 "id": a.id,

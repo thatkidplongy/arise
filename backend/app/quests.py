@@ -1,6 +1,6 @@
 """Rotating quest content — free, offline, deterministic.
 
-The 15 quests are stable *slots*: their id, stat, xp, cadence and target never
+The quests are stable *slots*: their id, stat, xp, cadence and target never
 change (so completions, streaks and achievements keep counting). What rotates is
 each slot's title + description + steps, picked from a hand-written pool by a
 hash of the period — the day for daily/side quests, the ISO week for weekly ones.
@@ -10,13 +10,19 @@ Each variant is (title, desc, steps): the desc is the one-line "what", and steps
 are the specific "how" — concrete instructions (reps × sets, timed segments,
 prompts) so a quest tells you exactly what to do, not just its theme.
 
+Some daily slots also carry a fixed *non-negotiable* core (see ANCHORS): a small
+floor prepended to that day's steps and met every day regardless of the variant
+(e.g. push-ups + plank on the physical daily). And where a quest is about
+learning, it points at a trusted source (see RESOURCES), matched to the variant.
+
 The pools are tuned to the hunter's real interests:
-  STR  badminton + strength, plyometrics, home workouts
+  STR  badminton + strength, plyometrics, home workouts; push-ups/plank floor
   CRE  drawing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
   INT  coding, math from scratch, Japanese (serious study), reading, and the
        wider world (politics, history, geography, science)
+  WLT  making money: fundamentals, side income, monetising skills, managing money
 
 Personalisation: if the player sets a focus for an attribute (Settings →
 Attribute focus), that attribute's *side quest* becomes their focus for the day.
@@ -97,6 +103,11 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Hum or play a 4-bar melody or loop",
             "Record it before you lose it",
         ]),
+        ("Daily Verse", "Write a short poem", [
+            "Freewrite 5 min on one image, moment, or feeling",
+            "Shape it into a few lines — any form, no rules",
+            "Read it aloud once",
+        ]),
     ],
     "d-meditate": [  # SPI — calm / focus / reflection / breath
         ("Inner Gate", "10 min meditation", [
@@ -156,53 +167,57 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     "d-read": [  # INT — coding / math / Japanese / reading / the world
-        ("Grimoire Study", "Read 20 min", [
-            "Read for 20 minutes",
-            "Write one sentence on what stuck",
+        ("Grimoire Study", "20 min in your current book", [
+            "Read your current book for 20 minutes",
+            "Write one sentence on the idea that stuck",
         ]),
-        ("Growth Read", "Self-help or a book that grows you", [
-            "Read 20 minutes",
-            "Pick one idea to actually try today",
+        ("Growth Read", "20 min, a book that grows you", [
+            "Read 20 min of a self-help / growth book (e.g. Atomic Habits)",
+            "Write the one idea + the single action you'll try today",
         ]),
-        ("Code Kata", "20 min coding", [
-            "Pick one small problem or feature",
-            "Write it, run it, tidy it up",
+        ("Code Kata", "20 min hands-on coding", [
+            "Pick one small problem: FizzBuzz, reverse a string, or sum a list",
+            "Write it from scratch and run it",
+            "Refactor it once to read cleaner",
         ]),
-        ("Math from Zero", "20 min fundamentals", [
-            "Watch or read one concept",
-            "Do 5 practice problems on it",
+        ("Math from Zero", "20 min rebuilding fundamentals", [
+            "Pick today's topic: times tables, fractions, %, or basic algebra",
+            "Watch that topic's Khan Academy lesson",
+            "Do 5 practice problems — redo any you miss",
         ]),
         ("Kanji & Grammar", "15 min Japanese", [
-            "Learn 5 new kanji or one grammar point",
-            "Write 2 example sentences",
+            "Learn 5 new kanji — write each one 3×",
+            "Study one Genki grammar point",
+            "Write 2 sentences that use it",
         ]),
         ("Kana Drill", "10 min kana", [
-            "Drill one hiragana/katakana row",
-            "Write each character 5×",
+            "Drill one kana row (e.g. か き く け こ)",
+            "Write each character 5× from memory",
         ]),
         ("Current Affairs", "15 min news", [
-            "Read one local and one world story",
-            "Ask: who's affected, and why?",
+            "Read one local and one world story in full",
+            "Write one line: who's affected, and why it matters",
         ]),
         ("Into History", "20 min history", [
-            "Pick an era, event, or figure",
-            "Note the cause and the consequence",
+            "Pick one event or figure (e.g. WWII, the fall of Rome, Rizal)",
+            "Read about it, then note one cause and one consequence",
         ]),
         ("Map the World", "15 min geography", [
-            "Pick a country or region",
-            "Learn its location, capital, and one fact",
+            "Pick one country",
+            "Learn its capital, its neighbours, and one fact",
+            "Place it on a map from memory",
         ]),
         ("Science Dive", "20 min science", [
-            "Pick one 'how does X work?' question",
-            "Read until you can explain it simply",
+            "Pick one 'how does X work?' (e.g. vaccines, black holes, Wi-Fi)",
+            "Read or watch until you can explain it in 2 sentences",
         ]),
-        ("Deep Page", "20 min reading", [
+        ("Deep Page", "20 min deep reading", [
             "Phone in another room",
-            "Read without stopping",
+            "Read your book for 20 min with no stopping",
         ]),
-        ("Problem Set", "Practice problems", [
-            "5 problems (math or code)",
-            "Redo any you got wrong",
+        ("Problem Set", "20 min practice", [
+            "Do 5 problems at your level (math or code)",
+            "Redo every one you got wrong until it clicks",
         ]),
     ],
     # ── Weekly ───────────────────────────────────────────────────────────────
@@ -280,34 +295,37 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Pick a rough you like",
             "Refine line and values, then final details",
         ]),
+        ("Finish a Poem", "Complete one poem", [
+            "Draft freely — don't judge the first pass",
+            "Revise: cut weak words, sharpen the images, read it aloud",
+            "Call it finished",
+        ]),
     ],
-    "w-tome": [  # INT — a weekly learning milestone
-        ("Clear the Tome", "3 chapters", [
-            "Read 3+ chapters this week",
-            "Jot the gist of each",
-        ]),
+    "w-tome": [  # INT — a weekly learning milestone (reading is owned by the daily
+        # floor + the weekly book review, so this slot is the *other* learning)
         ("Ship Something", "Small coding project", [
-            "Define one tiny scope",
-            "Build it end to end",
-            "Ship or commit it",
+            "Pick one tiny scope (e.g. a CLI, a to-do page, a script)",
+            "Build it end to end so it actually runs",
+            "Commit it to GitHub with a README",
         ]),
-        ("Math Milestone", "Full topic", [
-            "Finish one topic's lessons",
-            "Complete its problem set",
+        ("Math Milestone", "Finish one Khan Academy unit", [
+            "Watch every lesson in one unit",
+            "Score 80%+ on its unit quiz",
+            "List the 2 ideas that were hardest",
         ]),
-        ("Japanese Checkpoint", "A textbook lesson", [
-            "Finish one lesson",
-            "Drill its kanji and vocab",
-            "Review with flashcards",
+        ("Japanese Checkpoint", "One Genki lesson", [
+            "Finish one Genki lesson (grammar + reading)",
+            "Learn its kanji and vocab — write each 3×",
+            "Review the set twice with flashcards (Anki)",
         ]),
         ("Understand the World", "Go deep on one topic", [
-            "Pick: history, science, politics, or geography",
-            "Read 3+ sources",
-            "Explain it to someone in your words",
+            "Pick one topic (e.g. inflation, WWI, plate tectonics)",
+            "Read 3 sources on it",
+            "Explain it out loud to someone in your own words",
         ]),
-        ("Deep Study", "Course section or long read", [
-            "Finish one section",
-            "Summarise it in your own words",
+        ("Deep Study", "One course section, start to finish", [
+            "Finish one full section of a course you're taking",
+            "Summarise it in a half-page, in your own words",
         ]),
     ],
     "w-still": [  # SPI — the long sit / weekly reset
@@ -390,6 +408,10 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Watch a scene or episode",
             "Note one thing about its shots, story, or edit",
         ]),
+        ("Poem from a Prompt", "Stretch your writing", [
+            "Pick a random word, object, or line",
+            "Write a poem you wouldn't normally write",
+        ]),
     ],
     "s-nature": [  # SPI — grounded, introspective
         ("Nature Attunement", "Mindful time outdoors", [
@@ -439,32 +461,121 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     ],
     "s-code": [  # INT
         ("Arcane Study: Code", "30 min learning to code", [
-            "Follow one tutorial or docs page",
-            "Type the examples — don't copy-paste",
+            "Follow one freeCodeCamp lesson or docs page",
+            "Type every example by hand — no copy-paste",
         ]),
         ("Debug Something", "Fix or refactor", [
-            "Find one bug or messy function",
-            "Fix it and test it",
+            "Find one bug or one messy function in your code",
+            "Fix it, then write a test that proves it works",
         ]),
         ("Math Reps", "20 min practice", [
-            "10 problems at your current level",
-            "Speed up the easy ones",
+            "Do 10 problems at your current level",
+            "Time the last 5 — beat your first-half pace",
         ]),
         ("Japanese Study", "20 min structured", [
-            "Grammar or kanji, 15 min",
-            "Flashcard review, 5 min",
+            "15 min: one grammar point or 5 kanji (write each 3×)",
+            "5 min: flashcard review (Anki or WaniKani)",
         ]),
-        ("Read the Docs", "30 min deep on a tool", [
-            "Pick a tool or language you use",
-            "Read one section you skipped before",
+        ("Read the Docs", "30 min deep on a tool you use", [
+            "Pick a tool/language you use (e.g. Python, React, git)",
+            "Read one section you've always skipped",
+            "Try one thing from it in a scratch file",
         ]),
-        ("Explain It", "Learn it, then write it", [
-            "Learn one concept",
-            "Write it in your own words (5 sentences)",
+        ("Explain It", "Learn it, then teach it", [
+            "Learn one concept you're shaky on",
+            "Write it in your own words in 5 sentences",
         ]),
         ("Down the Rabbit Hole", "Follow your curiosity", [
-            "Pick a question that nags you",
-            "Read until it clicks",
+            "Pick one question that's been nagging you",
+            "Read until it clicks, then note the answer in a line",
+        ]),
+    ],
+    # ── Wealth (WLT) ──────────────────────────────────────────────────────────
+    "d-wealth": [  # daily — a small money habit: learn, manage, or earn a little
+        ("Ledger Study", "Track today's money", [
+            "Add up today's spending into categories",
+            "Name one expense you could trim this week",
+        ]),
+        ("Money Class", "10 min learning", [
+            "Read or watch one lesson on money, investing, or business",
+            "Write the single idea in a sentence",
+        ]),
+        ("Skill to Sell", "Sharpen an earning skill", [
+            "15 min improving a skill people pay for",
+            "Note who would pay for it, and roughly how much",
+        ]),
+        ("Offer Draft", "Package what you make", [
+            "Describe one thing you could sell — a beat, edit, photo, or bit of code",
+            "Put a price on it",
+        ]),
+        ("Market Watch", "Understand the game", [
+            "Read one business or market headline",
+            "Ask: who makes money here, and how?",
+        ]),
+        ("Budget Tune", "Widen the gap", [
+            "Review one spending category",
+            "Move a little more toward saving or investing",
+        ]),
+        ("Value Reps", "Learn the language of money", [
+            "Learn one term (compounding, margin, cash flow, runway…)",
+            "Explain it in your own words",
+        ]),
+        ("Micro-Hustle", "One small income action", [
+            "Pick one thing you can offer today",
+            "List it, pitch it, or post it — actually send it",
+        ]),
+    ],
+    "w-wealth": [  # weekly — one real milestone toward earning
+        ("Ship an Offer", "Put something up for sale", [
+            "Pick one skill or product (beat, edit, art, code, service)",
+            "Write the listing or offer",
+            "Post it somewhere buyers can see it",
+        ]),
+        ("Learn a System", "Finish one money lesson set", [
+            "Complete one course section on investing or business",
+            "Summarise it in five sentences",
+        ]),
+        ("Money Review", "Weekly finance reset", [
+            "Total this week's income and spending",
+            "Set next week's saving or investing target",
+        ]),
+        ("Chase a Lead", "Make one real move for income", [
+            "Reach out to 3 possible clients or buyers",
+            "Follow up on anyone who replies",
+        ]),
+        ("Invest Plan", "Grow what you have — on paper first", [
+            "Research one option (index fund, savings, a small venture)",
+            "Write your plan down — no rushed decisions",
+        ]),
+        ("Build the Funnel", "Make your work findable", [
+            "Set up or improve one place people find what you do",
+            "Add a clear way to pay you or reach you",
+        ]),
+    ],
+    "s-wealth": [  # side — a quick, optional money action
+        ("Extra Coin", "One quick earning action", [
+            "Spend 15 min toward income",
+            "Sell, pitch, apply, or list something",
+        ]),
+        ("Learn & Earn", "Study a paid skill", [
+            "Watch one tutorial on a skill people pay for",
+            "Try it once yourself",
+        ]),
+        ("Declutter for Cash", "Turn stuff into money", [
+            "Find one thing you don't use",
+            "List it for sale",
+        ]),
+        ("Price It Right", "Value your work fairly", [
+            "Look up what your skill usually charges",
+            "Adjust your price to match your worth",
+        ]),
+        ("Network Node", "Meet someone in the field", [
+            "Message one person who earns where you'd like to",
+            "Ask one genuine question",
+        ]),
+        ("Idea Bank", "Capture an income idea", [
+            "Write down one way you could make money",
+            "Note the first small step to test it",
         ]),
     ],
 }
@@ -476,6 +587,92 @@ FOCUS_TITLES: dict[str, str] = {
     "SPI": "Focused Practice",
     "CHA": "Focused Connection",
     "INT": "Focused Study",
+    "WLT": "Focused Earning",
+}
+
+# Daily non-negotiables: a small fixed core prepended to a daily quest's rotating
+# steps, so there's a floor you meet every single day no matter which variant
+# shows. Deliberately light — a minimum you never skip, not a second workout. The
+# rotating steps are the "and then some". Only the areas below have one; the rest
+# (Connect, Creativity) are a single rotating action that is itself the day's one
+# commitment, and creativity is better served by variety than a rigid routine.
+ANCHORS: dict[str, list[str]] = {
+    "d-train": ["10 push-ups (or as many as good form allows)", "30–45s plank"],
+    "d-meditate": ["Pause for 5 slow breaths before you begin"],
+    "d-wealth": ["Log today's spending — everything in and out"],
+}
+
+# Where a quest is about *learning* something, point at a popular, well-trusted
+# source. Keyed by the variant's title, so the pointer matches the day's focus.
+# The emoji signals the medium: 📖 book · 🎥 YouTube · 🎧 audio/app · 🌐 site.
+RESOURCES: dict[str, str] = {
+    # STR — technique worth studying
+    "Explosive Footwork": "🎥 Badminton Insight (YouTube)",
+    "Dungeon Raid: Badminton": "🎥 Badminton Insight (YouTube)",
+    "Doubles Raid": "🎥 Badminton Insight (YouTube)",
+    "New Technique": "🎥 Badminton Insight (YouTube)",
+    "Weak Spot": "🎥 Badminton Insight (YouTube)",
+    # CRE — drawing, music, photo/video, film
+    "Daily Sketch": "📖 Drawing on the Right Side of the Brain — Betty Edwards",
+    "Gesture Warmup": "🎥 Proko (YouTube)",
+    "Beyond the Comfort Zone": "🎥 Proko (YouTube)",
+    "Finish a Piece": "🎥 Proko (YouTube)",
+    "Full Render": "🎥 Proko (YouTube)",
+    "Beat Lab": "🎥 In The Mix (YouTube)",
+    "Finish a Beat": "🎥 In The Mix (YouTube)",
+    "New Sound": "🎥 In The Mix (YouTube)",
+    "Cover It": "🎥 In The Mix (YouTube)",
+    "Instrument Time": "🌐 musictheory.net",
+    "Photo Walk": "🎥 Peter McKinnon (YouTube)",
+    "Frame Work": "🎥 Peter McKinnon (YouTube)",
+    "Photo Set": "🎥 Peter McKinnon (YouTube)",
+    "Short Edit": "🎥 Peter McKinnon (YouTube)",
+    "Odd Angle": "🎥 Peter McKinnon (YouTube)",
+    "Screen Study": "🎥 Every Frame a Painting (YouTube)",
+    "Daily Verse": "📖 A Poetry Handbook — Mary Oliver",
+    "Finish a Poem": "🌐 Poetry Foundation (poetryfoundation.org)",
+    "Poem from a Prompt": "🌐 Poetry Foundation (poetryfoundation.org)",
+    # SPI — meditation
+    "Inner Gate": "📖 Mindfulness in Plain English — Bhante Gunaratana",
+    "Body Scan": "🎧 Waking Up — Sam Harris",
+    "Deep Stillness": "🎧 Waking Up — Sam Harris",
+    "Box Breathing": "🎥 Huberman Lab (YouTube)",
+    # CHA — people skills
+    "Good Question": "📖 How to Win Friends and Influence People — Dale Carnegie",
+    "Listen Fully": "📖 How to Win Friends and Influence People — Dale Carnegie",
+    "Deep Talk": "🎥 Charisma on Command (YouTube)",
+    # INT — code, math, Japanese, the world
+    "Growth Read": "📖 Atomic Habits — James Clear",
+    "Code Kata": "📖 Automate the Boring Stuff with Python — Al Sweigart",
+    "Arcane Study: Code": "🎥 freeCodeCamp (YouTube)",
+    "Ship Something": "🌐 The Odin Project (theodinproject.com)",
+    "Math from Zero": "🎥 Khan Academy",
+    "Math Milestone": "🎥 Khan Academy",
+    "Math Reps": "🎥 Khan Academy",
+    "Problem Set": "🎥 Khan Academy",
+    "Kanji & Grammar": "🎥 Tokini Andy — Genki walkthroughs (YouTube)",
+    "Kana Drill": "🌐 Tofugu — hiragana & katakana guides",
+    "Japanese Study": "🌐 Tae Kim's Guide to Japanese (guidetojapanese.org)",
+    "Japanese Checkpoint": "📖 Genki: An Integrated Course in Elementary Japanese",
+    "Into History": "🎥 Crash Course (YouTube)",
+    "Understand the World": "🎥 Crash Course (YouTube)",
+    "Map the World": "🎥 Geography Now (YouTube)",
+    "Science Dive": "🎥 Veritasium (YouTube)",
+    # WLT — money
+    "Money Class": "📖 The Psychology of Money — Morgan Housel",
+    "Ledger Study": "📖 I Will Teach You to Be Rich — Ramit Sethi",
+    "Budget Tune": "📖 I Will Teach You to Be Rich — Ramit Sethi",
+    "Money Review": "📖 I Will Teach You to Be Rich — Ramit Sethi",
+    "Learn a System": "📖 The Simple Path to Wealth — JL Collins",
+    "Invest Plan": "📖 The Simple Path to Wealth — JL Collins",
+    "Value Reps": "🌐 Investopedia",
+    "Market Watch": "🌐 Investopedia",
+    "Skill to Sell": "🎥 Ali Abdaal (YouTube)",
+    "Offer Draft": "🎥 Ali Abdaal (YouTube)",
+    "Micro-Hustle": "🎥 Ali Abdaal (YouTube)",
+    "Ship an Offer": "🎥 Ali Abdaal (YouTube)",
+    "Build the Funnel": "🎥 Ali Abdaal (YouTube)",
+    "Learn & Earn": "🎥 Ali Abdaal (YouTube)",
 }
 
 
@@ -496,18 +693,32 @@ def _pick(slot_id: str, period_key: str, n: int) -> int:
 
 
 def content_for(
-    quest: QuestDef, day: str, focus: list[str] | None = None
-) -> tuple[str, str, list[str]]:
-    """The (title, desc, steps) a slot should show for the period containing `day`.
+    quest: QuestDef,
+    day: str,
+    focus: list[str] | None = None,
+    book: str | None = None,
+) -> tuple[str, str, list[str], str]:
+    """The (title, desc, steps, resource) a slot should show for the period
+    containing `day`.
 
     `focus` is the attribute's set of focuses; a side quest rotates through them
-    day to day, so every focus gets its turn."""
+    day to day, so every focus gets its turn. `book` is the player's current book;
+    the Grow daily always opens with "read a chapter of it" — reading is the
+    mandatory daily floor (a chapter a day ≈ a book a week). `resource` is an
+    optional pointer to a trusted place to learn (empty when there isn't one).
+    Daily slots with an ANCHOR get their non-negotiable core prepended first."""
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
-        return title, f"Your focus: {chosen}", []
+        return title, f"Your focus: {chosen}", [], ""
     pool = POOLS.get(quest.id)
     if not pool:
-        return quest.title, quest.desc, []  # unknown slot → seeded fallback
-    return pool[_pick(quest.id, _period_key(quest.cadence, day), len(pool))]
+        return quest.title, quest.desc, [], ""  # unknown slot → seeded fallback
+    title, desc, steps = pool[_pick(quest.id, _period_key(quest.cadence, day), len(pool))]
+    anchor = list(ANCHORS.get(quest.id, []))
+    if quest.id == "d-read":  # reading a chapter is the mandatory daily floor
+        chapter = f"Read a chapter of {book}" if book else "Read a chapter of your current book"
+        anchor = [chapter] + anchor
+    steps = anchor + steps  # non-negotiables first, then the day's variety
+    return title, desc, steps, RESOURCES.get(title, "")

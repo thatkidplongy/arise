@@ -24,6 +24,15 @@ class PlayerIn(BaseModel):
     north_star: str | None = None
 
 
+class BookIn(BaseModel):
+    current_book: str = ""
+
+
+class BookReviewIn(BaseModel):
+    finished: bool
+    next_book: str = ""  # only used when finished is true
+
+
 class PreferencesIn(BaseModel):
     # {stat: [focus, ...]}; the full set per attribute. Empty list clears it.
     preferences: dict[str, list[str]]
@@ -42,6 +51,13 @@ class PlayerOut(BaseModel):
     xp_needed: int
     total_xp: int
     rank: str
+    current_book: str
+    books_finished: int
+
+
+class BookReviewOut(BaseModel):
+    pending: bool  # true when the weekly "did you finish it?" review is due
+    book: str
 
 
 class StatOut(BaseModel):
@@ -75,6 +91,7 @@ class QuestOut(BaseModel):
     id: str
     title: str
     desc: str
+    resource: str  # a trusted place to learn, or "" — see quests.RESOURCES
     steps: list[str]
     steps_done: list[bool]  # aligned with steps; which are ticked this period
     stat: str
@@ -103,6 +120,7 @@ class StateOut(BaseModel):
     stats: list[StatOut]
     streak: StreakOut
     today: TodayOut
+    book_review: BookReviewOut
     next_rank: RankGateOut | None
     preferences: dict[str, list[str]]
     quests: list[QuestOut]

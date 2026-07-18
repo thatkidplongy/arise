@@ -5,7 +5,17 @@ from sqlalchemy.orm import Session
 
 from . import service, state
 from .db import get_db
-from .schemas import ActionResult, CompleteIn, PlayerIn, PreferencesIn, StateOut, StepResult, StepToggleIn
+from .schemas import (
+    ActionResult,
+    BookIn,
+    BookReviewIn,
+    CompleteIn,
+    PlayerIn,
+    PreferencesIn,
+    StateOut,
+    StepResult,
+    StepToggleIn,
+)
 
 router = APIRouter()
 
@@ -95,6 +105,23 @@ def update_preferences(
     A set focus themes that attribute's side quest."""
     player = state.get_or_create_player(db)
     service.update_preferences(db, player, body.preferences)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.put("/book", response_model=StateOut)
+def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Set or change the book you're currently reading. Send "" to clear it."""
+    player = state.get_or_create_player(db)
+    service.set_book(db, player, body.current_book, _valid_day(day))
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/book/review", response_model=StateOut)
+def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Answer the weekly reading review: finished → counts it and rolls to
+    next_book; not yet → keeps the current book. Asked once per new week."""
+    player = state.get_or_create_player(db)
+    service.review_book(db, player, body.finished, body.next_book, _valid_day(day))
     return state.build_state(db, player, _valid_day(day))
 
 

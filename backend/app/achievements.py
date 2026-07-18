@@ -103,6 +103,13 @@ ACHIEVEMENTS: list[AchievementDef] = [
         check=lambda s: any(lvl >= 10 for lvl in s.stat_levels.values()),
     ),
     AchievementDef(
+        id="wealth-5",
+        name="Seed Capital",
+        desc="Raise Wealth to level 5.",
+        title_reward="The Enterprising",
+        check=lambda s: s.stat_levels.get("WLT", 0) >= 5,
+    ),
+    AchievementDef(
         id="xp-1000",
         name="Mana Reservoir",
         desc="Earn 1,000 total XP.",

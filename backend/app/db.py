@@ -52,6 +52,10 @@ def get_db():
 # Keep entries append-only; each is skipped if the column already exists.
 _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("players", "north_star", "VARCHAR DEFAULT ''"),
+    ("players", "current_book", "VARCHAR DEFAULT ''"),
+    ("players", "books_finished", "INTEGER DEFAULT 0"),
+    ("players", "book_started_week", "VARCHAR DEFAULT ''"),
+    ("players", "book_review_week", "VARCHAR DEFAULT ''"),
 ]
 
 

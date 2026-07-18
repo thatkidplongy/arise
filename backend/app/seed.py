@@ -23,12 +23,24 @@ SEED_QUESTS = [
     dict(id="s-nature", title="Nature Attunement", desc="Meditate or take a mindful walk outdoors", stat="SPI", xp=15, cadence="side", target=1),
     dict(id="s-ally", title="New Ally", desc="Have a real conversation with someone new", stat="CHA", xp=15, cadence="side", target=1),
     dict(id="s-code", title="Arcane Study: Code", desc="30 minutes learning to code (building this app counts)", stat="INT", xp=15, cadence="side", target=1),
+    # Wealth — learning to make money: fundamentals, side income, monetising your
+    # skills, and managing/growing what you have.
+    dict(id="d-wealth", title="Ledger Study", desc="10 min toward earning or managing money", stat="WLT", xp=10, cadence="daily", target=1),
+    dict(id="w-wealth", title="Wealth Milestone", desc="One real step toward making money this week", stat="WLT", xp=40, cadence="weekly", target=1),
+    dict(id="s-wealth", title="Extra Coin", desc="A quick money-making action", stat="WLT", xp=15, cadence="side", target=1),
 ]
 
 
 def seed_quests(db: Session) -> None:
-    if db.query(QuestDef).count() > 0:
-        return
+    """Insert any missing quest definitions. Additive and idempotent: existing
+    rows (and the player's progress against them) are never touched, so new
+    quests reach a database that was seeded before they existed."""
+    existing = {row[0] for row in db.query(QuestDef.id).all()}
+    added = False
     for sort, q in enumerate(SEED_QUESTS):
+        if q["id"] in existing:
+            continue
         db.add(QuestDef(sort=sort, **q))
-    db.commit()
+        added = True
+    if added:
+        db.commit()

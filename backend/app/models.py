@@ -23,6 +23,12 @@ class Player(Base):
     equipped_title: Mapped[str | None] = mapped_column(String, nullable=True)
     # The life / person the hunter is reaching for — their reason, kept in view.
     north_star: Mapped[str] = mapped_column(String, default="")
+    # Reading loop: one book a week, a chapter a day. current_book is what they're
+    # reading now; at each new week the app asks if it's finished and what's next.
+    current_book: Mapped[str] = mapped_column(String, default="")
+    books_finished: Mapped[int] = mapped_column(Integer, default=0)
+    book_started_week: Mapped[str] = mapped_column(String, default="")  # ISO week set
+    book_review_week: Mapped[str] = mapped_column(String, default="")  # ISO week last asked
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -34,7 +40,7 @@ class QuestDef(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)  # slug, e.g. 'd-train'
     title: Mapped[str] = mapped_column(String)
     desc: Mapped[str] = mapped_column(String)
-    stat: Mapped[str] = mapped_column(String)  # STR | CRE | SPI | CHA | INT
+    stat: Mapped[str] = mapped_column(String)  # STR | CRE | SPI | CHA | INT | WLT
     xp: Mapped[int] = mapped_column(Integer)
     cadence: Mapped[str] = mapped_column(String)  # daily | weekly | side
     target: Mapped[int] = mapped_column(Integer, default=1)
@@ -69,7 +75,7 @@ class Preference(Base):
     __tablename__ = "preferences"
 
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    stat: Mapped[str] = mapped_column(String, primary_key=True)  # STR | CRE | SPI | CHA | INT
+    stat: Mapped[str] = mapped_column(String, primary_key=True)  # STR | CRE | SPI | CHA | INT | WLT
     focus: Mapped[str] = mapped_column(String)
 
 

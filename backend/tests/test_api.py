@@ -1,7 +1,7 @@
 """Integration tests: the HTTP API end to end, against a throwaway database."""
 
 DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read"]
+DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-wealth"]
 
 
 def _state(client):
@@ -16,13 +16,36 @@ def _quest(state, qid):
 
 def test_state_shape(client):
     s = _state(client)
-    for key in ("player", "stats", "streak", "today", "preferences", "quests", "achievements", "record"):
+    for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
         assert key in s
-    assert len(s["quests"]) == 15
+    assert len(s["quests"]) == 18
+    assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT"}
     q = _quest(s, "d-train")
-    assert "steps" in q and "steps_done" in q
+    assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
+    # The physical daily always carries its non-negotiable core.
+    assert q["steps"][0].startswith("10 push-ups")
+    # The Grow daily always opens with reading (the mandatory floor).
+    assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
     assert s["player"]["total_xp"] == 0
+
+
+def test_reading_review_flow(client):
+    # Set a book — no review the same week it started.
+    r = client.put("/book?day=2026-07-18", json={"current_book": "Atomic Habits"})
+    body = r.json()
+    assert body["player"]["current_book"] == "Atomic Habits"
+    assert body["book_review"]["pending"] is False
+    assert _quest(body, "d-read")["steps"][0] == "Read a chapter of Atomic Habits"
+    # A fresh week later, the review is due.
+    nxt = "2026-07-27"  # a Monday in the following ISO week
+    assert client.get(f"/state?day={nxt}").json()["book_review"]["pending"] is True
+    # Finish it → counts, rolls to the next book, and stops asking this week.
+    r = client.post(f"/book/review?day={nxt}", json={"finished": True, "next_book": "Deep Work"})
+    body = r.json()
+    assert body["player"]["books_finished"] == 1
+    assert body["player"]["current_book"] == "Deep Work"
+    assert body["book_review"]["pending"] is False
 
 
 def test_complete_then_conflict(client):
@@ -72,8 +95,8 @@ def test_daily_clear_bonus(client):
     for qid in DAILY_IDS:
         events = client.post("/completions", json={"quest_id": qid, "day": DAY}).json()["events"]
     assert any(e["type"] == "daily_clear" for e in events)
-    # 5 dailies × 10 + 15 bonus
-    assert _state(client)["player"]["total_xp"] == 65
+    # 7 dailies × 10 + 15 bonus
+    assert _state(client)["player"]["total_xp"] == len(DAILY_IDS) * 10 + 15
     assert _state(client)["today"]["cleared"] is True
 
 

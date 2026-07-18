@@ -158,7 +158,7 @@ def toggle_step(db: Session, player: Player, quest_id: str, step_index: int, day
         raise HTTPException(400, "Step checklist only applies to single-completion quests")
 
     prefs = preferences_of(db, player)
-    _, _, steps = quests.content_for(quest, day, prefs.get(quest.stat))
+    _, _, steps, _ = quests.content_for(quest, day, prefs.get(quest.stat), player.current_book)
     if not steps or not (0 <= step_index < len(steps)):
         raise HTTPException(400, "No such step for this quest today")
 
@@ -221,6 +221,28 @@ def update_player(
         player.equipped_title = equipped_title
     if north_star_provided:
         player.north_star = (north_star or "").strip()
+    db.commit()
+
+
+def set_book(db: Session, player: Player, current_book: str, day: str) -> None:
+    """Set (or change) the book being read. Starts the weekly clock so the review
+    only asks once a fresh week has begun."""
+    player.current_book = (current_book or "").strip()
+    player.book_started_week = game.week_key(day) if player.current_book else ""
+    player.book_review_week = ""  # allow the next week's review to fire
+    db.commit()
+
+
+def review_book(db: Session, player: Player, finished: bool, next_book: str, day: str) -> None:
+    """Answer the weekly reading review. Finished → count it and roll to the next
+    book; not yet → keep the current one. Either way, don't ask again this week."""
+    week = game.week_key(day)
+    if finished:
+        if player.current_book:
+            player.books_finished += 1
+        player.current_book = (next_book or "").strip()
+        player.book_started_week = week if player.current_book else ""
+    player.book_review_week = week
     db.commit()
 
 
