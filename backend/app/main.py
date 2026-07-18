@@ -62,6 +62,9 @@ if WEB_DIR.is_dir():
     def web_app(path: str):
         candidate = WEB_DIR / path
         if path and candidate.is_file():
+            # version.json is polled to detect new builds — never cache it.
+            if path == "version.json":
+                return FileResponse(candidate, headers={"Cache-Control": "no-cache"})
             return FileResponse(candidate)
         # The SPA shell must always revalidate so a reload (or the app's own
         # pull-to-reload) picks up a fresh build — the JS bundles it points to are

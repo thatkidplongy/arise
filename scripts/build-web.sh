@@ -5,8 +5,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-echo "▸ Exporting web build…"
+# A build id, baked into the bundle (EXPO_PUBLIC_* is inlined at export time) and
+# written to dist/version.json. The running app compares the two to know when a
+# newer build has been deployed, so it can offer a gentle "update" instead of
+# reloading blindly. See src/store/useAppUpdate.ts.
+BUILD_ID="$(date +%Y%m%d%H%M%S)"
+export EXPO_PUBLIC_ARISE_BUILD="$BUILD_ID"
+
+echo "▸ Exporting web build ($BUILD_ID)…"
 npx expo export --platform web
+
+echo "▸ Writing version.json…"
+printf '{"build":"%s"}\n' "$BUILD_ID" > dist/version.json
 
 echo "▸ Generating home-screen icon…"
 # 180x180 is the size iOS uses for apple-touch-icon.

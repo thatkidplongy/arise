@@ -1,12 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CONTENT_MAX_WIDTH } from '@/components/Screen';
+import { useAppUpdate } from '@/store/useAppUpdate';
 import { accent, surface, text } from '@/theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+
+  // Quietly watch for a newer build while the app is open, so the Screen can
+  // offer a one-tap update instead of forcing a reload. No-ops off the web.
+  useEffect(() => {
+    const check = () => void useAppUpdate.getState().check();
+    check();
+    const w: any = globalThis;
+    const id = w.setInterval?.(check, 60_000);
+    const doc = w.document;
+    const onVisible = () => {
+      if (!doc || doc.visibilityState === 'visible') check();
+    };
+    doc?.addEventListener?.('visibilitychange', onVisible);
+    w.addEventListener?.('focus', onVisible);
+    return () => {
+      w.clearInterval?.(id);
+      doc?.removeEventListener?.('visibilitychange', onVisible);
+      w.removeEventListener?.('focus', onVisible);
+    };
+  }, []);
 
   return (
     <Tabs
