@@ -46,45 +46,59 @@ export function FocusAreasCard() {
 
   if (!state) return null;
 
+  // Persist the whole set immediately on any chip change, so nothing is lost to a
+  // forgotten "Save" — the exact trap that hid the Wealth/Craft pills' additions.
+  const persist = (focus: Record<string, string[]>, levels: Record<string, string>) => {
+    const mergedFocus: Record<string, string[]> = {};
+    const mergedLevels: Record<string, string> = {};
+    for (const k of STAT_KEYS) {
+      mergedFocus[k] = [...(focus[k] ?? [])];
+      mergedLevels[k] = (levels[k] ?? '').trim();
+    }
+    void savePreferences(mergedFocus, mergedLevels);
+  };
+
   const addFocus = (k: string) => {
     const v = (focusInput[k] ?? '').trim();
-    if (!v) return;
-    setFocusDraft((d) => {
-      const cur = d[k] ?? [];
-      if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) return d; // no dupes
-      return { ...d, [k]: [...cur, v] };
-    });
     setFocusInput((s) => ({ ...s, [k]: '' }));
     setRemovedFocus(null);
+    if (!v) return;
+    const cur = focusDraft[k] ?? [];
+    if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) return; // no dupes
+    const next = { ...focusDraft, [k]: [...cur, v] };
+    setFocusDraft(next);
+    persist(next, levelDraft);
   };
 
   const addSuggestedFocus = (k: string, v: string) => {
-    setFocusDraft((d) => {
-      const cur = d[k] ?? [];
-      if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) return d; // no dupes
-      return { ...d, [k]: [...cur, v] };
-    });
     setRemovedFocus(null);
+    const cur = focusDraft[k] ?? [];
+    if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) return; // no dupes
+    const next = { ...focusDraft, [k]: [...cur, v] };
+    setFocusDraft(next);
+    persist(next, levelDraft);
   };
 
   const removeFocus = (k: string, i: number) => {
     const item = (focusDraft[k] ?? [])[i];
     if (item == null) return;
+    const next = { ...focusDraft, [k]: (focusDraft[k] ?? []).filter((_, idx) => idx !== i) };
     setRemovedFocus({ stat: k, item, index: i });
-    setFocusDraft((d) => ({ ...d, [k]: (d[k] ?? []).filter((_, idx) => idx !== i) }));
+    setFocusDraft(next);
+    persist(next, levelDraft);
   };
 
   const undoRemoveFocus = () => {
     if (!removedFocus) return;
     const { stat, item, index } = removedFocus;
-    setFocusDraft((d) => {
-      const cur = d[stat] ?? [];
-      if (cur.some((x) => x.toLowerCase() === item.toLowerCase())) return d; // already back
-      const next = [...cur];
-      next.splice(Math.min(index, next.length), 0, item);
-      return { ...d, [stat]: next };
-    });
     setRemovedFocus(null);
+    const cur = focusDraft[stat] ?? [];
+    if (cur.some((x) => x.toLowerCase() === item.toLowerCase())) return; // already back
+    const arr = [...cur];
+    arr.splice(Math.min(index, arr.length), 0, item);
+    const next = { ...focusDraft, [stat]: arr };
+    setFocusDraft(next);
+    persist(next, levelDraft);
   };
 
   const saveFocusFlow = async () => {
@@ -119,7 +133,7 @@ export function FocusAreasCard() {
       <Text style={styles.help}>
         Optional. Add as many focuses as you like per attribute — each attribute&apos;s side quest
         rotates through them. Solid chips are on (tap × to remove); dashed pills are suggestions —
-        tap to add.
+        tap to add. Focuses save as soon as you add or remove them.
         {state.llm_enabled
           ? ' “Where I’m at” tells the AI your level so it can prescribe your next step.'
           : ' “Where I’m at” is used once you turn on AI personalisation.'}
@@ -186,6 +200,7 @@ export function FocusAreasCard() {
             <TextInput
               value={levelDraft[k] ?? ''}
               onChangeText={(v) => setLevelDraft((s) => ({ ...s, [k]: v }))}
+              onEndEditing={() => persist(focusDraft, levelDraft)}
               style={[styles.input, styles.levelInput]}
               placeholder="Where I'm at (for AI) · e.g. Math: fractions"
               placeholderTextColor={text.faint}
@@ -210,7 +225,7 @@ export function FocusAreasCard() {
         onPress={saveFocusFlow}
       >
         <Text style={styles.btnText}>
-          {focusSave === 'saving' ? 'Saving…' : focusSave === 'done' ? 'Saved ✓' : 'Save focuses'}
+          {focusSave === 'saving' ? 'Saving…' : focusSave === 'done' ? 'Saved ✓' : 'Save notes'}
         </Text>
       </Pressable>
     </SystemPanel>
