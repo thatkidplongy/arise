@@ -67,6 +67,12 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   undo), and the completion circle fills as you go.
 - **Focus areas** — an optional set of focuses per attribute (Settings → Focus
   areas); a saved focus rotates that attribute's side quest through your set.
+- **Reading loop** — a chapter a day is the mandatory Grow floor; each new week
+  Arise asks if you finished your book and what to read next (a book a week).
+- **AI personalisation (optional)** — set a free Gemini key and quests are
+  generated and sequenced to your level; unset, it uses the handcrafted pools.
+  Mandatory floors (reading, push-ups…) are always enforced regardless. See
+  [DEPLOY.md](./DEPLOY.md).
 - **Your North Star** — a line you write about the life you're reaching for,
   pinned to the top of the Status screen.
 - **Rest days & forgiveness** — mark a rest day and your streak stays safe;

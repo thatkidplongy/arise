@@ -85,6 +85,26 @@ sudo pmset -c sleep 0 disablesleep 1    # on a desktop / always-plugged Mac
 Tailscale also routes locally on the same Wi-Fi, so that one address works at
 home and away.
 
+## Optional: AI-personalised quests (Gemini free tier)
+
+Off by default — with no key set, quests come from the handcrafted pools. To turn
+on AI personalisation (quests tuned and sequenced to you):
+
+1. Get a free key at https://aistudio.google.com/apikey (Google AI Studio).
+2. In `backend/deploy/com.arise.backend.plist`, uncomment the
+   `EnvironmentVariables` block and set `ARISE_LLM_API_KEY` to your key
+   (optionally `ARISE_LLM_MODEL`, default `gemini-2.0-flash`).
+3. Re-run `bash deploy/install.sh`, then
+   `launchctl kickstart -k gui/$(id -u)/com.arise.backend`.
+
+The app then personalises each period in one cached call (a few small calls a
+day → free tier is plenty). Set your level per subject under **Settings → Focus
+areas → "Where I'm at"** so it can prescribe your next step. Anything goes wrong
+(no key, offline, rate limit) and it silently falls back to the pools.
+
+> Privacy: your focus/level/book/recent-activity are sent to the Gemini API under
+> your own key. Minimal, but yours to weigh. It's entirely optional.
+
 ## Backups
 
 `install.sh` also schedules `com.arise.backup`: a daily snapshot of `arise.db`

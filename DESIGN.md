@@ -106,6 +106,31 @@ quest* through the set day to day (`Your focus: …`). Free, keyword-simple; the
 architecture leaves room to swap in LLM-generated quests later without changing
 the slot model.
 
+## LLM personalisation (optional, off by default)
+
+Deterministic rotation is specific but can't sequence to *you* ("do the next
+lesson"). An optional LLM layer closes that gap without changing anything above.
+
+- **Hybrid, never fragile.** With no key set (`ARISE_LLM_API_KEY`), the LLM is
+  off and everything falls back to the handcrafted pools — identical behaviour.
+  When on, `service.generate_quests` makes **one** call per period that returns
+  personalised `(title, desc, steps, resource)` for every slot, cached in
+  `generated_quests` so it's generated at most once per slot per period. Any
+  failure (no key, offline, timeout, bad JSON) is caught and falls back per the
+  same path — the LLM can never break the app.
+- **Floors are enforced in code, not by the model.** The mandatory floor
+  (`quests.floor_for` — reading a chapter, push-ups + plank…) is re-applied on
+  read on top of whatever the model wrote, so personalisation can't drop a
+  non-negotiable. The model is told not to include them.
+- **What it sees.** A compact profile: name, North Star, current book, each
+  attribute's focus set and "where I'm at" level note (`preferences.level`), and
+  a 7-day completion summary — enough to prescribe the next step. Changing the
+  profile (focus/level/book) clears the cache so the next generation reflects it.
+- **Engine.** Google Gemini free tier via stdlib HTTP (`app/llm.py`), model set
+  by `ARISE_LLM_MODEL` (default `gemini-2.0-flash`). Swappable — the seam is one
+  module and two env vars. The client calls `POST /quests/generate` after each
+  state load; the pool board shows instantly and quietly upgrades when ready.
+
 ## North Star
 
 A free-text line the player writes (`players.north_star`) about the life they're
