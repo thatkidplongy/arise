@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BookPicker } from '@/components/BookPicker';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text } from '@/theme';
+import { accent, surface, text, withAlpha } from '@/theme';
 
 type SaveState = 'idle' | 'saving' | 'done';
 
@@ -14,28 +15,28 @@ export function CurrentBookCard() {
   const state = useSystem((s) => s.state);
   const saveBook = useSystem((s) => s.saveBook);
 
-  const [bookDraft, setBookDraft] = useState(state?.player.current_book ?? '');
-  const [chaptersDraft, setChaptersDraft] = useState(
-    state?.player.current_book_chapters ? String(state.player.current_book_chapters) : '',
-  );
+  // Inputs stay empty — they're for entering a *new* book. What you're currently
+  // reading is shown in the banner below, not pre-filled here.
+  const [bookDraft, setBookDraft] = useState('');
+  const [chaptersDraft, setChaptersDraft] = useState('');
   const [bookSave, setBookSave] = useState<SaveState>('idle');
-
-  useEffect(() => setBookDraft(state?.player.current_book ?? ''), [state?.player.current_book]);
-  useEffect(
-    () =>
-      setChaptersDraft(
-        state?.player.current_book_chapters ? String(state.player.current_book_chapters) : '',
-      ),
-    [state?.player.current_book_chapters],
-  );
 
   if (!state) return null;
 
+  const current = state.player.current_book;
+  const currentChapters = state.player.current_book_chapters;
+
+  const canSave = bookDraft.trim().length > 0 && bookSave !== 'saving';
+
   const saveBookFlow = async () => {
+    const title = bookDraft.trim();
+    if (!title) return; // never clear the current book with an empty save
     setBookSave('saving');
     const chapters = Math.max(0, parseInt(chaptersDraft, 10) || 0);
-    await saveBook(bookDraft.trim(), chapters);
+    await saveBook(title, chapters);
     if (useSystem.getState().status === 'online') {
+      setBookDraft(''); // don't persist the entry — the banner now reflects it
+      setChaptersDraft('');
       setBookSave('done');
       setTimeout(() => setBookSave('idle'), 1600);
     } else {
@@ -45,11 +46,21 @@ export function CurrentBookCard() {
 
   return (
     <SystemPanel title="Current book" sub={`${state.player.books_finished} finished`}>
+      {current ? (
+        <View style={styles.nowReading}>
+          <Ionicons name="book" size={16} color={accent} />
+          <View style={styles.nowBody}>
+            <Text style={styles.nowLabel}>NOW READING</Text>
+            <Text style={styles.nowTitle}>{current}</Text>
+            {currentChapters ? <Text style={styles.nowMeta}>{currentChapters} chapters</Text> : null}
+          </View>
+        </View>
+      ) : null}
       <Text style={styles.help}>
-        What you’re reading now. Your Grow daily is to read it at your own pace — which quietly
-        speeds up as your Intelligence level climbs. Search a title (or browse a shelf) to fill it
-        in, or type your own; the chapter count paces you and can be left blank. Each week it asks
-        if you finished.
+        Your Grow daily is to read at your own pace — which quietly speeds up as your Intelligence
+        level climbs. {current ? 'To change it, search' : 'Search'} a title (or browse a shelf), or
+        type your own; the chapter count paces you and can be left blank. Each week it asks if you
+        finished.
       </Text>
       <BookPicker
         onPick={(title, chapters) => {
@@ -75,12 +86,12 @@ export function CurrentBookCard() {
         maxLength={4}
       />
       <Pressable
-        disabled={bookSave === 'saving'}
-        style={({ pressed }) => [styles.btn, (pressed || bookSave === 'saving') && { opacity: 0.8 }]}
+        disabled={!canSave}
+        style={({ pressed }) => [styles.btn, (pressed || !canSave) && { opacity: 0.5 }]}
         onPress={saveBookFlow}
       >
         <Text style={styles.btnText}>
-          {bookSave === 'saving' ? 'Saving…' : bookSave === 'done' ? 'Saved ✓' : 'Save book'}
+          {bookSave === 'saving' ? 'Saving…' : bookSave === 'done' ? 'Saved ✓' : current ? 'Change book' : 'Save book'}
         </Text>
       </Pressable>
     </SystemPanel>
@@ -88,6 +99,21 @@ export function CurrentBookCard() {
 }
 
 const styles = StyleSheet.create({
+  nowReading: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: withAlpha(accent, 0.08),
+    borderWidth: 1,
+    borderColor: withAlpha(accent, 0.25),
+    borderRadius: 10,
+    padding: 11,
+    marginBottom: 12,
+  },
+  nowBody: { flex: 1, gap: 2 },
+  nowLabel: { color: accent, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  nowTitle: { color: text.primary, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  nowMeta: { color: text.faint, fontSize: 11 },
   help: { color: text.secondary, fontSize: 12, lineHeight: 18, marginBottom: 12 },
   input: {
     borderWidth: 1,
