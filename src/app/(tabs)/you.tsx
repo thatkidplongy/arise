@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AvatarEditor } from '@/components/AvatarEditor';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
@@ -21,6 +22,7 @@ export default function YouScreen() {
   return (
     <Screen>
       <View style={styles.head}>
+        <AvatarEditor />
         <Text style={styles.h1}>You</Text>
         {state ? (
           <Text style={styles.sub}>
@@ -50,7 +52,7 @@ export default function YouScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { gap: 4, marginBottom: 2 },
+  head: { gap: 4, marginBottom: 2, alignItems: 'center' },
   h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
   sub: { color: text.secondary, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },

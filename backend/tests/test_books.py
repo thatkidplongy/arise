@@ -3,6 +3,22 @@
 from app import books
 
 
+def test_reading_progress_tracks_completed_dailies(client):
+    day = "2026-07-18"
+    assert client.get(f"/state?day={day}").json()["reading"] is None  # no book yet
+
+    # Set a book whose length makes the pace exactly 14 days at reading level 0.
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 14})
+    r = client.get(f"/state?day={day}").json()["reading"]
+    assert r["book"] == "Atomic Habits" and r["days_to_finish"] == 14
+    assert r["days_read"] == 0 and r["progress"] == 0.0 and r["done_today"] is False
+
+    # Doing the reading daily today moves the needle — progress is completion-based.
+    r = client.post("/completions", json={"quest_id": "d-read", "day": day}).json()["state"]["reading"]
+    assert r["days_read"] == 1 and r["done_today"] is True
+    assert 0 < r["progress"] < 1
+
+
 def test_parse_search_normalises_and_builds_cover_url():
     payload = {"docs": [
         {"title": "Atomic Habits", "author_name": ["James Clear"],

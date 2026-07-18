@@ -103,6 +103,8 @@ interface SystemStore {
     preferences: Partial<Record<StatKey, string[]>>,
     levels?: Partial<Record<StatKey, string>>,
   ) => Promise<void>;
+  addReminder: (text: string) => Promise<void>;
+  removeReminder: (id: string) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
@@ -266,6 +268,28 @@ export const useSystem = create<SystemStore>()(
         const { serverUrl, apiToken, notices } = get();
         try {
           const state = await api.updatePreferences(serverUrl, apiToken, preferences, levels, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      addReminder: async (text) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.addReminder(serverUrl, apiToken, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      removeReminder: async (id) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.removeReminder(serverUrl, apiToken, id, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);

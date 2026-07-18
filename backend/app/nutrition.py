@@ -235,19 +235,69 @@ SUGGESTIONS: list[tuple[str, str, int, int, int, str]] = [
 ]
 
 
+# Philippines set — same protein/fibre focus, but everyday Cebu staples you can
+# actually find in a palengke or local supermarket, so the picks aren't wasted on
+# foods that aren't around. Same (name, serving, kcal, protein_g, fibre_g, tag).
+SUGGESTIONS_PH: list[tuple[str, str, int, int, int, str]] = [
+    # Protein-forward
+    ("Chicken breast, grilled (150 g)", "150 g", 250, 47, 0, "protein"),
+    ("Boiled eggs (2)", "2 eggs", 155, 13, 0, "protein"),
+    ("Bangus (milkfish), grilled (150 g)", "150 g", 220, 30, 0, "protein"),
+    ("Tilapia, grilled (150 g)", "150 g", 195, 34, 0, "protein"),
+    ("Canned tuna in water (100 g)", "100 g", 115, 26, 0, "protein"),
+    ("Tokwa (firm tofu, 150 g)", "150 g", 180, 17, 2, "protein"),
+    ("Lean pork, grilled (120 g)", "120 g", 250, 30, 0, "protein"),
+    ("Greek yoghurt, plain (200 g)", "200 g", 130, 20, 0, "protein"),
+    ("Pusit (squid), grilled (150 g)", "150 g", 140, 24, 0, "protein"),
+    ("Hipon (shrimp, 150 g)", "150 g", 150, 30, 0, "protein"),
+    # Fibre-forward
+    ("Monggo (mung beans, 150 g cooked)", "150 g", 160, 12, 11, "fibre"),
+    ("Brown rice (1 cup cooked)", "1 cup", 215, 5, 4, "fibre"),
+    ("Saba banana, boiled (1)", "1", 120, 1, 4, "fibre"),
+    ("Kamote (sweet potato, 200 g)", "200 g", 180, 4, 6, "fibre"),
+    ("Rolled oats (60 g dry)", "60 g", 230, 8, 6, "fibre"),
+    ("Kangkong, sautéed (150 g)", "150 g", 60, 3, 4, "fibre"),
+    ("Malunggay leaves, cooked (100 g)", "100 g", 60, 5, 4, "fibre"),
+    ("Okra, steamed (150 g)", "150 g", 50, 3, 5, "fibre"),
+    ("Garbanzos (chickpeas, 150 g)", "150 g", 205, 11, 11, "fibre"),
+    ("Ripe mango (1 medium)", "1 medium", 135, 1, 4, "fibre"),
+    ("Corn / mais (1 cob)", "1 cob", 125, 4, 4, "fibre"),
+    ("Ampalaya, sautéed (150 g)", "150 g", 50, 2, 4, "fibre"),
+    # Balanced meals — high protein AND high fibre
+    ("Chicken tinola with malunggay + rice", "1 bowl", 480, 38, 8, "meal"),
+    ("Ginisang monggo with veg", "1 bowl", 350, 20, 14, "meal"),
+    ("Tinolang isda (fish) with veg", "1 bowl", 380, 32, 6, "meal"),
+    ("Tokwa & veg stir-fry + brown rice", "1 plate", 450, 24, 10, "meal"),
+    ("Grilled tilapia + kamote + kangkong", "1 plate", 470, 36, 9, "meal"),
+    ("Adobong kangkong + egg + rice", "1 plate", 420, 18, 8, "meal"),
+    ("Greek yoghurt + banana + oats", "1 bowl", 340, 22, 8, "meal"),
+    ("Ginisang monggo + tilapia + rice", "1 plate", 520, 34, 14, "meal"),
+]
+
+# Region code (from the body profile) → its library. Anything unset/unknown falls
+# back to the worldwide set, so nothing ever breaks on a new country.
+_LIBRARIES: dict[str, list[tuple[str, str, int, int, int, str]]] = {
+    "PH": SUGGESTIONS_PH,
+}
+
+
 def _suggest_item(t: tuple) -> dict:
     name, serving, kcal, protein, fibre, tag = t
     return {"name": name, "serving": serving, "kcal": kcal,
             "protein_g": protein, "fibre_g": fibre, "tag": tag}
 
 
-def daily_suggestions(day: str, per_tag: int = 4) -> list[dict]:
+def daily_suggestions(day: str, country: str = "", per_tag: int = 4) -> list[dict]:
     """A rotating slice of the library for `day` — a few protein picks, a few
     fibre picks, and a couple of meal ideas. Deterministic per day (md5), so the
-    board is stable through the day and fresh tomorrow, exactly like the quests."""
+    board is stable through the day and fresh tomorrow, exactly like the quests.
+
+    `country` (e.g. 'PH') swaps in a locally-available set when we have one, so the
+    picks are things you can actually buy; otherwise the worldwide set is used."""
+    library = _LIBRARIES.get((country or "").upper(), SUGGESTIONS)
     out: list[dict] = []
     for tag, n in (("meal", 3), ("protein", per_tag), ("fibre", per_tag)):
-        pool = [s for s in SUGGESTIONS if s[5] == tag]
+        pool = [s for s in library if s[5] == tag]
         if not pool:
             continue
         start = int(hashlib.md5(f"{tag}:{day}".encode()).hexdigest(), 16) % len(pool)

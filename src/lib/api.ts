@@ -16,6 +16,7 @@ export interface ApiPlayer {
   current_book_chapters: number;
   books_finished: number;
   interview_mode: boolean;
+  has_avatar: boolean; // true when a profile picture is set (fetch via getAvatar)
 }
 
 export interface ApiStat {
@@ -71,6 +72,7 @@ export interface ApiState {
     resting: boolean;
   };
   book_review: { pending: boolean; book: string };
+  reading: ApiReading | null; // progress on the current book, or null when none set
   next_rank: { rank: Rank; level: number; streak: number } | null;
   preferences: Partial<Record<StatKey, string[]>>;
   levels: Partial<Record<StatKey, string>>;
@@ -81,6 +83,19 @@ export interface ApiState {
   quests: ApiQuest[];
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
+  reminders: { id: string; text: string }[]; // a plain personal list on Status
+}
+
+/** Read-only progress on the current book, for the Status screen. */
+export interface ApiReading {
+  book: string;
+  chapters: number; // 0 = unknown
+  books_finished: number;
+  days_read: number; // days the reading daily was done since this book began
+  days_to_finish: number; // target days at the current reading pace
+  progress: number; // 0..1 — days_read / days_to_finish (capped)
+  per_day: string; // today's reading target, e.g. "Read a chapter of …"
+  done_today: boolean; // reading daily already ticked today
 }
 
 // ── Body (standalone wellness tools) ─────────────────────────────────────────
@@ -93,6 +108,7 @@ export interface ApiBodyProfile {
   activity: string; // sedentary | light | moderate | active | very_active
   goal: string; // maintain | gentle_loss | gentle_gain (fallback when no goal weight)
   goal_weight_kg: number; // 0 = not set
+  country: string; // "" = worldwide; "PH" = localised food picks
 }
 
 export interface ApiTargets {
@@ -159,6 +175,20 @@ export interface ApiSkincareStep {
   routine: 'AM' | 'PM';
   text: string;
   done: boolean;
+}
+
+export interface ApiSkincareNote {
+  label: string; // e.g. "Niacinamide" / "Fragrance"
+  detail: string; // one gentle line on why it's flagged
+}
+
+/** A product looked up in Open Beauty Facts, with a read of its ingredients. */
+export interface ApiSkincareProduct {
+  name: string;
+  brand: string;
+  ingredients: string; // raw INCI list (truncated), for the curious
+  helpful: ApiSkincareNote[]; // actives that help pigmentation & pores
+  watch: ApiSkincareNote[]; // worth knowing if your skin runs sensitive
 }
 
 export interface ApiBody {
@@ -370,6 +400,9 @@ export const api = {
   removeFood: (base: string, token: string, entryId: string, day: string) =>
     request<ApiBody>(base, `/food/log/${entryId}?day=${day}`, token, { method: 'DELETE' }),
 
+  searchSkincare: (base: string, token: string, q: string) =>
+    request<ApiSkincareProduct[]>(base, `/skincare/search?q=${encodeURIComponent(q)}`, token),
+
   addSkincareStep: (base: string, token: string, routine: 'AM' | 'PM', text: string, day: string) =>
     request<ApiBody>(base, `/skincare/step?day=${day}`, token, {
       method: 'POST',
@@ -400,4 +433,27 @@ export const api = {
 
   removeInsight: (base: string, token: string, insightId: string) =>
     request<ApiInsight[]>(base, `/insights/${insightId}`, token, { method: 'DELETE' }),
+
+  // ── Profile avatar (kept out of /state) ───────────────────────────────────
+  getAvatar: (base: string, token: string) =>
+    request<{ avatar: string }>(base, '/player/avatar', token),
+
+  setAvatar: (base: string, token: string, avatar: string) =>
+    request<{ avatar: string }>(
+      base,
+      '/player/avatar',
+      token,
+      { method: 'PUT', body: JSON.stringify({ avatar }) },
+      20000, // a base64 image is bigger than a normal call
+    ),
+
+  // ── Reminders (a simple personal list) ────────────────────────────────────
+  addReminder: (base: string, token: string, text: string, day: string) =>
+    request<ApiState>(base, `/reminders?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  removeReminder: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/reminders/${id}?day=${day}`, token, { method: 'DELETE' }),
 };

@@ -43,6 +43,22 @@ def test_daily_suggestions_rotate_and_cover_tags():
     assert all(s["kcal"] > 0 and s["name"] for s in a)
 
 
+def test_country_swaps_in_a_local_library():
+    day = "2026-07-18"
+    world = nutrition.daily_suggestions(day)
+    ph = nutrition.daily_suggestions(day, "PH")
+    world_names = {n for (n, *_rest) in nutrition.SUGGESTIONS}
+    ph_names = {n for (n, *_rest) in nutrition.SUGGESTIONS_PH}
+    # Every PH pick is drawn from the PH library; every worldwide pick from the world one.
+    assert all(s["name"] in ph_names for s in ph)
+    assert all(s["name"] in world_names for s in world)
+    assert ph != world  # localisation actually changed the board
+    # Same shape either way, and an unknown country falls back to worldwide.
+    assert {s["tag"] for s in ph} == {"protein", "fibre", "meal"}
+    assert nutrition.daily_suggestions(day, "zz") == world
+    assert nutrition.daily_suggestions(day, "ph") == ph  # case-insensitive
+
+
 def test_unspecified_sex_lands_between_male_and_female():
     args = dict(age=30, height_cm=180, weight_kg=80)
     m = nutrition.bmr("male", **args)

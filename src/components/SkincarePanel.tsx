@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { ApiSkincareStep } from '@/lib/api';
+import type { ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { useBody } from '@/store/useBody';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
 
@@ -79,6 +79,114 @@ function Routine({
   );
 }
 
+/** Look a product up in Open Beauty Facts and read what's inside — which actives
+ * help pigmentation & pores, and anything gentle to be aware of. */
+function ProductLookup() {
+  const searchProducts = useBody((s) => s.searchProducts);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ApiSkincareProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [note, setNote] = useState('');
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  const run = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setNote('');
+    setOpenIdx(null);
+    try {
+      const items = await searchProducts(q);
+      setResults(items);
+      if (items.length === 0) {
+        setNote('No match with a readable ingredient list — try the brand and product name together.');
+      }
+    } catch {
+      setNote('Lookup unavailable right now — try again in a bit.');
+      setResults([]);
+    }
+    setSearching(false);
+  };
+
+  return (
+    <View style={styles.lookup}>
+      <Text style={styles.lookupTitle}>Check a product</Text>
+      <Text style={styles.lookupHint}>
+        Search any product to read its ingredients and see which actives suit pigmentation & pores.
+      </Text>
+      <View style={styles.searchRow}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={run}
+          returnKeyType="search"
+          style={[styles.addInput, styles.searchInput]}
+          placeholder="e.g. CeraVe moisturising lotion"
+          placeholderTextColor={text.faint}
+          maxLength={80}
+        />
+        <Pressable onPress={run} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
+          {searching ? (
+            <ActivityIndicator size="small" color={TONE} />
+          ) : (
+            <Text style={[styles.addBtnText, { color: TONE }]}>Search</Text>
+          )}
+        </Pressable>
+      </View>
+      {note ? <Text style={styles.lookupNote}>{note}</Text> : null}
+
+      {results.map((p, i) => {
+        const open = openIdx === i;
+        return (
+          <View key={`${p.name}-${i}`} style={styles.product}>
+            <Text style={styles.productName} numberOfLines={2}>
+              {p.name}
+              {p.brand ? <Text style={styles.productBrand}> · {p.brand}</Text> : null}
+            </Text>
+
+            {p.helpful.length > 0 ? (
+              <View style={styles.chips}>
+                {p.helpful.map((h) => (
+                  <View key={h.label} style={[styles.chip, styles.chipGood]}>
+                    <Text style={styles.chipGoodText}>{h.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noneText}>No standout actives for pigmentation or pores here.</Text>
+            )}
+
+            {p.watch.length > 0 ? (
+              <View style={styles.chips}>
+                {p.watch.map((w) => (
+                  <View key={w.label} style={[styles.chip, styles.chipWatch]}>
+                    <Text style={styles.chipWatchText}>{w.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <Pressable onPress={() => setOpenIdx(open ? null : i)} hitSlop={6}>
+              <Text style={styles.detailToggle}>{open ? 'Hide details' : 'What each does · full ingredients'}</Text>
+            </Pressable>
+
+            {open ? (
+              <View style={styles.details}>
+                {[...p.helpful, ...p.watch].map((n) => (
+                  <Text key={n.label} style={styles.detailLine}>
+                    <Text style={styles.detailLabel}>{n.label}</Text> — {n.detail}
+                  </Text>
+                ))}
+                <Text style={styles.ingredients}>{p.ingredients}</Text>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function SkincarePanel() {
   const body = useBody((s) => s.body);
   if (!body) return null;
@@ -88,6 +196,7 @@ export function SkincarePanel() {
       <Text style={styles.note}>{body.skincare_note}</Text>
       <Routine title="Morning" icon="sunny-outline" routine="AM" steps={body.skincare_am} />
       <Routine title="Evening" icon="moon-outline" routine="PM" steps={body.skincare_pm} />
+      <ProductLookup />
       {body.skincare_resources.length > 0 ? (
         <View style={styles.resources}>
           <Text style={styles.resourcesLabel}>LEARN</Text>
@@ -148,6 +257,58 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   addBtnText: { fontSize: 13, fontWeight: '700' },
+
+  // Product lookup
+  lookup: {
+    marginTop: 4,
+    marginBottom: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  lookupTitle: { color: text.primary, fontSize: 14, fontWeight: '700' },
+  lookupHint: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 2, marginBottom: 10 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchInput: { marginBottom: 0 },
+  searchBtn: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    minWidth: 74,
+    alignItems: 'center',
+  },
+  lookupNote: { color: text.secondary, fontSize: 12, marginTop: 10 },
+  product: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  productName: { color: text.primary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  productBrand: { color: text.faint, fontWeight: '400' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  chip: { borderRadius: 99, paddingVertical: 4, paddingHorizontal: 10 },
+  chipGood: { backgroundColor: withAlpha(feedback.success, 0.14) },
+  chipGoodText: { color: feedback.success, fontSize: 11, fontWeight: '700' },
+  chipWatch: { backgroundColor: withAlpha(feedback.gold, 0.16) },
+  chipWatchText: { color: feedback.gold, fontSize: 11, fontWeight: '700' },
+  noneText: { color: text.faint, fontSize: 12, marginTop: 8, fontStyle: 'italic' },
+  detailToggle: { color: TONE, fontSize: 12, fontWeight: '700', marginTop: 10 },
+  details: { marginTop: 8, gap: 6 },
+  detailLine: { color: text.secondary, fontSize: 12, lineHeight: 17 },
+  detailLabel: { color: text.primary, fontWeight: '700' },
+  ingredients: {
+    color: text.faint,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+    backgroundColor: surface.base,
+    borderRadius: 8,
+    padding: 9,
+  },
+
   resources: { marginTop: 4, gap: 5 },
   resourcesLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 2 },
   resource: { color: text.secondary, fontSize: 12, lineHeight: 18 },

@@ -90,12 +90,12 @@ def build_body(db: Session, player_id: str, day: str) -> dict:
             None if p is None else {
                 "sex": p.sex, "age": p.age, "height_cm": p.height_cm,
                 "weight_kg": p.weight_kg, "activity": p.activity, "goal": p.goal,
-                "goal_weight_kg": p.goal_weight_kg,
+                "goal_weight_kg": p.goal_weight_kg, "country": p.country,
             }
         ),
         "targets": _targets(p),
         "food": _food_day(db, player_id, day),
-        "suggestions": nutrition.daily_suggestions(day),
+        "suggestions": nutrition.daily_suggestions(day, p.country if p else ""),
         "skincare_am": am,
         "skincare_pm": pm,
         "skincare_resources": skincare.RESOURCES,
@@ -107,7 +107,8 @@ def build_body(db: Session, player_id: str, day: str) -> dict:
 
 
 def set_profile(db: Session, player_id: str, *, sex: str, age: int, height_cm: int,
-                weight_kg: float, activity: str, goal: str, goal_weight_kg: float = 0) -> None:
+                weight_kg: float, activity: str, goal: str, goal_weight_kg: float = 0,
+                country: str = "") -> None:
     sex = sex if sex in _SEX else "unspecified"
     activity = activity if activity in nutrition.ACTIVITY_FACTORS else "moderate"
     goal = goal if goal in nutrition.GOALS else "maintain"
@@ -118,6 +119,7 @@ def set_profile(db: Session, player_id: str, *, sex: str, age: int, height_cm: i
     row.sex, row.age, row.height_cm = sex, max(0, age), max(0, height_cm)
     row.weight_kg, row.activity, row.goal = max(0.0, float(weight_kg)), activity, goal
     row.goal_weight_kg = max(0.0, float(goal_weight_kg))
+    row.country = (country or "").strip().upper()[:2]  # ISO-ish code; "" = worldwide
     db.commit()
 
 

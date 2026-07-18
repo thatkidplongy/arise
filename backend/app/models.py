@@ -36,6 +36,9 @@ class Player(Base):
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Optional profile picture as a small data-URI (base64). Kept OUT of the main
+    # /state payload (only `has_avatar` is exposed there); fetched on its own route.
+    avatar: Mapped[str] = mapped_column(String, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -117,6 +120,7 @@ class BodyProfile(Base):
     activity: Mapped[str] = mapped_column(String, default="moderate")
     goal: Mapped[str] = mapped_column(String, default="maintain")
     goal_weight_kg: Mapped[float] = mapped_column(Float, default=0.0)  # 0 = not set
+    country: Mapped[str] = mapped_column(String, default="")  # "" = worldwide; "PH" localises food picks
 
 
 class FoodEntry(Base):
@@ -193,4 +197,16 @@ class Insight(Base):
     summary: Mapped[str] = mapped_column(String, default="")
     takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
     quotes: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Reminder(Base):
+    """A plain personal reminder — a simple list the hunter jots and reads on
+    Status. No scheduling, no notifications; it just informs."""
+
+    __tablename__ = "reminders"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

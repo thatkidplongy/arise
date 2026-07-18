@@ -1,5 +1,7 @@
 """Integration tests for the standalone Body tools (nutrition + skincare)."""
 
+from app import skincare
+
 DAY = "2026-07-18"
 
 
@@ -61,6 +63,41 @@ def test_food_log_totals_and_delete(client):
     assert b["food"]["total_kcal"] == 78
     # Food never touches the game state — it's standalone.
     assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 0
+
+
+def test_country_persists_and_localises_suggestions(client):
+    r = client.put(f"/body/profile?day={DAY}", json={
+        "sex": "male", "age": 30, "height_cm": 170, "weight_kg": 70,
+        "activity": "moderate", "goal": "maintain", "country": "ph",
+    })
+    b = r.json()
+    assert b["profile"]["country"] == "PH"  # stored upper-cased
+    # The "what to eat" board now shows local picks.
+    assert any("monggo" in s["name"].lower() or "tinola" in s["name"].lower()
+               for s in b["suggestions"])
+
+
+def test_skincare_search_reads_ingredients(client, monkeypatch):
+    # Stub the network so the route is tested without hitting Open Beauty Facts.
+    def fake_lookup(q, timeout=8.0, limit=8):
+        return skincare._parse_products({"products": [
+            {"product_name": "Test Serum", "brands": "ACME",
+             "ingredients_text": "Aqua, Niacinamide, Zinc Oxide, Parfum"},
+        ]})
+    monkeypatch.setattr(skincare, "lookup", fake_lookup)
+    r = client.get("/skincare/search?q=niacinamide")
+    assert r.status_code == 200
+    items = r.json()
+    assert items[0]["name"] == "Test Serum"
+    assert {h["label"] for h in items[0]["helpful"]} == {"Niacinamide", "Sunscreen filter"}
+    assert items[0]["watch"][0]["label"] == "Fragrance"
+
+
+def test_skincare_search_failure_is_a_clean_502(client, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(skincare, "lookup", boom)
+    assert client.get("/skincare/search?q=cerave").status_code == 502
 
 
 def test_skincare_check_and_edit(client):

@@ -21,6 +21,7 @@ from .models import (
     Player,
     Preference,
     QuestDef,
+    Reminder,
     StepCheck,
     utcnow,
 )
@@ -395,6 +396,26 @@ def update_preferences(
             db.add(Preference(player_id=player.id, stat=stat, focus=json.dumps(focus), level=level))
     _clear_generated(db, player)
     db.commit()
+
+
+def set_avatar(db: Session, player: Player, avatar: str) -> None:
+    """Store (or clear, with "") the profile picture. Not part of /state."""
+    player.avatar = avatar or ""
+    db.commit()
+
+
+def add_reminder(db: Session, player: Player, text: str) -> None:
+    text = (text or "").strip()[:200]
+    if text:
+        db.add(Reminder(player_id=player.id, text=text))
+        db.commit()
+
+
+def remove_reminder(db: Session, player: Player, reminder_id: str) -> None:
+    row = db.get(Reminder, reminder_id)
+    if row is not None and row.player_id == player.id:
+        db.delete(row)
+        db.commit()
 
 
 def reset_all(db: Session, player: Player) -> None:

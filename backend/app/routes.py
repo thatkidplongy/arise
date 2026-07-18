@@ -3,14 +3,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import body, books, insights, llm, nutrition, service, state, transcript
+from . import body, books, insights, llm, nutrition, service, skincare, state, transcript
 from .db import get_db
-from .schemas import (ActionResult, BodyOut, BodyProfileIn, BookIn, BookReviewIn,
-                      BookOut, BookShelfOut, CompleteIn, FoodAnalyzeIn,
-                      FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
+from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CompleteIn,
+                      FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       InsightAddIn, InsightOut, InterviewModeIn, PlayerIn,
-                      PreferencesIn, SkincareCheckIn, SkincareStepIn, StateOut,
-                      StepResult, StepToggleIn)
+                      PreferencesIn, ReminderIn, SkincareCheckIn, SkincareProductOut,
+                      SkincareStepIn, StateOut, StepResult, StepToggleIn)
 
 router = APIRouter()
 
@@ -186,7 +186,7 @@ def set_body_profile(profile: BodyProfileIn, day: str | None = Query(None), db: 
     body.set_profile(
         db, player.id, sex=profile.sex, age=profile.age, height_cm=profile.height_cm,
         weight_kg=profile.weight_kg, activity=profile.activity, goal=profile.goal,
-        goal_weight_kg=profile.goal_weight_kg,
+        goal_weight_kg=profile.goal_weight_kg, country=profile.country,
     )
     return body.build_body(db, player.id, _valid_day(day))
 
@@ -232,6 +232,18 @@ def remove_food(entry_id: str, day: str | None = Query(None), db: Session = Depe
     player = state.get_or_create_player(db)
     body.remove_food(db, player.id, entry_id)
     return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.get("/skincare/search", response_model=list[SkincareProductOut])
+def skincare_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    """Look a product up in Open Beauty Facts (free, no key) and read its
+    ingredients, flagging the actives that help pigmentation & pores. A gentle
+    guide, not medical advice. A lookup failure is a clean 502, not a crash."""
+    state.get_or_create_player(db)
+    try:
+        return skincare.lookup(q)
+    except Exception:
+        raise HTTPException(502, "Ingredient lookup is unavailable right now — try again in a bit.")
 
 
 @router.post("/skincare/step", response_model=BodyOut)
@@ -291,3 +303,44 @@ def remove_insight(insight_id: str, db: Session = Depends(get_db)):
     player = state.get_or_create_player(db)
     insights.remove_insight(db, player.id, insight_id)
     return insights.list_insights(db, player.id)
+
+
+# ── Profile avatar (kept out of /state; fetched on demand) ────────────────────
+
+
+@router.get("/player/avatar", response_model=AvatarOut)
+def get_avatar(db: Session = Depends(get_db)):
+    """The profile picture as a data URI, or "" when none is set."""
+    player = state.get_or_create_player(db)
+    return {"avatar": player.avatar or ""}
+
+
+@router.put("/player/avatar", response_model=AvatarOut)
+def put_avatar(body_in: AvatarIn, db: Session = Depends(get_db)):
+    """Set (or clear, with "") the profile picture — a small image data URI."""
+    player = state.get_or_create_player(db)
+    av = (body_in.avatar or "").strip()
+    if av and not av.startswith("data:image/"):
+        raise HTTPException(400, "Avatar must be an image data URI.")
+    if len(av) > 700_000:  # ~500 KB image; keep the database lean
+        raise HTTPException(413, "That image is too large — pick a smaller one.")
+    service.set_avatar(db, player, av)
+    return {"avatar": av}
+
+
+# ── Reminders (a simple personal list; no scheduling) ─────────────────────────
+
+
+@router.post("/reminders", response_model=StateOut)
+def add_reminder(body_in: ReminderIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Jot a plain reminder. It shows as a simple list on Status."""
+    player = state.get_or_create_player(db)
+    service.add_reminder(db, player, body_in.text)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.delete("/reminders/{reminder_id}", response_model=StateOut)
+def remove_reminder(reminder_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_reminder(db, player, reminder_id)
+    return state.build_state(db, player, _valid_day(day))

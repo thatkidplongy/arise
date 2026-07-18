@@ -6,6 +6,7 @@ import {
   type ApiBodyProfile,
   type ApiFoodEstimate,
   type ApiFoodSearchItem,
+  type ApiSkincareProduct,
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 
@@ -25,6 +26,7 @@ interface BodyStore {
   fetch: () => Promise<void>;
   saveProfile: (profile: ApiBodyProfile) => Promise<void>;
   search: (q: string) => Promise<ApiFoodSearchItem[]>;
+  searchProducts: (q: string) => Promise<ApiSkincareProduct[]>;
   analyzePhoto: (image: string, mime: string) => Promise<ApiFoodEstimate>;
   logFood: (entry: { name: string; grams: number; kcal: number; protein_g: number; fibre_g: number }) => Promise<void>;
   removeFood: (id: string) => Promise<void>;
@@ -63,6 +65,11 @@ export const useBody = create<BodyStore>((set) => ({
   search: async (q) => {
     const { serverUrl, apiToken } = link();
     return api.searchFood(serverUrl, apiToken, q);
+  },
+
+  searchProducts: async (q) => {
+    const { serverUrl, apiToken } = link();
+    return api.searchSkincare(serverUrl, apiToken, q);
   },
 
   analyzePhoto: async (image, mime) => {

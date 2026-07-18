@@ -23,6 +23,13 @@ const ACTIVITY = [
   { key: 'active', label: 'Active' },
   { key: 'very_active', label: 'Very active' },
 ];
+// Where you are — picks the local "what to eat" library so suggestions are foods
+// you can actually find. Add more as the backend grows its regional sets.
+const COUNTRY = [
+  { key: '', label: 'Worldwide' },
+  { key: 'PH', label: 'Philippines' },
+];
+const COUNTRY_LABEL: Record<string, string> = { PH: 'the Philippines' };
 const GROUPS: { tag: ApiSuggestion['tag']; label: string }[] = [
   { tag: 'meal', label: 'Balanced meals' },
   { tag: 'protein', label: 'Protein-rich' },
@@ -84,6 +91,7 @@ export function NutritionPanel() {
   const [weight, setWeight] = useState(profile?.weight_kg ? String(profile.weight_kg) : '');
   const [activity, setActivity] = useState(profile?.activity ?? 'moderate');
   const [goalWeight, setGoalWeight] = useState(profile?.goal_weight_kg ? String(profile.goal_weight_kg) : '');
+  const [country, setCountry] = useState(profile?.country ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Food logging.
@@ -115,6 +123,7 @@ export function NutritionPanel() {
     setWeight(profile?.weight_kg ? String(profile.weight_kg) : '');
     setActivity(profile?.activity ?? 'moderate');
     setGoalWeight(profile?.goal_weight_kg ? String(profile.goal_weight_kg) : '');
+    setCountry(profile?.country ?? '');
     setEditing(true);
   };
 
@@ -127,6 +136,7 @@ export function NutritionPanel() {
       activity,
       goal: profile?.goal ?? 'maintain', // fallback when no goal weight is set
       goal_weight_kg: num(goalWeight),
+      country,
     };
     setSavingProfile(true);
     await saveProfile(p);
@@ -286,6 +296,9 @@ export function NutritionPanel() {
         </View>
         <Text style={styles.fieldLabel}>Activity</Text>
         <Segmented options={ACTIVITY} value={activity} onChange={setActivity} />
+        <Text style={styles.fieldLabel}>Where you are</Text>
+        <Segmented options={COUNTRY} value={country} onChange={setCountry} />
+        <Text style={styles.hint}>Tunes the “what to eat” picks to foods you can actually find locally.</Text>
         <Text style={styles.fieldLabel}>Goal weight (kg)</Text>
         <TextInput
           value={goalWeight}
@@ -390,7 +403,11 @@ export function NutritionPanel() {
       {suggestions.length > 0 ? (
         <View style={styles.suggest}>
           <Text style={styles.suggestTitle}>What to eat today</Text>
-          <Text style={styles.suggestHint}>Protein- & fibre-forward picks. Tap + to log one.</Text>
+          <Text style={styles.suggestHint}>
+            Protein- & fibre-forward picks{profile?.country && COUNTRY_LABEL[profile.country]
+              ? ` for ${COUNTRY_LABEL[profile.country]}`
+              : ''}. Tap + to log one.
+          </Text>
           {GROUPS.map(({ tag, label }) => {
             const items = suggestions.filter((s) => s.tag === tag);
             if (items.length === 0) return null;

@@ -42,6 +42,14 @@ class InsightAddIn(BaseModel):
     url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL")
 
 
+class AvatarIn(BaseModel):
+    avatar: str = ""  # image data URI (base64), or "" to clear
+
+
+class ReminderIn(BaseModel):
+    text: str = Field(min_length=1, max_length=200)
+
+
 # ── Body (standalone wellness tools) ──────────────────────────────────────────
 
 
@@ -53,6 +61,7 @@ class BodyProfileIn(BaseModel):
     activity: str = "moderate"  # sedentary | light | moderate | active | very_active
     goal: str = "maintain"  # maintain | gentle_loss | gentle_gain (fallback when no goal weight)
     goal_weight_kg: float = Field(0, ge=0, le=400)  # 0 = not set → use goal
+    country: str = ""  # "" = worldwide; "PH" = localised food picks
 
 
 class FoodLogIn(BaseModel):
@@ -86,6 +95,7 @@ class BodyProfileOut(BaseModel):
     activity: str
     goal: str
     goal_weight_kg: float
+    country: str = ""  # "" = worldwide; "PH" = localised food picks
 
 
 class TargetsOut(BaseModel):
@@ -167,6 +177,20 @@ class SkincareStepOut(BaseModel):
     done: bool  # ticked for the requested day
 
 
+class SkincareNoteOut(BaseModel):
+    label: str   # e.g. "Niacinamide" / "Fragrance"
+    detail: str  # one gentle line on why it's flagged
+
+
+class SkincareProductOut(BaseModel):
+    """A product from Open Beauty Facts, with a read of its ingredients."""
+    name: str
+    brand: str
+    ingredients: str  # the raw INCI list (truncated), for the curious
+    helpful: list[SkincareNoteOut]  # actives that help pigmentation & pores
+    watch: list[SkincareNoteOut]    # worth knowing if your skin runs sensitive
+
+
 class BodyOut(BaseModel):
     day: str
     profile: BodyProfileOut | None  # null until set
@@ -203,11 +227,24 @@ class PlayerOut(BaseModel):
     current_book_chapters: int
     books_finished: int
     interview_mode: bool
+    has_avatar: bool  # true when a profile picture is set (fetch it from /player/avatar)
 
 
 class BookReviewOut(BaseModel):
     pending: bool  # true when the weekly "did you finish it?" review is due
     book: str
+
+
+class ReadingOut(BaseModel):
+    """Read-only progress on the current book, for the Status screen."""
+    book: str
+    chapters: int  # 0 = unknown
+    books_finished: int
+    days_read: int  # days the reading daily was done since this book began
+    days_to_finish: int  # target days at the current reading pace
+    progress: float  # 0..1 — days_read / days_to_finish (capped)
+    per_day: str  # today's reading target, e.g. "Read a chapter of …"
+    done_today: bool  # reading daily already ticked today
 
 
 class StatOut(BaseModel):
@@ -294,12 +331,22 @@ class DailyQuoteOut(BaseModel):
     insight_id: str
 
 
+class AvatarOut(BaseModel):
+    avatar: str  # data URI, or "" when none
+
+
+class ReminderOut(BaseModel):
+    id: str
+    text: str
+
+
 class StateOut(BaseModel):
     player: PlayerOut
     stats: list[StatOut]
     streak: StreakOut
     today: TodayOut
     book_review: BookReviewOut
+    reading: ReadingOut | None  # progress on the current book, or null when none set
     next_rank: RankGateOut | None
     preferences: dict[str, list[str]]
     levels: dict[str, str]
@@ -310,6 +357,7 @@ class StateOut(BaseModel):
     quests: list[QuestOut]
     achievements: list[AchievementOut]
     record: RecordOut
+    reminders: list[ReminderOut]  # a plain personal list shown on Status
 
 
 class EventOut(BaseModel):

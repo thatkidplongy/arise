@@ -1,14 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import type { ApiReading } from '@/lib/api';
 import { RankBadge } from '@/components/RankBadge';
 import { Screen } from '@/components/Screen';
 import { StatRow } from '@/components/StatRow';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import { dateKey } from '@/lib/dates';
+import { useAvatar } from '@/store/useAvatar';
+import { useMotivation } from '@/store/useMotivation';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, surface, text, withAlpha } from '@/theme';
 
@@ -63,24 +67,130 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
-function DailyQuote({ quote }: { quote: { text: string; source_title: string } }) {
+// Today's line (a deterministic daily pick from the server). Tapping shuffles to
+// another captured quote — no attribution, no navigation (Inspire is its own tab).
+function DailyQuote({ initialText }: { initialText: string }) {
+  const [line, setLine] = useState(initialText);
+  useEffect(() => setLine(initialText), [initialText]);
+
+  const shuffle = async () => {
+    const { insights, loaded, fetch } = useMotivation.getState();
+    let quotes = insights.flatMap((i) => i.quotes);
+    if (!loaded) {
+      await fetch(); // lazy-load the pool on first tap
+      quotes = useMotivation.getState().insights.flatMap((i) => i.quotes);
+    }
+    const others = quotes.filter((q) => q !== line);
+    if (others.length === 0) return;
+    setLine(others[Math.floor(Math.random() * others.length)]);
+  };
+
   return (
     <Pressable
-      onPress={() => router.push('/inspire')}
+      onPress={shuffle}
       style={({ pressed }) => [styles.quoteCard, pressed && { opacity: 0.85 }]}
     >
       <View style={styles.quoteHead}>
         <Ionicons name="sparkles-outline" size={13} color={feedback.gold} />
         <Text style={styles.quoteLabel}>A LINE TO CARRY TODAY</Text>
       </View>
-      <Text style={styles.quoteCardText}>“{quote.text}”</Text>
-      {quote.source_title ? <Text style={styles.quoteCardSource}>{quote.source_title}</Text> : null}
+      <Text style={styles.quoteCardText}>“{line}”</Text>
+      <Text style={styles.quoteHint}>tap for another</Text>
     </Pressable>
+  );
+}
+
+function Reminders({ items }: { items: { id: string; text: string }[] }) {
+  const addReminder = useSystem((s) => s.addReminder);
+  const removeReminder = useSystem((s) => s.removeReminder);
+  const [draft, setDraft] = useState('');
+
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    setDraft('');
+    void addReminder(t);
+  };
+
+  return (
+    <SystemPanel title="Reminders" sub={items.length ? String(items.length) : undefined}>
+      {items.map((r) => (
+        <View key={r.id} style={styles.reminderRow}>
+          <Text style={styles.reminderText}>{r.text}</Text>
+          <Pressable onPress={() => removeReminder(r.id)} hitSlop={8}>
+            <Text style={styles.reminderX}>×</Text>
+          </Pressable>
+        </View>
+      ))}
+      <View style={styles.reminderAdd}>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          onSubmitEditing={add}
+          blurOnSubmit={false}
+          returnKeyType="done"
+          style={styles.reminderInput}
+          placeholder="Add a reminder…"
+          placeholderTextColor={text.faint}
+          maxLength={200}
+        />
+        <Pressable
+          onPress={add}
+          style={({ pressed }) => [styles.reminderAddBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.reminderAddText}>Add</Text>
+        </Pressable>
+      </View>
+    </SystemPanel>
+  );
+}
+
+/** Read-only reading progress — how far toward finishing the current book, paced
+ * by how many reading dailies you've actually done. Editing lives on Quests. */
+function Reading({ reading }: { reading: ApiReading }) {
+  const pct = Math.round(reading.progress * 100);
+  const done = pct >= 100;
+  const perDay = reading.per_day.replace(/ of .*/, ''); // book name shown above already
+  return (
+    <SystemPanel
+      title="Reading"
+      sub={reading.books_finished ? `${reading.books_finished} finished` : undefined}
+    >
+      <Text style={styles.readingBook} numberOfLines={2}>
+        {reading.book}
+      </Text>
+      <View style={styles.xpRow}>
+        <Text style={styles.xpLabel}>Toward finishing</Text>
+        <Text style={styles.xpValue}>
+          {reading.days_read} / {reading.days_to_finish} days
+        </Text>
+      </View>
+      <XpBar
+        value={Math.min(reading.days_read, reading.days_to_finish)}
+        max={reading.days_to_finish}
+        color={done ? feedback.success : accent}
+        height={8}
+      />
+      <Text style={styles.readingMeta}>
+        {done
+          ? 'On pace to finish — the weekly check-in will ask when you’re done.'
+          : `About ${pct}% of the way at your pace · ${perDay} a day`}
+      </Text>
+      <Text style={[styles.readingToday, { color: reading.done_today ? feedback.success : text.faint }]}>
+        {reading.done_today ? '✓ Read today' : 'Not read yet today'}
+      </Text>
+    </SystemPanel>
   );
 }
 
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
+  const avatarUri = useAvatar((s) => s.uri);
+  const loadAvatar = useAvatar((s) => s.load);
+  const hasAvatar = state?.player.has_avatar ?? false;
+  useEffect(() => {
+    if (hasAvatar && avatarUri === null) void loadAvatar();
+  }, [hasAvatar, avatarUri, loadAvatar]);
 
   if (!state) {
     return (
@@ -99,17 +209,21 @@ export default function StatusScreen() {
 
       <NorthStar value={player.north_star} />
 
-      {state.daily_quote ? <DailyQuote quote={state.daily_quote} /> : null}
+      {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
 
       <SystemPanel>
         <View style={styles.identityRow}>
-          <RankBadge rank={player.rank} />
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatar} />
+          ) : (
+            <RankBadge rank={player.rank} />
+          )}
           <View style={styles.identity}>
             <Text style={styles.name}>{player.name}</Text>
             {player.equipped_title ? (
               <Text style={styles.title}>{player.equipped_title}</Text>
             ) : null}
-            <Text style={styles.meta}>Hunter · Level {player.level}</Text>
+            <Text style={styles.meta}>Hunter · {player.rank}-Rank · Level {player.level}</Text>
           </View>
         </View>
 
@@ -169,6 +283,10 @@ export default function StatusScreen() {
           <Text style={styles.restNote}>Your streak is safe. Rest is part of it.</Text>
         ) : null}
       </SystemPanel>
+
+      {state.reading ? <Reading reading={state.reading} /> : null}
+
+      <Reminders items={state.reminders} />
 
       {next_rank ? (
         <SystemPanel title="Next rank">
@@ -271,15 +389,50 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontStyle: 'italic',
   },
-  quoteCardSource: {
+  quoteHint: {
     color: text.faint,
     fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  reminderText: { color: text.primary, fontSize: 13, lineHeight: 18, flex: 1 },
+  reminderX: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
+  reminderAdd: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  reminderInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    color: text.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+    backgroundColor: surface.base,
+  },
+  reminderAddBtn: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  reminderAddText: { color: accent, fontSize: 13, fontWeight: '700' },
   restNote: {
     color: feedback.success,
     fontSize: 12,
     marginTop: 10,
   },
+  readingBook: { color: text.primary, fontSize: 15, fontWeight: '700', marginBottom: 12, lineHeight: 21 },
+  readingMeta: { color: text.secondary, fontSize: 12, lineHeight: 17, marginTop: 10 },
+  readingToday: { fontSize: 12, fontWeight: '700', marginTop: 6 },
   reminder: {
     color: text.faint,
     fontSize: 12,
@@ -288,6 +441,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 4,
     marginBottom: 4,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: withAlpha(accent, 0.4),
   },
   identityRow: {
     flexDirection: 'row',

@@ -21,6 +21,7 @@ from .models import (
     Player,
     Preference,
     QuestDef,
+    Reminder,
     StepCheck,
 )
 
@@ -292,6 +293,34 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
     }
 
 
+def reading_of(db: Session, player: Player, day: str, rows: list[Completion], int_level: int) -> dict | None:
+    """A read-only view of progress on the current book, measured by how many days
+    the reading daily was actually done since the book began — so the Status screen
+    can show 'how far to finishing', grounded in real quest completions rather than
+    elapsed time. None when no book is set."""
+    book = player.current_book
+    if not book:
+        return None
+    days_target = quests.days_to_finish(int_level)
+    start = progression.week_start(player.book_started_week) if player.book_started_week else None
+    read_days = {r.day for r in rows if r.quest_id == "d-read"}
+    if start is not None:  # only count reading done since this book began
+        floor = start.isoformat()
+        read_days = {d for d in read_days if d >= floor}
+    days_read = len(read_days)
+    progress = min(1.0, days_read / days_target) if days_target else 0.0
+    return {
+        "book": book,
+        "chapters": player.current_book_chapters,
+        "books_finished": player.books_finished,
+        "days_read": days_read,
+        "days_to_finish": days_target,
+        "progress": round(progress, 3),
+        "per_day": quests.reading_floor(book, int_level, player.current_book_chapters),
+        "done_today": day in read_days,
+    }
+
+
 def build_state(db: Session, player: Player, day: str) -> dict:
     defs = quest_defs(db)
     rows = completions_of(db, player)
@@ -348,8 +377,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "current_book_chapters": player.current_book_chapters,
             "books_finished": player.books_finished,
             "interview_mode": player.interview_mode,
+            "has_avatar": bool(player.avatar),
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
+        "reading": reading_of(db, player, day, rows, prog_levels.get("INT", 0)),
         "stats": [
             {"key": k, **game.stat_level_info(agg["by_stat"][k])} for k in game.STAT_KEYS
         ],
@@ -388,4 +419,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "active_days": len(agg["active_days"]),
             "total_completions": agg["total_completions"],
         },
+        "reminders": [
+            {"id": r.id, "text": r.text}
+            for r in db.query(Reminder).filter_by(player_id=player.id).order_by(Reminder.created_at)
+        ],
     }

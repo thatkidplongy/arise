@@ -1027,6 +1027,12 @@ def reading_floor(book: str | None, level: int, chapters: int = 0) -> str:
     return f"Read {per} chapters{where}" if per > 1 else f"Read a chapter{where}"
 
 
+def days_to_finish(level: int) -> int:
+    """How many days a book should take at this reading level — the denominator
+    the Status screen uses to show reading progress. Higher level → fewer days."""
+    return _READING_PACE_DAYS[max(0, min(level, len(_READING_PACE_DAYS) - 1))]
+
+
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters: int = 0) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
