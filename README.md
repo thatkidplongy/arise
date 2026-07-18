@@ -61,6 +61,12 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
 - **Rotating quests** — each quest is a stable "slot" whose text is picked from a
   hand-written pool by the date, so daily quests refresh each day and weekly ones
   each Monday. Free, offline, deterministic (no LLM).
+- **Progression that climbs** — every attribute has a level that starts at 0 and
+  grows as you show up consistently, so the challenge never stagnates. The daily
+  floor ratchets up (5 push-ups → 20; a pause → a 5-min sit) and the harder areas
+  move fundamentals-first (learn *how to learn* before the hard subjects; money
+  *psychology* before hustle). Miss a week and it eases down gently; your all-time
+  **peak never drops**, and there are no penalties.
 - **Coaching steps** — every quest carries specific instructions (reps × sets,
   timed segments, prompts). Single-completion quests turn those into a tickable
   **checklist**; ticking the last step auto-completes the quest (with a floating
@@ -79,6 +85,43 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   the copy invites rather than commands.
 
 ## Architecture
+
+### In plain English
+
+Arise is made of three simple parts:
+
+1. **The app on your phone** — the screens you tap. It doesn't remember anything
+   on its own; it just shows what the "brain" sends it and passes your taps back.
+2. **The "brain" on your Mac** — a small program that runs quietly in the
+   background, always on. It does all the thinking (working out your quests,
+   levels, streaks) and keeps everything in **one file**, like a private notebook.
+3. **A private tunnel between them** (a free tool called *Tailscale*) — so your
+   phone can reach your Mac from anywhere, and no one else can. Think of it as a
+   locked hallway only your own devices have a key to.
+
+```text
+     YOUR PHONE          ⇄   private tunnel   ⇄          YOUR MAC (always on)
+   ───────────────           (Tailscale)            ──────────────────────────
+   the Arise app:                                    "the brain":
+   shows your quests,                                works out quests, levels &
+   takes your taps                                   streaks — all the thinking
+                                                          │
+                                                          ▼
+                                                    "the notebook":
+                                                    one file with all your
+                                                    progress, backed up daily
+
+   (optional) the brain can ask Google's Gemini AI to tailor your quests to your
+   level — roughly once a day, and only if you switch it on.
+```
+
+**Why keep the "brain" on the Mac and not the phone?** Because the Mac is always
+on and never loses your data. Your whole history lives in one file that *you*
+own, backed up automatically every day — and it costs nothing. The phone stays a
+simple window onto it, so it works the same on your phone, an old tablet, or a
+browser.
+
+### For developers
 
 The server owns all game state; the app is a thin client that renders one
 `GET /state` payload and posts actions back.
@@ -107,7 +150,9 @@ flowchart TD
   R --> SV["service.py<br/>write operations"]
   SV --> ST
   ST --> G["game.py<br/>pure rules"]
-  ST --> Q["quests.py<br/>rotating content"]
+  ST --> Q["quests.py<br/>rotating content + leveled floors"]
+  ST --> P["progression.py<br/>earned difficulty (levels)"]
+  Q --> P
   ST --> AC["achievements.py"]
   ST --> M["models.py<br/>ORM"]
   SV --> M
@@ -165,7 +210,9 @@ backend/
     state.py      read model — derives game state from stored rows
     service.py    write operations (complete, undo, steps, prefs, rest, reset)
     game.py       pure rules: XP curves, ranks, streaks
-    quests.py     rotating quest content + step generator
+    quests.py     rotating content + leveled floors + content bands
+    progression.py earned difficulty: per-attribute levels that climb/ease
+    llm.py        optional Gemini personalisation (off without a key)
     achievements.py, models.py, schemas.py, seed.py, db.py, security.py
   scripts/        backup_db.py
   tests/          pytest: unit + integration + migration
