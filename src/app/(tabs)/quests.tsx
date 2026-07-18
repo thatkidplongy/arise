@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { CurrentBookCard } from '@/components/CurrentBookCard';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
@@ -75,6 +76,9 @@ export default function QuestsScreen() {
           ))}
         </View>
       </SystemPanel>
+
+      {/* Reading is the Grow floor — set/browse your book right by its quests. */}
+      <CurrentBookCard />
 
       {/* Rest is part of the path — never a failure. */}
       <Pressable
