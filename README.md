@@ -74,7 +74,9 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
 - **Focus areas** — an optional set of focuses per attribute (Settings → Focus
   areas); a saved focus rotates that attribute's side quest through your set.
 - **Reading loop** — a chapter a day is the mandatory Grow floor; each new week
-  Arise asks if you finished your book and what to read next (a book a week).
+  Arise asks if you finished your book and what to read next (a book a week). Set
+  the book by **searching Open Library** (free, no key) or browsing themed shelves
+  (Grow / Money / Craft / Calm); picking one fills the title and estimates chapters.
 - **Craft — the engineering ladder** — a dedicated attribute for coding, aimed
   at going mid → Senior. It climbs fundamentals-first: fluency & fundamentals →
   patterns & problem-solving → system design & architecture, with a small
@@ -233,6 +235,7 @@ backend/
     body.py       standalone Body tools: nutrition + skincare (read + write)
     nutrition.py  calorie/protein targets (pure) + Open Food Facts lookup
     skincare.py   the seeded AM/PM routine template + resources
+    books.py      book search + themed shelves via Open Library
     achievements.py, models.py, schemas.py, seed.py, db.py, security.py
   scripts/        backup_db.py
   tests/          pytest: unit + integration + migration

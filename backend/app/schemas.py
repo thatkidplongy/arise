@@ -143,6 +143,19 @@ class FoodEstimateOut(BaseModel):
     source: str = ""  # 'label' (read off a Nutrition Facts panel), 'food', 'none'
 
 
+class BookOut(BaseModel):
+    title: str
+    author: str
+    pages: int  # 0 if unknown
+    cover_url: str  # "" if none
+    year: int  # 0 if unknown
+
+
+class BookShelfOut(BaseModel):
+    label: str  # Grow | Money | Craft | Calm …
+    books: list[BookOut]
+
+
 class SkincareStepOut(BaseModel):
     id: str
     routine: str

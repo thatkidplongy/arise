@@ -171,6 +171,21 @@ export interface ApiBody {
   skincare_note: string;
 }
 
+// ── Books (Open Library) ─────────────────────────────────────────────────────
+
+export interface ApiBook {
+  title: string;
+  author: string;
+  pages: number; // 0 if unknown
+  cover_url: string; // '' if none
+  year: number; // 0 if unknown
+}
+
+export interface ApiBookShelf {
+  label: string;
+  books: ApiBook[];
+}
+
 export interface ApiEvent {
   type: 'daily_clear' | 'level_up' | 'rank_up' | 'achievement' | string;
   data: Record<string, any>;
@@ -285,6 +300,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ finished, next_book: nextBook }),
     }),
+
+  searchBooks: (base: string, token: string, q: string) =>
+    request<ApiBook[]>(base, `/books/search?q=${encodeURIComponent(q)}`, token),
+
+  suggestBooks: (base: string, token: string) =>
+    request<ApiBookShelf[]>(base, `/books/suggest`, token),
 
   setInterviewMode: (base: string, token: string, enabled: boolean, day: string) =>
     request<ApiState>(base, `/interview?day=${day}`, token, {

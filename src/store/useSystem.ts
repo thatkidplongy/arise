@@ -4,7 +4,15 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { api, UnauthorizedError, type ApiEvent, type ApiQuest, type ApiState } from '@/lib/api';
+import {
+  api,
+  UnauthorizedError,
+  type ApiBook,
+  type ApiBookShelf,
+  type ApiEvent,
+  type ApiQuest,
+  type ApiState,
+} from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import type { Notice, StatKey, Toast } from '@/types';
 
@@ -100,6 +108,8 @@ interface SystemStore {
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
   setInterviewMode: (enabled: boolean) => Promise<void>;
+  searchBooks: (q: string) => Promise<ApiBook[]>;
+  suggestBooks: () => Promise<ApiBookShelf[]>;
   resetAll: () => Promise<void>;
   setServerUrl: (url: string) => void;
   setApiToken: (token: string) => void;
@@ -303,6 +313,21 @@ export const useSystem = create<SystemStore>()(
         } catch (e) {
           const { status, notice } = errorOutcome(e);
           set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      // Book lookup (Open Library). Search lets errors surface so the picker can
+      // show a hint; suggestions are a nicety, so they fail quietly to empty.
+      searchBooks: async (q) => {
+        const { serverUrl, apiToken } = get();
+        return api.searchBooks(serverUrl, apiToken, q);
+      },
+      suggestBooks: async () => {
+        const { serverUrl, apiToken } = get();
+        try {
+          return await api.suggestBooks(serverUrl, apiToken);
+        } catch {
+          return [];
         }
       },
 

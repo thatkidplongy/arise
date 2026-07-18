@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BookPicker } from '@/components/BookPicker';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
@@ -242,9 +243,16 @@ export default function SettingsScreen() {
         <SystemPanel title="Current book" sub={`${state.player.books_finished} finished`}>
           <Text style={styles.help}>
             What you’re reading now. Your Grow daily is to read it at your own pace — which quietly
-            speeds up as your Intelligence level climbs. Add the chapter count and Arise paces you to
-            keep up; leave it blank for a simple chapter a day. Each week it asks if you finished.
+            speeds up as your Intelligence level climbs. Search a title below (or browse a shelf) to
+            fill it in, or type your own; the chapter count paces you and can be left blank. Each
+            week it asks if you finished.
           </Text>
+          <BookPicker
+            onPick={(title, chapters) => {
+              setBookDraft(title);
+              if (chapters > 0) setChaptersDraft(String(chapters));
+            }}
+          />
           <TextInput
             value={bookDraft}
             onChangeText={setBookDraft}

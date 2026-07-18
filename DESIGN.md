@@ -147,6 +147,13 @@ and they name the next book; not yet → it carries over, no penalty
 (`service.review_book`), asked at most once per week (`book_review_week` guards
 it). Setting or changing the book restarts that weekly clock.
 
+To set a book you can **search Open Library** (`books.py`, `GET /books/search`,
+free, no key — the largest open catalogue) or browse themed shelves
+(`GET /books/suggest`: Grow / Money / Craft / Calm, from Open Library subjects);
+picking one fills the title and estimates chapters from the page count. This is a
+third external touchpoint (with Open Food Facts and Gemini) — a lookup failure
+just falls back to typing the title.
+
 ## Body — nutrition & skincare (standalone tools)
 
 The **Body** tab is a deliberate exception to the game: it is *not* an attribute,

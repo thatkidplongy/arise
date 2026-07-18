@@ -1,0 +1,204 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+
+import type { ApiBook, ApiBookShelf } from '@/lib/api';
+import { useSystem } from '@/store/useSystem';
+import { accent, surface, text } from '@/theme';
+
+/** Estimate chapters from page count (~15 pages/chapter) — a starting guess the
+ * user can adjust; 0 when the page count is unknown. */
+function estChapters(pages: number): number {
+  return pages > 0 ? Math.max(1, Math.round(pages / 15)) : 0;
+}
+
+function Cover({ url, size }: { url: string; size: number }) {
+  const box = { width: size, height: Math.round(size * 1.5), borderRadius: 4, backgroundColor: surface.raised };
+  if (url) return <Image source={{ uri: url }} style={box} resizeMode="cover" />;
+  return (
+    <View style={[box, styles.coverPlaceholder]}>
+      <Ionicons name="book-outline" size={Math.round(size * 0.55)} color={text.faint} />
+    </View>
+  );
+}
+
+/** Search Open Library (or browse themed shelves) and pick a book. `onPick` gets
+ * the title and a chapter estimate; the parent fills its book form from those. */
+export function BookPicker({ onPick }: { onPick: (title: string, chapters: number) => void }) {
+  const searchBooks = useSystem((s) => s.searchBooks);
+  const suggestBooks = useSystem((s) => s.suggestBooks);
+
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ApiBook[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [note, setNote] = useState('');
+  const [shelves, setShelves] = useState<ApiBookShelf[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void suggestBooks().then((s) => {
+      if (alive) setShelves(s);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const run = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setNote('');
+    try {
+      const items = await searchBooks(q);
+      setResults(items);
+      if (!items.length) setNote('No matches — try another title, or just type it below.');
+    } catch {
+      setNote('Book search is unavailable right now — type the title below.');
+      setResults([]);
+    }
+    setSearching(false);
+  };
+
+  const pick = (b: ApiBook) => {
+    onPick(b.title, estChapters(b.pages));
+    setResults([]);
+    setQuery('');
+    setNote('');
+  };
+
+  return (
+    <View style={styles.wrap}>
+      <View style={styles.searchRow}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={run}
+          returnKeyType="search"
+          style={[styles.input, styles.searchInput]}
+          placeholder="Search a book (title or author)"
+          placeholderTextColor={text.faint}
+        />
+        <Pressable onPress={run} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
+          {searching ? (
+            <ActivityIndicator size="small" color={accent} />
+          ) : (
+            <Text style={styles.searchBtnText}>Search</Text>
+          )}
+        </Pressable>
+      </View>
+      {note ? <Text style={styles.note}>{note}</Text> : null}
+
+      {results.length > 0 ? (
+        <View style={styles.results}>
+          {results.map((b, i) => (
+            <Pressable
+              key={`${b.title}-${i}`}
+              onPress={() => pick(b)}
+              style={({ pressed }) => [styles.resultRow, pressed && { opacity: 0.7 }]}
+            >
+              <Cover url={b.cover_url} size={30} />
+              <View style={styles.resultMain}>
+                <Text style={styles.resultTitle} numberOfLines={1}>
+                  {b.title}
+                </Text>
+                <Text style={styles.resultMeta} numberOfLines={1}>
+                  {[b.author, b.year ? String(b.year) : '', b.pages ? `${b.pages} pp` : '']
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </View>
+              <Ionicons name="add-circle-outline" size={20} color={accent} />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {shelves.length > 0 ? (
+        <View style={styles.shelves}>
+          <Text style={styles.shelvesLabel}>Or browse suggestions</Text>
+          {shelves.map((sh) => (
+            <View key={sh.label} style={styles.shelf}>
+              <Text style={styles.shelfTitle}>{sh.label}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.shelfRow}
+              >
+                {sh.books.map((b, i) => (
+                  <Pressable
+                    key={`${b.title}-${i}`}
+                    onPress={() => pick(b)}
+                    style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+                  >
+                    <Cover url={b.cover_url} size={56} />
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {b.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { marginBottom: 12 },
+  searchRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  input: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    color: text.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: surface.base,
+  },
+  searchInput: { flex: 1 },
+  searchBtn: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 74,
+    alignItems: 'center',
+  },
+  searchBtnText: { color: accent, fontSize: 13, fontWeight: '700' },
+  note: { color: text.secondary, fontSize: 12, marginTop: 8 },
+  coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  results: { marginTop: 8 },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  resultMain: { flex: 1 },
+  resultTitle: { color: text.primary, fontSize: 13, fontWeight: '600' },
+  resultMeta: { color: text.faint, fontSize: 11, marginTop: 1 },
+  shelves: { marginTop: 14 },
+  shelvesLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  shelf: { marginBottom: 12 },
+  shelfTitle: { color: text.primary, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  shelfRow: { gap: 10, paddingRight: 8 },
+  card: { width: 56 },
+  cardTitle: { color: text.secondary, fontSize: 10, lineHeight: 13, marginTop: 4 },
+});

@@ -3,13 +3,13 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import body, llm, nutrition, service, state
+from . import body, books, llm, nutrition, service, state
 from .db import get_db
 from .schemas import (ActionResult, BodyOut, BodyProfileIn, BookIn, BookReviewIn,
-                      CompleteIn, FoodAnalyzeIn, FoodEstimateOut, FoodLogIn,
-                      FoodSearchItemOut, InterviewModeIn, PlayerIn, PreferencesIn,
-                      SkincareCheckIn, SkincareStepIn, StateOut, StepResult,
-                      StepToggleIn)
+                      BookOut, BookShelfOut, CompleteIn, FoodAnalyzeIn,
+                      FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
+                      InterviewModeIn, PlayerIn, PreferencesIn, SkincareCheckIn,
+                      SkincareStepIn, StateOut, StepResult, StepToggleIn)
 
 router = APIRouter()
 
@@ -119,6 +119,26 @@ def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(
     player = state.get_or_create_player(db)
     service.set_book(db, player, body.current_book, _valid_day(day), body.chapters)
     return state.build_state(db, player, _valid_day(day))
+
+
+@router.get("/books/search", response_model=list[BookOut])
+def books_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    """Search Open Library for a book to set as your current read (free, no key)."""
+    state.get_or_create_player(db)
+    try:
+        return books.search(q)
+    except Exception:
+        raise HTTPException(502, "Book search is unavailable right now — try again, or type the title.")
+
+
+@router.get("/books/suggest", response_model=list[BookShelfOut])
+def books_suggest(db: Session = Depends(get_db)):
+    """A few themed reading shelves (Grow / Money / Craft / Calm) from Open Library."""
+    state.get_or_create_player(db)
+    try:
+        return books.suggestions()
+    except Exception:
+        return []  # suggestions are a nicety — never an error
 
 
 @router.post("/book/review", response_model=StateOut)
