@@ -1,19 +1,18 @@
 import { StyleSheet, Text, View, type ViewProps } from 'react-native';
 
-import { colors, withAlpha } from '@/theme';
+import { surface, text } from '@/theme';
 
 interface Props extends ViewProps {
   title?: string;
   sub?: string;
 }
 
-/** The bordered, faintly glowing window every System screen is built from. */
+/** A flat, warm card. A quiet header label does the work — no borders-within-borders. */
 export function SystemPanel({ title, sub, children, style, ...rest }: Props) {
   return (
     <View style={[styles.panel, style]} {...rest}>
       {title ? (
         <View style={styles.header}>
-          <View style={styles.diamond} />
           <Text style={styles.headerText}>{title}</Text>
           {sub ? <Text style={styles.subText}>{sub}</Text> : null}
         </View>
@@ -25,34 +24,25 @@ export function SystemPanel({ title, sub, children, style, ...rest }: Props) {
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: colors.card,
+    backgroundColor: surface.card,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: 16,
-    boxShadow: `0 0 14px ${withAlpha(colors.primary, 0.12)}`,
+    borderColor: surface.hairline,
+    borderRadius: 14,
+    padding: 18,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  diamond: {
-    width: 8,
-    height: 8,
-    backgroundColor: colors.primary,
-    transform: [{ rotate: '45deg' }],
+    alignItems: 'baseline',
+    marginBottom: 14,
   },
   headerText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 3,
+    color: text.secondary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   subText: {
-    color: colors.textDim,
-    fontSize: 11,
+    color: text.faint,
+    fontSize: 12,
     marginLeft: 'auto',
   },
 });

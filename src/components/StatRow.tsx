@@ -1,30 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { statLevelInfo } from '@/lib/leveling';
-import { useSystem } from '@/store/useSystem';
-import { colors, STAT_META, withAlpha } from '@/theme';
-import type { StatKey } from '@/types';
+import type { ApiStat } from '@/lib/api';
+import { STAT_META, text, withAlpha } from '@/theme';
 
 import { XpBar } from './XpBar';
 
-export function StatRow({ stat }: { stat: StatKey }) {
-  const xp = useSystem((s) => s.statXp[stat]);
-  const meta = STAT_META[stat];
-  const info = statLevelInfo(xp);
+export function StatRow({ stat }: { stat: ApiStat }) {
+  const meta = STAT_META[stat.key];
 
   return (
     <View style={styles.row}>
       <View style={[styles.iconBox, { backgroundColor: withAlpha(meta.color, 0.12) }]}>
-        <Ionicons name={meta.icon} size={18} color={meta.color} />
+        <Ionicons name={meta.icon} size={17} color={meta.color} />
       </View>
       <View style={styles.body}>
         <View style={styles.labelRow}>
-          <Text style={styles.code}>{stat}</Text>
           <Text style={styles.label}>{meta.label}</Text>
-          <Text style={styles.level}>Lv {info.level}</Text>
+          <Text style={styles.level}>Lv {stat.level}</Text>
         </View>
-        <XpBar value={info.into} max={info.needed} color={meta.color} height={6} />
+        <XpBar value={stat.into} max={stat.needed} color={meta.color} height={4} />
         <Text style={styles.sub}>{meta.sub}</Text>
       </View>
     </View>
@@ -35,42 +30,35 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   body: {
     flex: 1,
-    gap: 4,
+    gap: 5,
   },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
-  },
-  code: {
-    color: colors.text,
-    fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 1,
   },
   label: {
-    color: colors.textDim,
-    fontSize: 13,
+    color: text.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   level: {
-    color: colors.text,
-    fontWeight: '700',
+    color: text.secondary,
     fontSize: 13,
     marginLeft: 'auto',
   },
   sub: {
-    color: colors.textDim,
+    color: text.faint,
     fontSize: 11,
   },
 });

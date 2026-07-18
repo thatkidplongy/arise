@@ -8,42 +8,35 @@ interface Props {
   size?: number;
 }
 
-export function RankBadge({ rank, size = 64 }: Props) {
+/** A flat, warm tile — the rank letter carries it, no glow. */
+export function RankBadge({ rank, size = 60 }: Props) {
   const color = RANK_COLORS[rank];
   return (
     <View
       style={[
         styles.badge,
-        {
-          width: size,
-          height: size,
-          borderColor: color,
-          boxShadow: `0 0 16px ${withAlpha(color, 0.35)}`,
-        },
+        { width: size, height: size, borderColor: color, backgroundColor: withAlpha(color, 0.1) },
       ]}
     >
-      <Text style={[styles.letter, { color, fontSize: size * 0.5 }]}>{rank}</Text>
-      <Text style={[styles.caption, { color }]}>RANK</Text>
+      <Text style={[styles.letter, { color, fontSize: size * 0.46 }]}>{rank}</Text>
+      <Text style={[styles.caption, { color }]}>rank</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   letter: {
-    fontWeight: '800',
-    lineHeight: undefined,
+    fontWeight: '700',
   },
   caption: {
-    fontSize: 8,
-    letterSpacing: 2,
-    fontWeight: '700',
-    opacity: 0.8,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: -2,
   },
 });

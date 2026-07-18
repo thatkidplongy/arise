@@ -1,206 +1,284 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { ACHIEVEMENTS } from '@/data/achievements';
-import { DAILY_CLEAR_BONUS, DAILY_CLEAR_ID, DAILY_QUESTS, questById } from '@/data/quests';
+import { api, UnauthorizedError, type ApiEvent, type ApiQuest, type ApiState } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
-import { levelInfo, rankFor, statLevelInfo } from '@/lib/leveling';
-import * as sel from '@/lib/selectors';
-import type { Notice, Snapshot, StatKey } from '@/types';
+import type { Notice, StatKey, Toast } from '@/types';
 
-const EMPTY_STATS: Record<StatKey, number> = { STR: 0, CRE: 0, SPI: 0, CHA: 0, INT: 0 };
+function computeDefaultServerUrl(): string {
+  // Web build served straight from the backend → talk to its own origin, so
+  // the home-screen app auto-connects with zero setup (and no CORS).
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const { protocol, hostname, port, origin } = window.location;
+    // In Metro dev the page is on :8081 but the API is on :8000.
+    return port === '8081' ? `${protocol}//${hostname}:8000` : origin;
+  }
+  // In Expo Go / dev builds, hostUri is "<dev-machine-lan-ip>:8081" — so the
+  // phone finds the backend on the same machine with zero configuration.
+  const devHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  return devHost ? `http://${devHost}:8000` : 'http://localhost:8000';
+}
+
+export const DEFAULT_SERVER_URL = computeDefaultServerUrl();
+
+export type LinkStatus = 'connecting' | 'online' | 'offline' | 'unauthorized';
 
 let noticeSeq = 0;
 function makeNotice(title: string, lines: string[]): Notice {
   return { id: `n-${Date.now()}-${noticeSeq++}`, title, lines };
 }
 
-function buildSnapshot(
-  totalXp: number,
-  statXp: Record<StatKey, number>,
-  log: sel.CompletionLog,
-): Snapshot {
-  const statLevels = Object.fromEntries(
-    (Object.keys(statXp) as StatKey[]).map((k) => [k, statLevelInfo(statXp[k]).level]),
-  ) as Record<StatKey, number>;
-  return {
-    totalXp,
-    level: levelInfo(totalXp).level,
-    statLevels,
-    maxStreak: sel.maxStreak(log),
-    dailyClears: sel.dailyClears(log),
-    totalCompletions: sel.totalCompletions(log),
-    sideCompletions: sel.sideCompletions(log),
-    countOf: (questId) => sel.countAll(log, questId),
-  };
+/** Translate server events into System pop-ups. */
+function noticesFrom(events: ApiEvent[]): Notice[] {
+  return events.map((e) => {
+    switch (e.type) {
+      case 'daily_clear':
+        return makeNotice('You showed up for all five today', [
+          'That’s a full day of showing up — no small thing.',
+          `A little bonus for it: +${e.data.bonus_xp} XP`,
+        ]);
+      case 'level_up':
+        return makeNotice('Level up', [`You have reached Level ${e.data.level}.`]);
+      case 'rank_up':
+        return makeNotice('Rank up', [`Hunter rank increased: ${e.data.from} → ${e.data.to}.`]);
+      case 'achievement': {
+        const lines = [e.data.desc as string];
+        if (e.data.title_reward) lines.push(`Title acquired: “${e.data.title_reward}”`);
+        return makeNotice(`Achievement · ${e.data.name}`, lines);
+      }
+      default:
+        return makeNotice('SYSTEM', [JSON.stringify(e.data)]);
+    }
+  });
 }
 
-interface SystemState {
-  name: string;
-  equippedTitle: string | null;
-  totalXp: number;
-  statXp: Record<StatKey, number>;
-  log: sel.CompletionLog;
-  /** achievementId -> ISO timestamp unlocked. */
-  achievements: Record<string, string>;
-  /** Queue of System pop-ups awaiting dismissal. Not persisted. */
+const CONNECTION_LOST = () =>
+  makeNotice('Connection lost', [
+    'The System server is unreachable.',
+    'Check Settings → System link.',
+  ]);
+
+const ACCESS_DENIED = () =>
+  makeNotice('Access denied', [
+    'The System rejected your access token.',
+    'Set the correct token in Settings → System link.',
+  ]);
+
+/** Map a thrown request error to the status + notice it should produce.
+ * (The notice is only shown for user-initiated actions, not passive refresh.) */
+function errorOutcome(e: unknown): { status: LinkStatus; notice: Notice } {
+  if (e instanceof UnauthorizedError) return { status: 'unauthorized', notice: ACCESS_DENIED() };
+  return { status: 'offline', notice: CONNECTION_LOST() };
+}
+
+interface SystemStore {
+  serverUrl: string;
+  apiToken: string;
+  state: ApiState | null;
+  status: LinkStatus;
   notices: Notice[];
-  createdAt: string;
+  toast: Toast | null;
 
-  completeQuest: (questId: string) => void;
-  undoQuest: (questId: string) => void;
-  setName: (name: string) => void;
-  equipTitle: (title: string | null) => void;
+  refresh: () => Promise<void>;
+  complete: (quest: ApiQuest) => Promise<void>;
+  undo: (quest: ApiQuest) => Promise<void>;
+  toggleStep: (quest: ApiQuest, stepIndex: number) => Promise<void>;
+  undoToast: () => Promise<void>;
+  dismissToast: () => void;
+  saveName: (name: string) => Promise<void>;
+  equipTitle: (title: string | null) => Promise<void>;
+  saveNorthStar: (northStar: string) => Promise<void>;
+  savePreferences: (preferences: Partial<Record<StatKey, string[]>>) => Promise<void>;
+  toggleRest: () => Promise<void>;
+  resetAll: () => Promise<void>;
+  setServerUrl: (url: string) => void;
+  setApiToken: (token: string) => void;
   dismissNotice: () => void;
-  resetAll: () => void;
 }
 
-export const useSystem = create<SystemState>()(
+export const useSystem = create<SystemStore>()(
   persist(
     (set, get) => ({
-      name: 'Hunter',
-      equippedTitle: null,
-      totalXp: 0,
-      statXp: { ...EMPTY_STATS },
-      log: {},
-      achievements: {},
+      serverUrl: DEFAULT_SERVER_URL,
+      apiToken: '',
+      state: null,
+      status: 'connecting',
       notices: [],
-      createdAt: new Date().toISOString(),
+      toast: null,
 
-      completeQuest: (questId) => {
-        const quest = questById(questId);
-        if (!quest) return;
-        const s = get();
-        const today = dateKey();
-
-        const done =
-          quest.cadence === 'weekly'
-            ? sel.countThisWeek(s.log, questId)
-            : sel.countToday(s.log, questId);
-        if (done >= quest.target) return;
-
-        const before = levelInfo(s.totalXp);
-        const beforeRank = rankFor(before.level, sel.maxStreak(s.log));
-
-        const todayLog = [
-          ...(s.log[today] ?? []),
-          { questId, xp: quest.xp, at: new Date().toISOString() },
-        ];
-        const notices: Notice[] = [];
-        let gained = quest.xp;
-
-        if (quest.cadence === 'daily') {
-          const cleared = DAILY_QUESTS.every(
-            (q) => todayLog.filter((c) => c.questId === q.id).length >= q.target,
-          );
-          const bonusGiven = todayLog.some((c) => c.questId === DAILY_CLEAR_ID);
-          if (cleared && !bonusGiven) {
-            todayLog.push({ questId: DAILY_CLEAR_ID, xp: DAILY_CLEAR_BONUS, at: new Date().toISOString() });
-            gained += DAILY_CLEAR_BONUS;
-            notices.push(
-              makeNotice('DAILY QUESTS CLEARED', [
-                'All daily quests have been completed.',
-                `Bonus reward: +${DAILY_CLEAR_BONUS} XP`,
-              ]),
-            );
-          }
+      refresh: async () => {
+        const { serverUrl, apiToken, state } = get();
+        if (!state) set({ status: 'connecting' });
+        try {
+          const fresh = await api.state(serverUrl, apiToken, dateKey());
+          set({ state: fresh, status: 'online' });
+        } catch (e) {
+          // Passive refresh is silent — the ConnectionPanel communicates the
+          // problem (offline vs unauthorized). No pop-up on load.
+          set({ status: errorOutcome(e).status });
         }
-
-        const log = { ...s.log, [today]: todayLog };
-        const totalXp = s.totalXp + gained;
-        const statXp = { ...s.statXp, [quest.stat]: s.statXp[quest.stat] + quest.xp };
-
-        const after = levelInfo(totalXp);
-        if (after.level > before.level) {
-          notices.push(makeNotice('LEVEL UP', [`You have reached Level ${after.level}.`]));
-        }
-        const afterRank = rankFor(after.level, sel.maxStreak(log));
-        if (afterRank !== beforeRank) {
-          notices.push(
-            makeNotice('RANK UP', [`Hunter rank increased: ${beforeRank} → ${afterRank}.`]),
-          );
-        }
-
-        const snap = buildSnapshot(totalXp, statXp, log);
-        const achievements = { ...s.achievements };
-        for (const a of ACHIEVEMENTS) {
-          if (!achievements[a.id] && a.check(snap)) {
-            achievements[a.id] = new Date().toISOString();
-            const lines = [a.desc];
-            if (a.titleReward) lines.push(`Title acquired: “${a.titleReward}”`);
-            notices.push(makeNotice(`ACHIEVEMENT — ${a.name}`, lines));
-          }
-        }
-
-        set({ log, totalXp, statXp, achievements, notices: [...s.notices, ...notices] });
       },
 
-      undoQuest: (questId) => {
-        const s = get();
-        const today = dateKey();
-        const todayLog = [...(s.log[today] ?? [])];
-        const idx = todayLog.map((c) => c.questId).lastIndexOf(questId);
-        if (idx < 0) return;
-
-        const [removed] = todayLog.splice(idx, 1);
-        let lost = removed.xp;
-
-        // Revoke the daily-clear bonus if the dailies are no longer all complete.
-        const bonusIdx = todayLog.findIndex((c) => c.questId === DAILY_CLEAR_ID);
-        if (bonusIdx >= 0) {
-          const stillCleared = DAILY_QUESTS.every(
-            (q) => todayLog.filter((c) => c.questId === q.id).length >= q.target,
-          );
-          if (!stillCleared) {
-            lost += todayLog[bonusIdx].xp;
-            todayLog.splice(bonusIdx, 1);
-          }
+      complete: async (quest) => {
+        const { serverUrl, apiToken, notices } = get();
+        if (quest.done >= quest.target) return;
+        try {
+          const { events, state } = await api.complete(serverUrl, apiToken, quest.id, dateKey());
+          set({ state, status: 'online', notices: [...notices, ...noticesFrom(events)] });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
         }
-
-        const quest = questById(questId);
-        const log = { ...s.log };
-        if (todayLog.length > 0) log[today] = todayLog;
-        else delete log[today];
-
-        set({
-          log,
-          totalXp: Math.max(0, s.totalXp - lost),
-          statXp: quest
-            ? { ...s.statXp, [quest.stat]: Math.max(0, s.statXp[quest.stat] - removed.xp) }
-            : s.statXp,
-        });
       },
 
-      setName: (name) => set({ name }),
-      equipTitle: (title) => set({ equippedTitle: title }),
+      undo: async (quest) => {
+        const { serverUrl, apiToken, notices } = get();
+        if (!quest.undoable_id) return;
+        try {
+          const { state } = await api.undo(serverUrl, apiToken, quest.undoable_id, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      toggleStep: async (quest, stepIndex) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const { events, state, completed } = await api.toggleStep(
+            serverUrl,
+            apiToken,
+            quest.id,
+            stepIndex,
+            dateKey(),
+          );
+          set({
+            state,
+            status: 'online',
+            notices: [...notices, ...noticesFrom(events)],
+            // A completion pops a floating toast with undo; any other toggle
+            // clears a lingering one.
+            toast: completed
+              ? {
+                  id: `t-${Date.now()}-${noticeSeq++}`,
+                  title: quest.title,
+                  xp: quest.xp,
+                  undo: { questId: quest.id, stepIndex },
+                }
+              : null,
+          });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      undoToast: async () => {
+        const t = get().toast;
+        if (!t) return;
+        const { serverUrl, apiToken } = get();
+        set({ toast: null });
+        try {
+          const { state } = await api.toggleStep(
+            serverUrl,
+            apiToken,
+            t.undo.questId,
+            t.undo.stepIndex,
+            dateKey(),
+          );
+          set({ state, status: 'online' });
+        } catch (e) {
+          set({ status: errorOutcome(e).status });
+        }
+      },
+
+      dismissToast: () => set({ toast: null }),
+
+      saveName: async (name) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updatePlayer(serverUrl, apiToken, { name }, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      equipTitle: async (title) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updatePlayer(serverUrl, apiToken, { equipped_title: title }, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      saveNorthStar: async (northStar) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updatePlayer(serverUrl, apiToken, { north_star: northStar }, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      toggleRest: async () => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.toggleRest(serverUrl, apiToken, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      savePreferences: async (preferences) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updatePreferences(serverUrl, apiToken, preferences, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      resetAll: async () => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.reset(serverUrl, apiToken, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      // Pure setters — the caller decides when to refresh (so it can await it
+      // and show a saving indicator).
+      setServerUrl: (url) => set({ serverUrl: url.trim().replace(/\/+$/, '') }),
+      setApiToken: (token) => set({ apiToken: token.trim() }),
+
       dismissNotice: () => set({ notices: get().notices.slice(1) }),
-
-      resetAll: () =>
-        set({
-          name: 'Hunter',
-          equippedTitle: null,
-          totalXp: 0,
-          statXp: { ...EMPTY_STATS },
-          log: {},
-          achievements: {},
-          notices: [],
-          createdAt: new Date().toISOString(),
-        }),
     }),
     {
-      name: 'arise-system-v1',
+      name: 'arise-client-v2',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
-      // Notices are transient pop-ups; don't resurrect them on restart.
+      version: 2,
+      // Server owns the game state; the client only remembers its own settings.
       partialize: (s) => ({
-        name: s.name,
-        equippedTitle: s.equippedTitle,
-        totalXp: s.totalXp,
-        statXp: s.statXp,
-        log: s.log,
-        achievements: s.achievements,
-        createdAt: s.createdAt,
+        serverUrl: s.serverUrl,
+        apiToken: s.apiToken,
       }),
     },
   ),

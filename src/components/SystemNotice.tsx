@@ -1,40 +1,54 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
-import { colors, withAlpha } from '@/theme';
+import { accent, surface, text, withAlpha } from '@/theme';
 
 /**
- * The System's pop-up window — level ups, rank ups, achievements.
- * Renders above everything; shows one notice at a time from the queue.
+ * The System pop-up — level ups, rank ups, achievements. One at a time from
+ * the queue, with a soft entrance. Flat and warm; no blur or glow.
  */
 export function SystemNoticeHost() {
   const notice = useSystem((s) => s.notices[0]);
   const dismiss = useSystem((s) => s.dismissNotice);
 
+  const scale = useRef(new Animated.Value(0.9)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!notice) return;
+    scale.setValue(0.9);
+    opacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }),
+      Animated.timing(opacity, { toValue: 1, duration: 130, useNativeDriver: true }),
+    ]).start();
+  }, [notice?.id, notice, scale, opacity]);
+
   if (!notice) return null;
 
   return (
     <View style={styles.overlay}>
-      <View style={styles.box}>
-        <View style={styles.header}>
-          <View style={styles.alertIcon}>
-            <Text style={styles.alertMark}>!</Text>
-          </View>
-          <Text style={styles.headerText}>NOTIFICATION</Text>
-        </View>
+      <Animated.View style={[styles.box, { transform: [{ scale }], opacity }]}>
+        <Text style={styles.kicker}>Notification</Text>
         <Text style={styles.title}>{notice.title}</Text>
         {notice.lines.map((line, i) => (
           <Text key={i} style={styles.line}>
             {line}
           </Text>
         ))}
-        <Pressable style={({ pressed }) => [styles.ok, pressed && styles.okPressed]} onPress={dismiss}>
+        <Pressable
+          style={({ pressed }) => [styles.ok, pressed && { backgroundColor: accentPressed }]}
+          onPress={dismiss}
+        >
           <Text style={styles.okText}>OK</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }
+
+const accentPressed = withAlpha(accent, 0.85);
 
 const styles = StyleSheet.create({
   overlay: {
@@ -43,7 +57,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(3, 6, 12, 0.75)',
+    backgroundColor: surface.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -51,68 +65,43 @@ const styles = StyleSheet.create({
   },
   box: {
     width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#0B1424',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: 6,
-    padding: 22,
+    maxWidth: 330,
+    backgroundColor: surface.card,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
     gap: 6,
-    boxShadow: `0 0 30px ${withAlpha(colors.primary, 0.35)}`,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  alertIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertMark: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  headerText: {
-    color: colors.primary,
+  kicker: {
+    color: accent,
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 4,
+    fontWeight: '600',
+    marginBottom: 6,
   },
   title: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
+    color: text.primary,
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
   },
   line: {
-    color: colors.textDim,
+    color: text.secondary,
     fontSize: 13,
     textAlign: 'center',
+    lineHeight: 19,
   },
   ok: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 36,
-  },
-  okPressed: {
-    backgroundColor: withAlpha(colors.primary, 0.15),
+    marginTop: 16,
+    backgroundColor: accent,
+    borderRadius: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 44,
   },
   okText: {
-    color: colors.primary,
+    color: '#FBF5EB',
     fontWeight: '700',
-    letterSpacing: 2,
+    fontSize: 14,
   },
 });

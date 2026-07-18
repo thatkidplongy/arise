@@ -1,52 +1,103 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { QuestCard } from '@/components/QuestCard';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
-import { DAILY_CLEAR_BONUS, DAILY_QUESTS, SIDE_QUESTS, WEEKLY_QUESTS } from '@/data/quests';
-import { dateKey } from '@/lib/dates';
-import { countToday, xpOnDay } from '@/lib/selectors';
 import { useSystem } from '@/store/useSystem';
-import { colors } from '@/theme';
+import { accent, feedback, surface, text, withAlpha } from '@/theme';
 
 export default function QuestsScreen() {
-  const log = useSystem((s) => s.log);
-  const todayXp = xpOnDay(log, dateKey());
-  const cleared = DAILY_QUESTS.every((q) => countToday(log, q.id) >= q.target);
+  const state = useSystem((s) => s.state);
+  const toggleRest = useSystem((s) => s.toggleRest);
+  const [pending, setPending] = useState(false);
+
+  if (!state) {
+    return (
+      <Screen>
+        <ConnectionPanel />
+      </Screen>
+    );
+  }
+
+  const daily = state.quests.filter((q) => q.cadence === 'daily');
+  const weekly = state.quests.filter((q) => q.cadence === 'weekly');
+  const side = state.quests.filter((q) => q.cadence === 'side');
+  const isResting = state.today.resting;
+
+  const onRest = async () => {
+    if (pending) return;
+    setPending(true);
+    await toggleRest();
+    setPending(false);
+  };
 
   return (
     <Screen>
       <View style={styles.headerRow}>
-        <Text style={styles.h1}>QUEST BOARD</Text>
-        <Text style={styles.todayXp}>+{todayXp} XP today</Text>
+        <Text style={styles.h1}>Quest board</Text>
+        <Text style={styles.todayXp}>{state.today.xp} XP today</Text>
       </View>
 
       <SystemPanel
-        title="DAILY QUESTS"
-        sub={cleared ? 'Cleared — bonus granted' : `Clear all 5 for +${DAILY_CLEAR_BONUS} XP`}
+        title="Daily quests"
+        sub={
+          isResting
+            ? 'Resting today 🌙'
+            : state.today.cleared
+              ? 'All five today 🌱'
+              : 'Do what you can — showing up is the win'
+        }
       >
         <View style={styles.list}>
-          {DAILY_QUESTS.map((q) => (
+          {daily.map((q) => (
             <QuestCard key={q.id} quest={q} />
           ))}
         </View>
       </SystemPanel>
 
-      <SystemPanel title="WEEKLY QUESTS" sub="Resets every Monday">
+      <SystemPanel title="Weekly quests" sub="New set each Monday">
         <View style={styles.list}>
-          {WEEKLY_QUESTS.map((q) => (
+          {weekly.map((q) => (
             <QuestCard key={q.id} quest={q} />
           ))}
         </View>
       </SystemPanel>
 
-      <SystemPanel title="SIDE QUESTS" sub="Optional · once per day">
+      <SystemPanel title="Side quests" sub="Optional · whenever you feel like it">
         <View style={styles.list}>
-          {SIDE_QUESTS.map((q) => (
+          {side.map((q) => (
             <QuestCard key={q.id} quest={q} />
           ))}
         </View>
       </SystemPanel>
+
+      {/* Rest is part of the path — never a failure. */}
+      <Pressable
+        onPress={onRest}
+        disabled={pending}
+        style={({ pressed }) => [
+          styles.rest,
+          isResting && styles.restOn,
+          (pressed || pending) && { opacity: 0.85 },
+        ]}
+      >
+        {pending ? (
+          <ActivityIndicator size="small" color={accent} />
+        ) : (
+          <>
+            <Text style={[styles.restTitle, isResting && { color: feedback.success }]}>
+              {isResting ? 'You’re resting today 🌙' : 'Take a rest day'}
+            </Text>
+            <Text style={styles.restSub}>
+              {isResting
+                ? 'Your streak is safe. Tap to undo.'
+                : 'Not feeling it? Rest still counts — your streak stays.'}
+            </Text>
+          </>
+        )}
+      </Pressable>
     </Screen>
   );
 }
@@ -58,17 +109,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   h1: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 3,
+    color: text.primary,
+    fontSize: 20,
+    fontWeight: '700',
   },
   todayXp: {
-    color: colors.success,
-    fontSize: 13,
-    fontWeight: '700',
+    color: feedback.success,
+    fontSize: 14,
+    fontWeight: '600',
   },
   list: {
     gap: 8,
+  },
+  rest: {
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 11,
+    borderStyle: 'dashed',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    minHeight: 64,
+    justifyContent: 'center',
+  },
+  restOn: {
+    borderStyle: 'solid',
+    backgroundColor: withAlpha(feedback.success, 0.06),
+    borderColor: withAlpha(feedback.success, 0.4),
+  },
+  restTitle: {
+    color: text.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  restSub: {
+    color: text.faint,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
