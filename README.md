@@ -1,7 +1,7 @@
 # ARISE
 
 A personal, Solo Leveling-inspired "System" for real life — but a **gentle
-guide, not a taskmaster**. Five areas of life become five attributes; you get
+guide, not a taskmaster**. Six areas of life become six attributes; you get
 daily/weekly/side quests, XP, levels, hunter ranks (E→S), streaks, achievements
 and titles. Showing up is the win, rest counts, and a missed day is never a
 failure.
