@@ -150,9 +150,9 @@ it). Setting or changing the book restarts that weekly clock.
 To set a book you can **search Open Library** (`books.py`, `GET /books/search`,
 free, no key — the largest open catalogue) or browse themed shelves
 (`GET /books/suggest`: Grow / Money / Craft / Calm, from Open Library subjects);
-picking one fills the title and estimates chapters from the page count. This is a
-third external touchpoint (with Open Food Facts and Gemini) — a lookup failure
-just falls back to typing the title.
+picking one fills the title and estimates chapters from the page count. It's one
+of the app's free external touchpoints (with Open Food Facts, Gemini and
+Supadata) — a lookup failure just falls back to typing the title.
 
 ## Body — nutrition & skincare (standalone tools)
 
@@ -173,7 +173,7 @@ by a plain tool than by a scored quest — so this is its own small subsystem
   rotating **"what to eat"** list (`nutrition.SUGGESTIONS` → `daily_suggestions`,
   protein/fibre/meal, deterministic per day) gives concrete, tap-to-log ideas.
   Food is logged precisely against **Open Food Facts** (`nutrition.search`, free,
-  no API key, server-side) — one of two external services the app reaches; any
+  no API key, server-side) — one of the app's free external services; any
   lookup failure falls back to logging by hand. You can also **snap a photo**:
   `POST /food/analyze` sends it to **Gemini vision** (`llm.analyze_food`) which
   returns an estimated name + calories/protein/fibre. It's on-demand only (one
@@ -189,6 +189,30 @@ by a plain tool than by a scored quest — so this is its own small subsystem
 Why standalone (not a stat): calorie tracking is the single feature most able to
 turn a gentle app anxious, so it's kept off the leveling/streak machinery on
 purpose — it informs, it never punishes.
+
+## Inspire — capture what moved you (standalone tools)
+
+Like Body, the **Inspire** tab sits outside the game — no XP, no streaks. It turns
+motivational videos you've already watched into something you keep. Paste a
+**TikTok, Reel, Short or YouTube** link and `POST /insights` (`insights.py`) does
+two things:
+
+- **Fetch the words.** `transcript.py` sends the URL to **Supadata** (a hosted
+  transcript API — free tier 100/month, `x-api-key`, stdlib `urllib`, server-side)
+  and gets back the spoken transcript. Share links are canonicalised first
+  (`clean_url`) to drop signed tracking params on TikTok/Reels; YouTube is left
+  intact (its id lives in the query string). No key → the feature simply hides.
+- **Distil it.** The transcript goes to the LLM (`llm.distill_motivation`, one
+  Gemini call, structured output): a warm one-line **summary**, 2–4 concrete
+  **takeaways** in the app's gentle voice, and 1–3 faithful **pull-quotes**
+  (nothing invented, filler dropped). Stored on the `insights` table.
+
+One quote surfaces on **Status** each day (`insights.daily_quote`, chosen
+deterministically by the date — stable across a day, rotating as days pass),
+beside the North Star; any quote can *become* the North Star in a tap. A video
+with no speech (music- or text-only) has nothing to transcribe and says so
+cleanly (422). Like the LLM and the food database, this touchpoint can never
+break the rest of Arise — every failure is caught and surfaced, never fatal.
 
 ## Learning resources (citations)
 

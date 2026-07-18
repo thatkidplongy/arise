@@ -96,9 +96,16 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   estimate** — snap a meal and Gemini vision estimates its calories/protein/fibre
   for you to edit before logging (on-demand, needs the Gemini key). Skincare is
   an editable AM/PM **routine** seeded with a pigmentation/pores-tuned template
-  plus trusted resources. The food database is the one external service the app
-  reaches.
-- **Your North Star** — a line you write about the life you're reaching for,
+  plus trusted resources.
+- **Inspire — capture what moved you** — a separate **Inspire** tab that turns
+  motivational videos into something you keep. Paste a **TikTok, Reel, Short or
+  YouTube** link and Arise fetches what was actually said (via [Supadata](https://supadata.ai) —
+  a free key, 100/month) and the LLM distils it into a few **takeaways** and
+  faithful **pull-quotes**. One quote resurfaces on your Status each day, beside
+  your North Star — and any quote can *become* your North Star in a tap.
+  Standalone: it never touches XP or streaks, and it hides unless a Supadata key
+  is set. (Videos with no speech — music- or text-only — have nothing to transcribe.)
+- **Your North Star** — a line you write about the life you’re reaching for,
   pinned to the top of the Status screen.
 - **Rest days & forgiveness** — mark a rest day and your streak stays safe;
   the copy invites rather than commands.
@@ -218,7 +225,7 @@ cd backend && .venv/bin/python scripts/backup_db.py
 ```
 src/
   app/            expo-router screens (file = route)
-    (tabs)/       Status · Quests · Achievements · Settings
+    (tabs)/       Status · Quests · Body · Focus · Inspire · Achievements · Settings
   components/     flat sandy UI: QuestCard, Toast, SystemNotice, panels
   lib/            api client, date helpers
   store/          zustand store: server state + client settings
@@ -236,6 +243,8 @@ backend/
     nutrition.py  calorie/protein targets (pure) + Open Food Facts lookup
     skincare.py   the seeded AM/PM routine template + resources
     books.py      book search + themed shelves via Open Library
+    transcript.py video transcripts via Supadata (TikTok/Reels/Shorts)
+    insights.py   Inspire: capture → distil → store; the daily pull-quote
     achievements.py, models.py, schemas.py, seed.py, db.py, security.py
   scripts/        backup_db.py
   tests/          pytest: unit + integration + migration
