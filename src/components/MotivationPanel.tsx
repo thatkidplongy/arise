@@ -15,6 +15,31 @@ const SOURCE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   web: 'link-outline',
 };
 
+// Normalise a link so we can spot the same video pasted twice — mirrors the
+// server's clean_url enough to guard against re-hitting the API for a dupe.
+function canonical(raw: string): string {
+  const u = raw.trim();
+  const tt = u.match(/https?:\/\/(?:www\.)?tiktok\.com\/@[\w.\-]+\/video\/\d+/i);
+  if (tt) return tt[0].toLowerCase();
+  const ig = u.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:reel|reels|p)\/[\w-]+/i);
+  if (ig) return ig[0].toLowerCase();
+  const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/i);
+  if (yt) return `yt:${yt[1].toLowerCase()}`;
+  return u.split('#')[0].split('?')[0].toLowerCase();
+}
+
+function duplicateOf(
+  url: string,
+  pending: PendingCapture[],
+  insights: ApiInsight[],
+): 'pending' | 'done' | null {
+  if (!url) return null;
+  const c = canonical(url);
+  if (pending.some((p) => canonical(p.url) === c)) return 'pending';
+  if (insights.some((i) => i.source_url && canonical(i.source_url) === c)) return 'done';
+  return null;
+}
+
 function PendingCard({
   item,
   onRetry,
@@ -137,7 +162,6 @@ export function MotivationPanel() {
   const remove = useMotivation((s) => s.remove);
 
   const [url, setUrl] = useState('');
-  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch();
@@ -147,15 +171,26 @@ export function MotivationPanel() {
   const llmOn = state?.llm_enabled ?? false;
   const ready = transcriptOn && llmOn;
 
+  const trimmed = url.trim();
+  const looksValid = /^https?:\/\//i.test(trimmed);
+  const dup = duplicateOf(trimmed, pending, insights);
+  const canCapture = ready && looksValid && !dup;
+
+  // The API-wasting cases (empty, half-typed, already-captured) are all blocked
+  // before a request goes out — the button greys out and says why.
+  const statusMsg = !trimmed
+    ? null
+    : !looksValid
+      ? 'Paste a full link — it should start with https://.'
+      : dup === 'pending'
+        ? 'That link is already being captured.'
+        : dup === 'done'
+          ? 'You’ve already captured that one — it’s in your list below.'
+          : null;
+
   const capture = () => {
-    const link = url.trim();
-    if (!link) return;
-    if (!/^https?:\/\//i.test(link)) {
-      setHint('Paste a full link (it should start with https://).');
-      return;
-    }
-    setHint(null);
-    add(link); // fire-and-forget; a pending card appears immediately
+    if (!canCapture) return; // defense in depth (also guards the keyboard submit)
+    add(trimmed); // fire-and-forget; a pending card appears immediately
     setUrl('');
   };
 
@@ -167,7 +202,8 @@ export function MotivationPanel() {
         ready={ready}
         transcriptOn={transcriptOn}
         llmOn={llmOn}
-        hint={hint}
+        canCapture={canCapture}
+        statusMsg={statusMsg}
         onCapture={capture}
       />
 
@@ -196,7 +232,8 @@ function CaptureCard({
   ready,
   transcriptOn,
   llmOn,
-  hint,
+  canCapture,
+  statusMsg,
   onCapture,
 }: {
   url: string;
@@ -204,7 +241,8 @@ function CaptureCard({
   ready: boolean;
   transcriptOn: boolean;
   llmOn: boolean;
-  hint: string | null;
+  canCapture: boolean;
+  statusMsg: string | null;
   onCapture: () => void;
 }) {
   return (
@@ -227,8 +265,12 @@ function CaptureCard({
         placeholderTextColor={text.faint}
       />
       <Pressable
-        disabled={!ready}
-        style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }, !ready && styles.btnDisabled]}
+        disabled={!canCapture}
+        style={({ pressed }) => [
+          styles.btn,
+          pressed && { opacity: 0.8 },
+          !canCapture && styles.btnDisabled,
+        ]}
         onPress={onCapture}
       >
         <Text style={styles.btnText}>Capture</Text>
@@ -240,7 +282,7 @@ function CaptureCard({
       ) : !llmOn ? (
         <Text style={styles.gate}>Distilling needs your Gemini key (ARISE_LLM_API_KEY).</Text>
       ) : null}
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {statusMsg ? <Text style={styles.hint}>{statusMsg}</Text> : null}
     </SystemPanel>
   );
 }
