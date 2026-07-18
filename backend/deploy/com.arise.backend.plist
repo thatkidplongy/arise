@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template — do not load directly. Run `bash backend/deploy/install.sh`, which
+  substitutes __BACKEND_DIR__ / __PYTHON__ for your machine and loads it.
+  Always-on API: starts at login, restarts on crash, relaunches after reboot.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.arise.backend</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>app.main:app</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>8000</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__BACKEND_DIR__</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__BACKEND_DIR__/logs/backend.log</string>
+    <key>StandardErrorPath</key>
+    <string>__BACKEND_DIR__/logs/backend.log</string>
+
+    <!-- To require a token, uncomment and set a value (also set it in the app
+         under Settings → System link). Left out, auth is off (Tailscale is the
+         boundary). -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ARISE_API_TOKEN</key>
+        <string>replace-with-a-long-random-string</string>
+    </dict>
+    -->
+</dict>
+</plist>
