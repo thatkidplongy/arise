@@ -9,6 +9,13 @@ import { accent, feedback, STAT_KEYS, STAT_META, surface, text, withAlpha } from
 
 type SaveState = 'idle' | 'saving' | 'done';
 
+// Tap-to-add focus suggestions for the less-obvious attributes. Tapping one adds
+// it to that attribute's focus set (same as typing it). Extend per stat as needed.
+const FOCUS_SUGGESTIONS: Record<string, string[]> = {
+  WLT: ['Investing', 'Budgeting', 'Side income', 'Business', 'Saving', 'Money mindset'],
+  CFT: ['System design', 'Algorithms (DSA)', 'Testing', 'Refactoring', 'Design patterns', 'A side project'],
+};
+
 export default function SettingsScreen() {
   const state = useSystem((s) => s.state);
   const status = useSystem((s) => s.status);
@@ -84,6 +91,15 @@ export default function SettingsScreen() {
       return { ...d, [k]: [...cur, v] };
     });
     setFocusInput((s) => ({ ...s, [k]: '' }));
+    setRemovedFocus(null);
+  };
+
+  const addSuggestedFocus = (k: string, v: string) => {
+    setFocusDraft((d) => {
+      const cur = d[k] ?? [];
+      if (cur.some((x) => x.toLowerCase() === v.toLowerCase())) return d; // no dupes
+      return { ...d, [k]: [...cur, v] };
+    });
     setRemovedFocus(null);
   };
 
@@ -388,6 +404,27 @@ export default function SettingsScreen() {
                     ))}
                   </View>
                 ) : null}
+                {(FOCUS_SUGGESTIONS[k] ?? []).some(
+                  (s) => !items.some((x) => x.toLowerCase() === s.toLowerCase()),
+                ) ? (
+                  <View style={styles.suggestChips}>
+                    {(FOCUS_SUGGESTIONS[k] ?? [])
+                      .filter((s) => !items.some((x) => x.toLowerCase() === s.toLowerCase()))
+                      .map((s) => (
+                        <Pressable
+                          key={s}
+                          onPress={() => addSuggestedFocus(k, s)}
+                          style={({ pressed }) => [
+                            styles.suggestChip,
+                            { borderColor: withAlpha(STAT_META[k].color, 0.45) },
+                            pressed && { backgroundColor: withAlpha(STAT_META[k].color, 0.1) },
+                          ]}
+                        >
+                          <Text style={[styles.suggestChipText, { color: STAT_META[k].color }]}>+ {s}</Text>
+                        </Pressable>
+                      ))}
+                  </View>
+                ) : null}
                 <View style={styles.addRow}>
                   <TextInput
                     value={focusInput[k] ?? ''}
@@ -592,6 +629,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginTop: -1,
+  },
+  suggestChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  suggestChip: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 99,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+  },
+  suggestChipText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   addRow: {
     flexDirection: 'row',
