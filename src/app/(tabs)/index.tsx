@@ -63,6 +63,22 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
+function DailyQuote({ quote }: { quote: { text: string; source_title: string } }) {
+  return (
+    <Pressable
+      onPress={() => router.push('/inspire')}
+      style={({ pressed }) => [styles.quoteCard, pressed && { opacity: 0.85 }]}
+    >
+      <View style={styles.quoteHead}>
+        <Ionicons name="sparkles-outline" size={13} color={feedback.gold} />
+        <Text style={styles.quoteLabel}>A LINE TO CARRY TODAY</Text>
+      </View>
+      <Text style={styles.quoteCardText}>“{quote.text}”</Text>
+      {quote.source_title ? <Text style={styles.quoteCardSource}>{quote.source_title}</Text> : null}
+    </Pressable>
+  );
+}
+
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
 
@@ -82,6 +98,8 @@ export default function StatusScreen() {
       <Masthead />
 
       <NorthStar value={player.north_star} />
+
+      {state.daily_quote ? <DailyQuote quote={state.daily_quote} /> : null}
 
       <SystemPanel>
         <View style={styles.identityRow}>
@@ -226,6 +244,36 @@ const styles = StyleSheet.create({
     color: text.secondary,
     fontSize: 13,
     lineHeight: 20,
+  },
+  quoteCard: {
+    backgroundColor: withAlpha(feedback.gold, 0.08),
+    borderWidth: 1,
+    borderColor: withAlpha(feedback.gold, 0.3),
+    borderRadius: 11,
+    padding: 14,
+    gap: 8,
+  },
+  quoteHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  quoteLabel: {
+    color: feedback.gold,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  quoteCardText: {
+    color: text.primary,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  quoteCardSource: {
+    color: text.faint,
+    fontSize: 11,
   },
   restNote: {
     color: feedback.success,

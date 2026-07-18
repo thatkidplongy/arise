@@ -58,6 +58,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="focus"
+        options={{
+          title: 'Focus',
+          tabBarIcon: ({ color }) => <Ionicons name="compass-outline" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="inspire"
+        options={{
+          title: 'Inspire',
+          tabBarIcon: ({ color }) => <Ionicons name="sparkles-outline" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
         name="achievements"
         options={{
           title: 'Achievements',

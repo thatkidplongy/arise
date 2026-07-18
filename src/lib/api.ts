@@ -76,6 +76,8 @@ export interface ApiState {
   levels: Partial<Record<StatKey, string>>;
   progression: Record<StatKey, ApiProgression>;
   llm_enabled: boolean;
+  transcript_enabled: boolean; // true when a Supadata key is set (Inspire capture on)
+  daily_quote: ApiDailyQuote | null; // a rotating pull-quote from captured videos
   quests: ApiQuest[];
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
@@ -184,6 +186,26 @@ export interface ApiBook {
 export interface ApiBookShelf {
   label: string;
   books: ApiBook[];
+}
+
+// ── Inspire (captured motivational videos → distilled insights) ──────────────
+
+export interface ApiInsight {
+  id: string;
+  source_url: string;
+  source: string; // tiktok | instagram | youtube | web
+  title: string; // @handle / short label
+  summary: string;
+  takeaways: string[];
+  quotes: string[];
+  created_at: string;
+}
+
+/** One pull-quote surfaced on Status today, rotating by the date. */
+export interface ApiDailyQuote {
+  text: string;
+  source_title: string;
+  insight_id: string;
 }
 
 export interface ApiEvent {
@@ -362,4 +384,20 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ step_id: stepId, done }),
     }),
+
+  // ── Inspire ───────────────────────────────────────────────────────────────
+  getInsights: (base: string, token: string) =>
+    request<ApiInsight[]>(base, '/insights', token),
+
+  addInsight: (base: string, token: string, url: string) =>
+    request<ApiInsight>(
+      base,
+      '/insights',
+      token,
+      { method: 'POST', body: JSON.stringify({ url }) },
+      60000, // fetch a transcript + distil it — the slowest call in the app
+    ),
+
+  removeInsight: (base: string, token: string, insightId: string) =>
+    request<ApiInsight[]>(base, `/insights/${insightId}`, token, { method: 'DELETE' }),
 };
