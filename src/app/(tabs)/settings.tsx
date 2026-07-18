@@ -27,6 +27,9 @@ export default function SettingsScreen() {
   const [nameDraft, setNameDraft] = useState(state?.player.name ?? '');
   const [northStarDraft, setNorthStarDraft] = useState(state?.player.north_star ?? '');
   const [bookDraft, setBookDraft] = useState(state?.player.current_book ?? '');
+  const [chaptersDraft, setChaptersDraft] = useState(
+    state?.player.current_book_chapters ? String(state.player.current_book_chapters) : '',
+  );
   const [urlDraft, setUrlDraft] = useState(serverUrl);
   const [tokenDraft, setTokenDraft] = useState(apiToken);
   const [focusDraft, setFocusDraft] = useState<Record<string, string[]>>({});
@@ -46,6 +49,13 @@ export default function SettingsScreen() {
   useEffect(() => setNameDraft(state?.player.name ?? ''), [state?.player.name]);
   useEffect(() => setNorthStarDraft(state?.player.north_star ?? ''), [state?.player.north_star]);
   useEffect(() => setBookDraft(state?.player.current_book ?? ''), [state?.player.current_book]);
+  useEffect(
+    () =>
+      setChaptersDraft(
+        state?.player.current_book_chapters ? String(state.player.current_book_chapters) : '',
+      ),
+    [state?.player.current_book_chapters],
+  );
   useEffect(() => setUrlDraft(serverUrl), [serverUrl]);
   useEffect(() => setTokenDraft(apiToken), [apiToken]);
   // Reset the focus drafts when the saved preferences actually change (keyed on
@@ -150,7 +160,8 @@ export default function SettingsScreen() {
 
   const saveBookFlow = async () => {
     setBookSave('saving');
-    await saveBook(bookDraft.trim());
+    const chapters = Math.max(0, parseInt(chaptersDraft, 10) || 0);
+    await saveBook(bookDraft.trim(), chapters);
     settle(setBookSave);
   };
 
@@ -204,8 +215,9 @@ export default function SettingsScreen() {
       {state ? (
         <SystemPanel title="Current book" sub={`${state.player.books_finished} finished`}>
           <Text style={styles.help}>
-            What you’re reading now. Your Grow daily is to read a chapter of it — a chapter a day, a
-            book a week. At each new week, Arise asks if you finished it and what’s next.
+            What you’re reading now. Your Grow daily is to read it at your own pace — which quietly
+            speeds up as your Intelligence level climbs. Add the chapter count and Arise paces you to
+            keep up; leave it blank for a simple chapter a day. Each week it asks if you finished.
           </Text>
           <TextInput
             value={bookDraft}
@@ -214,6 +226,15 @@ export default function SettingsScreen() {
             placeholder="e.g. Atomic Habits — James Clear"
             placeholderTextColor={text.faint}
             maxLength={120}
+          />
+          <TextInput
+            value={chaptersDraft}
+            onChangeText={(v) => setChaptersDraft(v.replace(/[^0-9]/g, ''))}
+            style={styles.input}
+            keyboardType="number-pad"
+            placeholder="Total chapters (optional) · e.g. 20"
+            placeholderTextColor={text.faint}
+            maxLength={4}
           />
           <Pressable
             disabled={bookSave === 'saving'}

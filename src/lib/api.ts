@@ -13,6 +13,7 @@ export interface ApiPlayer {
   total_xp: number;
   rank: Rank;
   current_book: string;
+  current_book_chapters: number;
   books_finished: number;
 }
 
@@ -21,6 +22,16 @@ export interface ApiStat {
   level: number;
   into: number;
   needed: number;
+}
+
+/** Earned difficulty for one attribute (mirrors schemas.ProgressionOut). */
+export interface ApiProgression {
+  level: number; // current difficulty tier
+  peak: number; // highest tier ever reached — permanent
+  cap: number; // the ceiling tier
+  required: number; // days to clear this week to level up
+  cleared_this_week: number; // days cleared so far this week
+  band: number; // 0 foundation, 1 building, 2 depth
 }
 
 export interface ApiQuest {
@@ -62,6 +73,7 @@ export interface ApiState {
   next_rank: { rank: Rank; level: number; streak: number } | null;
   preferences: Partial<Record<StatKey, string[]>>;
   levels: Partial<Record<StatKey, string>>;
+  progression: Record<StatKey, ApiProgression>;
   llm_enabled: boolean;
   quests: ApiQuest[];
   achievements: ApiAchievement[];
@@ -164,10 +176,10 @@ export const api = {
   generate: (base: string, token: string, day: string) =>
     request<ApiState>(base, `/quests/generate?day=${day}`, token, { method: 'POST' }),
 
-  setBook: (base: string, token: string, currentBook: string, day: string) =>
+  setBook: (base: string, token: string, currentBook: string, chapters: number, day: string) =>
     request<ApiState>(base, `/book?day=${day}`, token, {
       method: 'PUT',
-      body: JSON.stringify({ current_book: currentBook }),
+      body: JSON.stringify({ current_book: currentBook, chapters }),
     }),
 
   reviewBook: (

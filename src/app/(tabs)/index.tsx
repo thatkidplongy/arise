@@ -121,7 +121,7 @@ export default function StatusScreen() {
 
       <SystemPanel title="Attributes">
         {stats.map((stat) => (
-          <StatRow key={stat.key} stat={stat} />
+          <StatRow key={stat.key} stat={stat} prog={state.progression?.[stat.key]} />
         ))}
       </SystemPanel>
 
@@ -131,7 +131,7 @@ export default function StatusScreen() {
           today.resting
             ? 'Resting today 🌙'
             : today.cleared
-              ? 'All five today — beautiful'
+              ? 'All of today — beautiful'
               : 'Whatever you manage counts'
         }
       >

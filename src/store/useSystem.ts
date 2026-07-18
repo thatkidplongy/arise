@@ -97,7 +97,7 @@ interface SystemStore {
   ) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
-  saveBook: (currentBook: string) => Promise<void>;
+  saveBook: (currentBook: string, chapters?: number) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
   resetAll: () => Promise<void>;
   setServerUrl: (url: string) => void;
@@ -272,10 +272,10 @@ export const useSystem = create<SystemStore>()(
         }
       },
 
-      saveBook: async (currentBook) => {
+      saveBook: async (currentBook, chapters = 0) => {
         const { serverUrl, apiToken, notices } = get();
         try {
-          const state = await api.setBook(serverUrl, apiToken, currentBook, dateKey());
+          const state = await api.setBook(serverUrl, apiToken, currentBook, chapters, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);
