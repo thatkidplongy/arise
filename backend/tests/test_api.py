@@ -48,6 +48,55 @@ def test_reading_review_flow(client):
     assert body["book_review"]["pending"] is False
 
 
+def test_llm_off_by_default_and_generate_is_noop(client):
+    s = _state(client)
+    assert s["llm_enabled"] is False
+    # With no key, generation is a safe no-op that returns the pool-based state.
+    r = client.post("/quests/generate?day=" + DAY)
+    assert r.status_code == 200, r.text
+    assert _quest(r.json(), "d-read")["title"] == _quest(s, "d-read")["title"]
+
+
+def test_generated_content_overrides_pool_but_keeps_floor(client):
+    import json as _json
+
+    from app.db import SessionLocal
+    from app.models import GeneratedQuest, Player
+
+    _state(client)  # ensure the player exists
+    session = SessionLocal()
+    pid = session.query(Player).first().id
+    session.add(
+        GeneratedQuest(
+            player_id=pid, quest_id="d-read", period_key=DAY,
+            title="Personalised Study", desc="Tuned to you",
+            steps=_json.dumps(["Do the custom thing", "And one more"]), resource="🎥 Example",
+        )
+    )
+    session.commit()
+    session.close()
+
+    q = _quest(_state(client), "d-read")
+    assert q["title"] == "Personalised Study"
+    assert q["resource"] == "🎥 Example"
+    assert "Do the custom thing" in q["steps"]
+    # The mandatory reading floor is still re-applied on top of LLM content.
+    assert q["steps"][0].startswith("Read a chapter")
+
+
+def test_levels_roundtrip_and_survive_focus_clear(client):
+    r = client.put(f"/preferences?day={DAY}", json={"levels": {"INT": "Math: fractions"}})
+    assert r.json()["levels"]["INT"] == "Math: fractions"
+    # Setting a focus for the same stat keeps the level.
+    r = client.put(f"/preferences?day={DAY}", json={"preferences": {"INT": ["coding"]}})
+    body = r.json()
+    assert body["levels"]["INT"] == "Math: fractions"
+    assert body["preferences"]["INT"] == ["coding"]
+    # Clearing the focus keeps the level (row survives on the level alone).
+    r = client.put(f"/preferences?day={DAY}", json={"preferences": {"INT": []}})
+    assert r.json()["levels"]["INT"] == "Math: fractions"
+
+
 def test_complete_then_conflict(client):
     r = client.post("/completions", json={"quest_id": "d-train", "day": DAY})
     assert r.status_code == 200, r.text

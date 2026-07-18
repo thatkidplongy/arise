@@ -77,6 +77,9 @@ class Preference(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
     stat: Mapped[str] = mapped_column(String, primary_key=True)  # STR | CRE | SPI | CHA | INT | WLT
     focus: Mapped[str] = mapped_column(String)
+    # Optional "where I'm at" note for this attribute (e.g. "Math: fractions").
+    # Feeds the LLM so it can prescribe the next step; ignored when the LLM is off.
+    level: Mapped[str] = mapped_column(String, default="")
 
 
 class StepCheck(Base):
@@ -90,3 +93,20 @@ class StepCheck(Base):
     quest_id: Mapped[str] = mapped_column(String, primary_key=True)
     period_key: Mapped[str] = mapped_column(String, primary_key=True)  # day or ISO week
     step_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class GeneratedQuest(Base):
+    """LLM-personalised content for a slot in a period, cached so we generate at
+    most once per slot per period. Absent row → fall back to the handcrafted
+    pool. The mandatory floor (reading chapter, push-ups…) is always re-applied
+    in code on top of this, so personalisation can't drop a non-negotiable."""
+
+    __tablename__ = "generated_quests"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    quest_id: Mapped[str] = mapped_column(String, primary_key=True)
+    period_key: Mapped[str] = mapped_column(String, primary_key=True)  # day or ISO week
+    title: Mapped[str] = mapped_column(String)
+    desc: Mapped[str] = mapped_column(String)
+    steps: Mapped[str] = mapped_column(String)  # JSON list of step strings
+    resource: Mapped[str] = mapped_column(String, default="")

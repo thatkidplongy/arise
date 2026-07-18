@@ -10,18 +10,32 @@ import json
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from . import game, quests
+from datetime import date, timedelta
+
+from . import game, llm, quests
 from .achievements import ACHIEVEMENTS
-from .models import AchievementUnlock, Completion, Player, Preference, QuestDef, StepCheck, utcnow
+from .models import (
+    AchievementUnlock,
+    Completion,
+    GeneratedQuest,
+    Player,
+    Preference,
+    QuestDef,
+    StepCheck,
+    utcnow,
+)
 from .state import (
+    _parse_focus,
     aggregate,
     build_state,
     completions_of,
     dailies_cleared,
     done_count,
     has_bonus,
+    levels_of,
     preferences_of,
     quest_defs,
+    resolve_steps,
     snapshot,
 )
 
@@ -157,8 +171,7 @@ def toggle_step(db: Session, player: Player, quest_id: str, step_index: int, day
     if quest.target != 1:
         raise HTTPException(400, "Step checklist only applies to single-completion quests")
 
-    prefs = preferences_of(db, player)
-    _, _, steps, _ = quests.content_for(quest, day, prefs.get(quest.stat), player.current_book)
+    steps = resolve_steps(db, player, quest, day)
     if not steps or not (0 <= step_index < len(steps)):
         raise HTTPException(400, "No such step for this quest today")
 
@@ -230,6 +243,7 @@ def set_book(db: Session, player: Player, current_book: str, day: str) -> None:
     player.current_book = (current_book or "").strip()
     player.book_started_week = game.week_key(day) if player.current_book else ""
     player.book_review_week = ""  # allow the next week's review to fire
+    _clear_generated(db, player)  # a new book should re-personalise the reading day
     db.commit()
 
 
@@ -246,30 +260,116 @@ def review_book(db: Session, player: Player, finished: bool, next_book: str, day
     db.commit()
 
 
-def update_preferences(db: Session, player: Player, prefs: dict[str, list[str]]) -> None:
-    """Replace each attribute's set of focuses with the given list (the client
-    sends the full set, so adding keeps the existing ones). An empty list clears
-    that attribute. Duplicates are dropped, order preserved, capped at 12."""
+def _clear_generated(db: Session, player: Player) -> None:
+    """Drop cached LLM content so the next generation reflects a changed profile."""
+    db.query(GeneratedQuest).filter_by(player_id=player.id).delete()
+
+
+def _profile(db: Session, player: Player, day: str) -> dict:
+    prefs = preferences_of(db, player)
+    levels = levels_of(db, player)
+    attrs: dict[str, dict] = {}
+    for stat in game.STAT_KEYS:
+        info: dict = {}
+        if prefs.get(stat):
+            info["focus"] = prefs[stat]
+        if levels.get(stat):
+            info["level"] = levels[stat]
+        if info:
+            attrs[stat] = info
+    cutoff = (date.fromisoformat(day) - timedelta(days=7)).isoformat()
+    counts: dict[str, int] = {}
+    for r in completions_of(db, player):
+        if r.day >= cutoff and r.quest_id not in (game.DAILY_CLEAR_ID, game.REST_DAY_ID):
+            counts[r.quest_id] = counts.get(r.quest_id, 0) + 1
+    return {
+        "name": player.name,
+        "north_star": player.north_star,
+        "current_book": player.current_book,
+        "attributes": attrs,
+        "recent": ", ".join(f"{k}×{v}" for k, v in sorted(counts.items())),
+    }
+
+
+def generate_quests(db: Session, player: Player, day: str) -> dict:
+    """Personalise this period's uncached quests via the LLM in one call, caching
+    the result. No key, nothing to generate, or any failure → state is unchanged
+    (the handcrafted pools). The mandatory floor is re-applied on read, so this
+    can never drop a non-negotiable."""
+    if not llm.enabled():
+        return build_state(db, player, day)
+    defs = quest_defs(db)
+    slots = []
+    for q in defs:
+        pk = quests.period_key(q.cadence, day)
+        if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
+            continue
+        title, desc, steps = quests.pool_variant(q, day)
+        slots.append(
+            {"id": q.id, "stat": q.stat, "cadence": q.cadence,
+             "theme": title, "example_desc": desc, "example_steps": steps}
+        )
+    if not slots:
+        return build_state(db, player, day)
+    try:
+        generated = llm.generate(slots, _profile(db, player, day))
+    except Exception as err:  # transport/parse/timeout — never fatal
+        llm.log_failure(err)
+        return build_state(db, player, day)
+    for q in defs:
+        g = generated.get(q.id)
+        if not g:
+            continue  # slot the model skipped → keep the pool for it
+        pk = quests.period_key(q.cadence, day)
+        db.merge(
+            GeneratedQuest(
+                player_id=player.id, quest_id=q.id, period_key=pk,
+                title=g["title"], desc=g["desc"],
+                steps=json.dumps(g["steps"]), resource=g.get("resource", ""),
+            )
+        )
+    db.commit()
+    return build_state(db, player, day)
+
+
+def _clean_focus(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in values or []:
+        v = (v or "").strip()
+        if v and v.lower() not in seen:
+            seen.add(v.lower())
+            out.append(v)
+    return out[:12]
+
+
+def update_preferences(
+    db: Session,
+    player: Player,
+    prefs: dict[str, list[str]] | None = None,
+    levels: dict[str, str] | None = None,
+) -> None:
+    """Update each attribute's focus set (client sends the full set) and/or its
+    "where I'm at" level note. A stat only in one dict keeps the other field. A
+    row is deleted only when both focus and level end up empty. Changing the
+    profile clears the LLM cache so the next generation reflects it."""
+    prefs = prefs or {}
+    levels = levels or {}
     existing = {p.stat: p for p in db.query(Preference).filter_by(player_id=player.id)}
-    for stat, values in prefs.items():
+    for stat in set(prefs) | set(levels):
         if stat not in game.STAT_KEYS:
             continue
-        seen: set[str] = set()
-        cleaned: list[str] = []
-        for v in values or []:
-            v = (v or "").strip()
-            if v and v.lower() not in seen:
-                seen.add(v.lower())
-                cleaned.append(v)
-        cleaned = cleaned[:12]
         row = existing.get(stat)
-        if not cleaned:
+        focus = _clean_focus(prefs[stat]) if stat in prefs else (_parse_focus(row.focus) if row else [])
+        level = (levels[stat].strip() if stat in levels else (row.level if row else "")) or ""
+        if not focus and not level:
             if row is not None:
                 db.delete(row)
         elif row is not None:
-            row.focus = json.dumps(cleaned)
+            row.focus, row.level = json.dumps(focus), level
         else:
-            db.add(Preference(player_id=player.id, stat=stat, focus=json.dumps(cleaned)))
+            db.add(Preference(player_id=player.id, stat=stat, focus=json.dumps(focus), level=level))
+    _clear_generated(db, player)
     db.commit()
 
 
@@ -277,6 +377,7 @@ def reset_all(db: Session, player: Player) -> None:
     db.query(Completion).filter_by(player_id=player.id).delete()
     db.query(AchievementUnlock).filter_by(player_id=player.id).delete()
     db.query(StepCheck).filter_by(player_id=player.id).delete()
+    _clear_generated(db, player)
     player.equipped_title = None
     player.created_at = utcnow()
     db.commit()

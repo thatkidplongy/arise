@@ -12,6 +12,10 @@ import pytest
 
 _TMP_DB = Path(tempfile.gettempdir()) / "arise-pytest.db"
 os.environ["ARISE_DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
+# Keep the LLM off during tests regardless of the developer's shell env, so the
+# fallback paths are what's exercised.
+os.environ.pop("ARISE_LLM_API_KEY", None)
+os.environ.pop("GEMINI_API_KEY", None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app import models  # noqa: E402,F401  (registers tables on Base)

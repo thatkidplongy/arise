@@ -35,14 +35,20 @@
     <key>StandardErrorPath</key>
     <string>__BACKEND_DIR__/logs/backend.log</string>
 
-    <!-- To require a token, uncomment and set a value (also set it in the app
-         under Settings → System link). Left out, auth is off (Tailscale is the
-         boundary). -->
+    <!-- Optional environment. Uncomment the block and set what you need:
+         • ARISE_API_TOKEN   require a token (also set it in the app under
+                             Settings → System link). Omitted → auth off
+                             (Tailscale is the boundary).
+         • ARISE_LLM_API_KEY free Google AI Studio key → turns on AI-personalised
+                             quests. Omitted → the handcrafted pools are used.
+         • ARISE_LLM_MODEL   optional; defaults to gemini-2.0-flash. -->
     <!--
     <key>EnvironmentVariables</key>
     <dict>
         <key>ARISE_API_TOKEN</key>
         <string>replace-with-a-long-random-string</string>
+        <key>ARISE_LLM_API_KEY</key>
+        <string>your-google-ai-studio-key</string>
     </dict>
     -->
 </dict>

@@ -10,9 +10,17 @@ import json
 
 from sqlalchemy.orm import Session
 
-from . import game, quests
+from . import game, llm, quests
 from .achievements import ACHIEVEMENTS, Snapshot
-from .models import AchievementUnlock, Completion, Player, Preference, QuestDef, StepCheck
+from .models import (
+    AchievementUnlock,
+    Completion,
+    GeneratedQuest,
+    Player,
+    Preference,
+    QuestDef,
+    StepCheck,
+)
 
 
 def get_or_create_player(db: Session) -> Player:
@@ -54,6 +62,53 @@ def preferences_of(db: Session, player: Player) -> dict[str, list[str]]:
         if vals:
             out[p.stat] = vals
     return out
+
+
+def levels_of(db: Session, player: Player) -> dict[str, str]:
+    """The optional 'where I'm at' note per attribute (drives LLM sequencing)."""
+    out: dict[str, str] = {}
+    for p in db.query(Preference).filter_by(player_id=player.id):
+        if (p.level or "").strip():
+            out[p.stat] = p.level.strip()
+    return out
+
+
+def _gen_steps(raw: str) -> list[str]:
+    try:
+        val = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    return [str(s) for s in val] if isinstance(val, list) else []
+
+
+def generated_by(db: Session, player: Player) -> dict[tuple[str, str], dict]:
+    """Cached LLM content keyed by (quest_id, period_key). Empty when the LLM is
+    off or nothing's been generated yet."""
+    out: dict[tuple[str, str], dict] = {}
+    for g in db.query(GeneratedQuest).filter_by(player_id=player.id):
+        out[(g.quest_id, g.period_key)] = {
+            "title": g.title,
+            "desc": g.desc,
+            "steps": _gen_steps(g.steps),
+            "resource": g.resource,
+        }
+    return out
+
+
+def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
+    """The full step list a quest shows today — generated content if present,
+    else the pool — always with the mandatory floor prepended. Shared by the read
+    model and the step-toggle write path so they never disagree."""
+    pk = quests.period_key(quest.cadence, day)
+    g = db.get(
+        GeneratedQuest,
+        {"player_id": player.id, "quest_id": quest.id, "period_key": pk},
+    )
+    if g is not None:
+        return quests.floor_for(quest, player.current_book) + _gen_steps(g.steps)
+    prefs = preferences_of(db, player)
+    _, _, steps, _ = quests.content_for(quest, day, prefs.get(quest.stat), player.current_book)
+    return steps
 
 
 # ── Derivation ──────────────────────────────────────────────────────────────
@@ -138,9 +193,15 @@ def snapshot(agg: dict) -> Snapshot:
 # ── State assembly ────────────────────────────────────────────────────────────
 
 
-def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="") -> dict:
-    title, desc, steps, resource = quests.content_for(q, day, prefs.get(q.stat), book)
+def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None) -> dict:
     pk = quests.period_key(q.cadence, day)
+    gen = (gen_by or {}).get((q.id, pk))
+    if gen is not None:  # LLM-personalised, with the mandatory floor re-applied
+        title, desc = gen["title"], gen["desc"]
+        steps = quests.floor_for(q, book) + gen["steps"]
+        resource = gen["resource"]
+    else:
+        title, desc, steps, resource = quests.content_for(q, day, prefs.get(q.stat), book)
     checked = checks_by.get((q.id, pk), set())
     return {
         "id": q.id,
@@ -162,6 +223,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     defs = quest_defs(db)
     rows = completions_of(db, player)
     prefs = preferences_of(db, player)
+    levels = levels_of(db, player)
+    gen_by = generated_by(db, player)
     agg = aggregate(rows, defs)
 
     li = game.level_info(agg["total_xp"])
@@ -224,8 +287,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "next_rank": game.next_gate(li["level"], best),
         "preferences": prefs,
+        "levels": levels,
+        "llm_enabled": llm.enabled(),
         "quests": [
-            _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book)
+            _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by)
             for q in defs
         ],
         "achievements": [

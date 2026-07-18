@@ -692,33 +692,45 @@ def _pick(slot_id: str, period_key: str, n: int) -> int:
     return int(digest, 16) % n
 
 
+def floor_for(quest: QuestDef, book: str | None = None) -> list[str]:
+    """The mandatory non-negotiable steps for a slot — the floor met every day
+    regardless of the day's variant or whether an LLM wrote it. Grow always opens
+    with reading a chapter; other daily anchors come from ANCHORS. Empty for
+    non-daily slots."""
+    anchor = list(ANCHORS.get(quest.id, []))
+    if quest.id == "d-read":  # reading a chapter is the mandatory daily floor
+        chapter = f"Read a chapter of {book}" if book else "Read a chapter of your current book"
+        anchor = [chapter] + anchor
+    return anchor
+
+
+def pool_variant(quest: QuestDef, day: str) -> tuple[str, str, list[str]]:
+    """The raw (title, desc, steps) picked from the handcrafted pool for the
+    period — no floor applied. Used as the fallback and as a style seed for the
+    LLM prompt."""
+    pool = POOLS.get(quest.id)
+    if not pool:
+        return quest.title, quest.desc, []  # unknown slot → seeded fallback
+    return pool[_pick(quest.id, _period_key(quest.cadence, day), len(pool))]
+
+
 def content_for(
     quest: QuestDef,
     day: str,
     focus: list[str] | None = None,
     book: str | None = None,
 ) -> tuple[str, str, list[str], str]:
-    """The (title, desc, steps, resource) a slot should show for the period
-    containing `day`.
+    """The (title, desc, steps, resource) a slot should show from the handcrafted
+    pool for the period containing `day`, with the mandatory floor prepended.
 
     `focus` is the attribute's set of focuses; a side quest rotates through them
-    day to day, so every focus gets its turn. `book` is the player's current book;
-    the Grow daily always opens with "read a chapter of it" — reading is the
-    mandatory daily floor (a chapter a day ≈ a book a week). `resource` is an
-    optional pointer to a trusted place to learn (empty when there isn't one).
-    Daily slots with an ANCHOR get their non-negotiable core prepended first."""
+    day to day. `book` is the player's current book (drives the reading floor).
+    `resource` points at a trusted place to learn (empty when there isn't one)."""
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
-        return title, f"Your focus: {chosen}", [], ""
-    pool = POOLS.get(quest.id)
-    if not pool:
-        return quest.title, quest.desc, [], ""  # unknown slot → seeded fallback
-    title, desc, steps = pool[_pick(quest.id, _period_key(quest.cadence, day), len(pool))]
-    anchor = list(ANCHORS.get(quest.id, []))
-    if quest.id == "d-read":  # reading a chapter is the mandatory daily floor
-        chapter = f"Read a chapter of {book}" if book else "Read a chapter of your current book"
-        anchor = [chapter] + anchor
-    steps = anchor + steps  # non-negotiables first, then the day's variety
+        return title, f"Your focus: {chosen}", floor_for(quest, book), ""
+    title, desc, steps = pool_variant(quest, day)
+    steps = floor_for(quest, book) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

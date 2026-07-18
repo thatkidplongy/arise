@@ -35,7 +35,9 @@ class BookReviewIn(BaseModel):
 
 class PreferencesIn(BaseModel):
     # {stat: [focus, ...]}; the full set per attribute. Empty list clears it.
-    preferences: dict[str, list[str]]
+    preferences: dict[str, list[str]] = {}
+    # {stat: "where I'm at"}; optional per-attribute level note for LLM sequencing.
+    levels: dict[str, str] = {}
 
 
 # ── Responses ────────────────────────────────────────────────────────────────
@@ -123,6 +125,8 @@ class StateOut(BaseModel):
     book_review: BookReviewOut
     next_rank: RankGateOut | None
     preferences: dict[str, list[str]]
+    levels: dict[str, str]
+    llm_enabled: bool  # true when a Gemini key is configured (quests are personalised)
     quests: list[QuestOut]
     achievements: list[AchievementOut]
     record: RecordOut

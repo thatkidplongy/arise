@@ -101,11 +101,21 @@ def update_preferences(
     day: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Set a focus per attribute (STR/CRE/SPI/CHA/INT). Blank clears it.
-    A set focus themes that attribute's side quest."""
+    """Set a focus and/or a "where I'm at" level per attribute
+    (STR/CRE/SPI/CHA/INT/WLT). A set focus themes that attribute's side quest;
+    the level feeds LLM sequencing when enabled."""
     player = state.get_or_create_player(db)
-    service.update_preferences(db, player, body.preferences)
+    service.update_preferences(db, player, body.preferences, body.levels)
     return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/quests/generate", response_model=StateOut)
+def generate_quests(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Personalise this period's quests with the LLM (if a key is configured),
+    caching the result. Safe to call any time: a no-op when the LLM is off or the
+    period is already generated, and it falls back to the pools on any failure."""
+    player = state.get_or_create_player(db)
+    return service.generate_quests(db, player, _valid_day(day))
 
 
 @router.put("/book", response_model=StateOut)
