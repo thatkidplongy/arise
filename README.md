@@ -225,7 +225,7 @@ cd backend && .venv/bin/python scripts/backup_db.py
 ```
 src/
   app/            expo-router screens (file = route)
-    (tabs)/       Status · Quests · Body · Focus · Inspire · Achievements · Settings
+    (tabs)/       Status · Quests · Body · Inspire · You  (You → Focus · Achievements · Settings)
   components/     flat sandy UI: QuestCard, Toast, SystemNotice, panels
   lib/            api client, date helpers
   store/          zustand store: server state + client settings

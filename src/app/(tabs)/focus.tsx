@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { FocusAreasCard } from '@/components/FocusAreasCard';
 import { InterviewModeCard } from '@/components/InterviewModeCard';
@@ -12,6 +13,7 @@ export default function FocusScreen() {
 
   return (
     <Screen>
+      <BackLink />
       <View style={styles.head}>
         <Text style={styles.h1}>Focus</Text>
         <Text style={styles.sub}>Shape how the System tailors your quests.</Text>

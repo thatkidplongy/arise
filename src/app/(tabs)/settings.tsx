@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BackLink } from '@/components/BackLink';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
@@ -85,6 +86,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      <BackLink />
       <Text style={styles.h1}>Settings</Text>
 
       {state ? (

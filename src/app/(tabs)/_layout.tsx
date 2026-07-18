@@ -36,6 +36,7 @@ export default function TabsLayout() {
         tabBarIconStyle: { marginTop: 2 },
       }}
     >
+      {/* The five primary destinations. */}
       <Tabs.Screen
         name="index"
         options={{
@@ -58,13 +59,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="focus"
-        options={{
-          title: 'Focus',
-          tabBarIcon: ({ color }) => <Ionicons name="compass-outline" color={color} size={24} />,
-        }}
-      />
-      <Tabs.Screen
         name="inspire"
         options={{
           title: 'Inspire',
@@ -72,19 +66,18 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="achievements"
+        name="you"
         options={{
-          title: 'Achievements',
-          tabBarIcon: ({ color }) => <Ionicons name="trophy-outline" color={color} size={24} />,
+          title: 'You',
+          tabBarIcon: ({ color }) => <Ionicons name="person-circle-outline" color={color} size={24} />,
         }}
       />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Ionicons name="settings-outline" color={color} size={24} />,
-        }}
-      />
+
+      {/* Reachable from the You hub (and deep links), but kept off the tab bar so
+          it stays at a clean five. `href: null` hides the button, not the route. */}
+      <Tabs.Screen name="focus" options={{ href: null, title: 'Focus' }} />
+      <Tabs.Screen name="achievements" options={{ href: null, title: 'Achievements' }} />
+      <Tabs.Screen name="settings" options={{ href: null, title: 'Settings' }} />
     </Tabs>
   );
 }

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
@@ -33,6 +34,7 @@ export default function AchievementsScreen() {
 
   return (
     <Screen>
+      <BackLink />
       <View style={styles.headerRow}>
         <Text style={styles.h1}>Achievements</Text>
         <Text style={styles.count}>
