@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CurrentBookCard } from '@/components/CurrentBookCard';
+import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
@@ -28,6 +29,14 @@ export default function QuestsScreen() {
   const side = state.quests.filter((q) => q.cadence === 'side');
   const isResting = state.today.resting;
 
+  // Group the daily quests into soft time-blocks and mark the one for right now,
+  // so the board reads as a rhythm — "what fits this moment" — not a flat list.
+  const nowKey = currentBlockKey(new Date().getHours());
+  const dailyBlocks = DAY_BLOCKS.map((block) => ({
+    block,
+    items: daily.filter((q) => blockOf(q.stat, q.title) === block.key),
+  })).filter((g) => g.items.length > 0);
+
   const onRest = async () => {
     if (pending) return;
     setPending(true);
@@ -44,22 +53,32 @@ export default function QuestsScreen() {
 
       <ReadingReview />
 
-      <SystemPanel
-        title="Daily quests"
-        sub={
-          isResting
-            ? 'Resting today 🌙'
-            : state.today.cleared
-              ? 'Every area today 🌱'
-              : 'Do what you can — showing up is the win'
-        }
-      >
-        <View style={styles.list}>
-          {daily.map((q) => (
-            <QuestCard key={q.id} quest={q} />
-          ))}
-        </View>
-      </SystemPanel>
+      <Text style={styles.rhythmNote}>
+        {isResting
+          ? 'Resting today 🌙 — your streak is safe'
+          : state.today.cleared
+            ? 'Every area today 🌱'
+            : 'Your day in blocks — do what fits the moment'}
+      </Text>
+
+      {dailyBlocks.map(({ block, items }) => {
+        const isNow = !isResting && block.key === nowKey;
+        const allDone = items.every((q) => q.done >= q.target);
+        return (
+          <SystemPanel
+            key={block.key}
+            title={block.label}
+            sub={isNow ? 'Now' : allDone ? 'Done 🌱' : ''}
+            style={isNow ? styles.nowBlock : undefined}
+          >
+            <View style={styles.list}>
+              {items.map((q) => (
+                <QuestCard key={q.id} quest={q} />
+              ))}
+            </View>
+          </SystemPanel>
+        );
+      })}
 
       <SystemPanel title="Weekly quests" sub="New set each Monday">
         <View style={styles.list}>
@@ -127,6 +146,17 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 8,
+  },
+  rhythmNote: {
+    color: text.faint,
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  nowBlock: {
+    borderColor: withAlpha(accent, 0.55),
+    backgroundColor: withAlpha(accent, 0.05),
   },
   rest: {
     alignItems: 'center',
