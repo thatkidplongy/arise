@@ -25,13 +25,22 @@ META = """
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
 """
 
+# maximum-scale=1 + user-scalable=no stop iOS Safari from auto-zooming into any
+# input/button whose font is under 16px (our compact fields). We deliberately do
+# NOT set viewport-fit=cover — it extends the page under the home indicator and
+# exposes the white document background below the tab bar.
+VIEWPORT = ('<meta name="viewport" content="width=device-width, initial-scale=1, '
+            'maximum-scale=1, user-scalable=no"/>')
+
 for html in pathlib.Path("dist").glob("**/*.html"):
     text = html.read_text()
-    if "apple-mobile-web-app-capable" in text:
-        continue  # already injected
-    # Insert right after the opening <head> tag.
-    new = re.sub(r"(<head[^>]*>)", r"\1" + META, text, count=1)
-    html.write_text(new)
+    if re.search(r'<meta[^>]*name="viewport"[^>]*/?>', text):
+        text = re.sub(r'<meta[^>]*name="viewport"[^>]*/?>', VIEWPORT, text, count=1)
+    elif re.search(r"<head[^>]*>", text):
+        text = re.sub(r"(<head[^>]*>)", r"\1" + VIEWPORT, text, count=1)
+    if "apple-mobile-web-app-capable" not in text:
+        text = re.sub(r"(<head[^>]*>)", r"\1" + META, text, count=1)
+    html.write_text(text)
 PY
 
 echo "✔ Web app built to dist/ (installable). The always-on backend serves it."
