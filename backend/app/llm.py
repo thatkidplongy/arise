@@ -242,6 +242,80 @@ def analyze_food(image_b64: str, mime: str = "image/jpeg", timeout: float = 25.0
     return _parse_estimate(payload)
 
 
+# ── Distil a motivational transcript into takeaways + pull-quotes ────────────────
+
+_DISTIL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "takeaways": {"type": "array", "items": {"type": "string"}},
+        "quotes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["summary", "takeaways", "quotes"],
+}
+
+_DISTIL_PROMPT = (
+    "You distil a motivational video's transcript into something a person can keep, "
+    "for a personal wellness app whose voice is a gentle guide — encouraging, never a "
+    "drill sergeant. From the transcript, return:\n"
+    "• summary: ONE warm sentence capturing the heart of it.\n"
+    "• takeaways: 2–4 concrete, actionable lessons in a kind voice — each a short line "
+    "the person could act on today (not vague platitudes).\n"
+    "• quotes: 1–3 SHORT lines lifted (near-)verbatim from the transcript — the kind "
+    "worth resurfacing as a daily nudge. Keep each under ~120 characters, faithful to "
+    "the speaker's words, invent nothing. Skip filler ('follow my page', 'link below').\n"
+    "If the transcript is empty or has no real substance, return empty arrays.\n"
+    "Return JSON only: {summary, takeaways[], quotes[]}."
+)
+
+
+def _clip(s, n: int) -> str:
+    """Collapse whitespace and cap length — keeps stored lines tidy for display."""
+    s = " ".join(str(s).split())
+    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+
+def _parse_distillation(payload: dict) -> dict:
+    """Pure: Gemini response JSON → {summary, takeaways[], quotes[]}. Testable offline."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    data = json.loads(text)
+    takeaways = [_clip(x, 200) for x in (data.get("takeaways") or []) if str(x).strip()]
+    quotes = [_clip(x, 160) for x in (data.get("quotes") or []) if str(x).strip()]
+    return {
+        "summary": _clip(data.get("summary", ""), 200),
+        "takeaways": takeaways[:4],
+        "quotes": quotes[:3],
+    }
+
+
+def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
+    """One Gemini call → {summary, takeaways[], quotes[]} from a video transcript.
+
+    Raises on any transport/parse error; the caller surfaces a clean message. Called
+    on demand when the user captures a video, never in the background."""
+    body = {
+        "contents": [{"parts": [
+            {"text": _DISTIL_PROMPT},
+            {"text": "TRANSCRIPT:\n" + transcript.strip()},
+        ]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "responseMimeType": "application/json",
+            "responseSchema": _DISTIL_SCHEMA,
+        },
+    }
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        payload = json.load(resp)
+    return _parse_distillation(payload)
+
+
 def log_failure(err: Exception) -> None:
     """A generation failure is non-fatal (we fall back); note it and move on.
 

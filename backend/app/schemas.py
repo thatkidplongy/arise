@@ -38,6 +38,10 @@ class InterviewModeIn(BaseModel):
     enabled: bool  # Craft (CFT): shift quests to interview prep when true
 
 
+class InsightAddIn(BaseModel):
+    url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL")
+
+
 # ── Body (standalone wellness tools) ──────────────────────────────────────────
 
 
@@ -271,6 +275,25 @@ class RecordOut(BaseModel):
     total_completions: int
 
 
+class InsightOut(BaseModel):
+    """A captured video distilled into keepable takeaways + pull-quotes."""
+    id: str
+    source_url: str
+    source: str  # tiktok | instagram | youtube | web
+    title: str
+    summary: str
+    takeaways: list[str]
+    quotes: list[str]
+    created_at: datetime
+
+
+class DailyQuoteOut(BaseModel):
+    """One pull-quote surfaced on Status today, rotating by the date."""
+    text: str
+    source_title: str
+    insight_id: str
+
+
 class StateOut(BaseModel):
     player: PlayerOut
     stats: list[StatOut]
@@ -282,6 +305,8 @@ class StateOut(BaseModel):
     levels: dict[str, str]
     progression: dict[str, ProgressionOut]  # per-attribute earned difficulty (STR, INT, …)
     llm_enabled: bool  # true when a Gemini key is configured (quests are personalised)
+    transcript_enabled: bool  # true when a Supadata key is set (Inspire capture is on)
+    daily_quote: DailyQuoteOut | None  # a rotating pull-quote from captured videos
     quests: list[QuestOut]
     achievements: list[AchievementOut]
     record: RecordOut

@@ -12,7 +12,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from . import game, llm, progression, quests
+from . import game, insights, llm, progression, quests, transcript
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -367,6 +367,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "levels": levels,
         "progression": prog,
         "llm_enabled": llm.enabled(),
+        "transcript_enabled": transcript.enabled(),
+        "daily_quote": insights.daily_quote(db, player.id, day),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.current_book_chapters, player.interview_mode)

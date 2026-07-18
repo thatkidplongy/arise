@@ -176,3 +176,21 @@ class GeneratedQuest(Base):
     desc: Mapped[str] = mapped_column(String)
     steps: Mapped[str] = mapped_column(String)  # JSON list of step strings
     resource: Mapped[str] = mapped_column(String, default="")
+
+
+class Insight(Base):
+    """A motivational video the hunter captured: its spoken transcript, distilled
+    by the LLM into takeaways + pull-quotes. Quotes resurface on Status as a gentle
+    nudge. Stored, not derived — fetched once when captured, then kept."""
+
+    __tablename__ = "insights"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    source_url: Mapped[str] = mapped_column(String)
+    source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
+    title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
+    summary: Mapped[str] = mapped_column(String, default="")
+    takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
+    quotes: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

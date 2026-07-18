@@ -3,13 +3,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import body, books, llm, nutrition, service, state
+from . import body, books, insights, llm, nutrition, service, state, transcript
 from .db import get_db
 from .schemas import (ActionResult, BodyOut, BodyProfileIn, BookIn, BookReviewIn,
                       BookOut, BookShelfOut, CompleteIn, FoodAnalyzeIn,
                       FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
-                      InterviewModeIn, PlayerIn, PreferencesIn, SkincareCheckIn,
-                      SkincareStepIn, StateOut, StepResult, StepToggleIn)
+                      InsightAddIn, InsightOut, InterviewModeIn, PlayerIn,
+                      PreferencesIn, SkincareCheckIn, SkincareStepIn, StateOut,
+                      StepResult, StepToggleIn)
 
 router = APIRouter()
 
@@ -254,3 +255,39 @@ def check_skincare(body_in: SkincareCheckIn, day: str | None = Query(None), db: 
     player = state.get_or_create_player(db)
     body.toggle_skincare(db, player.id, body_in.step_id, body_in.done, _valid_day(day))
     return body.build_body(db, player.id, _valid_day(day))
+
+
+# ── Inspire: capture a motivational video → distilled insight ─────────────────
+
+
+@router.get("/insights", response_model=list[InsightOut])
+def list_insights(db: Session = Depends(get_db)):
+    """Every captured video, newest first, with its distilled takeaways + quotes."""
+    player = state.get_or_create_player(db)
+    return insights.list_insights(db, player.id)
+
+
+@router.post("/insights", response_model=InsightOut)
+def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
+    """Capture a video: fetch its spoken transcript (Supadata) and distil it (Gemini)
+    into takeaways + pull-quotes. Needs a Supadata key; distilling needs the Gemini key.
+    A rough, editable capture by nature — never logged silently anywhere else."""
+    player = state.get_or_create_player(db)
+    if not transcript.enabled():
+        raise HTTPException(503, "Capturing videos needs a Supadata key (set ARISE_SUPADATA_API_KEY).")
+    if not llm.enabled():
+        raise HTTPException(503, "Distilling needs a Gemini key (set ARISE_LLM_API_KEY).")
+    try:
+        return insights.add_insight(db, player.id, body_in.url)
+    except insights.NoTranscript:
+        raise HTTPException(422, "No speech found in that video — it may be music- or text-only.")
+    except Exception:
+        raise HTTPException(502, "Couldn't fetch that transcript — check the link, or try another.")
+
+
+@router.delete("/insights/{insight_id}", response_model=list[InsightOut])
+def remove_insight(insight_id: str, db: Session = Depends(get_db)):
+    """Forget a capture. Returns the remaining list."""
+    player = state.get_or_create_player(db)
+    insights.remove_insight(db, player.id, insight_id)
+    return insights.list_insights(db, player.id)
