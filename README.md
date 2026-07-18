@@ -1,7 +1,7 @@
 # ARISE
 
 A personal, Solo Leveling-inspired "System" for real life — but a **gentle
-guide, not a taskmaster**. Six areas of life become six attributes; you get
+guide, not a taskmaster**. Seven areas of life become seven attributes; you get
 daily/weekly/side quests, XP, levels, hunter ranks (E→S), streaks, achievements
 and titles. Showing up is the win, rest counts, and a missed day is never a
 failure.
@@ -75,10 +75,27 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   areas); a saved focus rotates that attribute's side quest through your set.
 - **Reading loop** — a chapter a day is the mandatory Grow floor; each new week
   Arise asks if you finished your book and what to read next (a book a week).
+- **Craft — the engineering ladder** — a dedicated attribute for coding, aimed
+  at going mid → Senior. It climbs fundamentals-first: fluency & fundamentals →
+  patterns & problem-solving → system design & architecture, with a small
+  deep-work floor every day. Flip on **interview mode** (Settings) when one's on
+  the horizon and its quests shift to timed DSA, mock system-design, and
+  behavioural (STAR) prep.
 - **AI personalisation (optional)** — set a free Gemini key and quests are
   generated and sequenced to your level; unset, it uses the handcrafted pools.
   Mandatory floors (reading, push-ups…) are always enforced regardless. See
   [DEPLOY.md](./DEPLOY.md).
+- **Body — nutrition & skincare (standalone)** — a separate **Body** tab that
+  isn't a stat and doesn't touch XP/streaks. Nutrition is a gentle
+  calorie/protein/**fibre** target (Mifflin–St Jeor — a *range*, never a hard
+  number or a "failure" state) driven by a **goal weight** with your BMI + healthy
+  range shown; a **"what to eat"** list of protein- and fibre-forward foods/meals
+  you can tap to log; a food log with **Open Food Facts** lookup; and a **photo
+  estimate** — snap a meal and Gemini vision estimates its calories/protein/fibre
+  for you to edit before logging (on-demand, needs the Gemini key). Skincare is
+  an editable AM/PM **routine** seeded with a pigmentation/pores-tuned template
+  plus trusted resources. The food database is the one external service the app
+  reaches.
 - **Your North Star** — a line you write about the life you're reaching for,
   pinned to the top of the Status screen.
 - **Rest days & forgiveness** — mark a rest day and your streak stays safe;
@@ -213,6 +230,9 @@ backend/
     quests.py     rotating content + leveled floors + content bands
     progression.py earned difficulty: per-attribute levels that climb/ease
     llm.py        optional Gemini personalisation (off without a key)
+    body.py       standalone Body tools: nutrition + skincare (read + write)
+    nutrition.py  calorie/protein targets (pure) + Open Food Facts lookup
+    skincare.py   the seeded AM/PM routine template + resources
     achievements.py, models.py, schemas.py, seed.py, db.py, security.py
   scripts/        backup_db.py
   tests/          pytest: unit + integration + migration

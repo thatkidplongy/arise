@@ -1,6 +1,6 @@
 # ARISE — The System · Design Document
 
-A Solo Leveling-inspired personal progression system. One Player, six areas of
+A Solo Leveling-inspired personal progression system. One Player, seven areas of
 life, one goal: become your best version by showing up — at whatever pace you can.
 
 ## Philosophy — a guide, not a taskmaster
@@ -16,18 +16,23 @@ Every feature and every line of copy is checked against this:
 - **Keep the why in view.** The player's North Star sits atop the Status screen.
 - **Room to live.** Rest and enjoying life are part of the path, not a detour.
 
-## The Six Attributes (Party Composition)
+## The Seven Attributes (Party Composition)
 
 | Slot | Hobby | Stat | Notes |
 |---|---|---|---|
 | Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank floor that *climbs with your level* (see Progression), tuned for toning, not bulk |
-| Creative | Drawing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
+| Creative | Drawing, dance, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
 | Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |
-| Grow | Coding, math, Japanese, reading, the world | **INT** | Reads a book a week (a chapter a day is the mandatory floor); the rest — code/math/Japanese/history/science — rotates on top |
+| Grow | Math, Japanese, reading, the world | **INT** | Reads a book a week (a chapter a day is the mandatory floor); the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top |
 | Wealth | Making money | **WLT** | Fundamentals, side income, monetising your skills, and managing/growing money |
+| Craft | Coding → Senior | **CFT** | The engineering ladder: fluency → patterns & problem-solving → system design & architecture (bands, fundamentals-first), with a small deep-work floor daily. An **interview-mode** toggle (`Player.interview_mode`) swaps its quests to DSA drills, mock system-design, and behavioural (STAR) prep |
 
-Time budget: 30 min–2 hrs/day. Minimum daily loop ≈ 80 minutes — but showing up
+Coding lives in its own attribute (**Craft**), separate from **Grow** (INT):
+Grow is broad, curious learning; Craft is deliberate practice toward Senior. The
+distinction keeps the career ladder from being diluted by a random rotation.
+
+Time budget: 30 min–2 hrs/day. Minimum daily loop ≈ 90 minutes — but showing up
 for any of it is the win.
 
 ## Quests
@@ -36,7 +41,8 @@ for any of it is the win.
   a **+15 XP Daily Clear bonus**.
 - **Weekly Quests** — the raids. Badminton ×2/week (40 XP each), one hangout
   (50 XP), one finished drawing (40 XP), 3 book chapters (40 XP), one 30-min
-  meditation (30 XP). Reset every Monday (ISO week).
+  meditation (30 XP), a wealth milestone (40 XP), and a Craft master-work
+  (40 XP). Reset every Monday (ISO week).
 - **Side Quests** — optional, 15 XP, each completable once per day.
 
 The quests are stable **slots** (`quest_defs` table, seeded by
@@ -109,13 +115,21 @@ Each completed week is settled once:
 Two flavours of "harder":
 
 - **A climbing floor** where it's measurable — STR push-ups 5→20 & plank 20s→60s,
-  SPI a pause → a 5-min sit, WLT "log it" → a real money check-in. Each **caps**
-  at a sustainable maintain tier.
+  SPI a pause → a 5-min sit, WLT "log it" → a real money check-in, CFT 15 → 45
+  minutes of daily deep work. Each **caps** at a sustainable maintain tier.
 - **A content band** where it isn't — 0 foundation → 1 building → 2 depth (`TIER`
   in `quests.py`). Fundamentals before tactics: **INT** starts with *learning how
   to learn* (active recall, mind-mapping, the Feynman technique) before domains;
-  **WLT** with money *psychology* before hustle; **CRE/CHA** with quick low-stakes
-  reps before ambitious pieces / deeper connection.
+  **WLT** with money *psychology* before hustle; **CFT** with fluency &
+  fundamentals before patterns, and patterns before system design & architecture;
+  **CRE/CHA** with quick low-stakes reps before ambitious pieces / deeper connection.
+
+**Craft (CFT) has both:** the daily deep-work floor climbs, and the *content*
+climbs the ladder toward Senior. An **interview-mode** toggle
+(`Player.interview_mode`) swaps CFT's daily/weekly/side pools for interview-prep
+ones (`INTERVIEW_POOLS` in `quests.py`) — timed DSA, mock system-design,
+behavioural (STAR) stories — at the same band; the floor is unchanged. It clears
+the LLM cache so personalised quests re-generate in the new mode.
 
 Progression begins the week you turn it on (`players.progression_start_week`), so
 past history never counts retroactively — everyone starts each attribute at Lv 0.
@@ -132,6 +146,42 @@ week, if a book has been in progress since a prior week, the app surfaces a
 and they name the next book; not yet → it carries over, no penalty
 (`service.review_book`), asked at most once per week (`book_review_week` guards
 it). Setting or changing the book restarts that weekly clock.
+
+## Body — nutrition & skincare (standalone tools)
+
+The **Body** tab is a deliberate exception to the game: it is *not* an attribute,
+earns no XP, and doesn't touch stats or streaks. Some self-care is better served
+by a plain tool than by a scored quest — so this is its own small subsystem
+(`body.py` + `nutrition.py` + `skincare.py`, tables `body_profiles`,
+`food_entries`, `skincare_steps`, `skincare_checks`), reached via `/body`.
+
+- **Nutrition — gentle by design.** A one-time profile (sex, age, height, weight,
+  activity, **goal weight**) yields a calorie / **protein** (1.8 g/kg) / **fibre**
+  (14 g per 1000 kcal) *target range* via Mifflin–St Jeor (`nutrition.targets`,
+  derived on read), alongside your **BMI** and the healthy-BMI weight range for
+  your height. The goal weight drives the direction (a gentle deficit above it, a
+  gentle surplus below, maintenance within ~1 kg). It is a **range, never a hard
+  number**, going over is never a "failure", the deficit is floored at BMR so it
+  can't go dangerously low, and it's an estimate — not medical/nutrition advice. A
+  rotating **"what to eat"** list (`nutrition.SUGGESTIONS` → `daily_suggestions`,
+  protein/fibre/meal, deterministic per day) gives concrete, tap-to-log ideas.
+  Food is logged precisely against **Open Food Facts** (`nutrition.search`, free,
+  no API key, server-side) — one of two external services the app reaches; any
+  lookup failure falls back to logging by hand. You can also **snap a photo**:
+  `POST /food/analyze` sends it to **Gemini vision** (`llm.analyze_food`) which
+  returns an estimated name + calories/protein/fibre. It's on-demand only (one
+  call per photo, never in the background), needs the Gemini key, and — being a
+  guess from a picture — is returned as an **editable** estimate, not logged
+  automatically.
+- **Skincare — consistency is the whole game.** An editable AM/PM checklist
+  (`skincare.TEMPLATE`, seeded once per player, pigmentation/pores-tuned:
+  SPF-first, one active at a time). It ships a *framework* + trusted resources and
+  a gentle "see a dermatologist for persistent pigmentation" note — not a medical
+  prescription.
+
+Why standalone (not a stat): calorie tracking is the single feature most able to
+turn a gentle app anxious, so it's kept off the leveling/streak machinery on
+purpose — it informs, it never punishes.
 
 ## Learning resources (citations)
 
