@@ -43,7 +43,7 @@ export const RANK_COLORS: Record<Rank, string> = {
   S: '#BE9A57',
 };
 
-export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT'];
+export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT'];
 
 export const STAT_META: Record<
   StatKey,
@@ -54,6 +54,7 @@ export const STAT_META: Record<
   SPI: { label: 'Spirit', sub: 'Meditation & reflection', color: '#6F8A57', icon: 'leaf' },
   CHA: { label: 'Charisma', sub: 'Connection', color: '#977A8C', icon: 'people' },
   INT: { label: 'Intelligence', sub: 'Reading, coding, science & languages', color: '#5E8085', icon: 'book' },
+  WLT: { label: 'Wealth', sub: 'Earning, business & money skills', color: '#4E7D6E', icon: 'cash' },
 };
 
 /** '#RRGGBB' + alpha -> 'rgba(...)', for soft tint fills. */

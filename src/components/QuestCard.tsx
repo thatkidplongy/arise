@@ -52,6 +52,10 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
         <Text style={[styles.title, isDone && styles.titleDone]}>{quest.title}</Text>
         <Text style={styles.desc}>{quest.desc}</Text>
 
+        {quest.resource && !isDone ? (
+          <Text style={styles.resource}>Learn: {quest.resource}</Text>
+        ) : null}
+
         {!isDone && quest.steps.length > 0 ? (
           <View style={styles.steps}>
             {quest.steps.map((step, i) =>
@@ -203,6 +207,12 @@ const styles = StyleSheet.create({
   desc: {
     color: text.faint,
     fontSize: 11,
+  },
+  resource: {
+    color: text.secondary,
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 3,
   },
   steps: {
     marginTop: 7,

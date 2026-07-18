@@ -12,6 +12,8 @@ export interface ApiPlayer {
   xp_needed: number;
   total_xp: number;
   rank: Rank;
+  current_book: string;
+  books_finished: number;
 }
 
 export interface ApiStat {
@@ -25,6 +27,7 @@ export interface ApiQuest {
   id: string;
   title: string;
   desc: string;
+  resource: string; // a trusted place to learn, or '' when there isn't one
   steps: string[];
   steps_done: boolean[];
   stat: StatKey;
@@ -55,6 +58,7 @@ export interface ApiState {
     cleared: boolean;
     resting: boolean;
   };
+  book_review: { pending: boolean; book: string };
   next_rank: { rank: Rank; level: number; streak: number } | null;
   preferences: Partial<Record<StatKey, string[]>>;
   quests: ApiQuest[];
@@ -152,6 +156,24 @@ export const api = {
     request<ApiState>(base, `/preferences?day=${day}`, token, {
       method: 'PUT',
       body: JSON.stringify({ preferences }),
+    }),
+
+  setBook: (base: string, token: string, currentBook: string, day: string) =>
+    request<ApiState>(base, `/book?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify({ current_book: currentBook }),
+    }),
+
+  reviewBook: (
+    base: string,
+    token: string,
+    finished: boolean,
+    nextBook: string,
+    day: string,
+  ) =>
+    request<ApiState>(base, `/book/review?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ finished, next_book: nextBook }),
     }),
 
   reset: (base: string, token: string, day: string) =>

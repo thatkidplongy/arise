@@ -17,6 +17,7 @@ export default function SettingsScreen() {
   const setApiToken = useSystem((s) => s.setApiToken);
   const saveName = useSystem((s) => s.saveName);
   const saveNorthStar = useSystem((s) => s.saveNorthStar);
+  const saveBook = useSystem((s) => s.saveBook);
   const savePreferences = useSystem((s) => s.savePreferences);
   const resetAll = useSystem((s) => s.resetAll);
   const refresh = useSystem((s) => s.refresh);
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const prefsKey = JSON.stringify(state?.preferences ?? {});
   const [nameDraft, setNameDraft] = useState(state?.player.name ?? '');
   const [northStarDraft, setNorthStarDraft] = useState(state?.player.north_star ?? '');
+  const [bookDraft, setBookDraft] = useState(state?.player.current_book ?? '');
   const [urlDraft, setUrlDraft] = useState(serverUrl);
   const [tokenDraft, setTokenDraft] = useState(apiToken);
   const [focusDraft, setFocusDraft] = useState<Record<string, string[]>>({});
@@ -34,12 +36,14 @@ export default function SettingsScreen() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [nameSave, setNameSave] = useState<SaveState>('idle');
   const [northStarSave, setNorthStarSave] = useState<SaveState>('idle');
+  const [bookSave, setBookSave] = useState<SaveState>('idle');
   const [linkSave, setLinkSave] = useState<SaveState>('idle');
   const [focusSave, setFocusSave] = useState<SaveState>('idle');
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => setNameDraft(state?.player.name ?? ''), [state?.player.name]);
   useEffect(() => setNorthStarDraft(state?.player.north_star ?? ''), [state?.player.north_star]);
+  useEffect(() => setBookDraft(state?.player.current_book ?? ''), [state?.player.current_book]);
   useEffect(() => setUrlDraft(serverUrl), [serverUrl]);
   useEffect(() => setTokenDraft(apiToken), [apiToken]);
   // Reset the focus drafts when the saved preferences actually change (keyed on
@@ -135,6 +139,12 @@ export default function SettingsScreen() {
     settle(setNorthStarSave);
   };
 
+  const saveBookFlow = async () => {
+    setBookSave('saving');
+    await saveBook(bookDraft.trim());
+    settle(setBookSave);
+  };
+
   const statusColor =
     status === 'online'
       ? feedback.success
@@ -177,6 +187,32 @@ export default function SettingsScreen() {
           >
             <Text style={styles.btnText}>
               {northStarSave === 'saving' ? 'Saving…' : northStarSave === 'done' ? 'Saved ✓' : 'Save North Star'}
+            </Text>
+          </Pressable>
+        </SystemPanel>
+      ) : null}
+
+      {state ? (
+        <SystemPanel title="Current book" sub={`${state.player.books_finished} finished`}>
+          <Text style={styles.help}>
+            What you’re reading now. Your Grow daily is to read a chapter of it — a chapter a day, a
+            book a week. At each new week, Arise asks if you finished it and what’s next.
+          </Text>
+          <TextInput
+            value={bookDraft}
+            onChangeText={setBookDraft}
+            style={styles.input}
+            placeholder="e.g. Atomic Habits — James Clear"
+            placeholderTextColor={text.faint}
+            maxLength={120}
+          />
+          <Pressable
+            disabled={bookSave === 'saving'}
+            style={({ pressed }) => [styles.btn, (pressed || bookSave === 'saving') && { opacity: 0.8 }]}
+            onPress={saveBookFlow}
+          >
+            <Text style={styles.btnText}>
+              {bookSave === 'saving' ? 'Saving…' : bookSave === 'done' ? 'Saved ✓' : 'Save book'}
             </Text>
           </Pressable>
         </SystemPanel>

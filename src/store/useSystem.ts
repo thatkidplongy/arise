@@ -36,7 +36,7 @@ function noticesFrom(events: ApiEvent[]): Notice[] {
   return events.map((e) => {
     switch (e.type) {
       case 'daily_clear':
-        return makeNotice('You showed up for all five today', [
+        return makeNotice('You showed up across the board today', [
           'That’s a full day of showing up — no small thing.',
           `A little bonus for it: +${e.data.bonus_xp} XP`,
         ]);
@@ -93,6 +93,8 @@ interface SystemStore {
   saveNorthStar: (northStar: string) => Promise<void>;
   savePreferences: (preferences: Partial<Record<StatKey, string[]>>) => Promise<void>;
   toggleRest: () => Promise<void>;
+  saveBook: (currentBook: string) => Promise<void>;
+  reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
   resetAll: () => Promise<void>;
   setServerUrl: (url: string) => void;
   setApiToken: (token: string) => void;
@@ -246,6 +248,28 @@ export const useSystem = create<SystemStore>()(
         const { serverUrl, apiToken, notices } = get();
         try {
           const state = await api.updatePreferences(serverUrl, apiToken, preferences, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      saveBook: async (currentBook) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.setBook(serverUrl, apiToken, currentBook, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      reviewBook: async (finished, nextBook) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.reviewBook(serverUrl, apiToken, finished, nextBook, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);

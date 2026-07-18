@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { QuestCard } from '@/components/QuestCard';
+import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
@@ -40,13 +41,15 @@ export default function QuestsScreen() {
         <Text style={styles.todayXp}>{state.today.xp} XP today</Text>
       </View>
 
+      <ReadingReview />
+
       <SystemPanel
         title="Daily quests"
         sub={
           isResting
             ? 'Resting today 🌙'
             : state.today.cleared
-              ? 'All five today 🌱'
+              ? 'Every area today 🌱'
               : 'Do what you can — showing up is the win'
         }
       >
