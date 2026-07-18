@@ -8,13 +8,6 @@ import { useMotivation, type PendingCapture } from '@/store/useMotivation';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, surface, text, withAlpha } from '@/theme';
 
-const SOURCE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
-  tiktok: 'logo-tiktok',
-  instagram: 'logo-instagram',
-  youtube: 'logo-youtube',
-  web: 'link-outline',
-};
-
 // Normalise a link so we can spot the same video pasted twice — mirrors the
 // server's clean_url enough to guard against re-hitting the API for a dupe.
 function canonical(raw: string): string {
@@ -38,6 +31,12 @@ function duplicateOf(
   if (pending.some((p) => canonical(p.url) === c)) return 'pending';
   if (insights.some((i) => i.source_url && canonical(i.source_url) === c)) return 'done';
   return null;
+}
+
+// Free-text filter across a capture's words (no creator/source attribution).
+function matches(i: ApiInsight, q: string): boolean {
+  if (!q) return true;
+  return [i.summary, ...i.takeaways, ...i.quotes].join(' ').toLowerCase().includes(q);
 }
 
 function PendingCard({
@@ -83,7 +82,17 @@ function PendingCard({
   );
 }
 
-function InsightCard({ insight, onRemove }: { insight: ApiInsight; onRemove: (id: string) => void }) {
+function InsightCard({
+  insight,
+  expanded,
+  onToggle,
+  onRemove,
+}: {
+  insight: ApiInsight;
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove: (id: string) => void;
+}) {
   const saveNorthStar = useSystem((s) => s.saveNorthStar);
   const [justSet, setJustSet] = useState<string | null>(null);
 
@@ -93,63 +102,81 @@ function InsightCard({ insight, onRemove }: { insight: ApiInsight; onRemove: (id
     setTimeout(() => setJustSet((q) => (q === quote ? null : q)), 2000);
   };
 
+  const label = insight.summary || insight.quotes[0] || 'Captured video';
+
   return (
     <View style={styles.card}>
-      <View style={styles.cardHead}>
-        <Ionicons name={SOURCE_ICON[insight.source] ?? 'link-outline'} size={16} color={accent} />
-        <Pressable
-          style={styles.cardTitleTap}
-          onPress={() => insight.source_url && Linking.openURL(insight.source_url).catch(() => {})}
-        >
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {insight.title || 'Captured video'}
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => onRemove(insight.id)} hitSlop={8}>
-          <Text style={styles.remove}>×</Text>
-        </Pressable>
-      </View>
+      <Pressable style={styles.rowHead} onPress={onToggle} hitSlop={4}>
+        <Text style={styles.rowSummary} numberOfLines={expanded ? undefined : 2}>
+          {label}
+        </Text>
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={text.faint} />
+      </Pressable>
 
-      {insight.summary ? <Text style={styles.summary}>{insight.summary}</Text> : null}
+      {expanded ? (
+        <>
+          {insight.takeaways.length > 0 ? (
+            <View style={styles.takeaways}>
+              <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
+              {insight.takeaways.map((t, i) => (
+                <View key={i} style={styles.bulletRow}>
+                  <Text style={styles.bulletDot}>•</Text>
+                  <Text style={styles.bulletText}>{t}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
-      {insight.takeaways.length > 0 ? (
-        <View style={styles.takeaways}>
-          <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
-          {insight.takeaways.map((t, i) => (
-            <View key={i} style={styles.bulletRow}>
-              <Text style={styles.bulletDot}>•</Text>
-              <Text style={styles.bulletText}>{t}</Text>
+          {insight.quotes.map((q, i) => (
+            <View key={i} style={styles.quote}>
+              <Text style={styles.quoteText}>“{q}”</Text>
+              <Pressable
+                onPress={() => setAsNorthStar(q)}
+                style={({ pressed }) => [styles.starBtn, pressed && { opacity: 0.7 }]}
+                hitSlop={6}
+              >
+                <Ionicons
+                  name={justSet === q ? 'checkmark-circle' : 'compass-outline'}
+                  size={13}
+                  color={justSet === q ? feedback.success : accent}
+                />
+                <Text style={[styles.starText, justSet === q && { color: feedback.success }]}>
+                  {justSet === q ? 'Set as North Star' : 'Make this my North Star'}
+                </Text>
+              </Pressable>
             </View>
           ))}
-        </View>
-      ) : null}
 
-      {insight.quotes.map((q, i) => (
-        <View key={i} style={styles.quote}>
-          <Text style={styles.quoteText}>“{q}”</Text>
-          <Pressable
-            onPress={() => setAsNorthStar(q)}
-            style={({ pressed }) => [styles.starBtn, pressed && { opacity: 0.7 }]}
-            hitSlop={6}
-          >
-            <Ionicons
-              name={justSet === q ? 'checkmark-circle' : 'compass-outline'}
-              size={13}
-              color={justSet === q ? feedback.success : accent}
-            />
-            <Text style={[styles.starText, justSet === q && { color: feedback.success }]}>
-              {justSet === q ? 'Set as North Star' : 'Make this my North Star'}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
+          <View style={styles.actions}>
+            {insight.source_url ? (
+              <Pressable
+                onPress={() => Linking.openURL(insight.source_url).catch(() => {})}
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+                hitSlop={6}
+              >
+                <Ionicons name="open-outline" size={14} color={text.secondary} />
+                <Text style={styles.actionText}>Open original</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => onRemove(insight.id)}
+              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+              hitSlop={6}
+            >
+              <Ionicons name="trash-outline" size={14} color={feedback.danger} />
+              <Text style={[styles.actionText, { color: feedback.danger }]}>Remove</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
 
 /** The Inspire tab body: paste a video link, keep its distilled wisdom, and let a
- * quote resurface on Status. Captures run in the background (see useMotivation),
- * so you can queue several or leave the tab. Standalone — never touches XP. */
+ * quote resurface on Status. Captures run in the background (see useMotivation).
+ * The library collapses to slim, tappable rows with a search filter so it stays
+ * scannable at any size. Standalone — never touches XP. */
 export function MotivationPanel() {
   const state = useSystem((s) => s.state);
   const insights = useMotivation((s) => s.insights);
@@ -162,6 +189,8 @@ export function MotivationPanel() {
   const remove = useMotivation((s) => s.remove);
 
   const [url, setUrl] = useState('');
+  const [query, setQuery] = useState('');
+  const [openIds, setOpenIds] = useState<string[]>([]);
 
   useEffect(() => {
     void fetch();
@@ -194,6 +223,12 @@ export function MotivationPanel() {
     setUrl('');
   };
 
+  const toggle = (id: string) =>
+    setOpenIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
+  const q = query.trim().toLowerCase();
+  const filtered = insights.filter((i) => matches(i, q));
+
   return (
     <>
       <CaptureCard
@@ -211,6 +246,26 @@ export function MotivationPanel() {
         <PendingCard key={p.tempId} item={p} onRetry={retry} onDismiss={dismiss} />
       ))}
 
+      {insights.length > 3 ? (
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={16} color={text.faint} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={`Search ${insights.length} captures…`}
+            placeholderTextColor={text.faint}
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color={text.faint} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {loaded && pending.length === 0 && insights.length === 0 ? (
         <Text style={styles.empty}>
           Nothing captured yet. Paste a link to a talk that moved you — its lessons will live here,
@@ -218,8 +273,18 @@ export function MotivationPanel() {
         </Text>
       ) : null}
 
-      {insights.map((ins) => (
-        <InsightCard key={ins.id} insight={ins} onRemove={remove} />
+      {q && filtered.length === 0 && insights.length > 0 ? (
+        <Text style={styles.empty}>No captures match “{query}”.</Text>
+      ) : null}
+
+      {filtered.map((ins) => (
+        <InsightCard
+          key={ins.id}
+          insight={ins}
+          expanded={openIds.includes(ins.id)}
+          onToggle={() => toggle(ins.id)}
+          onRemove={remove}
+        />
       ))}
     </>
   );
@@ -266,11 +331,7 @@ function CaptureCard({
       />
       <Pressable
         disabled={!canCapture}
-        style={({ pressed }) => [
-          styles.btn,
-          pressed && { opacity: 0.8 },
-          !canCapture && styles.btnDisabled,
-        ]}
+        style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }, !canCapture && styles.btnDisabled]}
         onPress={onCapture}
       >
         <Text style={styles.btnText}>Capture</Text>
@@ -308,6 +369,18 @@ const styles = StyleSheet.create({
   error: { color: feedback.danger, fontSize: 12, lineHeight: 17 },
   empty: { color: text.secondary, fontSize: 13, lineHeight: 20, textAlign: 'center', paddingHorizontal: 8 },
 
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    backgroundColor: surface.base,
+  },
+  searchInput: { flex: 1, color: text.primary, paddingVertical: 10, fontSize: 14 },
+
   card: {
     backgroundColor: surface.card,
     borderWidth: 1,
@@ -329,10 +402,11 @@ const styles = StyleSheet.create({
   retryText: { color: accent, fontSize: 13, fontWeight: '700' },
 
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardTitleTap: { flex: 1 },
-  cardTitle: { color: text.primary, fontSize: 14, fontWeight: '700' },
   remove: { color: text.faint, fontSize: 22, fontWeight: '700', marginTop: -4 },
-  summary: { color: text.secondary, fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
+
+  rowHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowSummary: { flex: 1, color: text.primary, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+
   takeaways: { gap: 6 },
   sectionLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   bulletRow: { flexDirection: 'row', gap: 8 },
@@ -349,4 +423,14 @@ const styles = StyleSheet.create({
   quoteText: { color: text.primary, fontSize: 14, lineHeight: 21, fontWeight: '600' },
   starBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   starText: { color: accent, fontSize: 12, fontWeight: '600' },
+
+  actions: {
+    flexDirection: 'row',
+    gap: 18,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
 });
