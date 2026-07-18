@@ -8,7 +8,8 @@ back, so the LLM can never break the app.
 
 Config (environment variables):
   ARISE_LLM_API_KEY   Google AI Studio key (or GEMINI_API_KEY). Unset → disabled.
-  ARISE_LLM_MODEL     default "gemini-2.0-flash" (free tier)
+  ARISE_LLM_MODEL     default "gemini-flash-latest" — an alias that tracks the
+                      current flash model, so a retired pinned version can't 404
 
 Only stdlib is used (urllib) so this works under launchd without extra deps.
 """
@@ -49,7 +50,9 @@ def _api_key() -> str:
 
 
 def _model() -> str:
-    return os.environ.get("ARISE_LLM_MODEL", "gemini-2.0-flash")
+    # An alias that tracks the current flash model, so a retired pinned version
+    # can't 404 us. Override with ARISE_LLM_MODEL to pin a specific one.
+    return os.environ.get("ARISE_LLM_MODEL", "gemini-flash-latest")
 
 
 def enabled() -> bool:
@@ -158,7 +161,7 @@ def log_failure(err: Exception) -> None:
     try:  # HTTPError is response-like; Google's error JSON carries no key
         raw = err.read()  # type: ignore[attr-defined]
         if raw:
-            body = " " + raw.decode("utf-8", "replace")[:300]
+            body = " " + raw.decode("utf-8", "replace")[:1500]
     except Exception:
         pass
     print(f"[arise.llm] generation failed ({detail}); using pools.{body}", file=sys.stderr)

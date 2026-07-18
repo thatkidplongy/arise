@@ -126,9 +126,10 @@ lesson"). An optional LLM layer closes that gap without changing anything above.
   attribute's focus set and "where I'm at" level note (`preferences.level`), and
   a 7-day completion summary — enough to prescribe the next step. Changing the
   profile (focus/level/book) clears the cache so the next generation reflects it.
-- **Engine.** Google Gemini free tier via stdlib HTTP (`app/llm.py`), model set
-  by `ARISE_LLM_MODEL` (default `gemini-2.0-flash`). Swappable — the seam is one
-  module and two env vars. The client calls `POST /quests/generate` after each
+- **Engine.** Google Gemini via stdlib HTTP (`app/llm.py`), model set by
+  `ARISE_LLM_MODEL` (default `gemini-flash-latest` — an alias that tracks the
+  current flash model, so a version retired for new keys can't 404 us).
+  Swappable — the seam is one module and two env vars. The client calls `POST /quests/generate` after each
   state load; the pool board shows instantly and quietly upgrades when ready.
 
 ## North Star

@@ -93,7 +93,9 @@ on AI personalisation (quests tuned and sequenced to you):
 1. Get a free key at https://aistudio.google.com/apikey (Google AI Studio).
 2. In `backend/deploy/com.arise.backend.plist`, uncomment the
    `EnvironmentVariables` block and set `ARISE_LLM_API_KEY` to your key
-   (optionally `ARISE_LLM_MODEL`, default `gemini-2.0-flash`).
+   (optionally `ARISE_LLM_MODEL`; default `gemini-flash-latest`, which tracks the
+   current flash model — older ones like `gemini-2.0/2.5-flash` may be retired or
+   give new keys a free-tier limit of 0).
 3. Re-run `bash deploy/install.sh`, then
    `launchctl kickstart -k gui/$(id -u)/com.arise.backend`.
 
