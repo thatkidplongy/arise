@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CONTENT_MAX_WIDTH } from '@/components/Screen';
 import { accent, surface, text } from '@/theme';
 
 export default function TabsLayout() {
@@ -22,6 +23,12 @@ export default function TabsLayout() {
           height: 74 + insets.bottom,
           paddingTop: 8,
           paddingBottom: insets.bottom + 8,
+          // On a wide browser, centre the bar in a column matching the page
+          // rather than stretching the tabs across the whole window. No effect on
+          // a phone (its width is already below the cap).
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
         },
         tabBarActiveTintColor: accent,
         tabBarInactiveTintColor: text.faint,
