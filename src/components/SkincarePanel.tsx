@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
+import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { useBody } from '@/store/useBody';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
 
 const TONE = STAT_META.CFT.color;
+const COUNTRY_LABEL: Record<string, string> = { PH: 'the Philippines' };
 
 function Routine({
   title,
@@ -75,6 +76,42 @@ function Routine({
           <Text style={[styles.addBtnText, { color: TONE }]}>Add</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+/** Concrete, easy-to-find products for each step, localised to what's on shelves
+ * where you are — so you know what to actually buy. */
+function ProductPicks({ picks, country }: { picks: ApiSkincarePick[]; country: string }) {
+  if (picks.length === 0) return null;
+  const where = COUNTRY_LABEL[country];
+  const groups: { label: string; items: ApiSkincarePick[] }[] = [
+    { label: 'MORNING', items: picks.filter((p) => p.slot === 'AM') },
+    { label: 'EVENING', items: picks.filter((p) => p.slot === 'PM') },
+  ];
+  return (
+    <View style={styles.buy}>
+      <Text style={styles.lookupTitle}>What to buy{where ? ` · ${where}` : ''}</Text>
+      <Text style={styles.lookupHint}>
+        Popular, easy-to-find picks for each step — a starting point, not medical advice or an
+        endorsement. Add one active at a time and patch-test.
+      </Text>
+      {groups.map(({ label, items }) =>
+        items.length === 0 ? null : (
+          <View key={label} style={styles.buyGroup}>
+            <Text style={styles.buyGroupLabel}>{label}</Text>
+            {items.map((p, i) => (
+              <View key={`${p.step}-${i}`} style={styles.buyRow}>
+                <Text style={styles.buyStep}>{p.step}</Text>
+                <Text style={styles.buyProduct}>
+                  <Text style={styles.buyBrand}>{p.brand}</Text> {p.product}
+                </Text>
+                <Text style={styles.buyWhy}>{p.why}</Text>
+              </View>
+            ))}
+          </View>
+        ),
+      )}
     </View>
   );
 }
@@ -196,6 +233,7 @@ export function SkincarePanel() {
       <Text style={styles.note}>{body.skincare_note}</Text>
       <Routine title="Morning" icon="sunny-outline" routine="AM" steps={body.skincare_am} />
       <Routine title="Evening" icon="moon-outline" routine="PM" steps={body.skincare_pm} />
+      <ProductPicks picks={body.skincare_products} country={body.profile?.country ?? ''} />
       <ProductLookup />
       {body.skincare_resources.length > 0 ? (
         <View style={styles.resources}>
@@ -257,6 +295,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   addBtnText: { fontSize: 13, fontWeight: '700' },
+
+  // What to buy
+  buy: {
+    marginTop: 4,
+    marginBottom: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  buyGroup: { marginTop: 10 },
+  buyGroupLabel: { color: TONE, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
+  buyRow: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: surface.hairline },
+  buyStep: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  buyProduct: { color: text.primary, fontSize: 13, lineHeight: 18, marginTop: 1 },
+  buyBrand: { fontWeight: '700' },
+  buyWhy: { color: text.secondary, fontSize: 11, lineHeight: 15, marginTop: 1 },
 
   // Product lookup
   lookup: {

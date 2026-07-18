@@ -177,6 +177,15 @@ class SkincareStepOut(BaseModel):
     done: bool  # ticked for the requested day
 
 
+class SkincareProductPickOut(BaseModel):
+    """A concrete product to buy for a routine step (localised to what's on shelves)."""
+    slot: str     # AM | PM
+    step: str     # e.g. "Sunscreen"
+    brand: str
+    product: str
+    why: str
+
+
 class SkincareNoteOut(BaseModel):
     label: str   # e.g. "Niacinamide" / "Fragrance"
     detail: str  # one gentle line on why it's flagged
@@ -199,6 +208,7 @@ class BodyOut(BaseModel):
     suggestions: list[SuggestionOut]  # today's protein/fibre-forward "what to eat"
     skincare_am: list[SkincareStepOut]
     skincare_pm: list[SkincareStepOut]
+    skincare_products: list[SkincareProductPickOut]  # what to buy, localised
     skincare_resources: list[str]
     skincare_note: str
 

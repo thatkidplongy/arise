@@ -77,6 +77,15 @@ def test_country_persists_and_localises_suggestions(client):
                for s in b["suggestions"])
 
 
+def test_skincare_products_localise_and_carry_brands():
+    world = skincare.product_suggestions()
+    ph = skincare.product_suggestions("ph")  # case-insensitive
+    assert all(p["brand"] and p["product"] and p["slot"] in {"AM", "PM"} for p in world)
+    assert ph != world  # PH swaps in locally-stocked picks
+    assert any("Beauty of Joseon" in p["brand"] for p in ph)  # a PH-popular sunscreen
+    assert skincare.product_suggestions("zz") == world  # unknown country → worldwide
+
+
 def test_skincare_search_reads_ingredients(client, monkeypatch):
     # Stub the network so the route is tested without hitting Open Beauty Facts.
     def fake_lookup(q, timeout=8.0, limit=8):

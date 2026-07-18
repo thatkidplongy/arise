@@ -98,6 +98,7 @@ def build_body(db: Session, player_id: str, day: str) -> dict:
         "suggestions": nutrition.daily_suggestions(day, p.country if p else ""),
         "skincare_am": am,
         "skincare_pm": pm,
+        "skincare_products": skincare.product_suggestions(p.country if p else ""),
         "skincare_resources": skincare.RESOURCES,
         "skincare_note": skincare.NOTE,
     }

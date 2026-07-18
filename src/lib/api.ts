@@ -182,6 +182,15 @@ export interface ApiSkincareNote {
   detail: string; // one gentle line on why it's flagged
 }
 
+/** A concrete product to buy for a routine step, localised to what's on shelves. */
+export interface ApiSkincarePick {
+  slot: 'AM' | 'PM';
+  step: string;
+  brand: string;
+  product: string;
+  why: string;
+}
+
 /** A product looked up in Open Beauty Facts, with a read of its ingredients. */
 export interface ApiSkincareProduct {
   name: string;
@@ -199,6 +208,7 @@ export interface ApiBody {
   suggestions: ApiSuggestion[];
   skincare_am: ApiSkincareStep[];
   skincare_pm: ApiSkincareStep[];
+  skincare_products: ApiSkincarePick[];
   skincare_resources: string[];
   skincare_note: string;
 }

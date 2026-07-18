@@ -50,6 +50,49 @@ NOTE: str = (
 )
 
 
+# ── What to buy: concrete, easy-to-find product picks ─────────────────────────
+# Real, popular products for each routine step, tuned for pigmentation & pores —
+# a starting point so you know what to actually buy, NOT medical advice or a paid
+# endorsement. Introduce one active at a time and patch-test. Each entry is
+# (slot, step, brand, product, why); slot is 'AM' | 'PM'.
+_PRODUCTS_GLOBAL: list[tuple[str, str, str, str, str]] = [
+    ("AM", "Gentle cleanser", "Cetaphil", "Gentle Skin Cleanser", "fragrance-free, doesn't strip"),
+    ("AM", "Vitamin C", "The Ordinary", "Ascorbyl Glucoside 12%", "gentle brightening antioxidant"),
+    ("AM", "Niacinamide", "The Ordinary", "Niacinamide 10% + Zinc 1%", "evens tone, softens pores"),
+    ("AM", "Moisturiser", "CeraVe", "Moisturising Lotion", "ceramides + hyaluronic acid"),
+    ("AM", "Sunscreen", "La Roche-Posay", "Anthelios UVMune SPF50+", "the #1 step for pigmentation"),
+    ("PM", "Cleanser", "CeraVe", "Hydrating or Foaming Cleanser", "foaming if oily, hydrating if dry"),
+    ("PM", "Azelaic acid", "The Ordinary", "Azelaic Acid Suspension 10%", "fades marks, calms redness"),
+    ("PM", "BHA (pores)", "COSRX", "BHA Blackhead Power Liquid", "unclogs pores; alternate nights"),
+    ("PM", "Retinoid", "The Ordinary", "Retinol 0.2% in Squalane", "texture & tone; start 1–2x/week"),
+    ("PM", "Moisturiser", "COSRX", "Advanced Snail 96 Mucin", "lightweight barrier support"),
+]
+# Philippines — the same evidence-based picks, chosen because they're genuinely
+# stocked here (Watsons / Beauty Bar / Lazada / Shopee) and kind on the wallet.
+_PRODUCTS_PH: list[tuple[str, str, str, str, str]] = [
+    ("AM", "Gentle cleanser", "Cetaphil", "Gentle Skin Cleanser", "in every Watsons; non-stripping"),
+    ("AM", "Vitamin C", "Garnier", "Bright Complete Vitamin C Serum", "cheap & everywhere; brightening"),
+    ("AM", "Niacinamide", "The Ordinary", "Niacinamide 10% + Zinc 1%", "tone & pores (Beauty Bar / Lazada)"),
+    ("AM", "Moisturiser", "CeraVe", "Moisturising Lotion", "ceramides; Watsons"),
+    ("AM", "Sunscreen", "Beauty of Joseon", "Relief Sun SPF50+", "the #1 step; popular & affordable here"),
+    ("PM", "Cleanser", "COSRX", "Low pH Good Morning Gel Cleanser", "gentle daily cleanse"),
+    ("PM", "Azelaic acid", "The Ordinary", "Azelaic Acid Suspension 10%", "fades dark marks"),
+    ("PM", "BHA (pores)", "COSRX", "BHA Blackhead Power Liquid", "unclogs pores; alternate nights"),
+    ("PM", "Moisturiser", "COSRX", "Advanced Snail 96 Mucin", "lightweight & calming"),
+]
+_PRODUCTS_BY_REGION: dict[str, list[tuple[str, str, str, str, str]]] = {"PH": _PRODUCTS_PH}
+
+
+def product_suggestions(country: str = "") -> list[dict]:
+    """Concrete product picks for the routine, localised to what's actually on
+    shelves where the user is (falls back to widely-available brands)."""
+    library = _PRODUCTS_BY_REGION.get((country or "").upper(), _PRODUCTS_GLOBAL)
+    return [
+        {"slot": slot, "step": step, "brand": brand, "product": product, "why": why}
+        for (slot, step, brand, product, why) in library
+    ]
+
+
 # ── Product lookup (Open Beauty Facts) ────────────────────────────────────────
 _SEARCH_URL = "https://world.openbeautyfacts.org/cgi/search.pl"
 
