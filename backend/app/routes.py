@@ -3,10 +3,13 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import service, state
+from . import body, llm, nutrition, service, state
 from .db import get_db
-from .schemas import (ActionResult, BookIn, BookReviewIn, CompleteIn, PlayerIn,
-                      PreferencesIn, StateOut, StepResult, StepToggleIn)
+from .schemas import (ActionResult, BodyOut, BodyProfileIn, BookIn, BookReviewIn,
+                      CompleteIn, FoodAnalyzeIn, FoodEstimateOut, FoodLogIn,
+                      FoodSearchItemOut, InterviewModeIn, PlayerIn, PreferencesIn,
+                      SkincareCheckIn, SkincareStepIn, StateOut, StepResult,
+                      StepToggleIn)
 
 router = APIRouter()
 
@@ -127,9 +130,107 @@ def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session =
     return state.build_state(db, player, _valid_day(day))
 
 
+@router.put("/interview", response_model=StateOut)
+def set_interview_mode(body: InterviewModeIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Toggle Craft's interview-prep mode. On → the coding attribute's quests shift
+    to timed DSA, mock system design, and behavioural stories; off → steady growth."""
+    player = state.get_or_create_player(db)
+    service.set_interview_mode(db, player, body.enabled)
+    return state.build_state(db, player, _valid_day(day))
+
+
 @router.post("/reset", response_model=StateOut)
 def reset(day: str | None = Query(None), db: Session = Depends(get_db)):
     """Erase all progress (completions + achievements). Name is kept."""
     player = state.get_or_create_player(db)
     service.reset_all(db, player)
     return state.build_state(db, player, _valid_day(day))
+
+
+# ── Body: nutrition + skincare (standalone wellness tools) ────────────────────
+
+
+@router.get("/body", response_model=BodyOut)
+def get_body(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Everything the Body screen needs: calorie/protein targets, the day's food
+    log with totals, and the AM/PM skincare routine with today's ticks."""
+    player = state.get_or_create_player(db)
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.put("/body/profile", response_model=BodyOut)
+def set_body_profile(profile: BodyProfileIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Set the one-time body inputs; targets are recomputed on read."""
+    player = state.get_or_create_player(db)
+    body.set_profile(
+        db, player.id, sex=profile.sex, age=profile.age, height_cm=profile.height_cm,
+        weight_kg=profile.weight_kg, activity=profile.activity, goal=profile.goal,
+        goal_weight_kg=profile.goal_weight_kg,
+    )
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.get("/food/search", response_model=list[FoodSearchItemOut])
+def food_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    """Look a food up in Open Food Facts (per-100 g values). The client picks one
+    and logs the grams eaten. A lookup failure is a clean 502, not a crash."""
+    state.get_or_create_player(db)
+    try:
+        return nutrition.search(q)
+    except Exception:
+        raise HTTPException(502, "Food lookup is unavailable right now — try again, or log it by hand.")
+
+
+@router.post("/food/analyze", response_model=FoodEstimateOut)
+def analyze_food(shot: FoodAnalyzeIn, db: Session = Depends(get_db)):
+    """Estimate a meal's calories/protein/fibre from a photo (Gemini vision). The
+    estimate is returned for the user to review and edit — it is NOT logged here.
+    Needs a Gemini key; a rough estimate by nature, never a precise measurement."""
+    state.get_or_create_player(db)
+    if not llm.enabled():
+        raise HTTPException(503, "Photo estimate needs a Gemini key (set ARISE_LLM_API_KEY).")
+    if not shot.image.strip():
+        raise HTTPException(400, "No image provided.")
+    try:
+        return llm.analyze_food(shot.image, shot.mime)
+    except Exception:
+        raise HTTPException(502, "Couldn't read that photo — try another shot, or log it by hand.")
+
+
+@router.post("/food/log", response_model=BodyOut)
+def log_food(entry: FoodLogIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Add one food to the day's log."""
+    player = state.get_or_create_player(db)
+    body.log_food(db, player.id, _valid_day(day), entry.name, entry.grams,
+                  entry.kcal, entry.protein_g, entry.fibre_g)
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.delete("/food/log/{entry_id}", response_model=BodyOut)
+def remove_food(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    body.remove_food(db, player.id, entry_id)
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.post("/skincare/step", response_model=BodyOut)
+def add_skincare_step(step: SkincareStepIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Append a step to your AM or PM routine."""
+    player = state.get_or_create_player(db)
+    body.add_skincare_step(db, player.id, step.routine, step.text)
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.delete("/skincare/step/{step_id}", response_model=BodyOut)
+def remove_skincare_step(step_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    body.remove_skincare_step(db, player.id, step_id)
+    return body.build_body(db, player.id, _valid_day(day))
+
+
+@router.post("/skincare/check", response_model=BodyOut)
+def check_skincare(body_in: SkincareCheckIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Tick or untick one skincare step for the day."""
+    player = state.get_or_create_player(db)
+    body.toggle_skincare(db, player.id, body_in.step_id, body_in.done, _valid_day(day))
+    return body.build_body(db, player.id, _valid_day(day))

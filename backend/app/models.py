@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -33,6 +33,9 @@ class Player(Base):
     # Progression begins the week this is first set (see progression.py), so past
     # history never counts retroactively — everyone starts each attribute at Lv 0.
     progression_start_week: Mapped[str] = mapped_column(String, default="")
+    # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
+    # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
+    interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -44,7 +47,7 @@ class QuestDef(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)  # slug, e.g. 'd-train'
     title: Mapped[str] = mapped_column(String)
     desc: Mapped[str] = mapped_column(String)
-    stat: Mapped[str] = mapped_column(String)  # STR | CRE | SPI | CHA | INT | WLT
+    stat: Mapped[str] = mapped_column(String)  # STR | CRE | SPI | CHA | INT | WLT | CFT
     xp: Mapped[int] = mapped_column(Integer)
     cadence: Mapped[str] = mapped_column(String)  # daily | weekly | side
     target: Mapped[int] = mapped_column(Integer, default=1)
@@ -79,7 +82,7 @@ class Preference(Base):
     __tablename__ = "preferences"
 
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    stat: Mapped[str] = mapped_column(String, primary_key=True)  # STR | CRE | SPI | CHA | INT | WLT
+    stat: Mapped[str] = mapped_column(String, primary_key=True)  # STR | CRE | SPI | CHA | INT | WLT | CFT
     focus: Mapped[str] = mapped_column(String)
     # Optional "where I'm at" note for this attribute (e.g. "Math: fractions").
     # Feeds the LLM so it can prescribe the next step; ignored when the LLM is off.
@@ -97,6 +100,65 @@ class StepCheck(Base):
     quest_id: Mapped[str] = mapped_column(String, primary_key=True)
     period_key: Mapped[str] = mapped_column(String, primary_key=True)  # day or ISO week
     step_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+
+class BodyProfile(Base):
+    """One-time body inputs for the calorie/protein calculator (see nutrition.py).
+    Targets are derived on read, never stored — the same derive-on-read contract
+    as the rest of the app."""
+
+    __tablename__ = "body_profiles"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    sex: Mapped[str] = mapped_column(String, default="unspecified")  # male | female | unspecified
+    age: Mapped[int] = mapped_column(Integer, default=0)
+    height_cm: Mapped[int] = mapped_column(Integer, default=0)
+    weight_kg: Mapped[float] = mapped_column(Float, default=0.0)
+    activity: Mapped[str] = mapped_column(String, default="moderate")
+    goal: Mapped[str] = mapped_column(String, default="maintain")
+    goal_weight_kg: Mapped[float] = mapped_column(Float, default=0.0)  # 0 = not set
+
+
+class FoodEntry(Base):
+    """One logged food for a day. The daily total is summed from these rows; there
+    is no 'budget exceeded' state — the tracker informs, it never punishes."""
+
+    __tablename__ = "food_entries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    name: Mapped[str] = mapped_column(String)
+    grams: Mapped[int] = mapped_column(Integer, default=0)  # 0 = a serving / unspecified
+    kcal: Mapped[int] = mapped_column(Integer, default=0)
+    protein_g: Mapped[int] = mapped_column(Integer, default=0)
+    fibre_g: Mapped[int] = mapped_column(Integer, default=0)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SkincareStep(Base):
+    """One step of a player's AM or PM routine — seeded from skincare.TEMPLATE on
+    first use, then fully editable. Deactivated rather than deleted so history of
+    ticks stays coherent."""
+
+    __tablename__ = "skincare_steps"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    routine: Mapped[str] = mapped_column(String)  # AM | PM
+    text: Mapped[str] = mapped_column(String)
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SkincareCheck(Base):
+    """Presence of a row means that step was done that day (like StepCheck)."""
+
+    __tablename__ = "skincare_checks"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    step_id: Mapped[str] = mapped_column(String, primary_key=True)
+    day: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class GeneratedQuest(Base):

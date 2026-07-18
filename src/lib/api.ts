@@ -15,6 +15,7 @@ export interface ApiPlayer {
   current_book: string;
   current_book_chapters: number;
   books_finished: number;
+  interview_mode: boolean;
 }
 
 export interface ApiStat {
@@ -80,6 +81,96 @@ export interface ApiState {
   record: { active_days: number; total_completions: number };
 }
 
+// ── Body (standalone wellness tools) ─────────────────────────────────────────
+
+export interface ApiBodyProfile {
+  sex: string; // male | female | unspecified
+  age: number;
+  height_cm: number;
+  weight_kg: number;
+  activity: string; // sedentary | light | moderate | active | very_active
+  goal: string; // maintain | gentle_loss | gentle_gain (fallback when no goal weight)
+  goal_weight_kg: number; // 0 = not set
+}
+
+export interface ApiTargets {
+  bmr: number;
+  tdee: number;
+  target: number;
+  target_low: number;
+  target_high: number;
+  protein_g: number;
+  fibre_g: number;
+  bmi: number;
+  bmi_category: string; // underweight | healthy | overweight | obese
+  healthy_low: number;
+  healthy_high: number;
+  goal_weight: number; // 0 when not set
+}
+
+export interface ApiFoodEntry {
+  id: string;
+  name: string;
+  grams: number;
+  kcal: number;
+  protein_g: number;
+  fibre_g: number;
+}
+
+export interface ApiFoodDay {
+  entries: ApiFoodEntry[];
+  total_kcal: number;
+  total_protein: number;
+  total_fibre: number;
+}
+
+export interface ApiFoodSearchItem {
+  name: string;
+  brand: string;
+  kcal_100g: number;
+  protein_100g: number;
+  fibre_100g: number;
+  serving_size: string;
+}
+
+export interface ApiSuggestion {
+  name: string;
+  serving: string;
+  kcal: number;
+  protein_g: number;
+  fibre_g: number;
+  tag: 'protein' | 'fibre' | 'meal';
+}
+
+/** An AI estimate from a food photo — the user edits it before logging. */
+export interface ApiFoodEstimate {
+  name: string;
+  kcal: number;
+  protein_g: number;
+  fibre_g: number;
+  note: string;
+  source: string; // 'label' (read off a nutrition panel), 'food', 'none', or ''
+}
+
+export interface ApiSkincareStep {
+  id: string;
+  routine: 'AM' | 'PM';
+  text: string;
+  done: boolean;
+}
+
+export interface ApiBody {
+  day: string;
+  profile: ApiBodyProfile | null;
+  targets: ApiTargets | null;
+  food: ApiFoodDay;
+  suggestions: ApiSuggestion[];
+  skincare_am: ApiSkincareStep[];
+  skincare_pm: ApiSkincareStep[];
+  skincare_resources: string[];
+  skincare_note: string;
+}
+
 export interface ApiEvent {
   type: 'daily_clear' | 'level_up' | 'rank_up' | 'achievement' | string;
   data: Record<string, any>;
@@ -106,9 +197,10 @@ async function request<T>(
   path: string,
   token: string,
   init?: RequestInit,
+  timeoutMs = 8000,
 ): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${baseUrl}${path}`, {
       ...init,
@@ -194,6 +286,59 @@ export const api = {
       body: JSON.stringify({ finished, next_book: nextBook }),
     }),
 
+  setInterviewMode: (base: string, token: string, enabled: boolean, day: string) =>
+    request<ApiState>(base, `/interview?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+
   reset: (base: string, token: string, day: string) =>
     request<ApiState>(base, `/reset?day=${day}`, token, { method: 'POST' }),
+
+  // ── Body ────────────────────────────────────────────────────────────────────
+  getBody: (base: string, token: string, day: string) =>
+    request<ApiBody>(base, `/body?day=${day}`, token),
+
+  setBodyProfile: (base: string, token: string, profile: ApiBodyProfile, day: string) =>
+    request<ApiBody>(base, `/body/profile?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify(profile),
+    }),
+
+  searchFood: (base: string, token: string, q: string) =>
+    request<ApiFoodSearchItem[]>(base, `/food/search?q=${encodeURIComponent(q)}`, token),
+
+  analyzeFood: (base: string, token: string, image: string, mime: string) =>
+    request<ApiFoodEstimate>(
+      base,
+      '/food/analyze',
+      token,
+      { method: 'POST', body: JSON.stringify({ image, mime }) },
+      30000, // vision is slower than the usual call
+    ),
+
+  logFood: (
+    base: string,
+    token: string,
+    entry: { name: string; grams: number; kcal: number; protein_g: number; fibre_g: number },
+    day: string,
+  ) => request<ApiBody>(base, `/food/log?day=${day}`, token, { method: 'POST', body: JSON.stringify(entry) }),
+
+  removeFood: (base: string, token: string, entryId: string, day: string) =>
+    request<ApiBody>(base, `/food/log/${entryId}?day=${day}`, token, { method: 'DELETE' }),
+
+  addSkincareStep: (base: string, token: string, routine: 'AM' | 'PM', text: string, day: string) =>
+    request<ApiBody>(base, `/skincare/step?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ routine, text }),
+    }),
+
+  removeSkincareStep: (base: string, token: string, stepId: string, day: string) =>
+    request<ApiBody>(base, `/skincare/step/${stepId}?day=${day}`, token, { method: 'DELETE' }),
+
+  checkSkincare: (base: string, token: string, stepId: string, done: boolean, day: string) =>
+    request<ApiBody>(base, `/skincare/check?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ step_id: stepId, done }),
+    }),
 };

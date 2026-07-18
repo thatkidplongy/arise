@@ -34,6 +34,134 @@ class BookReviewIn(BaseModel):
     next_book: str = ""  # only used when finished is true
 
 
+class InterviewModeIn(BaseModel):
+    enabled: bool  # Craft (CFT): shift quests to interview prep when true
+
+
+# ── Body (standalone wellness tools) ──────────────────────────────────────────
+
+
+class BodyProfileIn(BaseModel):
+    sex: str = "unspecified"  # male | female | unspecified
+    age: int = Field(0, ge=0, le=120)
+    height_cm: int = Field(0, ge=0, le=260)
+    weight_kg: float = Field(0, ge=0, le=400)
+    activity: str = "moderate"  # sedentary | light | moderate | active | very_active
+    goal: str = "maintain"  # maintain | gentle_loss | gentle_gain (fallback when no goal weight)
+    goal_weight_kg: float = Field(0, ge=0, le=400)  # 0 = not set → use goal
+
+
+class FoodLogIn(BaseModel):
+    name: str
+    grams: int = Field(0, ge=0)  # 0 = a serving / unspecified
+    kcal: int = Field(0, ge=0)
+    protein_g: int = Field(0, ge=0)
+    fibre_g: int = Field(0, ge=0)
+
+
+class FoodAnalyzeIn(BaseModel):
+    image: str  # base64-encoded image bytes (no data: prefix)
+    mime: str = "image/jpeg"
+
+
+class SkincareStepIn(BaseModel):
+    routine: str  # AM | PM
+    text: str
+
+
+class SkincareCheckIn(BaseModel):
+    step_id: str
+    done: bool
+
+
+class BodyProfileOut(BaseModel):
+    sex: str
+    age: int
+    height_cm: int
+    weight_kg: float
+    activity: str
+    goal: str
+    goal_weight_kg: float
+
+
+class TargetsOut(BaseModel):
+    bmr: int
+    tdee: int
+    target: int
+    target_low: int
+    target_high: int
+    protein_g: int
+    fibre_g: int
+    bmi: float
+    bmi_category: str  # underweight | healthy | overweight | obese
+    healthy_low: float  # healthy-BMI weight range for the height, kg
+    healthy_high: float
+    goal_weight: float  # echoed back; 0 when not set
+
+
+class FoodEntryOut(BaseModel):
+    id: str
+    name: str
+    grams: int
+    kcal: int
+    protein_g: int
+    fibre_g: int
+
+
+class FoodDayOut(BaseModel):
+    entries: list[FoodEntryOut]
+    total_kcal: int
+    total_protein: int
+    total_fibre: int
+
+
+class FoodSearchItemOut(BaseModel):
+    name: str
+    brand: str
+    kcal_100g: int
+    protein_100g: int
+    fibre_100g: int
+    serving_size: str
+
+
+class SuggestionOut(BaseModel):
+    name: str
+    serving: str
+    kcal: int
+    protein_g: int
+    fibre_g: int
+    tag: str  # protein | fibre | meal
+
+
+class FoodEstimateOut(BaseModel):
+    """An AI estimate from a photo — shown for the user to edit before logging."""
+    name: str
+    kcal: int
+    protein_g: int
+    fibre_g: int
+    note: str  # a short caveat/assumption, or ""
+    source: str = ""  # 'label' (read off a Nutrition Facts panel), 'food', 'none'
+
+
+class SkincareStepOut(BaseModel):
+    id: str
+    routine: str
+    text: str
+    done: bool  # ticked for the requested day
+
+
+class BodyOut(BaseModel):
+    day: str
+    profile: BodyProfileOut | None  # null until set
+    targets: TargetsOut | None  # null until the profile has real numbers
+    food: FoodDayOut
+    suggestions: list[SuggestionOut]  # today's protein/fibre-forward "what to eat"
+    skincare_am: list[SkincareStepOut]
+    skincare_pm: list[SkincareStepOut]
+    skincare_resources: list[str]
+    skincare_note: str
+
+
 class PreferencesIn(BaseModel):
     # {stat: [focus, ...]}; the full set per attribute. Empty list clears it.
     preferences: dict[str, list[str]] = {}
@@ -57,6 +185,7 @@ class PlayerOut(BaseModel):
     current_book: str
     current_book_chapters: int
     books_finished: int
+    interview_mode: bool
 
 
 class BookReviewOut(BaseModel):

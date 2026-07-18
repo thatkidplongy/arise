@@ -86,6 +86,11 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
         lines.append(f"  North Star (their reason): {profile['north_star']}")
     if profile.get("current_book"):
         lines.append(f"  Currently reading: {profile['current_book']}")
+    if profile.get("interview_mode"):
+        lines.append(
+            "  Interview prep mode is ON — for Craft (CFT) slots, favour interview"
+            " work: DSA drills, mock system design, and behavioural (STAR) stories."
+        )
     attrs = profile.get("attributes") or {}
     for stat, info in attrs.items():
         bits = []
@@ -156,6 +161,85 @@ def generate(slots: list[dict], profile: dict, timeout: float = 20.0) -> dict[st
                 "resource": str(item.get("resource", "")).strip(),
             }
     return out
+
+
+# ── Vision: estimate a meal's nutrition from a photo ─────────────────────────────
+
+_ESTIMATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "kcal": {"type": "integer"},
+        "protein_g": {"type": "integer"},
+        "fibre_g": {"type": "integer"},
+        "note": {"type": "string"},
+        "source": {"type": "string"},  # label | food | none
+    },
+    "required": ["name", "kcal", "protein_g", "fibre_g"],
+}
+
+_ESTIMATE_PROMPT = (
+    "You read nutrition from a photo for a personal wellness app. The photo is EITHER "
+    "a packaged food's Nutrition Facts label OR a plated meal.\n"
+    "• If it is a nutrition label: READ the printed numbers exactly — do NOT guess. Use "
+    "the PER-SERVING column, and put the serving size and servings-per-container in "
+    "'note' (e.g. 'per serving (30 g); 4 servings per pack'). Set source='label'.\n"
+    "• If it is a plated meal: estimate calories, protein and fibre for the portion "
+    "actually visible, assuming typical preparation; put the key assumption (portion "
+    "size, hidden oil) in 'note'. Set source='food'.\n"
+    "• If it is neither: name 'Not food', zeros, source='none'.\n"
+    "Give calories (kcal), protein (g) and fibre (g) as numbers. Return JSON only: "
+    "{name, kcal, protein_g, fibre_g, note, source}."
+)
+
+
+def _to_int(v) -> int:
+    try:
+        return max(0, round(float(v)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _parse_estimate(payload: dict) -> dict:
+    """Pure: Gemini response JSON → a normalised estimate dict. Testable offline."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    data = json.loads(text)
+    return {
+        "name": str(data.get("name", "")).strip() or "Meal",
+        "kcal": _to_int(data.get("kcal")),
+        "protein_g": _to_int(data.get("protein_g")),
+        "fibre_g": _to_int(data.get("fibre_g")),
+        "note": str(data.get("note", "")).strip(),
+        "source": str(data.get("source", "")).strip().lower(),  # label | food | none
+    }
+
+
+def analyze_food(image_b64: str, mime: str = "image/jpeg", timeout: float = 25.0) -> dict:
+    """One Gemini vision call → {name, kcal, protein_g, fibre_g, note} for a photo.
+
+    Raises on any transport/parse error; the route turns that into a clean message.
+    Only called on demand (when the user snaps a photo), never in the background."""
+    body = {
+        "contents": [{"parts": [
+            {"inline_data": {"mime_type": mime or "image/jpeg", "data": image_b64}},
+            {"text": _ESTIMATE_PROMPT},
+        ]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+            "responseSchema": _ESTIMATE_SCHEMA,
+        },
+    }
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        payload = json.load(resp)
+    return _parse_estimate(payload)
 
 
 def log_failure(err: Exception) -> None:
