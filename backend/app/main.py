@@ -63,4 +63,7 @@ if WEB_DIR.is_dir():
         candidate = WEB_DIR / path
         if path and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(WEB_DIR / "index.html")
+        # The SPA shell must always revalidate so a reload (or the app's own
+        # pull-to-reload) picks up a fresh build — the JS bundles it points to are
+        # content-hashed and safe to cache forever.
+        return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
