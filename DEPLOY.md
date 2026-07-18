@@ -91,13 +91,18 @@ Off by default — with no key set, quests come from the handcrafted pools. To t
 on AI personalisation (quests tuned and sequenced to you):
 
 1. Get a free key at https://aistudio.google.com/apikey (Google AI Studio).
-2. In `backend/deploy/com.arise.backend.plist`, uncomment the
-   `EnvironmentVariables` block and set `ARISE_LLM_API_KEY` to your key
-   (optionally `ARISE_LLM_MODEL`; default `gemini-flash-latest`, which tracks the
-   current flash model — older ones like `gemini-2.0/2.5-flash` may be retired or
-   give new keys a free-tier limit of 0).
-3. Re-run `bash deploy/install.sh`, then
-   `launchctl kickstart -k gui/$(id -u)/com.arise.backend`.
+2. Put it in **`backend/.env`** (git-ignored — never committed):
+   ```bash
+   cd backend
+   cp .env.example .env
+   # edit .env and set:  ARISE_LLM_API_KEY=your-key-here
+   ```
+   The default model is `gemini-flash-latest` (tracks the current flash model;
+   older ids like `gemini-2.0/2.5-flash` may be retired or give new keys a
+   free-tier limit of 0). Override with `ARISE_LLM_MODEL` in `.env` if needed.
+3. Load it: `bash deploy/install.sh`, then
+   `launchctl kickstart -k gui/$(id -u)/com.arise.backend`. The service sources
+   `.env` at startup, so your key stays out of the plist and out of git.
 
 The app then personalises each period in one cached call (a few small calls a
 day → free tier is plenty). Set your level per subject under **Settings → Focus

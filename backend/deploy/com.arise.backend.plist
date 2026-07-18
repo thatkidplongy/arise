@@ -10,16 +10,13 @@
     <key>Label</key>
     <string>com.arise.backend</string>
 
+    <!-- Sources backend/.env (git-ignored, if present) for secrets/config, then
+         runs uvicorn. No secret ever lives in this tracked template. -->
     <key>ProgramArguments</key>
     <array>
-        <string>__PYTHON__</string>
-        <string>-m</string>
-        <string>uvicorn</string>
-        <string>app.main:app</string>
-        <string>--host</string>
-        <string>0.0.0.0</string>
-        <string>--port</string>
-        <string>8000</string>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>set -a; [ -f "__BACKEND_DIR__/.env" ] &amp;&amp; . "__BACKEND_DIR__/.env"; set +a; exec "__PYTHON__" -m uvicorn app.main:app --host 0.0.0.0 --port 8000</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -35,21 +32,10 @@
     <key>StandardErrorPath</key>
     <string>__BACKEND_DIR__/logs/backend.log</string>
 
-    <!-- Optional environment. Uncomment the block and set what you need:
-         • ARISE_API_TOKEN   require a token (also set it in the app under
-                             Settings → System link). Omitted → auth off
-                             (Tailscale is the boundary).
-         • ARISE_LLM_API_KEY free Google AI Studio key → turns on AI-personalised
-                             quests. Omitted → the handcrafted pools are used.
-         • ARISE_LLM_MODEL   optional; defaults to gemini-2.0-flash. -->
-    <!--
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>ARISE_API_TOKEN</key>
-        <string>replace-with-a-long-random-string</string>
-        <key>ARISE_LLM_API_KEY</key>
-        <string>your-google-ai-studio-key</string>
-    </dict>
-    -->
+    <!-- Config/secrets live in backend/.env (git-ignored), sourced at startup by
+         the wrapper above — see backend/.env.example:
+         • ARISE_LLM_API_KEY  free Google AI Studio key → AI-personalised quests
+         • ARISE_API_TOKEN    require a token (also set it in the app)
+         • ARISE_LLM_MODEL    optional; default gemini-flash-latest -->
 </dict>
 </plist>
