@@ -182,8 +182,9 @@ function InsightCard({
   );
 }
 
-/** A captured how-to video: its practical steps, each of which can drop straight
- * into your to-do list. Collapsible like InsightCard, but no quotes / North Star. */
+/** A captured how-to video: its summary (the header) + takeaways — the kept
+ * information — each of which can also drop straight into your to-do list.
+ * Collapsible like InsightCard, but no quotes / North Star. */
 function TipsCard({
   insight,
   expanded,
@@ -220,7 +221,7 @@ function TipsCard({
         <>
           {insight.takeaways.length > 0 ? (
             <View style={styles.tips}>
-              <Text style={styles.sectionLabel}>STEPS</Text>
+              <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
               {insight.takeaways.map((step, i) => (
                 <View key={i} style={styles.tipRow}>
                   <Text style={styles.tipText}>{step}</Text>
@@ -242,7 +243,7 @@ function TipsCard({
               ))}
             </View>
           ) : (
-            <Text style={styles.empty}>No steps came out of this one.</Text>
+            <Text style={styles.empty}>No takeaways came out of this one.</Text>
           )}
 
           <View style={styles.actions}>
@@ -319,9 +320,12 @@ export function MotivationPanel() {
     setOpenIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
   const q = query.trim().toLowerCase();
-  const filtered = insights.filter((i) => matches(i, q));
-  const motivations = filtered.filter((i) => i.kind !== 'tips');
-  const tips = filtered.filter((i) => i.kind === 'tips');
+  const isTips = mode === 'tips';
+  // Motivation and Tips are separate views: the capture mode doubles as the
+  // active tab, so you only see (and add) one kind at a time.
+  const shownPending = pending.filter((p) => (isTips ? p.kind === 'tips' : p.kind !== 'tips'));
+  const shown = insights.filter((i) => (isTips ? i.kind === 'tips' : i.kind !== 'tips'));
+  const filtered = shown.filter((i) => matches(i, q));
 
   return (
     <>
@@ -338,11 +342,11 @@ export function MotivationPanel() {
         onCapture={capture}
       />
 
-      {pending.map((p) => (
+      {shownPending.map((p) => (
         <PendingCard key={p.tempId} item={p} onRetry={retry} onDismiss={dismiss} />
       ))}
 
-      {insights.length > 3 ? (
+      {shown.length > 3 ? (
         <View style={styles.searchRow}>
           <Ionicons name="search-outline" size={16} color={text.faint} />
           <TextInput
@@ -351,7 +355,7 @@ export function MotivationPanel() {
             style={styles.searchInput}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder={`Search ${insights.length} captures…`}
+            placeholder={`Search ${shown.length} ${isTips ? 'tips' : 'motivations'}…`}
             placeholderTextColor={text.faint}
           />
           {query ? (
@@ -362,48 +366,37 @@ export function MotivationPanel() {
         </View>
       ) : null}
 
-      {loaded && pending.length === 0 && insights.length === 0 ? (
+      {loaded && shownPending.length === 0 && shown.length === 0 ? (
         <Text style={styles.empty}>
-          Nothing captured yet. Paste a link — a talk that moved you (Motivation), or a how-to worth
-          keeping (Tips). Its substance lives here; a motivational line finds its way to your Status.
+          {isTips
+            ? 'No tips yet. Paste a how-to video above — Arise pulls out a summary and takeaways you can act on.'
+            : 'No motivation yet. Paste a talk that moved you — Arise keeps its takeaways and quotes, and one resurfaces on your Status.'}
         </Text>
       ) : null}
 
-      {q && filtered.length === 0 && insights.length > 0 ? (
-        <Text style={styles.empty}>No captures match “{query}”.</Text>
+      {q && filtered.length === 0 && shown.length > 0 ? (
+        <Text style={styles.empty}>No {isTips ? 'tips' : 'motivations'} match “{query}”.</Text>
       ) : null}
 
-      {tips.length > 0 ? (
-        <View style={styles.groupHead}>
-          <Ionicons name="bulb-outline" size={13} color={feedback.gold} />
-          <Text style={styles.groupLabel}>TIPS · A PLAYBOOK YOU CAN ACT ON</Text>
-        </View>
-      ) : null}
-      {tips.map((ins) => (
-        <TipsCard
-          key={ins.id}
-          insight={ins}
-          expanded={openIds.includes(ins.id)}
-          onToggle={() => toggle(ins.id)}
-          onRemove={remove}
-        />
-      ))}
-
-      {motivations.length > 0 ? (
-        <View style={styles.groupHead}>
-          <Ionicons name="sparkles-outline" size={13} color={accent} />
-          <Text style={styles.groupLabel}>MOTIVATION · LINES TO CARRY</Text>
-        </View>
-      ) : null}
-      {motivations.map((ins) => (
-        <InsightCard
-          key={ins.id}
-          insight={ins}
-          expanded={openIds.includes(ins.id)}
-          onToggle={() => toggle(ins.id)}
-          onRemove={remove}
-        />
-      ))}
+      {filtered.map((ins) =>
+        isTips ? (
+          <TipsCard
+            key={ins.id}
+            insight={ins}
+            expanded={openIds.includes(ins.id)}
+            onToggle={() => toggle(ins.id)}
+            onRemove={remove}
+          />
+        ) : (
+          <InsightCard
+            key={ins.id}
+            insight={ins}
+            expanded={openIds.includes(ins.id)}
+            onToggle={() => toggle(ins.id)}
+            onRemove={remove}
+          />
+        ),
+      )}
     </>
   );
 }
@@ -512,8 +505,6 @@ const styles = StyleSheet.create({
   modeText: { color: text.faint, fontSize: 13, fontWeight: '600' },
   modeTextOn: { color: accent },
 
-  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: -2 },
-  groupLabel: { color: text.secondary, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
 
   tips: { gap: 8 },
   tipRow: {
