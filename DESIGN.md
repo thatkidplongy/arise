@@ -16,15 +16,59 @@ Every feature and every line of copy is checked against this:
 - **Keep the why in view.** The player's North Star sits atop the Status screen.
 - **Room to live.** Rest and enjoying life are part of the path, not a detour.
 
+## How it all fits together — in plain terms
+
+If you're not a programmer, here's the whole thing without the jargon.
+
+Arise has **two halves that talk to each other**:
+
+- **The app** — what you tap on your phone. It's the storefront: it shows your
+  quests, stats and screens, and it never makes anything up. Think of it as a
+  window, not a filing cabinet.
+- **The "brain"** — a small always-on program running on a Mac at home. It
+  remembers everything, does all the thinking (what today's quests are, your XP,
+  your streak), and answers the app's questions. It's the filing cabinet *and*
+  the accountant.
+
+Every time you open a screen or tick something off, the app asks the brain and
+shows back exactly what the brain says. So there's **one source of truth** — your
+progress can never disagree with itself between screens. The two talk over a
+private, encrypted tunnel (**Tailscale**), so only your own devices can reach the
+brain — it's not open to the public internet.
+
+**Where your data lives:** in a single file on that Mac (a small database called
+SQLite), copied to a backup once a day and kept for a month. Nothing lives in the
+cloud; nothing is sold or shared.
+
+**Making screens feel instant:** the app keeps a short-term memory of what it just
+fetched, so flipping between tabs is immediate, and it quietly re-checks with the
+brain when you come back to a screen — you see fresh numbers without a spinner.
+(For the curious: that layer is a library called *React Query*. A recent change
+put the app's main game data on it too, behind an on/off switch so it can be
+compared with the older approach and reverted in one line.)
+
+**Four free helpers, all optional, none can break the app:**
+
+| Helper | What it does, in plain words |
+|---|---|
+| **Gemini** (Google's AI) | Summarises a video you paste, reads a food photo into a calorie estimate, and can tailor quests to you |
+| **Supadata** | Fetches the spoken words (transcript) from a TikTok/Reel/YouTube link |
+| **Open Food Facts** | A free food database — looks up calories/protein/fibre when you log a meal |
+| **Open Library** | A free book catalogue — search or browse to set your weekly book |
+
+Each helper is a nice-to-have. If one is switched off or unreachable, that feature
+quietly steps aside (or falls back to typing things by hand) and **everything else
+keeps working** — the app is designed so an outside service can never take it down.
+
 ## The Seven Attributes (Party Composition)
 
 | Slot | Hobby | Stat | Notes |
 |---|---|---|---|
 | Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank floor that *climbs with your level* (see Progression), tuned for toning, not bulk |
-| Creative | Drawing, dance, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
+| Creative | Drawing, dance, singing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
 | Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |
-| Grow | Math, Japanese, reading, the world | **INT** | Reads a book a week (a chapter a day is the mandatory floor); the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top |
+| Grow | Math, Japanese, reading, the world | **INT** | Reads a book a week (a chapter a day is the mandatory floor); the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top. The Japanese track follows a fixed beginner path by week: **hiragana → katakana → grammar → kanji** (hiragana first, as every course teaches it) |
 | Wealth | Making money | **WLT** | Fundamentals, side income, monetising your skills, and managing/growing money |
 | Craft | Coding → Senior | **CFT** | The engineering ladder: fluency → patterns & problem-solving → system design & architecture (bands, fundamentals-first), with a small deep-work floor daily. An **interview-mode** toggle (`Player.interview_mode`) swaps its quests to DSA drills, mock system-design, and behavioural (STAR) prep |
 
@@ -70,9 +114,22 @@ flowchart LR
 Each variant carries **steps**: concrete instructions (reps × sets, timed
 segments, prompts). For single-completion quests these render as a **tickable
 checklist** (`step_checks` table, scoped to the period). Ticking the last step
-auto-completes the quest — with a floating toast + undo — and the completion
-circle fills proportionally as steps are ticked. Multi-session quests (e.g.
-badminton ×2) keep steps as guidance and the tap-to-log flow.
+auto-completes the quest — with a floating toast (a thin bar along its bottom
+edge drains as the auto-dismiss timer runs down, so you can see how long you have
+to tap **Undo**) — and the completion circle fills proportionally as steps are
+ticked. Multi-session quests (e.g. badminton ×2) keep steps as guidance and the
+tap-to-log flow. The daily time-blocks, Weekly and Side sections are each
+**collapsible**, so a long board folds down to what you want to see.
+
+**Write-steps → your Journal.** When a step asks you to *write or reflect*
+something (detected from the step's wording), tapping it opens a small editor
+(on web, a proper rich-text one — bold/italic/lists/quotes — that saves as plain
+Markdown) instead of just ticking. What you write is kept in the **Journal** tab
+as a dated *reflection*, tagged to that attribute and showing the exact prompt you
+answered. Because the reflection *is* that step's answer, it's tied to the step:
+**undo the quest (or untick the step) and the reflection is removed too** — with a
+confirmation first, so you never lose writing by accident. The Journal also has a
+free-form daily space unattached to any quest.
 
 ## Daily floors — the leveled non-negotiables
 
@@ -193,21 +250,29 @@ purpose — it informs, it never punishes.
 ## Inspire — capture what moved you (standalone tools)
 
 Like Body, the **Inspire** tab sits outside the game — no XP, no streaks. It turns
-motivational videos you've already watched into something you keep. Paste a
-**TikTok, Reel, Short or YouTube** link and `POST /insights` (`insights.py`) does
-two things:
+videos you've already watched into something you keep, in **two separate views you
+switch between** (you only ever see one at a time): **Motivation** and **Tips**.
+Paste a **TikTok, Reel, Short or YouTube** link and `POST /insights`
+(`insights.py`) does two things:
 
 - **Fetch the words.** `transcript.py` sends the URL to **Supadata** (a hosted
   transcript API — free tier 100/month, `x-api-key`, stdlib `urllib`, server-side)
   and gets back the spoken transcript. Share links are canonicalised first
   (`clean_url`) to drop signed tracking params on TikTok/Reels; YouTube is left
   intact (its id lives in the query string). No key → the feature simply hides.
-- **Distil it.** The transcript goes to the LLM (`llm.distill_motivation`, one
-  Gemini call, structured output): a warm one-line **summary**, 2–4 concrete
-  **takeaways** in the app's gentle voice, and 1–3 faithful **pull-quotes**
-  (nothing invented, filler dropped). Stored on the `insights` table.
+- **Distil it** with one Gemini call (structured output), by kind:
+  - **Motivation** (`llm.distill_motivation`): a warm one-line **summary**, 2–4
+    concrete **takeaways** in the app's gentle voice, and 1–3 faithful
+    **pull-quotes** (nothing invented, filler dropped).
+  - **Tips** (`llm.distill_tips`): a plain 1–2 sentence **summary**, the key
+    **takeaways** worth remembering (the important part — informational, not
+    chores), and an *optional* list of **steps** — concrete actions, present only
+    when the video actually prescribes them. Each step is one-tap addable to your
+    to-do list; takeaways are just there to keep. No pull-quotes.
 
-One quote surfaces on **Status** each day (`insights.daily_quote`, chosen
+  Stored on the `insights` table (`takeaways`, `steps`, `quotes` as JSON).
+
+Only **motivation** quotes feed Status; one surfaces there each day (`insights.daily_quote`, chosen
 deterministically by the date — stable across a day, rotating as days pass),
 beside the North Star; any quote can *become* the North Star in a tap. A video
 with no speech (music- or text-only) has nothing to transcribe and says so
@@ -331,6 +396,21 @@ sequenceDiagram
 - **Backend modules split by concern:** `routes.py` (thin HTTP) → `state.py`
   (read model: derives the state payload from rows) and `service.py` (write
   operations). Pure rules live in `game.py`; quest content in `quests.py`.
+- **Client caching (React Query).** Fetched server data — Body, Inspire and the
+  avatar, plus the core game state *optionally* (behind `USE_RQ_CORE` in
+  `useSystem.ts`, a fallback flag so the migrated and un-migrated cores can be
+  A/B'd and reverted in one line) — is held in React Query: cached, deduped, and
+  refetched when a screen regains focus. Writes return the fresh payload and write
+  it into the cache, so the server stays the single source of truth. Genuinely
+  client-only state (connection settings, toasts, notices, in-flight captures)
+  stays in small Zustand stores. Rule of thumb: **server data → React Query,
+  UI state → Zustand.**
+- **Served same-origin, refresh-safe.** The web app is exported and served by the
+  backend itself, so it auto-connects with no setup. A hard refresh or deep link
+  is answered with that route's *own* page shell (so the active tab is preserved,
+  not reset to Status), and any unknown path falls back to the app shell. The Body
+  data endpoint lives at `/body/state` so the bare `/body` path can belong to the
+  app's Body tab.
 - **Durability:** SQLite runs in WAL mode; a launchd job snapshots the DB daily
   (`scripts/backup_db.py` → `backend/backups/`, last 30). Tested with pytest
   (unit + integration + migration).
