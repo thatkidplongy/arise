@@ -25,7 +25,7 @@ tactics.
 
 The pools are tuned to the hunter's real interests:
   STR  badminton + strength, plyometrics, home workouts; push-ups/plank floor
-  CRE  drawing, dance, music (FL Studio / instruments), photo & video
+  CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
   INT  learn-how-to-learn first, then math from scratch, Japanese, and the wider
@@ -85,7 +85,7 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Mix in high knees or double-unders if you can",
         ]),
     ],
-    "d-sketch": [  # CRE — drawing / music / photo / video
+    "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
         ("Daily Sketch", "20 min of drawing", [
             "5 min warm-up scribbles",
             "15 min on one subject of your choice",
@@ -130,6 +130,16 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Pick one song and count the beat out loud",
             "Practise a simple bounce or groove on every count",
             "Add one move on the offbeat",
+        ]),
+        ("Sing Practice", "15 min of singing", [
+            "5 min warm-up: lip trills and gentle scales",
+            "Sing through a song section, matching the pitch",
+            "Record one take and listen back for one thing to fix",
+        ]),
+        ("Pitch & Control", "15 min voice training", [
+            "Run scales slowly up and down your comfortable range",
+            "Hold steady notes — even tone, steady breath",
+            "Try one clean interval jump (e.g. do → sol)",
         ]),
     ],
     "d-meditate": [  # SPI — calm / focus / reflection / breath
@@ -348,6 +358,11 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Drill each section slow, then up to tempo",
             "Run it full-out to the music, twice",
         ]),
+        ("Perform a Song", "Sing one song fully", [
+            "Pick a song in your range and learn the melody",
+            "Practise the tricky bits slow, then at full speed",
+            "Sing it through twice — keep the better take",
+        ]),
     ],
     "w-tome": [  # INT — a weekly learning milestone (reading is owned by the daily
         # floor + the weekly book review, so this slot is the *other* learning)
@@ -463,6 +478,10 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ("New Style", "Try a dance style you don't do", [
             "Pick a style outside your comfort — hip-hop, house, contemporary…",
             "Learn one signature move from a tutorial",
+        ]),
+        ("Sing Outside Your Lane", "Try a vocal style you don't", [
+            "Pick a style you avoid — falsetto, belt, harmony, a new genre",
+            "Learn one short phrase in it from a tutorial",
         ]),
     ],
     "s-nature": [  # SPI — grounded, introspective
@@ -887,6 +906,10 @@ RESOURCES: dict[str, str] = {
     "Rhythm & Groove": "🎥 STEEZY (YouTube)",
     "Learn a Routine": "🎥 1MILLION Dance Studio (YouTube)",
     "New Style": "🎥 STEEZY (YouTube)",
+    "Sing Practice": "🎥 New York Vocal Coaching (YouTube)",
+    "Pitch & Control": "🌐 Singing Carrots — pitch & ear training",
+    "Perform a Song": "🎥 New York Vocal Coaching (YouTube)",
+    "Sing Outside Your Lane": "🎥 New York Vocal Coaching (YouTube)",
     # SPI — meditation
     "Inner Gate": "📖 Mindfulness in Plain English — Bhante Gunaratana",
     "Body Scan": "🎧 Waking Up — Sam Harris",
@@ -973,6 +996,7 @@ TIER: dict[str, int] = {
     "Finish a Beat": 2, "Short Edit": 2, "Full Render": 2, "Finish a Poem": 2, "Learn a Routine": 2,
     "New Sound": 1, "Odd Angle": 1, "New Medium": 1,
     "Beyond the Comfort Zone": 2, "Cover It": 2, "From Imagination": 2, "Poem from a Prompt": 2, "New Style": 2,
+    "Pitch & Control": 1, "Perform a Song": 2, "Sing Outside Your Lane": 2,  # singing (Sing Practice = band 0)
     # CHA — show up → quality → depth & reach
     "Check In": 1, "Voice, Not Text": 1, "Good Question": 1, "Make Plans": 2,
     "Guild Night": 1, "Party Gathering": 1, "Deep Talk": 2, "New Table": 2,
@@ -1076,12 +1100,25 @@ def pool_variant(quest: QuestDef, day: str, band: int = 0, interview: bool = Fal
 # randomly. Which phase you're in is set by how many weeks you've been studying
 # (see state._jp_week); within a phase, the task still varies day to day. Each
 # entry is (title, desc, steps, resource).
-_JP_KANA: list[tuple[str, str, list[str], str]] = [
+# Hiragana comes first — it writes native words and every grammatical particle
+# (は, を, が…), so you can't read a real sentence without it. Katakana (loanwords)
+# follows once hiragana is comfortable. This is the standard Genki/Tofugu order.
+_JP_HIRAGANA: list[tuple[str, str, list[str], str]] = [
     ("Hiragana Row", "10 min — the script for native words", [
         "Learn one hiragana row (e.g. か き く け こ)",
         "Trace each, then write it 5× from memory",
         "Read 5 words that use today's row, out loud",
     ], "🌐 Tofugu — hiragana guide (with mnemonics)"),
+    ("Hiragana Tracing", "10 min muscle memory", [
+        "Use a hiragana tracing worksheet for the rows you're on",
+        "Trace slowly, saying each sound as you write it",
+    ], "🌐 Tofugu — printable hiragana worksheets"),
+    ("Hiragana Reading", "10 min putting it together", [
+        "Read a short list of hiragana-only words aloud",
+        "Just decode the sounds smoothly — no katakana or kanji yet",
+    ], "🌐 Tofugu — hiragana reading practice"),
+]
+_JP_KATAKANA: list[tuple[str, str, list[str], str]] = [
     ("Katakana Row", "10 min — the script for foreign words", [
         "Learn one katakana row (e.g. カ キ ク ケ コ)",
         "Write each 5×, then read 5 loanwords (コーヒー, テレビ…)",
@@ -1090,12 +1127,8 @@ _JP_KANA: list[tuple[str, str, list[str], str]] = [
         "Run a hiragana + katakana flashcard deck (Anki or an app)",
         "Keep the ones you miss and drill just those again",
     ], "🎧 Anki — kana deck (spaced repetition)"),
-    ("Kana Tracing", "10 min muscle memory", [
-        "Use a tracing worksheet for the rows you're on",
-        "Trace slowly, saying each sound as you write it",
-    ], "🌐 Tofugu — printable kana worksheets"),
     ("Kana Reading", "10 min putting it together", [
-        "Read a short list of kana-only words aloud",
+        "Read a short mix of hiragana + katakana words aloud",
         "No kanji yet — just decode the sounds smoothly",
     ], "🌐 Tofugu — kana reading practice"),
 ]
@@ -1147,10 +1180,13 @@ _JP_KANJI: list[tuple[str, str, list[str], str]] = [
 
 def japanese_content(week_num: int, day: str) -> tuple[str, str, list[str], str]:
     """Today's Japanese task for a learner `week_num` weeks in, following the plan:
-    Weeks 1–2 kana → Week 3 basic grammar → Week 4+ kanji & everyday context. The
-    phase is fixed by the week; the exact task rotates within it, day to day."""
-    if week_num <= 2:
-        pool = _JP_KANA
+    Week 1 hiragana → Week 2 katakana → Week 3 basic grammar → Week 4+ kanji &
+    everyday context. The phase is fixed by the week; the exact task rotates within
+    it, day to day. Hiragana precedes katakana on purpose (see the pools above)."""
+    if week_num <= 1:
+        pool = _JP_HIRAGANA
+    elif week_num == 2:
+        pool = _JP_KATAKANA
     elif week_num == 3:
         pool = _JP_GRAMMAR
     else:

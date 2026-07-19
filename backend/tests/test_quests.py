@@ -149,18 +149,21 @@ def test_side_quest_focus_overrides_and_rotates():
 
 
 def test_japanese_plan_advances_by_week():
-    kana = {t for (t, *_r) in quests._JP_KANA}
+    hiragana = {t for (t, *_r) in quests._JP_HIRAGANA}
+    katakana = {t for (t, *_r) in quests._JP_KATAKANA}
     grammar = {t for (t, *_r) in quests._JP_GRAMMAR}
     kanji = {t for (t, *_r) in quests._JP_KANJI}
-    # Weeks 1–2 → kana, week 3 → grammar, week 4+ → kanji & context.
-    assert quests.japanese_content(1, "2026-07-06")[0] in kana
-    assert quests.japanese_content(2, "2026-07-06")[0] in kana
+    # Week 1 → hiragana (before katakana), week 2 → katakana, week 3 → grammar,
+    # week 4+ → kanji & context. Every week-1 pick is hiragana, never katakana.
+    for d in ("2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09"):
+        assert quests.japanese_content(1, d)[0] in hiragana
+    assert quests.japanese_content(2, "2026-07-06")[0] in katakana
     assert quests.japanese_content(3, "2026-07-06")[0] in grammar
     assert quests.japanese_content(9, "2026-07-06")[0] in kanji
     # content_for routes the d-jp daily through the plan and carries a resource.
     q = _q("d-jp", "INT", "daily")
     title, _desc, steps, res = quests.content_for(q, "2026-07-06", jp_week=1)
-    assert title in kana and steps and res
+    assert title in hiragana and steps and res
 
 
 def test_no_focus_uses_pool():
