@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { CurrentBookCard } from '@/components/CurrentBookCard';
 import type { ApiReading } from '@/lib/api';
 import { RankBadge } from '@/components/RankBadge';
 import { Screen } from '@/components/Screen';
@@ -68,7 +69,8 @@ function NorthStar({ value }: { value: string }) {
 }
 
 /** Read-only reading progress — how far toward finishing the current book, paced
- * by how many reading dailies you've actually done. Editing lives on Quests. */
+ * by how many reading dailies you've actually done. Setting/changing the book
+ * lives just below in the Current book card. */
 function Reading({ reading }: { reading: ApiReading }) {
   const pct = Math.round(reading.progress * 100);
   const done = pct >= 100;
@@ -238,6 +240,9 @@ export default function StatusScreen() {
       </Pressable>
 
       {state.reading ? <Reading reading={state.reading} /> : null}
+
+      {/* Set / change the book you're reading — grouped with its progress above. */}
+      <CurrentBookCard />
 
       <Reminders items={state.reminders} />
 

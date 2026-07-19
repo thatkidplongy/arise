@@ -1,7 +1,8 @@
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { CurrentBookCard } from '@/components/CurrentBookCard';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
@@ -12,6 +13,16 @@ import { accent, feedback, text, withAlpha } from '@/theme';
 
 export default function QuestsScreen() {
   const state = useSystem((s) => s.state);
+
+  // Bump on each visit to the tab so the time-block panels re-mount and re-apply
+  // their collapsed default — a finished block folds itself away every time you
+  // land here, while you can still open any block by hand during the visit.
+  const [visit, setVisit] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setVisit((v) => v + 1);
+    }, []),
+  );
 
   if (!state) {
     return (
@@ -56,11 +67,12 @@ export default function QuestsScreen() {
         const allDone = items.every((q) => q.done >= q.target);
         return (
           <SystemPanel
-            key={block.key}
+            key={`${block.key}-${visit}`}
             title={block.label}
             sub={isNow ? 'Now' : allDone ? 'Done 🌱' : ''}
             style={isNow ? styles.nowBlock : undefined}
             collapsible
+            defaultCollapsed={allDone}
           >
             <View style={styles.list}>
               {items.map((q) => (
@@ -86,9 +98,6 @@ export default function QuestsScreen() {
           ))}
         </View>
       </SystemPanel>
-
-      {/* Reading is the Grow floor — set/browse your book right by its quests. */}
-      <CurrentBookCard />
     </Screen>
   );
 }

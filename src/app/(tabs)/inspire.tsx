@@ -12,7 +12,7 @@ export default function InspireScreen() {
   return (
     <Screen>
       <View style={styles.head}>
-        <Text style={styles.h1}>Inspire</Text>
+        <Text style={styles.h1}>Fuel</Text>
         <Text style={styles.sub}>Turn what you watch into something you keep.</Text>
       </View>
       {state ? <MotivationPanel /> : <ConnectionPanel />}

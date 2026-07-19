@@ -10,7 +10,7 @@ import { accent, onAccent, surface, text, withAlpha } from '@/theme';
 type SaveState = 'idle' | 'saving' | 'done';
 
 /** Set / change the book you're reading — search Open Library or browse shelves,
- * then save. Lives with the reading loop on the Quests screen. */
+ * then save. Lives on the Status screen, just under the reading-progress panel. */
 export function CurrentBookCard() {
   const state = useSystem((s) => s.state);
   const saveBook = useSystem((s) => s.saveBook);
