@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion } from '@/lib/api';
 import { toBoundedDataUri, splitDataUri } from '@/lib/image';
-import { useBody } from '@/store/useBody';
+import { useBody } from '@/query/useBody';
 import { accent, feedback, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
 
 import { NutritionProfileForm } from './NutritionProfileForm';
@@ -26,11 +26,7 @@ function num(v: string, fallback = 0): number {
 }
 
 export function NutritionPanel() {
-  const body = useBody((s) => s.body);
-  const search = useBody((s) => s.search);
-  const analyzePhoto = useBody((s) => s.analyzePhoto);
-  const logFood = useBody((s) => s.logFood);
-  const removeFood = useBody((s) => s.removeFood);
+  const { body, search, analyzePhoto, logFood, removeFood } = useBody();
 
   const profile = body?.profile ?? null;
   const targets = body?.targets ?? null;

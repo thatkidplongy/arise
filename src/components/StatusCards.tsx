@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChecklistPanel } from '@/components/ChecklistPanel';
-import { useMotivation } from '@/store/useMotivation';
+import { fetchInsights } from '@/query/useInsights';
 import { useSystem } from '@/store/useSystem';
 import { feedback, text, withAlpha } from '@/theme';
 
@@ -14,12 +14,8 @@ export function DailyQuote({ initialText }: { initialText: string }) {
   useEffect(() => setLine(initialText), [initialText]);
 
   const shuffle = async () => {
-    const { insights, loaded, fetch } = useMotivation.getState();
-    let quotes = insights.flatMap((i) => i.quotes);
-    if (!loaded) {
-      await fetch(); // lazy-load the pool on first tap
-      quotes = useMotivation.getState().insights.flatMap((i) => i.quotes);
-    }
+    const insights = await fetchInsights(); // cached, or lazy-loaded on first tap
+    const quotes = insights.flatMap((i) => i.quotes);
     const others = quotes.filter((q) => q !== line);
     if (others.length === 0) return;
     setLine(others[Math.floor(Math.random() * others.length)]);

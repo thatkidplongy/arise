@@ -7,18 +7,17 @@ import { GroceryPanel } from '@/components/GroceryPanel';
 import { NutritionPanel } from '@/components/NutritionPanel';
 import { Screen } from '@/components/Screen';
 import { SkincarePanel } from '@/components/SkincarePanel';
-import { useBody } from '@/store/useBody';
+import { useBody } from '@/query/useBody';
 import { text } from '@/theme';
 
 export default function BodyScreen() {
-  const body = useBody((s) => s.body);
-  const fetchBody = useBody((s) => s.fetch);
+  const { body, refetch } = useBody();
 
   // Refetch whenever the tab comes into focus, so it's fresh without a manual pull.
   useFocusEffect(
     useCallback(() => {
-      void fetchBody();
-    }, [fetchBody]),
+      void refetch();
+    }, [refetch]),
   );
 
   return (

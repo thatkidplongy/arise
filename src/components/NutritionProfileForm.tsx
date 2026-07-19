@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiBodyProfile } from '@/lib/api';
-import { useBody } from '@/store/useBody';
+import { useBody } from '@/query/useBody';
 import { accent, onAccent, STAT_META, surface, text } from '@/theme';
 
 const TONE = STAT_META.CFT.color;
@@ -66,7 +66,7 @@ export function NutritionProfileForm({
   profile: ApiBodyProfile | null;
   onDone: () => void;
 }) {
-  const saveProfile = useBody((s) => s.saveProfile);
+  const { saveProfile } = useBody();
   const [sex, setSex] = useState(profile?.sex ?? 'unspecified');
   const [age, setAge] = useState(profile?.age ? String(profile.age) : '');
   const [height, setHeight] = useState(profile?.height_cm ? String(profile.height_cm) : '');

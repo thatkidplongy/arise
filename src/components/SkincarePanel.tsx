@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
-import { useBody } from '@/store/useBody';
+import { useBody } from '@/query/useBody';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
@@ -22,9 +22,7 @@ function Routine({
   routine: 'AM' | 'PM';
   steps: ApiSkincareStep[];
 }) {
-  const toggleStep = useBody((s) => s.toggleStep);
-  const addStep = useBody((s) => s.addStep);
-  const removeStep = useBody((s) => s.removeStep);
+  const { toggleStep, addStep, removeStep } = useBody();
   const [draft, setDraft] = useState('');
 
   const add = async () => {
@@ -119,7 +117,7 @@ function ProductPicks({ picks, country }: { picks: ApiSkincarePick[]; country: s
 /** Look a product up in Open Beauty Facts and read what's inside — which actives
  * help pigmentation & pores, and anything gentle to be aware of. */
 function ProductLookup() {
-  const searchProducts = useBody((s) => s.searchProducts);
+  const { searchProducts } = useBody();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ApiSkincareProduct[]>([]);
   const [searching, setSearching] = useState(false);
@@ -225,7 +223,7 @@ function ProductLookup() {
 }
 
 export function SkincarePanel() {
-  const body = useBody((s) => s.body);
+  const { body } = useBody();
   if (!body) return null;
 
   return (

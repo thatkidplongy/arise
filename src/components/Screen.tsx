@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useBody } from '@/store/useBody';
+import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
 import { accent, surface, text } from '@/theme';
 
@@ -12,9 +12,14 @@ export const CONTENT_MAX_WIDTH = 620;
 
 const PULL_THRESHOLD = 72; // px of drag before releasing triggers a refresh
 
-/** Re-fetch the data the screens render, in place — no page reload, no flash. */
+/** Re-fetch the data the screens render, in place — no page reload, no flash.
+ * The core state lives in useSystem; the Body tab's data is a React Query, so we
+ * invalidate it (refetches wherever it's mounted). */
 async function softRefresh() {
-  await Promise.all([useSystem.getState().refresh(), useBody.getState().fetch()]);
+  await Promise.all([
+    useSystem.getState().refresh(),
+    queryClient.invalidateQueries({ queryKey: ['body'] }),
+  ]);
 }
 
 /** Web-only pull-to-refresh. react-native-web's RefreshControl is a no-op, so we

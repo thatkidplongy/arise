@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import type { ApiInsight, InsightKind } from '@/lib/api';
-import { useMotivation, type PendingCapture } from '@/store/useMotivation';
+import { useInsights } from '@/query/useInsights';
+import { useCaptures, type PendingCapture } from '@/store/useCaptures';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
 
@@ -271,28 +272,21 @@ function TipsCard({
 }
 
 /** The Inspire tab body: paste a video link, keep its distilled wisdom, and let a
- * quote resurface on Status. Captures run in the background (see useMotivation).
+ * quote resurface on Status. Captures run in the background (see useCaptures).
  * The library collapses to slim, tappable rows with a search filter so it stays
  * scannable at any size. Standalone — never touches XP. */
 export function MotivationPanel() {
   const state = useSystem((s) => s.state);
-  const insights = useMotivation((s) => s.insights);
-  const pending = useMotivation((s) => s.pending);
-  const loaded = useMotivation((s) => s.loaded);
-  const fetch = useMotivation((s) => s.fetch);
-  const add = useMotivation((s) => s.add);
-  const retry = useMotivation((s) => s.retry);
-  const dismiss = useMotivation((s) => s.dismiss);
-  const remove = useMotivation((s) => s.remove);
+  const { insights, loaded, remove } = useInsights();
+  const pending = useCaptures((s) => s.pending);
+  const add = useCaptures((s) => s.add);
+  const retry = useCaptures((s) => s.retry);
+  const dismiss = useCaptures((s) => s.dismiss);
 
   const [url, setUrl] = useState('');
   const [mode, setMode] = useState<InsightKind>('motivation');
   const [query, setQuery] = useState('');
   const [openIds, setOpenIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    void fetch();
-  }, [fetch]);
 
   const transcriptOn = state?.transcript_enabled ?? false;
   const llmOn = state?.llm_enabled ?? false;
