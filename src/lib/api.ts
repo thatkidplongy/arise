@@ -460,14 +460,38 @@ export const api = {
   getAvatar: (base: string, token: string) =>
     request<{ avatar: string }>(base, '/player/avatar', token),
 
-  setAvatar: (base: string, token: string, avatar: string) =>
-    request<{ avatar: string }>(
-      base,
-      '/player/avatar',
-      token,
-      { method: 'PUT', body: JSON.stringify({ avatar }) },
-      20000, // a base64 image is bigger than a normal call
-    ),
+  // Uploaded via XHR (not fetch) so we can report real upload progress for the
+  // ring on the avatar. `onProgress` gets 0..1 as the bytes go up.
+  setAvatar: (
+    base: string,
+    token: string,
+    avatar: string,
+    onProgress?: (p: number) => void,
+  ): Promise<{ avatar: string }> =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', `${base}/player/avatar`);
+      xhr.setRequestHeader('content-type', 'application/json');
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.timeout = 20000; // a base64 image is bigger than a normal call
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve({ avatar });
+          }
+        } else {
+          reject(new Error(`API ${xhr.status}: ${xhr.responseText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('network error'));
+      xhr.ontimeout = () => reject(new Error('timeout'));
+      xhr.send(JSON.stringify({ avatar }));
+    }),
 
   // ── Reminders (a simple personal list) ────────────────────────────────────
   addReminder: (base: string, token: string, text: string, day: string) =>

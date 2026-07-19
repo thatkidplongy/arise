@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion } from '@/lib/api';
+import { toBoundedDataUri, splitDataUri } from '@/lib/image';
 import { useBody } from '@/store/useBody';
 import { accent, feedback, STAT_META, surface, text, withAlpha } from '@/theme';
 
@@ -124,22 +125,17 @@ export function NutritionPanel() {
       allowsEditing: true,
     });
     if (res.canceled || !res.assets?.[0]) return;
-    const asset = res.assets[0];
-    let b64 = asset.base64 ?? null;
-    let mime = asset.mimeType ?? 'image/jpeg';
-    // On web the picker returns a data: URI rather than a base64 field.
-    if (!b64 && asset.uri?.startsWith('data:')) {
-      b64 = asset.uri.slice(asset.uri.indexOf(',') + 1);
-      const m = asset.uri.match(/^data:(.*?);base64/);
-      if (m) mime = m[1];
-    }
-    if (!b64) {
+    // Downscale (bounded but still legible for label reading) — on web the picker
+    // returns the full-res photo, which would otherwise fail to upload.
+    const dataUri = await toBoundedDataUri(res.assets[0], 1024, 0.7);
+    if (!dataUri) {
       setPhotoError('Could not read that image — try another, or log by hand.');
       return;
     }
+    const { base64, mime } = splitDataUri(dataUri);
     setAnalyzing(true);
     try {
-      const est = await analyzePhoto(b64, mime);
+      const est = await analyzePhoto(base64, mime);
       setEstimate(est);
       setEName(est.name);
       setEKcal(String(est.kcal));

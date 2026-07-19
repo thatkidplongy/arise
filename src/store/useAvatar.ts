@@ -14,6 +14,7 @@ import { useSystem } from './useSystem';
 interface AvatarStore {
   uri: string | null; // null = not loaded yet; '' = none set; else a data URI
   busy: boolean;
+  progress: number; // 0..1 while a save is uploading
   load: () => Promise<void>;
   save: (uri: string) => Promise<void>; // '' clears it
 }
@@ -21,6 +22,7 @@ interface AvatarStore {
 export const useAvatar = create<AvatarStore>((set) => ({
   uri: null,
   busy: false,
+  progress: 0,
 
   load: async () => {
     const { serverUrl, apiToken } = link();
@@ -34,13 +36,13 @@ export const useAvatar = create<AvatarStore>((set) => ({
 
   save: async (uri) => {
     const { serverUrl, apiToken } = link();
-    set({ busy: true });
+    set({ busy: true, progress: 0 });
     try {
-      const res = await api.setAvatar(serverUrl, apiToken, uri);
-      set({ uri: res.avatar, busy: false });
+      const res = await api.setAvatar(serverUrl, apiToken, uri, (p) => set({ progress: p }));
+      set({ uri: res.avatar, busy: false, progress: 1 });
       void useSystem.getState().refresh(); // keep player.has_avatar current
     } catch {
-      set({ busy: false });
+      set({ busy: false, progress: 0 });
     }
   },
 }));

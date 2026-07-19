@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ProgressRing } from '@/components/ProgressRing';
+import { toBoundedDataUri } from '@/lib/image';
 import { useAvatar } from '@/store/useAvatar';
 import { useSystem } from '@/store/useSystem';
 import { accent, surface, text, withAlpha } from '@/theme';
@@ -13,6 +15,7 @@ export function AvatarEditor() {
   const hasAvatar = useSystem((s) => s.state?.player.has_avatar ?? false);
   const uri = useAvatar((s) => s.uri);
   const busy = useAvatar((s) => s.busy);
+  const progress = useAvatar((s) => s.progress);
   const load = useAvatar((s) => s.load);
   const save = useAvatar((s) => s.save);
 
@@ -28,19 +31,11 @@ export function AvatarEditor() {
       aspect: [1, 1],
     });
     if (res.canceled || !res.assets?.[0]) return;
-    const asset = res.assets[0];
-    let b64 = asset.base64 ?? null;
-    let mime = asset.mimeType ?? 'image/jpeg';
-    // On web the picker returns a data: URI rather than a base64 field.
-    if (!b64 && asset.uri.startsWith('data:')) {
-      const m = asset.uri.match(/^data:(.*?);base64,(.*)$/);
-      if (m) {
-        mime = m[1];
-        b64 = m[2];
-      }
-    }
-    if (!b64) return;
-    await save(`data:${mime};base64,${b64}`);
+    // Downscale to a small square-ish avatar (well under the upload limit) — on
+    // web the picker returns the full-res photo, which would otherwise fail.
+    const dataUri = await toBoundedDataUri(res.assets[0], 256, 0.8);
+    if (!dataUri) return;
+    await save(dataUri);
   };
 
   const shown = uri && uri.length > 0 ? uri : null;
@@ -50,18 +45,23 @@ export function AvatarEditor() {
       <Pressable
         onPress={pick}
         disabled={busy}
-        style={({ pressed }) => [styles.ring, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.ringWrap, pressed && { opacity: 0.85 }]}
       >
-        {busy ? (
-          <ActivityIndicator color={accent} />
-        ) : shown ? (
-          <Image source={{ uri: shown }} style={styles.img} />
-        ) : (
-          <Ionicons name="person-outline" size={30} color={text.faint} />
-        )}
-        <View style={styles.editBadge}>
-          <Ionicons name="camera" size={12} color="#FBF5EB" />
+        <View style={[styles.ring, busy && { opacity: 0.55 }]}>
+          {shown ? (
+            <Image source={{ uri: shown }} style={styles.img} />
+          ) : (
+            <Ionicons name="person-outline" size={30} color={text.faint} />
+          )}
+          <View style={styles.editBadge}>
+            <Ionicons name="camera" size={12} color="#FBF5EB" />
+          </View>
         </View>
+        {busy ? (
+          <View style={styles.progressOverlay} pointerEvents="none">
+            <ProgressRing size={84} progress={progress} stroke={3} />
+          </View>
+        ) : null}
       </Pressable>
       <View style={styles.actions}>
         <Pressable onPress={pick} disabled={busy} hitSlop={6}>
@@ -79,6 +79,16 @@ export function AvatarEditor() {
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', gap: 8, marginBottom: 4 },
+  ringWrap: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+  progressOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ring: {
     width: 76,
     height: 76,
