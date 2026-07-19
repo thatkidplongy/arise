@@ -6,7 +6,7 @@ DAY = "2026-07-18"
 
 
 def test_body_defaults_and_skincare_seeded(client):
-    b = client.get(f"/body?day={DAY}").json()
+    b = client.get(f"/body/state?day={DAY}").json()
     assert b["profile"] is None  # nothing set yet
     assert b["targets"] is None  # no target without a profile
     assert b["food"] == {"entries": [], "total_kcal": 0, "total_protein": 0, "total_fibre": 0}
@@ -110,7 +110,7 @@ def test_skincare_search_failure_is_a_clean_502(client, monkeypatch):
 
 
 def test_skincare_completion_feeds_spirit_and_streak(client):
-    b = client.get(f"/body?day={DAY}").json()
+    b = client.get(f"/body/state?day={DAY}").json()
     assert b["skincare_streak"] == 0 and b["skincare_days"] == 0
     assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 0
 
@@ -118,7 +118,7 @@ def test_skincare_completion_feeds_spirit_and_streak(client):
     for step in b["skincare_am"]:
         client.post(f"/skincare/check?day={DAY}", json={"step_id": step["id"], "done": True})
 
-    b = client.get(f"/body?day={DAY}").json()
+    b = client.get(f"/body/state?day={DAY}").json()
     assert b["skincare_streak"] == 1 and b["skincare_days"] == 1
     # It now feeds Spirit (and overall XP) — self-care counts.
     assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 5  # SKINCARE_BLOCK_XP
@@ -129,14 +129,14 @@ def test_skincare_completion_feeds_spirit_and_streak(client):
 
 
 def test_skincare_check_and_edit(client):
-    b = client.get(f"/body?day={DAY}").json()
+    b = client.get(f"/body/state?day={DAY}").json()
     step = b["skincare_am"][0]
     assert step["done"] is False
     # Tick it for today.
     b = client.post(f"/skincare/check?day={DAY}", json={"step_id": step["id"], "done": True}).json()
     assert next(s for s in b["skincare_am"] if s["id"] == step["id"])["done"] is True
     # A tick is per-day: a different day is untouched.
-    other = client.get("/body?day=2026-07-19").json()
+    other = client.get("/body/state?day=2026-07-19").json()
     assert next(s for s in other["skincare_am"] if s["id"] == step["id"])["done"] is False
     # Add a custom PM step, then remove it.
     b = client.post(f"/skincare/step?day={DAY}", json={"routine": "PM", "text": "Lip balm"}).json()

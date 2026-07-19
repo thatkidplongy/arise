@@ -127,6 +127,20 @@ def _clear_step_checks(db: Session, player: Player, quest_id: str, period_key: s
     ).delete()
 
 
+def _clear_quest_notes(
+    db: Session, player: Player, quest_id: str, period_key: str, step_index: int | None = None
+) -> None:
+    """Remove reflections written for a quest's period. With `step_index`, only the
+    note for that step; without, every note for the period. A reflection is a
+    write-step's answer, so it goes when that step (or the whole quest) is undone."""
+    q = db.query(QuestNote).filter_by(
+        player_id=player.id, quest_id=quest_id, period_key=period_key
+    )
+    if step_index is not None:
+        q = q.filter_by(step_index=step_index)
+    q.delete()
+
+
 # ── Public actions ────────────────────────────────────────────────────────────
 
 
@@ -158,10 +172,13 @@ def undo_completion(db: Session, player: Player, completion_id: str, day: str) -
     db.flush()
     _revoke_bonus_if_needed(db, player, row_day)
 
-    # Reset the quest's checklist for this period so it starts fresh.
+    # Reset the quest's checklist for this period so it starts fresh, and drop the
+    # reflections written for it — undoing the quest means it wasn't done.
     quest = next((q for q in quest_defs(db) if q.id == quest_id), None)
     if quest is not None:
-        _clear_step_checks(db, player, quest_id, quests.period_key(quest.cadence, row_day))
+        pk = quests.period_key(quest.cadence, row_day)
+        _clear_step_checks(db, player, quest_id, pk)
+        _clear_quest_notes(db, player, quest_id, pk)
 
     db.commit()
     return {"events": [], "state": build_state(db, player, day)}
@@ -192,6 +209,9 @@ def toggle_step(db: Session, player: Player, quest_id: str, step_index: int, day
 
     if existing is not None:
         db.delete(existing)
+        # Unticking a write-step retracts its reflection too (the note was that
+        # step's answer). Older notes have no step_index and are left alone.
+        _clear_quest_notes(db, player, quest.id, pk, step_index)
         db.flush()
         if is_done:
             _remove_one_completion(db, player, quest, day)
@@ -440,9 +460,14 @@ def toggle_reminder(db: Session, player: Player, reminder_id: str, done: bool) -
         db.commit()
 
 
-def add_quest_note(db: Session, player: Player, quest_id: str, day: str, text: str) -> None:
+def add_quest_note(
+    db: Session, player: Player, quest_id: str, day: str, text: str,
+    prompt: str = "", step_index: int | None = None,
+) -> None:
     """Save a reflection for a quest, scoped to its current period. The client sends
-    one only from a 'write' step, but any note that arrives is kept."""
+    one only from a 'write' step, but any note that arrives is kept. `prompt` is the
+    step text being answered, stored so the Journal can show what the note responds
+    to; `step_index` binds it to that step so undoing the step removes the note."""
     text = (text or "").strip()[:2000]
     if not text:
         return
@@ -450,7 +475,10 @@ def add_quest_note(db: Session, player: Player, quest_id: str, day: str, text: s
     if quest is None:
         raise HTTPException(404, f"Unknown quest: {quest_id}")
     pk = quests.period_key(quest.cadence, day)
-    db.add(QuestNote(player_id=player.id, quest_id=quest_id, period_key=pk, day=day, text=text))
+    db.add(QuestNote(
+        player_id=player.id, quest_id=quest_id, period_key=pk, day=day,
+        text=text, prompt=(prompt or "").strip()[:500], step_index=step_index,
+    ))
     db.commit()
 
 

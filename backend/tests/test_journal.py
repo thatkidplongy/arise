@@ -70,6 +70,49 @@ def test_newest_reflection_comes_first(client):
     assert [e["text"] for e in s["reflections"]] == ["second", "first"]
 
 
+# ── A reflection is a write-step's answer: undo the step, undo the note ───────
+
+
+def test_note_carries_its_step_and_unticking_removes_it(client):
+    # A note written from step 0…
+    s = client.post("/quest-notes", json={
+        "quest_id": "d-wealth", "text": "save first, then invest", "step_index": 0, "day": DAY,
+    }).json()
+    assert _quest(s, "d-wealth")["notes"][0]["step"] == 0
+
+    # Tick that step, then untick it — the reflection goes with the step.
+    client.post("/steps", json={"quest_id": "d-wealth", "step_index": 0, "day": DAY})
+    s = client.post("/steps", json={"quest_id": "d-wealth", "step_index": 0, "day": DAY}).json()["state"]
+    assert _quest(s, "d-wealth")["notes"] == []
+    assert s["reflections"] == []
+
+
+def test_undo_completion_clears_the_quests_reflections(client):
+    client.post("/quest-notes", json={
+        "quest_id": "d-wealth", "text": "wealth is freedom from debt", "step_index": 0, "day": DAY,
+    })
+    s = client.post("/completions", json={"quest_id": "d-wealth", "day": DAY}).json()["state"]
+    assert len(s["reflections"]) == 1  # completing keeps the note
+    cid = _quest(s, "d-wealth")["undoable_id"]
+
+    s = client.request("DELETE", f"/completions/{cid}?day={DAY}").json()["state"]
+    # Undoing the quest retracts what was written for it.
+    assert s["reflections"] == []
+    assert _quest(s, "d-wealth")["notes"] == []
+
+
+def test_unticking_a_step_leaves_notes_from_other_steps(client):
+    # A note bound to step 0 and one with no step (older, standalone).
+    client.post("/quest-notes", json={
+        "quest_id": "d-wealth", "text": "step-zero note", "step_index": 0, "day": DAY})
+    client.post("/quest-notes", json={"quest_id": "d-wealth", "text": "legacy note", "day": DAY})
+
+    client.post("/steps", json={"quest_id": "d-wealth", "step_index": 0, "day": DAY})
+    s = client.post("/steps", json={"quest_id": "d-wealth", "step_index": 0, "day": DAY}).json()["state"]
+    # Only the step-0 note is retracted; the unbound one is left alone.
+    assert [n["text"] for n in _quest(s, "d-wealth")["notes"]] == ["legacy note"]
+
+
 # ── Free-form daily journal (unlinked to any quest) ───────────────────────────
 
 

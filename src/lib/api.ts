@@ -49,7 +49,7 @@ export interface ApiQuest {
   target: number;
   done: number;
   undoable_id: string | null;
-  notes: { id: string; text: string }[]; // notes jotted this period (via write-steps)
+  notes: { id: string; text: string; step: number | null }[]; // notes jotted this period (via write-steps)
 }
 
 /** One quest-linked reflection (from a requires_log quest). */
@@ -57,6 +57,7 @@ export interface ApiReflection {
   id: string;
   quest_id: string;
   stat: StatKey;
+  prompt: string; // the write-step/question this answers (empty for older notes)
   day: string;
   text: string;
   created_at: string;
@@ -419,7 +420,7 @@ export const api = {
 
   // ── Body ────────────────────────────────────────────────────────────────────
   getBody: (base: string, token: string, day: string) =>
-    request<ApiBody>(base, `/body?day=${day}`, token),
+    request<ApiBody>(base, `/body/state?day=${day}`, token),
 
   setBodyProfile: (base: string, token: string, profile: ApiBodyProfile, day: string) =>
     request<ApiBody>(base, `/body/profile?day=${day}`, token, {
@@ -553,10 +554,13 @@ export const api = {
     request<ApiState>(base, `/grocery/${id}?day=${day}`, token, { method: 'DELETE' }),
 
   // ── Quest journal (reflection notes) ──────────────────────────────────────
-  addQuestNote: (base: string, token: string, questId: string, text: string, day: string) =>
+  addQuestNote: (
+    base: string, token: string, questId: string, text: string, day: string,
+    prompt = '', stepIndex: number | null = null,
+  ) =>
     request<ApiState>(base, `/quest-notes`, token, {
       method: 'POST',
-      body: JSON.stringify({ quest_id: questId, text, day }),
+      body: JSON.stringify({ quest_id: questId, text, prompt, step_index: stepIndex, day }),
     }),
 
   updateQuestNote: (base: string, token: string, id: string, text: string, day: string) =>

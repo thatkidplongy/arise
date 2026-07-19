@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import type { ApiQuest } from '@/lib/api';
@@ -50,6 +51,9 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
   const [noteInitial, setNoteInitial] = useState('');
   const [pendingStep, setPendingStep] = useState<number | null>(null);
 
+  // A guard before anything that would discard a written reflection.
+  const [confirm, setConfirm] = useState<{ message: string; label: string; onYes: () => void } | null>(null);
+
   const openEditNote = (n: { id: string; text: string }) => {
     setPendingStep(null);
     setEditingNoteId(n.id);
@@ -64,29 +68,53 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
       void updateQuestNote(editingNoteId, t);
       return;
     }
-    // A fresh entry written from a step: log it, then tick that step (which may
-    // complete the quest if it was the last one).
+    // A fresh entry written from a step: log it (with the step text as the prompt,
+    // so the Journal shows what was answered), then tick that step — which may
+    // complete the quest if it was the last one.
     const step = pendingStep;
     setPendingStep(null);
-    await addQuestNote(quest.id, t);
+    await addQuestNote(quest.id, t, step != null ? quest.steps[step] : notePrompt, step);
     if (step != null) await toggleStep(quest, step);
+  };
+
+  // Undoing a completion removes any reflections written for it, so confirm first
+  // when there's writing to lose (the server cascades the delete).
+  const requestUndo = () => {
+    if (busy) return;
+    if (quest.notes.length > 0) {
+      setConfirm({
+        message: 'Undoing this also removes what you wrote for it. Undo anyway?',
+        label: 'Undo & remove',
+        onYes: () => run(() => undo(quest)),
+      });
+    } else run(() => undo(quest));
   };
 
   const completeOrUndo = () => {
     if (busy) return;
     if (!isDone) run(() => complete(quest));
-    else if (canUndoToday) run(() => undo(quest));
+    else if (canUndoToday) requestUndo();
   };
 
   // Tapping a step. A "write" step being ticked opens the editor first (saving
-  // logs it and ticks the step); every other tap just toggles the step.
+  // logs it and ticks the step). Unticking a write-step retracts its reflection,
+  // so confirm when there's a saved note for it. Any other tap just toggles.
   const onStepPress = (i: number) => {
-    if (!quest.steps_done[i] && isWriteStep(quest.steps[i])) {
+    const isWrite = isWriteStep(quest.steps[i]);
+    if (!quest.steps_done[i] && isWrite) {
       setEditingNoteId(null);
       setNoteInitial('');
       setNotePrompt(quest.steps[i]);
       setPendingStep(i);
       setNoteOpen(true);
+      return;
+    }
+    if (quest.steps_done[i] && isWrite && quest.notes.some((n) => n.step === i)) {
+      setConfirm({
+        message: 'Unticking this removes what you wrote for it. Continue?',
+        label: 'Untick & remove',
+        onYes: () => run(() => toggleStep(quest, i)),
+      });
       return;
     }
     run(() => toggleStep(quest, i));
@@ -182,7 +210,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
 
         {partialMulti && canUndoToday ? (
           <Pressable
-            onPress={() => run(() => undo(quest))}
+            onPress={requestUndo}
             hitSlop={6}
             style={({ pressed }) => [styles.stepDown, pressed && { opacity: 0.6 }]}
           >
@@ -214,14 +242,27 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
     </>
   );
 
-  const noteModal = (
-    <NoteEditorModal
-      visible={noteOpen}
-      prompt={notePrompt}
-      initial={noteInitial}
-      onSave={saveNote}
-      onClose={() => setNoteOpen(false)}
-    />
+  const modals = (
+    <>
+      <NoteEditorModal
+        visible={noteOpen}
+        prompt={notePrompt}
+        initial={noteInitial}
+        onSave={saveNote}
+        onClose={() => setNoteOpen(false)}
+      />
+      <ConfirmModal
+        visible={confirm != null}
+        message={confirm?.message ?? ''}
+        confirmLabel={confirm?.label ?? 'Confirm'}
+        destructive
+        onConfirm={() => {
+          confirm?.onYes();
+          setConfirm(null);
+        }}
+        onCancel={() => setConfirm(null)}
+      />
+    </>
   );
 
   // Checklist quests aren't tap-to-complete as a whole (you tick steps or tap the
@@ -230,7 +271,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
     return (
       <>
         <View style={[styles.card, isDone && styles.cardDone]}>{inner}</View>
-        {noteModal}
+        {modals}
       </>
     );
   }
@@ -247,7 +288,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
       >
         {inner}
       </Pressable>
-      {noteModal}
+      {modals}
     </>
   );
 }

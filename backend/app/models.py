@@ -223,10 +223,11 @@ class Reminder(Base):
 
 
 class QuestNote(Base):
-    """What the hunter wrote down for a quest whose `requires_log` is set — a
-    takeaway, an idea, a line to keep. Scoped to the quest's period (day for
-    dailies, ISO week for weekly/side) and dated, so the Journal reads back by date.
-    Kept forever; the note is the point, not the tick."""
+    """What the hunter wrote to complete a quest's write-step — a takeaway, an
+    idea, a line to keep. Scoped to the quest's period (day for dailies, ISO week
+    for weekly/side) and dated, so the Journal reads back by date. `step_index`
+    binds it to the step that produced it, so undoing that step removes the note
+    (the reflection *is* the step's answer, not an independent journal entry)."""
 
     __tablename__ = "quest_notes"
 
@@ -236,6 +237,8 @@ class QuestNote(Base):
     period_key: Mapped[str] = mapped_column(String)  # day or ISO week the note belongs to
     day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
     text: Mapped[str] = mapped_column(String)
+    prompt: Mapped[str] = mapped_column(String, default="")  # the write-step/question this answers
+    step_index: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)  # the step it answers
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

@@ -71,11 +71,27 @@ if WEB_DIR.is_dir():
         if (WEB_DIR / sub).is_dir():
             app.mount(f"/{sub}", StaticFiles(directory=WEB_DIR / sub), name=sub)
 
+    web_root = WEB_DIR.resolve()
+
+    def _within_root(p: Path) -> Path | None:
+        """Resolve a candidate under the web dir, or None if it escapes it."""
+        rp = (WEB_DIR / p).resolve()
+        return rp if rp == web_root or web_root in rp.parents else None
+
     @app.get("/{path:path}")
     def web_app(path: str):
-        candidate = WEB_DIR / path
-        if path and candidate.is_file():
-            return FileResponse(candidate)
-        # The SPA shell always revalidates so a fresh launch picks up a new build
-        # — the JS bundles it points to are content-hashed and safe to cache.
+        # A real file (favicon, manifest, …); hashed JS/CSS is served by the mounts.
+        asset = _within_root(Path(path)) if path else None
+        if asset and asset.is_file():
+            return FileResponse(asset)
+        # A statically-exported route page: /quests -> quests.html. Serving the
+        # right shell means a refresh or deep link boots on that screen — so the
+        # active tab matches the URL instead of always resetting to Status.
+        if path:
+            page = _within_root(Path(f"{path.rstrip('/')}.html"))
+            if page and page.is_file():
+                return FileResponse(page, headers={"Cache-Control": "no-cache"})
+        # Unknown route: the SPA shell (client router resolves it). Always
+        # revalidates so a fresh launch picks up a new build — the JS bundles it
+        # points to are content-hashed and safe to cache.
         return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})

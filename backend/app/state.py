@@ -413,11 +413,14 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     notes_by: dict[tuple[str, str], list[dict]] = {}
     reflections: list[dict] = []
     for n in sorted(db.query(QuestNote).filter_by(player_id=player.id), key=lambda n: n.created_at):
-        notes_by.setdefault((n.quest_id, n.period_key), []).append({"id": n.id, "text": n.text})
+        notes_by.setdefault((n.quest_id, n.period_key), []).append(
+            {"id": n.id, "text": n.text, "step": n.step_index}
+        )
         reflections.append({
             "id": n.id,
             "quest_id": n.quest_id,
             "stat": stat_by_qid.get(n.quest_id, ""),
+            "prompt": n.prompt or "",
             "day": n.day,
             "text": n.text,
             "created_at": n.created_at,

@@ -182,7 +182,9 @@ def reset(day: str | None = Query(None), db: Session = Depends(get_db)):
 # ── Body: nutrition + skincare (standalone wellness tools) ────────────────────
 
 
-@router.get("/body", response_model=BodyOut)
+# Note: served at /body/state, not /body — the bare /body path belongs to the
+# web app's Body tab, so a browser refresh there loads the app, not this JSON.
+@router.get("/body/state", response_model=BodyOut)
 def get_body(day: str | None = Query(None), db: Session = Depends(get_db)):
     """Everything the Body screen needs: calorie/protein targets, the day's food
     log with totals, and the AM/PM skincare routine with today's ticks."""
@@ -394,7 +396,10 @@ def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = De
 def add_quest_note(body_in: QuestNoteIn, db: Session = Depends(get_db)):
     """Save what you wrote for a reflective quest. Kept, dated, in the Journal."""
     player = state.get_or_create_player(db)
-    service.add_quest_note(db, player, body_in.quest_id, _valid_day(body_in.day), body_in.text)
+    service.add_quest_note(
+        db, player, body_in.quest_id, _valid_day(body_in.day), body_in.text,
+        body_in.prompt, body_in.step_index,
+    )
     return state.build_state(db, player, _valid_day(body_in.day))
 
 

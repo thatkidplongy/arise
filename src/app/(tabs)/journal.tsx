@@ -131,6 +131,7 @@ export default function JournalScreen() {
                         <Text style={[styles.entryStat, { color: meta?.color ?? text.secondary }]}>
                           {meta?.label ?? 'Note'}
                         </Text>
+                        {e.prompt ? <Text style={styles.entryPrompt}>{e.prompt}</Text> : null}
                         <Markdown value={e.text} />
                       </View>
                       <Pressable onPress={() => void removeQuestNote(e.id)} hitSlop={8}>
@@ -203,5 +204,6 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   entryStat: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  entryPrompt: { color: text.secondary, fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
   entryX: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
 });

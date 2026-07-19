@@ -109,7 +109,7 @@ interface SystemStore {
   addGrocery: (name: string) => Promise<void>;
   toggleGrocery: (id: string, bought: boolean) => Promise<void>;
   removeGrocery: (id: string) => Promise<void>;
-  addQuestNote: (questId: string, text: string) => Promise<void>;
+  addQuestNote: (questId: string, text: string, prompt?: string, stepIndex?: number | null) => Promise<void>;
   updateQuestNote: (id: string, text: string) => Promise<void>;
   removeQuestNote: (id: string) => Promise<void>;
   addJournalEntry: (text: string) => Promise<void>;
@@ -259,7 +259,8 @@ export const useSystem = create<SystemStore>()(
       addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
       toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
       removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
-      addQuestNote: (questId, text) => mutate((b, t, d) => api.addQuestNote(b, t, questId, text, d)),
+      addQuestNote: (questId, text, prompt = '', stepIndex = null) =>
+        mutate((b, t, d) => api.addQuestNote(b, t, questId, text, d, prompt, stepIndex)),
       updateQuestNote: (id, text) => mutate((b, t, d) => api.updateQuestNote(b, t, id, text, d)),
       removeQuestNote: (id) => mutate((b, t, d) => api.removeQuestNote(b, t, id, d)),
       addJournalEntry: (text) => mutate((b, t, d) => api.addJournalEntry(b, t, text, d)),

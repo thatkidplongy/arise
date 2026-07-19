@@ -67,6 +67,8 @@ class GroceryToggleIn(BaseModel):
 class QuestNoteIn(BaseModel):
     quest_id: str
     text: str = Field(min_length=1, max_length=2000)  # lightweight Markdown
+    prompt: str = Field("", max_length=500)  # the write-step/question being answered
+    step_index: int | None = Field(None, ge=0)  # the step that produced it (binds note↔step)
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
@@ -345,6 +347,7 @@ class RankGateOut(BaseModel):
 class QuestNoteOut(BaseModel):
     id: str
     text: str
+    step: int | None = None  # the step this note answers, so the UI can pair them
 
 
 class QuestOut(BaseModel):
@@ -418,6 +421,7 @@ class ReflectionOut(BaseModel):
     id: str
     quest_id: str
     stat: str  # STR | CRE | SPI | CHA | INT | WLT | CFT — colours/labels the entry
+    prompt: str = ""  # the write-step/question this answers (empty for older notes)
     day: str
     text: str
     created_at: datetime
