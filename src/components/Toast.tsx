@@ -5,10 +5,15 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
 
+/** How long a toast lingers before auto-dismissing. The bottom bar drains over
+ * exactly this span, so the two always stay in sync. */
+const TOAST_MS = 5000;
+
 /**
  * A transient floating confirmation, anchored above the tab bar. Used when a
  * quest auto-completes from ticking its last step — confirms it, and offers a
- * quick undo before fading on its own.
+ * quick undo before fading on its own. A thin bar along the bottom drains as the
+ * auto-dismiss timer runs down, so you can see how long you've got to hit Undo.
  */
 export function ToastHost() {
   const toast = useSystem((s) => s.toast);
@@ -17,16 +22,20 @@ export function ToastHost() {
 
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(24)).current;
+  const countdown = useRef(new Animated.Value(1)).current; // 1 = full bar → 0 = gone
 
   useEffect(() => {
     if (!toast) return;
     opacity.setValue(0);
     translateY.setValue(24);
+    countdown.setValue(1);
     Animated.parallel([
       Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }),
       Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 6 }),
     ]).start();
-    const timer = setTimeout(() => dismiss(), 5000);
+    // Width can't run on the native thread, but it's a single 3px bar — cheap.
+    Animated.timing(countdown, { toValue: 0, duration: TOAST_MS, useNativeDriver: false }).start();
+    const timer = setTimeout(() => dismiss(), TOAST_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast?.id]);
@@ -52,6 +61,13 @@ export function ToastHost() {
         >
           <Text style={styles.undoText}>Undo</Text>
         </Pressable>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.countdown,
+            { width: countdown.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
+          ]}
+        />
       </Animated.View>
     </View>
   );
@@ -79,12 +95,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 11,
     paddingHorizontal: 13,
+    // clip the countdown bar to the rounded corners
+    overflow: 'hidden',
     // a soft lift off the page
     shadowColor: '#2C2720',
     shadowOpacity: 0.14,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
+  },
+  // Drains left-anchored from full width to nothing over the toast's lifetime.
+  countdown: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: accent,
   },
   badge: {
     width: 24,
