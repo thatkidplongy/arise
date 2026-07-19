@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type ApiBody, type ApiBodyProfile } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
-import { link } from '@/store/link';
 
+import { authed } from './authed';
 import { qk } from './keys';
 
 type FoodEntry = { name: string; grams: number; kcal: number; protein_g: number; fibre_g: number };
@@ -21,55 +21,36 @@ export function useBody() {
 
   const query = useQuery({
     queryKey: qk.body(day),
-    queryFn: () => {
-      const { serverUrl, apiToken } = link();
-      return api.getBody(serverUrl, apiToken, day);
-    },
+    queryFn: () => authed((b, t) => api.getBody(b, t, day)),
   });
 
-  const writeCache = (body: ApiBody) => qc.setQueryData(qk.body(day), body);
+  const onSuccess = (body: ApiBody) => qc.setQueryData(qk.body(day), body);
 
   const saveProfileMut = useMutation({
-    mutationFn: (profile: ApiBodyProfile) => {
-      const { serverUrl, apiToken } = link();
-      return api.setBodyProfile(serverUrl, apiToken, profile, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (p: ApiBodyProfile) => authed((b, t) => api.setBodyProfile(b, t, p, day)),
+    onSuccess,
   });
   const logFoodMut = useMutation({
-    mutationFn: (entry: FoodEntry) => {
-      const { serverUrl, apiToken } = link();
-      return api.logFood(serverUrl, apiToken, entry, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (e: FoodEntry) => authed((b, t) => api.logFood(b, t, e, day)),
+    onSuccess,
   });
   const removeFoodMut = useMutation({
-    mutationFn: (id: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.removeFood(serverUrl, apiToken, id, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (id: string) => authed((b, t) => api.removeFood(b, t, id, day)),
+    onSuccess,
   });
   const addStepMut = useMutation({
-    mutationFn: (v: { routine: 'AM' | 'PM'; text: string }) => {
-      const { serverUrl, apiToken } = link();
-      return api.addSkincareStep(serverUrl, apiToken, v.routine, v.text, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (v: { routine: 'AM' | 'PM'; text: string }) =>
+      authed((b, t) => api.addSkincareStep(b, t, v.routine, v.text, day)),
+    onSuccess,
   });
   const removeStepMut = useMutation({
-    mutationFn: (id: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.removeSkincareStep(serverUrl, apiToken, id, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (id: string) => authed((b, t) => api.removeSkincareStep(b, t, id, day)),
+    onSuccess,
   });
   const toggleStepMut = useMutation({
-    mutationFn: (v: { id: string; done: boolean }) => {
-      const { serverUrl, apiToken } = link();
-      return api.checkSkincare(serverUrl, apiToken, v.id, v.done, day);
-    },
-    onSuccess: writeCache,
+    mutationFn: (v: { id: string; done: boolean }) =>
+      authed((b, t) => api.checkSkincare(b, t, v.id, v.done, day)),
+    onSuccess,
   });
 
   return {
@@ -81,17 +62,8 @@ export function useBody() {
     addStep: (routine: 'AM' | 'PM', text: string) => addStepMut.mutateAsync({ routine, text }),
     removeStep: (id: string) => removeStepMut.mutateAsync(id),
     toggleStep: (id: string, done: boolean) => toggleStepMut.mutateAsync({ id, done }),
-    search: (q: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.searchFood(serverUrl, apiToken, q);
-    },
-    searchProducts: (q: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.searchSkincare(serverUrl, apiToken, q);
-    },
-    analyzePhoto: (image: string, mime: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.analyzeFood(serverUrl, apiToken, image, mime);
-    },
+    search: (q: string) => authed((b, t) => api.searchFood(b, t, q)),
+    searchProducts: (q: string) => authed((b, t) => api.searchSkincare(b, t, q)),
+    analyzePhoto: (image: string, mime: string) => authed((b, t) => api.analyzeFood(b, t, image, mime)),
   };
 }

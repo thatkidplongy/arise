@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { api } from '@/lib/api';
-import { link } from '@/store/link';
 import { useSystem } from '@/store/useSystem';
 
+import { authed } from './authed';
 import { qk } from './keys';
 
 /**
@@ -21,21 +21,15 @@ export function useAvatar(enabled: boolean) {
 
   const query = useQuery({
     queryKey: qk.avatar,
-    queryFn: async () => {
-      const { serverUrl, apiToken } = link();
-      const { avatar } = await api.getAvatar(serverUrl, apiToken);
-      return avatar;
-    },
+    queryFn: () => authed(async (b, t) => (await api.getAvatar(b, t)).avatar),
     enabled,
     staleTime: Infinity, // changes only via save() below, which writes the cache
   });
 
   const save = useMutation({
-    mutationFn: async (uri: string) => {
+    mutationFn: (uri: string) => {
       setProgress(0);
-      const { serverUrl, apiToken } = link();
-      const res = await api.setAvatar(serverUrl, apiToken, uri, setProgress);
-      return res.avatar;
+      return authed(async (b, t) => (await api.setAvatar(b, t, uri, setProgress)).avatar);
     },
     onSuccess: (avatar) => {
       qc.setQueryData(qk.avatar, avatar);

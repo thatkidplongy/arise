@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type ApiInsight } from '@/lib/api';
-import { link } from '@/store/link';
 import { useSystem } from '@/store/useSystem';
 
+import { authed } from './authed';
 import { queryClient } from './client';
 import { qk } from './keys';
 
@@ -11,10 +11,7 @@ import { qk } from './keys';
 export function insightsQuery() {
   return {
     queryKey: qk.insights,
-    queryFn: async () => {
-      const { serverUrl, apiToken } = link();
-      return api.getInsights(serverUrl, apiToken);
-    },
+    queryFn: () => authed((b, t) => api.getInsights(b, t)),
   };
 }
 
@@ -32,10 +29,7 @@ export function useInsights() {
   const query = useQuery(insightsQuery());
 
   const removeMut = useMutation({
-    mutationFn: (id: string) => {
-      const { serverUrl, apiToken } = link();
-      return api.removeInsight(serverUrl, apiToken, id);
-    },
+    mutationFn: (id: string) => authed((b, t) => api.removeInsight(b, t, id)),
     onSuccess: (insights) => {
       qc.setQueryData(qk.insights, insights);
       void useSystem.getState().refresh(); // a removed quote drops off Status too

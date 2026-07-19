@@ -44,6 +44,40 @@ function matches(i: ApiInsight, q: string): boolean {
   return [i.summary, ...i.takeaways, ...i.steps, ...i.quotes].join(' ').toLowerCase().includes(q);
 }
 
+/** The footer shared by both card kinds: open the original, or remove it. */
+function CardActions({
+  sourceUrl,
+  id,
+  onRemove,
+}: {
+  sourceUrl: string;
+  id: string;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <View style={styles.actions}>
+      {sourceUrl ? (
+        <Pressable
+          onPress={() => Linking.openURL(sourceUrl).catch(() => {})}
+          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+          hitSlop={6}
+        >
+          <Ionicons name="open-outline" size={14} color={text.secondary} />
+          <Text style={styles.actionText}>Open original</Text>
+        </Pressable>
+      ) : null}
+      <Pressable
+        onPress={() => onRemove(id)}
+        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+        hitSlop={6}
+      >
+        <Ionicons name="trash-outline" size={14} color={feedback.danger} />
+        <Text style={[styles.actionText, { color: feedback.danger }]}>Remove</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function PendingCard({
   item,
   onRetry,
@@ -156,26 +190,7 @@ function InsightCard({
             </View>
           ))}
 
-          <View style={styles.actions}>
-            {insight.source_url ? (
-              <Pressable
-                onPress={() => Linking.openURL(insight.source_url).catch(() => {})}
-                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
-                hitSlop={6}
-              >
-                <Ionicons name="open-outline" size={14} color={text.secondary} />
-                <Text style={styles.actionText}>Open original</Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => onRemove(insight.id)}
-              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
-              hitSlop={6}
-            >
-              <Ionicons name="trash-outline" size={14} color={feedback.danger} />
-              <Text style={[styles.actionText, { color: feedback.danger }]}>Remove</Text>
-            </Pressable>
-          </View>
+          <CardActions sourceUrl={insight.source_url} id={insight.id} onRemove={onRemove} />
         </>
       ) : null}
     </View>
@@ -262,26 +277,7 @@ function TipsCard({
             </View>
           ) : null}
 
-          <View style={styles.actions}>
-            {insight.source_url ? (
-              <Pressable
-                onPress={() => Linking.openURL(insight.source_url).catch(() => {})}
-                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
-                hitSlop={6}
-              >
-                <Ionicons name="open-outline" size={14} color={text.secondary} />
-                <Text style={styles.actionText}>Open original</Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => onRemove(insight.id)}
-              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
-              hitSlop={6}
-            >
-              <Ionicons name="trash-outline" size={14} color={feedback.danger} />
-              <Text style={[styles.actionText, { color: feedback.danger }]}>Remove</Text>
-            </Pressable>
-          </View>
+          <CardActions sourceUrl={insight.source_url} id={insight.id} onRemove={onRemove} />
         </>
       ) : null}
     </View>
