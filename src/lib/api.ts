@@ -267,6 +267,19 @@ export interface ApiBookShelf {
   books: ApiBook[];
 }
 
+// ── Quest history (the dated log of finished quests) ─────────────────────────
+
+export interface ApiHistoryItem {
+  id: string;
+  quest_id: string;
+  title: string;
+  stat: string; // STR | CRE | SPI | CHA | INT | WLT | CFT ('' if the slug is gone)
+  cadence: string; // daily | weekly | side
+  xp: number;
+  day: string; // client-local 'YYYY-MM-DD'
+  at: string; // ISO timestamp
+}
+
 // ── Inspire (captured motivational videos → distilled insights) ──────────────
 
 export type InsightKind = 'motivation' | 'tips';
@@ -470,6 +483,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ step_id: stepId, done }),
     }),
+
+  // ── Quest history ─────────────────────────────────────────────────────────
+  getHistory: (base: string, token: string) =>
+    request<ApiHistoryItem[]>(base, '/history', token),
 
   // ── Inspire ───────────────────────────────────────────────────────────────
   getInsights: (base: string, token: string) =>

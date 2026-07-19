@@ -14,6 +14,7 @@ import { accent, feedback, STAT_META, surface, text } from '@/theme';
 const ITEMS = [
   { icon: 'book-outline', label: 'Journal', sub: 'Write freely · quest reflections', route: '/journal' },
   { icon: 'trophy-outline', label: 'Achievements', sub: 'Titles & milestones', route: '/achievements' },
+  { icon: 'time-outline', label: 'Quest history', sub: 'Every quest you’ve finished', route: '/history' },
   { icon: 'compass-outline', label: 'Focus areas', sub: 'Tailor your quests · interview mode', route: '/focus' },
   { icon: 'settings-outline', label: 'Settings', sub: 'North Star · system link · your record', route: '/settings' },
 ] as const;

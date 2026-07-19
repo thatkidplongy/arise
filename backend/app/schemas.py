@@ -404,6 +404,18 @@ class AvatarOut(BaseModel):
     avatar: str  # data URI, or "" when none
 
 
+class HistoryItemOut(BaseModel):
+    """One finished quest in the You → History log."""
+    id: str
+    quest_id: str
+    title: str
+    stat: str      # STR | CRE | SPI | CHA | INT | WLT | CFT (empty if the slug is gone)
+    cadence: str   # daily | weekly | side
+    xp: int
+    day: str       # client-local 'YYYY-MM-DD'
+    at: datetime
+
+
 class ReminderOut(BaseModel):
     id: str
     text: str

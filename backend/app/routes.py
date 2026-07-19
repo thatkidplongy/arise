@@ -8,8 +8,8 @@ from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CompleteIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
-                      GroceryIn, GroceryToggleIn, InsightAddIn, InsightOut,
-                      InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
+                      GroceryIn, GroceryToggleIn, HistoryItemOut, InsightAddIn,
+                      InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult,
@@ -47,6 +47,13 @@ def get_state(
     """Everything the app needs to render, in one shot."""
     player = state.get_or_create_player(db)
     return state.build_state(db, player, _valid_day(day))
+
+
+@router.get("/history", response_model=list[HistoryItemOut])
+def quest_history(db: Session = Depends(get_db)):
+    """A dated log of finished quests, newest first — for the You → History screen."""
+    player = state.get_or_create_player(db)
+    return state.history_of(db, player)
 
 
 @router.post("/completions", response_model=ActionResult)

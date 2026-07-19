@@ -342,6 +342,36 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion], in
     }
 
 
+def history_of(db: Session, player: Player, limit: int = 200) -> list[dict]:
+    """A dated log of finished quests, newest first — every completion resolved to
+    its quest's title, area (stat) and cadence. Skips the rest-day and daily-clear
+    markers (they aren't quests). Capped so the payload stays small; the raw rows
+    live in the DB regardless. Powers the You → History screen."""
+    by_id = {d.id: d for d in quest_defs(db)}
+    out: list[dict] = []
+    for r in (
+        db.query(Completion)
+        .filter_by(player_id=player.id)
+        .order_by(Completion.at.desc())
+    ):
+        if r.quest_id in (game.REST_DAY_ID, game.DAILY_CLEAR_ID):
+            continue
+        q = by_id.get(r.quest_id)
+        out.append({
+            "id": r.id,
+            "quest_id": r.quest_id,
+            "title": q.title if q else r.quest_id,
+            "stat": q.stat if q else "",
+            "cadence": q.cadence if q else "",
+            "xp": r.xp,
+            "day": r.day,
+            "at": r.at,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def week_review_of(rows: list[Completion], defs: list[QuestDef], day: str) -> dict:
     """A gentle recap of the current ISO week: what got done, XP earned, days you
     showed up, days fully cleared, and the area you leaned into. Pure derive-on-read."""
