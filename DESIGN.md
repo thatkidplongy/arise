@@ -54,7 +54,7 @@ compared with the older approach and reverted in one line.)
 | **Gemini** (Google's AI) | Summarises a video you paste, reads a food photo into a calorie estimate, and can tailor quests to you |
 | **Supadata** | Fetches the spoken words (transcript) from a TikTok/Reel/YouTube link |
 | **Open Food Facts** | A free food database — looks up calories/protein/fibre when you log a meal |
-| **Open Library** | A free book catalogue — search or browse to set your weekly book |
+| **Open Library** | A free book catalogue — search or browse to set the book you're reading |
 
 Each helper is a nice-to-have. If one is switched off or unreachable, that feature
 quietly steps aside (or falls back to typing things by hand) and **everything else
@@ -68,7 +68,7 @@ keeps working** — the app is designed so an outside service can never take it 
 | Creative | Drawing, dance, singing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
 | Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |
-| Grow | Math, Japanese, reading, the world | **INT** | Reads a book a week (a chapter a day is the mandatory floor); the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top. The Japanese track follows a fixed beginner path by week: **hiragana → katakana → grammar → kanji** (hiragana first, as every course teaches it) |
+| Grow | Math, Japanese, reading, the world | **INT** | Reads a book at your own pace (a chapter a day is the mandatory floor) — one book runs for as many weeks as it takes, never reset by a week ending; the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top. The Japanese track follows a fixed beginner path by week: **hiragana → katakana → grammar → kanji** (hiragana first, as every course teaches it) |
 | Wealth | Making money | **WLT** | Fundamentals, side income, monetising your skills, and managing/growing money |
 | Craft | Coding → Senior | **CFT** | The engineering ladder: fluency → patterns & problem-solving → system design & architecture (bands, fundamentals-first), with a small deep-work floor daily. An **interview-mode** toggle (`Player.interview_mode`) swaps its quests to DSA drills, mock system-design, and behavioural (STAR) prep |
 
@@ -191,18 +191,22 @@ the LLM cache so personalised quests re-generate in the new mode.
 Progression begins the week you turn it on (`players.progression_start_week`), so
 past history never counts retroactively — everyone starts each attribute at Lv 0.
 
-## Reading loop (a book a week, at your pace)
+## Reading loop (one book at your pace, for as long as it takes)
 
 Reading is its own loop. The Grow floor is **read your book**, at a pace that
 climbs with your Intelligence level and scales to the book: give a chapter count
 (optional) and Arise paces you to keep up — a longer book asks more per day —
 otherwise it's a simple chapter a day, rising to a couple as you level.
-`current_book` (and `current_book_chapters`) live on `players`; each new ISO
-week, if a book has been in progress since a prior week, the app surfaces a
-**weekly review** — *"Did you finish it?"* Finished → `books_finished` ticks up
-and they name the next book; not yet → it carries over, no penalty
-(`service.review_book`), asked at most once per week (`book_review_week` guards
-it). Setting or changing the book restarts that weekly clock.
+`current_book` (and `current_book_chapters`) live on `players`. **A book is never
+reset by a week ending** — it carries on across as many weeks as it takes, with
+its progress intact (progress is counted from the reading days actually logged
+since the book began, so it only ever moves forward). Once you've put in enough
+reading days to finish at your pace (`state.reading["progress"]` reaches 1.0),
+the app surfaces a gentle **check-in** — *"Did you finish it?"* Finished →
+`books_finished` ticks up and they name the next book; not yet → it carries over,
+no penalty (`service.review_book`), and it won't ask again until next week
+(`book_review_week` guards it, so a long book you're still finishing is nudged at
+most once a week). Setting or changing the book starts a fresh pace clock.
 
 To set a book you can **search Open Library** (`books.py`, `GET /books/search`,
 free, no key — the largest open catalogue) or browse themed shelves

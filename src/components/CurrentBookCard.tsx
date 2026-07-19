@@ -59,8 +59,8 @@ export function CurrentBookCard() {
       <Text style={styles.help}>
         Your Grow daily is to read at your own pace — which quietly speeds up as your Intelligence
         level climbs. {current ? 'To change it, search' : 'Search'} a title (or browse a shelf), or
-        type your own; the chapter count paces you and can be left blank. Each week it asks if you
-        finished.
+        type your own; the chapter count paces you and can be left blank. A book carries on for as
+        long as it takes — it only checks in once you’ve read enough to finish.
       </Text>
       <BookPicker
         onPick={(title, chapters) => {

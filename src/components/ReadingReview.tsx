@@ -5,8 +5,9 @@ import { useSystem } from '@/store/useSystem';
 import { accent, surface, text, withAlpha } from '@/theme';
 
 /**
- * The weekly reading check-in. Shows only when the server flags a review as due
- * (a fresh week has begun with a book in progress): "Did you finish it?" →
+ * The reading check-in. A book is never reset by a week ending — it carries on
+ * with its progress intact. This shows only when the server flags a review as due
+ * (you've put in the reading days to finish at your pace): "Did you finish it?" →
  * yes rolls to the next book, not yet carries it over — no penalty either way.
  */
 export function ReadingReview() {
@@ -27,8 +28,8 @@ export function ReadingReview() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>📖 Weekly reading review</Text>
-      <Text style={styles.body}>Did you finish “{review.book}” this week?</Text>
+      <Text style={styles.title}>📖 Reading check-in</Text>
+      <Text style={styles.body}>Looks like you’ve read enough to finish “{review.book}”. Did you?</Text>
 
       {!finishing ? (
         <View style={styles.row}>

@@ -141,6 +141,11 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Hold steady notes — even tone, steady breath",
             "Try one clean interval jump (e.g. do → sol)",
         ]),
+        ("Memorise a Song", "Learn a song by heart", [
+            "Pick a song you love — a rap verse counts, and the wordier the better",
+            "Break it into lines; learn one small chunk at a time, looping the track",
+            "Perform it from memory with no lyrics on screen — stumbles are fine",
+        ]),
     ],
     "d-meditate": [  # SPI — calm / focus / reflection / breath
         ("Inner Gate", "10 min meditation", [
@@ -365,7 +370,7 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     "w-tome": [  # INT — a weekly learning milestone (reading is owned by the daily
-        # floor + the weekly book review, so this slot is the *other* learning)
+        # floor + the reading check-in, so this slot is the *other* learning)
         ("Ship Something", "Small coding project", [
             "Pick one tiny scope (e.g. a CLI, a to-do page, a script)",
             "Build it end to end so it actually runs",
@@ -910,6 +915,7 @@ RESOURCES: dict[str, str] = {
     "Pitch & Control": "🌐 Singing Carrots — pitch & ear training",
     "Perform a Song": "🎥 New York Vocal Coaching (YouTube)",
     "Sing Outside Your Lane": "🎥 New York Vocal Coaching (YouTube)",
+    "Memorise a Song": "🌐 Genius — lyrics & annotations (genius.com)",
     # SPI — meditation
     "Inner Gate": "📖 Mindfulness in Plain English — Bhante Gunaratana",
     "Body Scan": "🎧 Waking Up — Sam Harris",

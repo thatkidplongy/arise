@@ -45,11 +45,24 @@ def test_reading_review_flow(client):
     assert body["player"]["current_book"] == "Atomic Habits"
     assert body["book_review"]["pending"] is False
     assert _quest(body, "d-read")["steps"][0] == "Read a chapter of Atomic Habits"
-    # A fresh week later, the review is due.
+    # A week ending never resets the book: with no reading done, no review — the
+    # book simply carries on into the next week with its progress intact.
     nxt = "2026-07-27"  # a Monday in the following ISO week
-    assert client.get(f"/state?day={nxt}").json()["book_review"]["pending"] is True
+    later = client.get(f"/state?day={nxt}").json()
+    assert later["book_review"]["pending"] is False
+    assert later["player"]["current_book"] == "Atomic Habits"
+    # The check-in appears only once you've put in the reading days to finish at
+    # your pace (14 days at reading level 0). Log the reading daily 14 days running.
+    days = [f"2026-07-{d:02d}" for d in range(18, 32)]  # 18–31 Jul = 14 distinct days
+    assert len(days) == 14
+    for d in days:
+        client.post("/completions", json={"quest_id": "d-read", "day": d})
+    last = days[-1]
+    st = client.get(f"/state?day={last}").json()
+    assert st["reading"]["progress"] >= 1.0
+    assert st["book_review"]["pending"] is True
     # Finish it → counts, rolls to the next book, and stops asking this week.
-    r = client.post(f"/book/review?day={nxt}", json={"finished": True, "next_book": "Deep Work"})
+    r = client.post(f"/book/review?day={last}", json={"finished": True, "next_book": "Deep Work"})
     body = r.json()
     assert body["player"]["books_finished"] == 1
     assert body["player"]["current_book"] == "Deep Work"

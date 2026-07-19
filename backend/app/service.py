@@ -264,9 +264,11 @@ def update_player(
 
 
 def set_book(db: Session, player: Player, current_book: str, day: str, chapters: int = 0) -> None:
-    """Set (or change) the book being read. Starts the weekly clock so the review
-    only asks once a fresh week has begun. `chapters` (optional) sets the reading
-    pace — a longer book asks more per day to keep pace; 0 leaves it unknown."""
+    """Set (or change) the book being read. The book then carries on for as many
+    weeks as it takes — a week ending never resets it. `chapters` (optional) sets
+    the reading pace — a longer book asks more per day to keep pace; 0 leaves it
+    unknown. `book_review_week` is cleared so the finish check-in can fire once the
+    reading pace to finish is reached."""
     player.current_book = (current_book or "").strip()
     player.current_book_chapters = max(0, chapters) if player.current_book else 0
     player.book_started_week = game.week_key(day) if player.current_book else ""
@@ -284,8 +286,9 @@ def set_interview_mode(db: Session, player: Player, enabled: bool) -> None:
 
 
 def review_book(db: Session, player: Player, finished: bool, next_book: str, day: str) -> None:
-    """Answer the weekly reading review. Finished → count it and roll to the next
-    book; not yet → keep the current one. Either way, don't ask again this week."""
+    """Answer the reading check-in. Finished → count it and roll to the next book;
+    not yet → keep the current one and carry its progress on. Either way, don't ask
+    again this week (it re-appears next week only if still past the finish pace)."""
     week = game.week_key(day)
     if finished:
         if player.current_book:

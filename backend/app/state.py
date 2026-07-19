@@ -393,13 +393,17 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(r.quest_id == game.REST_DAY_ID and r.day == day for r in rows)
 
-    # Reading review: once a new week has begun since the book was started, ask
-    # (once that week) whether it's finished and what's next.
+    # Reading review: a book is never reset by a week ending — it carries on, with
+    # its progress intact, for as many weeks as it takes. The gentle "did you
+    # finish?" check-in appears only once you've put in the reading days to finish
+    # at your current pace (progress complete), and then at most once a week so it
+    # never nags.
     week = game.week_key(day)
+    reading = reading_of(db, player, day, rows, prog_levels.get("INT", 0))
     review_pending = bool(
         player.current_book
-        and player.book_started_week
-        and week > player.book_started_week
+        and reading
+        and reading["progress"] >= 1.0
         and player.book_review_week != week
     )
 
@@ -462,7 +466,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "has_avatar": bool(player.avatar),
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
-        "reading": reading_of(db, player, day, rows, prog_levels.get("INT", 0)),
+        "reading": reading,
         "week_review": week_review_of(rows, defs, day),
         "stats": [
             {"key": k, **game.stat_level_info(agg["by_stat"][k])} for k in game.STAT_KEYS

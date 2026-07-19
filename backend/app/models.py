@@ -23,13 +23,15 @@ class Player(Base):
     equipped_title: Mapped[str | None] = mapped_column(String, nullable=True)
     # The life / person the hunter is reaching for — their reason, kept in view.
     north_star: Mapped[str] = mapped_column(String, default="")
-    # Reading loop: one book a week, a chapter a day. current_book is what they're
-    # reading now; at each new week the app asks if it's finished and what's next.
+    # Reading loop: a chapter a day at a pace that climbs with level. A book runs
+    # for as many weeks as it takes — a week ending never resets it. current_book is
+    # what they're reading now; once they've read enough days to finish at their
+    # pace, the app checks in ("did you finish?") and, if so, rolls to the next.
     current_book: Mapped[str] = mapped_column(String, default="")
     current_book_chapters: Mapped[int] = mapped_column(Integer, default=0)  # 0 = unknown
     books_finished: Mapped[int] = mapped_column(Integer, default=0)
-    book_started_week: Mapped[str] = mapped_column(String, default="")  # ISO week set
-    book_review_week: Mapped[str] = mapped_column(String, default="")  # ISO week last asked
+    book_started_week: Mapped[str] = mapped_column(String, default="")  # ISO week set (paces progress)
+    book_review_week: Mapped[str] = mapped_column(String, default="")  # ISO week the check-in last fired
     # Progression begins the week this is first set (see progression.py), so past
     # history never counts retroactively — everyone starts each attribute at Lv 0.
     progression_start_week: Mapped[str] = mapped_column(String, default="")
