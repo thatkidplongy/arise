@@ -109,6 +109,25 @@ def test_skincare_search_failure_is_a_clean_502(client, monkeypatch):
     assert client.get("/skincare/search?q=cerave").status_code == 502
 
 
+def test_skincare_completion_feeds_spirit_and_streak(client):
+    b = client.get(f"/body?day={DAY}").json()
+    assert b["skincare_streak"] == 0 and b["skincare_days"] == 0
+    assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 0
+
+    # Tick every morning step → the AM block is complete for the day.
+    for step in b["skincare_am"]:
+        client.post(f"/skincare/check?day={DAY}", json={"step_id": step["id"], "done": True})
+
+    b = client.get(f"/body?day={DAY}").json()
+    assert b["skincare_streak"] == 1 and b["skincare_days"] == 1
+    # It now feeds Spirit (and overall XP) — self-care counts.
+    assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 5  # SKINCARE_BLOCK_XP
+
+    # Un-ticking one step breaks the block → back to zero.
+    client.post(f"/skincare/check?day={DAY}", json={"step_id": b["skincare_am"][0]["id"], "done": False})
+    assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 0
+
+
 def test_skincare_check_and_edit(client):
     b = client.get(f"/body?day={DAY}").json()
     step = b["skincare_am"][0]

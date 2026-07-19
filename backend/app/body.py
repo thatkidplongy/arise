@@ -8,10 +8,14 @@ tracker never has a 'failed' state; skincare is a plain daily checklist.
 
 from sqlalchemy.orm import Session
 
-from . import nutrition, skincare
+from . import game, nutrition, skincare
 from .models import BodyProfile, FoodEntry, SkincareCheck, SkincareStep, new_id
 
 _SEX = {"male", "female", "unspecified"}
+
+# Doing your routine is self-care → it feeds Spirit (SPI) and builds a gentle
+# consistency streak. XP per fully-completed routine block (AM or PM) on a day.
+SKINCARE_BLOCK_XP = 5
 
 
 # ── Reads ─────────────────────────────────────────────────────────────────────
@@ -79,11 +83,41 @@ def _skincare(db: Session, player_id: str, day: str) -> tuple[list[dict], list[d
     return am, pm
 
 
+def _skincare_done_blocks(db: Session, player_id: str) -> dict[str, set[str]]:
+    """{day: routine blocks ('AM'/'PM') fully completed that day}, judged against
+    the currently-active steps. A block counts only when it has steps and every
+    one of them is ticked for that day."""
+    block_ids: dict[str, set[str]] = {"AM": set(), "PM": set()}
+    for s in db.query(SkincareStep).filter_by(player_id=player_id, active=True):
+        block_ids["AM" if s.routine == "AM" else "PM"].add(s.id)
+    checks_by_day: dict[str, set[str]] = {}
+    for c in db.query(SkincareCheck).filter_by(player_id=player_id):
+        checks_by_day.setdefault(c.day, set()).add(c.step_id)
+    out: dict[str, set[str]] = {}
+    for day, ticked in checks_by_day.items():
+        done = {b for b, ids in block_ids.items() if ids and ids <= ticked}
+        if done:
+            out[day] = done
+    return out
+
+
+def skincare_stats(db: Session, player_id: str, day: str) -> dict:
+    """Self-care as Spirit: XP from every completed routine block (all history),
+    and a gentle consistency streak of days a block was done. Derive-on-read."""
+    blocks = _skincare_done_blocks(db, player_id)
+    return {
+        "xp": sum(len(b) for b in blocks.values()) * SKINCARE_BLOCK_XP,
+        "streak": game.current_streak(set(blocks.keys()), day),
+        "days": len(blocks),
+    }
+
+
 def build_body(db: Session, player_id: str, day: str) -> dict:
     """The whole Body payload for a day (see schemas.BodyOut)."""
     seed_skincare_if_empty(db, player_id)
     p = _profile_row(db, player_id)
     am, pm = _skincare(db, player_id, day)
+    sc = skincare_stats(db, player_id, day)
     return {
         "day": day,
         "profile": (
@@ -101,6 +135,8 @@ def build_body(db: Session, player_id: str, day: str) -> dict:
         "skincare_products": skincare.product_suggestions(p.country if p else ""),
         "skincare_resources": skincare.RESOURCES,
         "skincare_note": skincare.NOTE,
+        "skincare_streak": sc["streak"],
+        "skincare_days": sc["days"],
     }
 
 

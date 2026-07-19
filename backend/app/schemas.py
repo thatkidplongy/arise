@@ -211,6 +211,8 @@ class BodyOut(BaseModel):
     skincare_products: list[SkincareProductPickOut]  # what to buy, localised
     skincare_resources: list[str]
     skincare_note: str
+    skincare_streak: int  # consecutive days a routine block was completed
+    skincare_days: int    # total days you've done your routine
 
 
 class PreferencesIn(BaseModel):

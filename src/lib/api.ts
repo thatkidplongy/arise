@@ -223,6 +223,8 @@ export interface ApiBody {
   skincare_products: ApiSkincarePick[];
   skincare_resources: string[];
   skincare_note: string;
+  skincare_streak: number; // consecutive days a routine block was completed
+  skincare_days: number; // total days you've done your routine
 }
 
 // ── Books (Open Library) ─────────────────────────────────────────────────────

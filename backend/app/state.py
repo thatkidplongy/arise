@@ -12,7 +12,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from . import game, insights, llm, progression, quests, transcript
+from . import body, game, insights, llm, progression, quests, transcript
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -358,6 +358,12 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     prog_levels = {stat: info["level"] for stat, info in prog.items()}
     gen_by = generated_by(db, player)
     agg = aggregate(rows, defs)
+
+    # Self-care counts: skincare routine completions feed Spirit (and overall XP).
+    sc_xp = body.skincare_stats(db, player.id, day)["xp"]
+    if sc_xp:
+        agg["by_stat"]["SPI"] += sc_xp
+        agg["total_xp"] += sc_xp
 
     li = game.level_info(agg["total_xp"])
     best = game.max_streak(agg["active_days"])

@@ -230,6 +230,19 @@ export function SkincarePanel() {
 
   return (
     <SystemPanel title="Skincare" sub="pigmentation & pores">
+      {body.skincare_streak > 0 || body.skincare_days > 0 ? (
+        <View style={styles.streakRow}>
+          <Ionicons name="flame" size={14} color={feedback.gold} />
+          <Text style={styles.streakText}>
+            {body.skincare_streak > 0
+              ? `${body.skincare_streak}-day streak`
+              : `${body.skincare_days} ${body.skincare_days === 1 ? 'day' : 'days'} done`}
+            <Text style={styles.streakSub}> · a done routine builds Spirit</Text>
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.streakHint}>Finish a morning or evening routine and it builds Spirit — small and consistent.</Text>
+      )}
       <Text style={styles.note}>{body.skincare_note}</Text>
       <Routine title="Morning" icon="sunny-outline" routine="AM" steps={body.skincare_am} />
       <Routine title="Evening" icon="moon-outline" routine="PM" steps={body.skincare_pm} />
@@ -250,6 +263,10 @@ export function SkincarePanel() {
 }
 
 const styles = StyleSheet.create({
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  streakText: { color: text.primary, fontSize: 13, fontWeight: '700' },
+  streakSub: { color: text.faint, fontSize: 12, fontWeight: '400' },
+  streakHint: { color: text.faint, fontSize: 12, lineHeight: 17, marginBottom: 10 },
   note: {
     color: text.secondary,
     fontSize: 12,
