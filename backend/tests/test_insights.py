@@ -26,15 +26,17 @@ def test_parse_distillation_trims_and_drops_blanks():
     assert out["summary"] == "A warm one-liner."
     assert out["takeaways"] == ["Lower the floor, not the ceiling.", "Reset fast."]
     assert out["quotes"] == ["Consistency survives when your minimum is realistic."]
+    assert out["steps"] == []  # optional; empty when the payload has none (motivation)
 
 
 def test_parse_distillation_caps_counts():
     out = llm._parse_distillation(_payload({
         "summary": "x",
-        "takeaways": ["a", "b", "c", "d", "e", "f"],
+        "takeaways": ["a", "b", "c", "d", "e", "f", "g"],
+        "steps": ["s1", "s2", "s3", "s4", "s5", "s6", "s7"],
         "quotes": ["q1", "q2", "q3", "q4"],
     }))
-    assert len(out["takeaways"]) == 4 and len(out["quotes"]) == 3
+    assert len(out["takeaways"]) == 6 and len(out["steps"]) == 6 and len(out["quotes"]) == 3
 
 
 # ── add / list / remove (db-level, network stubbed) ───────────────────────────

@@ -388,6 +388,7 @@ class InsightOut(BaseModel):
     title: str
     summary: str
     takeaways: list[str]
+    steps: list[str] = []  # optional actions (tips only; empty for motivation)
     quotes: list[str]
     created_at: datetime
 

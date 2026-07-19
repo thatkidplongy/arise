@@ -41,7 +41,7 @@ function duplicateOf(
 // Free-text filter across a capture's words (no creator/source attribution).
 function matches(i: ApiInsight, q: string): boolean {
   if (!q) return true;
-  return [i.summary, ...i.takeaways, ...i.quotes].join(' ').toLowerCase().includes(q);
+  return [i.summary, ...i.takeaways, ...i.steps, ...i.quotes].join(' ').toLowerCase().includes(q);
 }
 
 function PendingCard({
@@ -219,10 +219,28 @@ function TipsCard({
 
       {expanded ? (
         <>
+          {insight.takeaways.length === 0 && insight.steps.length === 0 ? (
+            <Text style={styles.empty}>Nothing came out of this one.</Text>
+          ) : null}
+
+          {/* The kept knowledge — the important part, just to read. */}
           {insight.takeaways.length > 0 ? (
-            <View style={styles.tips}>
+            <View style={styles.takeaways}>
               <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
-              {insight.takeaways.map((step, i) => (
+              {insight.takeaways.map((t, i) => (
+                <View key={i} style={styles.bulletRow}>
+                  <Text style={styles.bulletDot}>•</Text>
+                  <Text style={styles.bulletText}>{t}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Optional concrete actions — each can drop into your to-do list. */}
+          {insight.steps.length > 0 ? (
+            <View style={styles.tips}>
+              <Text style={styles.sectionLabel}>STEPS TO TRY</Text>
+              {insight.steps.map((step, i) => (
                 <View key={i} style={styles.tipRow}>
                   <Text style={styles.tipText}>{step}</Text>
                   <Pressable
@@ -242,9 +260,7 @@ function TipsCard({
                 </View>
               ))}
             </View>
-          ) : (
-            <Text style={styles.empty}>No takeaways came out of this one.</Text>
-          )}
+          ) : null}
 
           <View style={styles.actions}>
             {insight.source_url ? (

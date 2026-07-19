@@ -277,6 +277,7 @@ export interface ApiInsight {
   title: string; // @handle / short label
   summary: string;
   takeaways: string[];
+  steps: string[]; // optional actions (tips only; empty for motivation)
   quotes: string[];
   created_at: string;
 }

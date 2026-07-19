@@ -241,6 +241,7 @@ _DISTIL_SCHEMA = {
     "properties": {
         "summary": {"type": "string"},
         "takeaways": {"type": "array", "items": {"type": "string"}},
+        "steps": {"type": "array", "items": {"type": "string"}},  # optional (tips only)
         "quotes": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["summary", "takeaways", "quotes"],
@@ -268,30 +269,37 @@ def _clip(s, n: int) -> str:
 
 
 def _parse_distillation(payload: dict) -> dict:
-    """Pure: Gemini response JSON → {summary, takeaways[], quotes[]}. Testable offline."""
+    """Pure: Gemini response JSON → {summary, takeaways[], steps[], quotes[]}. `steps`
+    is optional (tips captures only; empty for motivation). Testable offline."""
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(text)
     takeaways = [_clip(x, 200) for x in (data.get("takeaways") or []) if str(x).strip()]
+    steps = [_clip(x, 200) for x in (data.get("steps") or []) if str(x).strip()]
     quotes = [_clip(x, 160) for x in (data.get("quotes") or []) if str(x).strip()]
     return {
-        "summary": _clip(data.get("summary", ""), 200),
-        "takeaways": takeaways[:4],
+        "summary": _clip(data.get("summary", ""), 220),
+        "takeaways": takeaways[:6],
+        "steps": steps[:6],
         "quotes": quotes[:3],
     }
 
 
 _TIPS_PROMPT = (
-    "You distil a how-to / advice video's transcript into a practical playbook a "
-    "person can act on, for a personal wellness app with a warm, encouraging voice. "
-    "This video is USEFUL INFORMATION, not motivation — capture the substance, not the "
-    "vibe. From the transcript, return:\n"
+    "You distil a how-to / advice video's transcript into keepable knowledge, for a "
+    "personal wellness app with a warm, encouraging voice. This video is USEFUL "
+    "INFORMATION, not motivation — capture the substance, not the vibe. From the "
+    "transcript, return:\n"
     "• summary: 1–2 plain sentences capturing what this teaches and why it's worth "
     "keeping — enough to recall the gist later without rewatching.\n"
-    "• takeaways: 2–6 concrete, actionable steps or tips — each a short line the person "
-    "could actually do, specific and in a sensible order, no hype or filler.\n"
+    "• takeaways: 2–6 key points worth remembering — the facts, principles or insights "
+    "the video teaches. This is the important part: informational, not chores. Each a "
+    "short clear line, no hype or filler.\n"
+    "• steps: OPTIONAL — only if the video prescribes concrete actions to take. 0–6 "
+    "short things the person could actually do, in a sensible order. If it's purely "
+    "informational with nothing to act on, return an empty array. Never pad it.\n"
     "• quotes: return an empty array (this is a tips capture, not a motivational one).\n"
     "If the transcript is empty or has no real substance, return empty arrays.\n"
-    "Return JSON only: {summary, takeaways[], quotes[]}."
+    "Return JSON only: {summary, takeaways[], steps[], quotes[]}."
 )
 
 

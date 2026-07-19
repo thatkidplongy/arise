@@ -70,6 +70,7 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("insights", "kind", "VARCHAR DEFAULT 'motivation'"),
     ("quest_notes", "prompt", "VARCHAR DEFAULT ''"),
     ("quest_notes", "step_index", "INTEGER"),
+    ("insights", "steps", "VARCHAR DEFAULT '[]'"),
 ]
 
 

@@ -48,6 +48,7 @@ def to_out(row: Insight) -> dict:
         "title": row.title,
         "summary": row.summary,
         "takeaways": _loads(row.takeaways),
+        "steps": _loads(row.steps),
         "quotes": _loads(row.quotes),
         "created_at": row.created_at,
     }
@@ -95,6 +96,7 @@ def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation")
         title=_title_for(url, fetched.get("source", "web")),
         summary=distilled["summary"],
         takeaways=json.dumps(distilled["takeaways"]),
+        steps=json.dumps(distilled.get("steps", [])),
         quotes=json.dumps(distilled["quotes"]),
     )
     db.add(row)

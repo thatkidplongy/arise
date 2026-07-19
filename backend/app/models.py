@@ -202,7 +202,8 @@ class Insight(Base):
     kind: Mapped[str] = mapped_column(String, default="motivation")
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     summary: Mapped[str] = mapped_column(String, default="")
-    takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
+    takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list: the kept lessons
+    steps: Mapped[str] = mapped_column(String, default="[]")  # JSON list: optional actions (tips)
     quotes: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
