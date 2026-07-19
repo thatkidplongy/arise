@@ -84,7 +84,7 @@ export interface ApiState {
   quests: ApiQuest[];
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
-  reminders: { id: string; text: string }[]; // a plain personal list on Status
+  reminders: { id: string; text: string; done: boolean }[]; // a checkable to-do list on Status
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
@@ -500,6 +500,12 @@ export const api = {
     request<ApiState>(base, `/reminders?day=${day}`, token, {
       method: 'POST',
       body: JSON.stringify({ text }),
+    }),
+
+  toggleReminder: (base: string, token: string, id: string, done: boolean, day: string) =>
+    request<ApiState>(base, `/reminders/${id}/toggle?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ done }),
     }),
 
   removeReminder: (base: string, token: string, id: string, day: string) =>

@@ -9,8 +9,8 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CompleteIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       InsightAddIn, InsightOut, InterviewModeIn, PlayerIn,
-                      PreferencesIn, ReminderIn, SkincareCheckIn, SkincareProductOut,
-                      SkincareStepIn, StateOut, StepResult, StepToggleIn)
+                      PreferencesIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
+                      SkincareProductOut, SkincareStepIn, StateOut, StepResult, StepToggleIn)
 
 router = APIRouter()
 
@@ -338,6 +338,15 @@ def add_reminder(body_in: ReminderIn, day: str | None = Query(None), db: Session
     """Jot a plain reminder. It shows as a simple list on Status."""
     player = state.get_or_create_player(db)
     service.add_reminder(db, player, body_in.text)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/reminders/{reminder_id}/toggle", response_model=StateOut)
+def toggle_reminder(reminder_id: str, body_in: ReminderToggleIn,
+                    day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Check a to-do off (or back on). Done items stay in the list."""
+    player = state.get_or_create_player(db)
+    service.toggle_reminder(db, player, reminder_id, body_in.done)
     return state.build_state(db, player, _valid_day(day))
 
 

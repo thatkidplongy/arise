@@ -64,6 +64,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("body_profiles", "goal_weight_kg", "FLOAT DEFAULT 0"),
     ("players", "avatar", "VARCHAR DEFAULT ''"),
     ("body_profiles", "country", "VARCHAR DEFAULT ''"),
+    ("reminders", "done", "BOOLEAN DEFAULT 0"),
+    ("reminders", "done_at", "DATETIME"),
+    ("players", "japanese_started_week", "VARCHAR DEFAULT ''"),
 ]
 
 

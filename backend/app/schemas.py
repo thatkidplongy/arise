@@ -50,6 +50,10 @@ class ReminderIn(BaseModel):
     text: str = Field(min_length=1, max_length=200)
 
 
+class ReminderToggleIn(BaseModel):
+    done: bool
+
+
 # ── Body (standalone wellness tools) ──────────────────────────────────────────
 
 
@@ -361,6 +365,7 @@ class AvatarOut(BaseModel):
 class ReminderOut(BaseModel):
     id: str
     text: str
+    done: bool
 
 
 class StateOut(BaseModel):

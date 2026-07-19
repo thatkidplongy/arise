@@ -323,6 +323,8 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
     prog = progression_of(db, player, day)
     slots = []
     for q in defs:
+        if q.id == "d-jp":
+            continue  # Japanese follows a fixed phased plan, not the LLM
         pk = quests.period_key(q.cadence, day)
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue
@@ -416,6 +418,15 @@ def remove_reminder(db: Session, player: Player, reminder_id: str) -> None:
     row = db.get(Reminder, reminder_id)
     if row is not None and row.player_id == player.id:
         db.delete(row)
+        db.commit()
+
+
+def toggle_reminder(db: Session, player: Player, reminder_id: str, done: bool) -> None:
+    """Check a to-do off (or back on). Done items stay in the list as a record."""
+    row = db.get(Reminder, reminder_id)
+    if row is not None and row.player_id == player.id:
+        row.done = done
+        row.done_at = utcnow() if done else None
         db.commit()
 
 

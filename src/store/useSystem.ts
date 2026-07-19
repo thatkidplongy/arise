@@ -104,6 +104,7 @@ interface SystemStore {
     levels?: Partial<Record<StatKey, string>>,
   ) => Promise<void>;
   addReminder: (text: string) => Promise<void>;
+  toggleReminder: (id: string, done: boolean) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
@@ -279,6 +280,17 @@ export const useSystem = create<SystemStore>()(
         const { serverUrl, apiToken, notices } = get();
         try {
           const state = await api.addReminder(serverUrl, apiToken, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      toggleReminder: async (id, done) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.toggleReminder(serverUrl, apiToken, id, done, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);

@@ -33,6 +33,9 @@ class Player(Base):
     # Progression begins the week this is first set (see progression.py), so past
     # history never counts retroactively — everyone starts each attribute at Lv 0.
     progression_start_week: Mapped[str] = mapped_column(String, default="")
+    # The ISO week Japanese study began — anchors the phased learning plan
+    # (kana → grammar → kanji). Set the first time we see the player.
+    japanese_started_week: Mapped[str] = mapped_column(String, default="")
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -201,12 +204,15 @@ class Insight(Base):
 
 
 class Reminder(Base):
-    """A plain personal reminder — a simple list the hunter jots and reads on
-    Status. No scheduling, no notifications; it just informs."""
+    """A personal to-do the hunter jots on Status — check it off when done. Done
+    items stay (with when they were finished), so the list is also a record. No
+    scheduling, no notifications; it just informs."""
 
     __tablename__ = "reminders"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     text: Mapped[str] = mapped_column(String)
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

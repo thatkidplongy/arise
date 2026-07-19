@@ -148,6 +148,21 @@ def test_side_quest_focus_overrides_and_rotates():
     assert quests.content_for(q, "2026-07-13", focus)[1] == quests.content_for(q, "2026-07-17", focus)[1]
 
 
+def test_japanese_plan_advances_by_week():
+    kana = {t for (t, *_r) in quests._JP_KANA}
+    grammar = {t for (t, *_r) in quests._JP_GRAMMAR}
+    kanji = {t for (t, *_r) in quests._JP_KANJI}
+    # Weeks 1–2 → kana, week 3 → grammar, week 4+ → kanji & context.
+    assert quests.japanese_content(1, "2026-07-06")[0] in kana
+    assert quests.japanese_content(2, "2026-07-06")[0] in kana
+    assert quests.japanese_content(3, "2026-07-06")[0] in grammar
+    assert quests.japanese_content(9, "2026-07-06")[0] in kanji
+    # content_for routes the d-jp daily through the plan and carries a resource.
+    q = _q("d-jp", "INT", "daily")
+    title, _desc, steps, res = quests.content_for(q, "2026-07-06", jp_week=1)
+    assert title in kana and steps and res
+
+
 def test_no_focus_uses_pool():
     q = _q("s-drill", "STR", "side")
     title, desc, _, _ = quests.content_for(q, "2026-07-18", None)

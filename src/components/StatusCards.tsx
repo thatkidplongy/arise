@@ -42,8 +42,10 @@ export function DailyQuote({ initialText }: { initialText: string }) {
 }
 
 /** A plain personal reminders list — jot a line, tap × to remove. */
-export function Reminders({ items }: { items: { id: string; text: string }[] }) {
+/** A checkable to-do list — tick items off (they stay, as a record) or × to delete. */
+export function Reminders({ items }: { items: { id: string; text: string; done: boolean }[] }) {
   const addReminder = useSystem((s) => s.addReminder);
+  const toggleReminder = useSystem((s) => s.toggleReminder);
   const removeReminder = useSystem((s) => s.removeReminder);
   const [draft, setDraft] = useState('');
 
@@ -54,11 +56,24 @@ export function Reminders({ items }: { items: { id: string; text: string }[] }) 
     void addReminder(t);
   };
 
+  const open = items.filter((r) => !r.done).length;
+
   return (
-    <SystemPanel title="Reminders" sub={items.length ? String(items.length) : undefined}>
+    <SystemPanel title="To-do" sub={items.length ? `${open} left` : undefined}>
       {items.map((r) => (
         <View key={r.id} style={styles.reminderRow}>
-          <Text style={styles.reminderText}>{r.text}</Text>
+          <Pressable
+            onPress={() => toggleReminder(r.id, !r.done)}
+            hitSlop={6}
+            style={styles.reminderCheck}
+          >
+            <Ionicons
+              name={r.done ? 'checkmark-circle' : 'ellipse-outline'}
+              size={20}
+              color={r.done ? feedback.success : text.faint}
+            />
+            <Text style={[styles.reminderText, r.done && styles.reminderTextDone]}>{r.text}</Text>
+          </Pressable>
           <Pressable onPress={() => removeReminder(r.id)} hitSlop={8}>
             <Text style={styles.reminderX}>×</Text>
           </Pressable>
@@ -72,7 +87,7 @@ export function Reminders({ items }: { items: { id: string; text: string }[] }) 
           blurOnSubmit={false}
           returnKeyType="done"
           style={styles.reminderInput}
-          placeholder="Add a reminder…"
+          placeholder="Add a to-do…"
           placeholderTextColor={text.faint}
           maxLength={200}
         />
@@ -128,7 +143,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
   },
+  reminderCheck: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   reminderText: { color: text.primary, fontSize: 13, lineHeight: 18, flex: 1 },
+  reminderTextDone: { color: text.faint, textDecorationLine: 'line-through' },
   reminderX: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   reminderAdd: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   reminderInput: {

@@ -39,6 +39,10 @@ def get_or_create_player(db: Session) -> Player:
         # (Single-user, server-local: date.today() is the hunter's own date.)
         player.progression_start_week = game.week_key(date.today().isoformat())
         db.commit()
+    if not player.japanese_started_week:
+        # Start the Japanese plan (kana → grammar → kanji) from this week.
+        player.japanese_started_week = game.week_key(date.today().isoformat())
+        db.commit()
     return player
 
 
@@ -160,6 +164,16 @@ def generated_by(db: Session, player: Player) -> dict[tuple[str, str], dict]:
     return out
 
 
+def _jp_week(player: Player, day: str) -> int:
+    """Which week of the Japanese plan the player is in (1-indexed; week 1 = the
+    anchor week). 0 when the anchor isn't set yet."""
+    anchor = player.japanese_started_week
+    if not anchor:
+        return 0
+    elapsed = (date.fromisoformat(day) - progression.week_start(anchor)).days
+    return max(1, elapsed // 7 + 1)
+
+
 def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
     """The full step list a quest shows today — generated content if present,
     else the pool — always with the mandatory (leveled) floor prepended. Shared by
@@ -176,7 +190,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
     prefs = preferences_of(db, player)
     _, _, steps, _ = quests.content_for(
         quest, day, prefs.get(quest.stat), player.current_book, level, chapters,
-        interview=player.interview_mode,
+        interview=player.interview_mode, jp_week=_jp_week(player, day),
     )
     return steps
 
@@ -265,7 +279,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, chapters=0, interview=False) -> dict:
+               levels=None, chapters=0, interview=False, jp_week=0) -> dict:
     level = (levels or {}).get(q.stat, 0)
     pk = quests.period_key(q.cadence, day)
     gen = (gen_by or {}).get((q.id, pk))
@@ -275,7 +289,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         resource = gen["resource"]
     else:
         title, desc, steps, resource = quests.content_for(
-            q, day, prefs.get(q.stat), book, level, chapters, interview=interview
+            q, day, prefs.get(q.stat), book, level, chapters, interview=interview, jp_week=jp_week
         )
     checked = checks_by.get((q.id, pk), set())
     return {
@@ -437,7 +451,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "daily_quote": insights.daily_quote(db, player.id, day),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
-                       prog_levels, player.current_book_chapters, player.interview_mode)
+                       prog_levels, player.current_book_chapters, player.interview_mode,
+                       _jp_week(player, day))
             for q in defs
         ],
         "achievements": [
@@ -455,7 +470,12 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "total_completions": agg["total_completions"],
         },
         "reminders": [
-            {"id": r.id, "text": r.text}
-            for r in db.query(Reminder).filter_by(player_id=player.id).order_by(Reminder.created_at)
+            {"id": r.id, "text": r.text, "done": r.done}
+            # Open to-dos first (by when added), then done ones — the list is a
+            # record of what's left and what's finished.
+            for r in sorted(
+                db.query(Reminder).filter_by(player_id=player.id),
+                key=lambda r: (r.done, r.created_at),
+            )
         ],
     }

@@ -1,7 +1,7 @@
 """Integration tests: the HTTP API end to end, against a throwaway database."""
 
 DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-wealth", "d-craft"]
+DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
 
 
 def _state(client):
@@ -18,7 +18,7 @@ def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
         assert key in s
-    assert len(s["quests"]) == 21
+    assert len(s["quests"]) == 22
     assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"}
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
@@ -169,7 +169,7 @@ def test_daily_clear_bonus(client):
     for qid in DAILY_IDS:
         events = client.post("/completions", json={"quest_id": qid, "day": DAY}).json()["events"]
     assert any(e["type"] == "daily_clear" for e in events)
-    # 7 dailies × 10 + 15 bonus
+    # every daily × 10 + 15 clear bonus
     assert _state(client)["player"]["total_xp"] == len(DAILY_IDS) * 10 + 15
     assert _state(client)["today"]["cleared"] is True
 
