@@ -60,6 +60,7 @@ export default function QuestsScreen() {
             title={block.label}
             sub={isNow ? 'Now' : allDone ? 'Done 🌱' : ''}
             style={isNow ? styles.nowBlock : undefined}
+            collapsible
           >
             <View style={styles.list}>
               {items.map((q) => (
@@ -70,7 +71,7 @@ export default function QuestsScreen() {
         );
       })}
 
-      <SystemPanel title="Weekly quests" sub="New set each Monday">
+      <SystemPanel title="Weekly quests" sub="New set each Monday" collapsible>
         <View style={styles.list}>
           {weekly.map((q) => (
             <QuestCard key={q.id} quest={q} />
@@ -78,7 +79,7 @@ export default function QuestsScreen() {
         </View>
       </SystemPanel>
 
-      <SystemPanel title="Side quests" sub="Optional · whenever you feel like it">
+      <SystemPanel title="Side quests" sub="Optional · whenever you feel like it" collapsible>
         <View style={styles.list}>
           {side.map((q) => (
             <QuestCard key={q.id} quest={q} />
