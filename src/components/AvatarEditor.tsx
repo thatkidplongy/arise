@@ -7,7 +7,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { toBoundedDataUri } from '@/lib/image';
 import { useAvatar } from '@/store/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text, withAlpha } from '@/theme';
+import { accent, onAccent, surface, text, withAlpha } from '@/theme';
 
 /** The tappable profile picture on the You hub: pick a square photo, or remove it.
  * Displayed elsewhere (Status) read-only via useAvatar. */
@@ -54,7 +54,7 @@ export function AvatarEditor() {
             <Ionicons name="person-outline" size={30} color={text.faint} />
           )}
           <View style={styles.editBadge}>
-            <Ionicons name="camera" size={12} color="#FBF5EB" />
+            <Ionicons name="camera" size={12} color={onAccent} />
           </View>
         </View>
         {busy ? (

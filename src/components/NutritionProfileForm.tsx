@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiBodyProfile } from '@/lib/api';
 import { useBody } from '@/store/useBody';
-import { accent, STAT_META, surface, text } from '@/theme';
+import { accent, onAccent, STAT_META, surface, text } from '@/theme';
 
 const TONE = STAT_META.CFT.color;
 const SEX = [
@@ -44,7 +44,7 @@ function Segmented({
             onPress={() => onChange(o.key)}
             style={[styles.segment, on && { backgroundColor: TONE, borderColor: TONE }]}
           >
-            <Text style={[styles.segmentText, on && { color: '#FBF5EB' }]}>{o.label}</Text>
+            <Text style={[styles.segmentText, on && { color: onAccent }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -206,6 +206,6 @@ const styles = StyleSheet.create({
     backgroundColor: surface.base,
   },
   btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-  btnText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   cancel: { color: text.faint, textAlign: 'center', marginTop: 10, fontSize: 13 },
 });

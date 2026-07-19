@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { accent, STAT_KEYS, STAT_META, surface, text, withAlpha } from '@/theme';
+import { accent, onAccent, STAT_KEYS, STAT_META, surface, text, withAlpha } from '@/theme';
 
 type SaveState = 'idle' | 'saving' | 'done';
 
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: surface.base,
   },
   btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-  btnText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   focusRow: { marginBottom: 14 },
   focusLabel: { fontSize: 12, fontWeight: '700', marginBottom: 7 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },

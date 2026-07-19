@@ -130,7 +130,24 @@ interface SystemStore {
 
 export const useSystem = create<SystemStore>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Shared shape for a mutation that returns fresh state: run it, commit the
+      // state, route any error to a user-facing notice. Reads serverUrl/token/
+      // notices fresh at call time, exactly as the hand-written actions did.
+      const mutate = async (
+        fn: (base: string, token: string, day: string) => Promise<ApiState>,
+      ): Promise<void> => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await fn(serverUrl, apiToken, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      };
+
+      return {
       serverUrl: DEFAULT_SERVER_URL,
       apiToken: '',
       state: null,
@@ -230,192 +247,24 @@ export const useSystem = create<SystemStore>()(
 
       dismissToast: () => set({ toast: null }),
 
-      saveName: async (name) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updatePlayer(serverUrl, apiToken, { name }, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      equipTitle: async (title) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updatePlayer(serverUrl, apiToken, { equipped_title: title }, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      saveNorthStar: async (northStar) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updatePlayer(serverUrl, apiToken, { north_star: northStar }, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      toggleRest: async () => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.toggleRest(serverUrl, apiToken, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      savePreferences: async (preferences, levels = {}) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updatePreferences(serverUrl, apiToken, preferences, levels, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      addReminder: async (text) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.addReminder(serverUrl, apiToken, text, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      toggleReminder: async (id, done) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.toggleReminder(serverUrl, apiToken, id, done, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      removeReminder: async (id) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.removeReminder(serverUrl, apiToken, id, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      addGrocery: async (name) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.addGrocery(serverUrl, apiToken, name, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      toggleGrocery: async (id, bought) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.toggleGrocery(serverUrl, apiToken, id, bought, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      removeGrocery: async (id) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.removeGrocery(serverUrl, apiToken, id, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      addQuestNote: async (questId, text) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.addQuestNote(serverUrl, apiToken, questId, text, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      updateQuestNote: async (id, text) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updateQuestNote(serverUrl, apiToken, id, text, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      removeQuestNote: async (id) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.removeQuestNote(serverUrl, apiToken, id, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      addJournalEntry: async (text) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.addJournalEntry(serverUrl, apiToken, text, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      updateJournalEntry: async (id, text) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.updateJournalEntry(serverUrl, apiToken, id, text, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      removeJournalEntry: async (id) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.removeJournalEntry(serverUrl, apiToken, id, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
+      saveName: (name) => mutate((b, t, d) => api.updatePlayer(b, t, { name }, d)),
+      equipTitle: (title) => mutate((b, t, d) => api.updatePlayer(b, t, { equipped_title: title }, d)),
+      saveNorthStar: (northStar) => mutate((b, t, d) => api.updatePlayer(b, t, { north_star: northStar }, d)),
+      toggleRest: () => mutate((b, t, d) => api.toggleRest(b, t, d)),
+      savePreferences: (preferences, levels = {}) =>
+        mutate((b, t, d) => api.updatePreferences(b, t, preferences, levels, d)),
+      addReminder: (text) => mutate((b, t, d) => api.addReminder(b, t, text, d)),
+      toggleReminder: (id, done) => mutate((b, t, d) => api.toggleReminder(b, t, id, done, d)),
+      removeReminder: (id) => mutate((b, t, d) => api.removeReminder(b, t, id, d)),
+      addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
+      toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
+      removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
+      addQuestNote: (questId, text) => mutate((b, t, d) => api.addQuestNote(b, t, questId, text, d)),
+      updateQuestNote: (id, text) => mutate((b, t, d) => api.updateQuestNote(b, t, id, text, d)),
+      removeQuestNote: (id) => mutate((b, t, d) => api.removeQuestNote(b, t, id, d)),
+      addJournalEntry: (text) => mutate((b, t, d) => api.addJournalEntry(b, t, text, d)),
+      updateJournalEntry: (id, text) => mutate((b, t, d) => api.updateJournalEntry(b, t, id, text, d)),
+      removeJournalEntry: (id) => mutate((b, t, d) => api.removeJournalEntry(b, t, id, d)),
 
       generate: async () => {
         const { serverUrl, apiToken } = get();
@@ -427,38 +276,11 @@ export const useSystem = create<SystemStore>()(
         }
       },
 
-      saveBook: async (currentBook, chapters = 0) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.setBook(serverUrl, apiToken, currentBook, chapters, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      reviewBook: async (finished, nextBook) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.reviewBook(serverUrl, apiToken, finished, nextBook, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
-
-      setInterviewMode: async (enabled) => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.setInterviewMode(serverUrl, apiToken, enabled, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
+      saveBook: (currentBook, chapters = 0) =>
+        mutate((b, t, d) => api.setBook(b, t, currentBook, chapters, d)),
+      reviewBook: (finished, nextBook) =>
+        mutate((b, t, d) => api.reviewBook(b, t, finished, nextBook, d)),
+      setInterviewMode: (enabled) => mutate((b, t, d) => api.setInterviewMode(b, t, enabled, d)),
 
       // Book lookup (Open Library). Search lets errors surface so the picker can
       // show a hint; suggestions are a nicety, so they fail quietly to empty.
@@ -475,16 +297,7 @@ export const useSystem = create<SystemStore>()(
         }
       },
 
-      resetAll: async () => {
-        const { serverUrl, apiToken, notices } = get();
-        try {
-          const state = await api.reset(serverUrl, apiToken, dateKey());
-          set({ state, status: 'online' });
-        } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
-        }
-      },
+      resetAll: () => mutate((b, t, d) => api.reset(b, t, d)),
 
       // Pure setters — the caller decides when to refresh (so it can await it
       // and show a saving indicator).
@@ -492,7 +305,8 @@ export const useSystem = create<SystemStore>()(
       setApiToken: (token) => set({ apiToken: token.trim() }),
 
       dismissNotice: () => set({ notices: get().notices.slice(1) }),
-    }),
+      };
+    },
     {
       name: 'arise-client-v2',
       storage: createJSONStorage(() => AsyncStorage),

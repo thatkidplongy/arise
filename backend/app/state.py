@@ -308,9 +308,8 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         "target": q.target,
         "done": done_count(rows, q, day),
         "undoable_id": undoable_id(q),
-        # A quest flagged `requires_log` is completed by writing; its prompt (or a
-        # default) drives the editor and what's written is kept in the Journal.
-        "note_prompt": (q.log_prompt or quests.DEFAULT_LOG_PROMPT) if q.requires_log else "",
+        # Notes jotted this period for this quest (write-steps log into here); the
+        # client detects which steps are "write" steps from their wording.
         "notes": (notes_by or {}).get((q.id, pk), []),
     }
 

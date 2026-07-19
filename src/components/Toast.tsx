@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
 
 /**
  * A transient floating confirmation, anchored above the tab bar. Used when a
@@ -37,7 +37,7 @@ export function ToastHost() {
     <View pointerEvents="box-none" style={styles.wrap}>
       <Animated.View style={[styles.toast, { opacity, transform: [{ translateY }] }]}>
         <View style={styles.badge}>
-          <Ionicons name="checkmark" size={14} color="#FBF5EB" />
+          <Ionicons name="checkmark" size={14} color={onAccent} />
         </View>
         <View style={styles.msg}>
           <Text style={styles.title} numberOfLines={1}>

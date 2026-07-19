@@ -26,7 +26,9 @@ export const text = {
 
 /** The single accent, used sparingly. */
 export const accent = '#B0603A'; // clay
-export const accentBright = '#C67C4E';
+/** Ivory text/icon that sits on a filled-accent button. (Note: distinct from
+ * surface.card '#FAF5EB' — one shade brighter, intentionally.) */
+export const onAccent = '#FBF5EB';
 
 export const feedback = {
   success: '#6F8A57', // sage

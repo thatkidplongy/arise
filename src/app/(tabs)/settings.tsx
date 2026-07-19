@@ -5,7 +5,7 @@ import { BackLink } from '@/components/BackLink';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text } from '@/theme';
+import { accent, feedback, onAccent, surface, text } from '@/theme';
 
 type SaveState = 'idle' | 'saving' | 'done';
 
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnText: {
-    color: '#FBF5EB',
+    color: onAccent,
     fontSize: 14,
     fontWeight: '700',
   },

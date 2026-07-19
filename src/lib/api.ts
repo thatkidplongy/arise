@@ -49,8 +49,7 @@ export interface ApiQuest {
   target: number;
   done: number;
   undoable_id: string | null;
-  note_prompt: string; // a journal prompt for reflective quests, else ''
-  notes: { id: string; text: string }[]; // notes jotted this period for this quest
+  notes: { id: string; text: string }[]; // notes jotted this period (via write-steps)
 }
 
 /** One quest-linked reflection (from a requires_log quest). */

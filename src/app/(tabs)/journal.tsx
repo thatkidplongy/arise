@@ -8,28 +8,9 @@ import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { groupByDay, prettyDay } from '@/lib/dates';
 import { useSystem } from '@/store/useSystem';
-import { accent, STAT_META, surface, text, withAlpha } from '@/theme';
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** Format a 'YYYY-MM-DD' by hand — avoids the UTC-parsing off-by-one of new Date. */
-function prettyDay(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  if (!y || !m || !d) return day;
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
-
-/** Group already-newest-first items into day buckets, preserving order. */
-function groupByDay<T extends { day: string }>(items: T[]): { day: string; items: T[] }[] {
-  const out: { day: string; items: T[] }[] = [];
-  for (const e of items) {
-    const bucket = out.find((b) => b.day === e.day);
-    if (bucket) bucket.items.push(e);
-    else out.push({ day: e.day, items: [e] });
-  }
-  return out;
-}
+import { accent, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
 
 type Tab = 'journal' | 'reflections';
 
@@ -98,7 +79,7 @@ export default function JournalScreen() {
             onPress={openNew}
             style={({ pressed }) => [styles.writeBtn, pressed && { opacity: 0.85 }]}
           >
-            <Ionicons name="create-outline" size={16} color="#FBF5EB" />
+            <Ionicons name="create-outline" size={16} color={onAccent} />
             <Text style={styles.writeText}>Write something for today</Text>
           </Pressable>
 
@@ -201,7 +182,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
   },
-  writeText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  writeText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
   entry: {
     flexDirection: 'row',

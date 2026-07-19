@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion } from '@/lib/api';
 import { toBoundedDataUri, splitDataUri } from '@/lib/image';
 import { useBody } from '@/store/useBody';
-import { accent, feedback, STAT_META, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
 
 import { NutritionProfileForm } from './NutritionProfileForm';
 import { SystemPanel } from './SystemPanel';
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     backgroundColor: surface.base,
   },
   btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-  btnText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   flex1: { flex: 1 },
   targetRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 },
   bigNum: { color: text.primary, fontSize: 26, fontWeight: '700' },
@@ -579,6 +579,6 @@ const styles = StyleSheet.create({
   gramsInput: { width: 84, marginBottom: 0 },
   gramsPreview: { color: text.secondary, fontSize: 12, flex: 1 },
   addBtn: { backgroundColor: TONE, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 16 },
-  addBtnText: { color: '#FBF5EB', fontSize: 13, fontWeight: '700' },
+  addBtnText: { color: onAccent, fontSize: 13, fontWeight: '700' },
   manualLink: { color: text.faint, fontSize: 12, marginTop: 10, textDecorationLine: 'underline' },
 });

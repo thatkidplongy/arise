@@ -360,8 +360,7 @@ class QuestOut(BaseModel):
     target: int
     done: int
     undoable_id: str | None
-    note_prompt: str  # the journal prompt when the quest's requires_log is set, else ""
-    notes: list[QuestNoteOut]  # notes jotted this period for this quest
+    notes: list[QuestNoteOut]  # notes jotted this period for this quest (via write-steps)
 
 
 class AchievementOut(BaseModel):

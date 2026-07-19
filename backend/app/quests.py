@@ -960,10 +960,6 @@ RESOURCES: dict[str, str] = {
     "Flashcard Fundamentals": "🌐 Tech Interview Handbook (techinterviewhandbook.org)",
 }
 
-# The default journal prompt for a quest whose `requires_log` is set but that
-# carries no `log_prompt` of its own (see models.QuestDef / seed.SEED_QUESTS).
-DEFAULT_LOG_PROMPT = "Write down what you learned."
-
 
 # Content band per variant, where "harder" isn't a number: 0 foundation → 1
 # building → 2 depth. Fundamentals before tactics — a level's band (see

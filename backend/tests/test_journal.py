@@ -8,36 +8,9 @@ def _quest(state, qid):
     return next(q for q in state["quests"] if q["id"] == qid)
 
 
-def test_reflective_quests_carry_a_prompt(client):
+def test_quest_starts_with_no_notes(client):
     s = client.get(f"/state?day={DAY}").json()
-    # A quest whose requires_log flag is set invites a note, with its own prompt…
-    assert _quest(s, "d-wealth")["note_prompt"] == "What did you learn or decide about money today?"
-    assert _quest(s, "d-read")["note_prompt"]
-    # …a quest without the flag doesn't.
-    assert _quest(s, "d-train")["note_prompt"] == ""
-    assert _quest(s, "d-train")["notes"] == []
-
-
-def test_requires_log_flag_drives_the_prompt(client):
-    """The flag lives on the quest row — flip it and the prompt follows (a default
-    fills in when the row carries no prompt of its own)."""
-    from app import state
-    from app.db import SessionLocal
-    from app.models import QuestDef
-
-    client.get(f"/state?day={DAY}")  # ensure quests are seeded
-    with SessionLocal() as db:
-        q = db.get(QuestDef, "d-train")
-        q.requires_log = True
-        q.log_prompt = ""  # no custom prompt → default kicks in
-        db.commit()
-
-    s = client.get(f"/state?day={DAY}").json()
-    # d-train now requires a log, shown with the default prompt.
-    assert _quest(s, "d-train")["note_prompt"] == "Write down what you learned."
-    # And it can hold a note like any log quest.
-    s = client.post("/quest-notes", json={"quest_id": "d-train", "text": "logged it", "day": DAY}).json()
-    assert _quest(s, "d-train")["notes"][0]["text"] == "logged it"
+    assert _quest(s, "d-wealth")["notes"] == []
 
 
 def test_note_saves_shows_on_quest_and_journal(client):

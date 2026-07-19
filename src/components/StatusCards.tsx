@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ChecklistPanel } from '@/components/ChecklistPanel';
 import { useMotivation } from '@/store/useMotivation';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
-
-import { SystemPanel } from './SystemPanel';
+import { feedback, text, withAlpha } from '@/theme';
 
 /** Today's line — a deterministic daily pick from the server. Tapping shuffles to
  * another captured quote — no attribution, no navigation (Inspire is its own tab). */
@@ -41,64 +40,23 @@ export function DailyQuote({ initialText }: { initialText: string }) {
   );
 }
 
-/** A plain personal reminders list — jot a line, tap × to remove. */
 /** A checkable to-do list — tick items off (they stay, as a record) or × to delete. */
 export function Reminders({ items }: { items: { id: string; text: string; done: boolean }[] }) {
   const addReminder = useSystem((s) => s.addReminder);
   const toggleReminder = useSystem((s) => s.toggleReminder);
   const removeReminder = useSystem((s) => s.removeReminder);
-  const [draft, setDraft] = useState('');
-
-  const add = () => {
-    const t = draft.trim();
-    if (!t) return;
-    setDraft('');
-    void addReminder(t);
-  };
-
   const open = items.filter((r) => !r.done).length;
 
   return (
-    <SystemPanel title="To-do" sub={items.length ? `${open} left` : undefined}>
-      {items.map((r) => (
-        <View key={r.id} style={styles.reminderRow}>
-          <Pressable
-            onPress={() => toggleReminder(r.id, !r.done)}
-            hitSlop={6}
-            style={styles.reminderCheck}
-          >
-            <Ionicons
-              name={r.done ? 'checkmark-circle' : 'ellipse-outline'}
-              size={20}
-              color={r.done ? feedback.success : text.faint}
-            />
-            <Text style={[styles.reminderText, r.done && styles.reminderTextDone]}>{r.text}</Text>
-          </Pressable>
-          <Pressable onPress={() => removeReminder(r.id)} hitSlop={8}>
-            <Text style={styles.reminderX}>×</Text>
-          </Pressable>
-        </View>
-      ))}
-      <View style={styles.reminderAdd}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={add}
-          blurOnSubmit={false}
-          returnKeyType="done"
-          style={styles.reminderInput}
-          placeholder="Add a to-do…"
-          placeholderTextColor={text.faint}
-          maxLength={200}
-        />
-        <Pressable
-          onPress={add}
-          style={({ pressed }) => [styles.reminderAddBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.reminderAddText}>Add</Text>
-        </Pressable>
-      </View>
-    </SystemPanel>
+    <ChecklistPanel
+      title="To-do"
+      sub={items.length ? `${open} left` : undefined}
+      items={items.map((r) => ({ id: r.id, label: r.text, checked: r.done }))}
+      placeholder="Add a to-do…"
+      onAdd={(t) => void addReminder(t)}
+      onToggle={(id, done) => void toggleReminder(id, done)}
+      onRemove={(id) => void removeReminder(id)}
+    />
   );
 }
 
@@ -135,36 +93,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.3,
   },
-  reminderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 7,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  reminderCheck: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  reminderText: { color: text.primary, fontSize: 13, lineHeight: 18, flex: 1 },
-  reminderTextDone: { color: text.faint, textDecorationLine: 'line-through' },
-  reminderX: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
-  reminderAdd: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  reminderInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 14,
-    backgroundColor: surface.base,
-  },
-  reminderAddBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-  },
-  reminderAddText: { color: accent, fontSize: 13, fontWeight: '700' },
 });

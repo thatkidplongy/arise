@@ -1,38 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import type { ApiQuest } from '@/lib/api';
+import { isWriteStep } from '@/lib/quests';
 import { useSystem } from '@/store/useSystem';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
-
-// Contexts where a "write"/"note" verb means DO, not journal (write code, record
-// audio, practise kana, repeat N times…). Kept out so those stay normal check-offs.
-// Nouns allow a trailing plural; "5×" / "N times" / "N reps" flag drills.
-const DOING_CONTEXT =
-  /\b(code|snippet|program|function|script|midi|audio|footage|clip|melody|beat|chord|scale|loanword|kana|kanji|katakana|hiragana|push-?up|squat|lunge|plank)s?\b|\d\s*×|\b\d+\s*(times|reps?)\b/;
-
-/** A step whose point is to write/reflect something down (vs. a "do" step). Tapping
- * such a step opens the editor so what you write gets logged. Best-effort by wording;
- * the LLM is also told to phrase reflection steps as "Write down…/Note down…/Reflect on…"
- * so new quests get caught. See backend llm.generate. */
-export function isWriteStep(step: string): boolean {
-  const s = step.trim().toLowerCase();
-  // Unambiguous journaling signals, anywhere in the step.
-  if (/\b(jot|reflect|summari[sz]e|journal)\b/.test(s)) return true;
-  if (/in your own words|key ?takeaway|\btakeaway\b/.test(s)) return true;
-  if (/\b(one|two|three|four|five|six|\d+)[- ]sentence/.test(s)) return true;
-  if (/what (did|do) you (learn|notice|take away|think)|one thing you (learned|noticed|realised|realized)/.test(s))
-    return true;
-  // A writing verb leads the step (write/note/describe/explain/reflect/jot) — unless
-  // it's really a "do" step (write code, note the MIDI…).
-  if (/^(write|note|describe|explain|reflect|jot)\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
-  // "write … down" split across the phrase, e.g. "write your plan down".
-  if (/\bwrite\b/.test(s) && /\bdown\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
-  return false;
-}
 
 export function QuestCard({ quest }: { quest: ApiQuest }) {
   const complete = useSystem((s) => s.complete);
@@ -220,24 +195,20 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
       <View style={styles.right}>
         <Text style={[styles.xp, { color: meta.color }]}>+{quest.xp}</Text>
         <Pressable onPress={completeOrUndo} hitSlop={8} style={styles.checkSlot}>
-          {busy ? (
-            <ActivityIndicator size="small" color={meta.color} />
-          ) : (
-            <View
-              style={[
-                styles.check,
-                isDone && styles.checkDone,
-                !isDone && { borderColor: withAlpha(meta.color, 0.5) },
-              ]}
-            >
-              {!isDone && progress > 0 ? (
-                <View
-                  style={[styles.checkFill, { height: 26 * progress, backgroundColor: meta.color }]}
-                />
-              ) : null}
-              {isDone ? <Ionicons name="checkmark" size={15} color={surface.card} /> : null}
-            </View>
-          )}
+          <View
+            style={[
+              styles.check,
+              isDone && styles.checkDone,
+              !isDone && { borderColor: withAlpha(meta.color, 0.5) },
+            ]}
+          >
+            {!isDone && progress > 0 ? (
+              <View
+                style={[styles.checkFill, { height: 26 * progress, backgroundColor: meta.color }]}
+              />
+            ) : null}
+            {isDone ? <Ionicons name="checkmark" size={15} color={surface.card} /> : null}
+          </View>
         </Pressable>
       </View>
     </>

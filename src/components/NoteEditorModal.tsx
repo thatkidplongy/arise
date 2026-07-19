@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { accent, surface, text, withAlpha } from '@/theme';
+import { accent, onAccent, surface, text, withAlpha } from '@/theme';
 
 type Sel = { start: number; end: number };
 
@@ -223,5 +223,5 @@ const styles = StyleSheet.create({
   btnGhost: { color: text.secondary, fontSize: 14, fontWeight: '600' },
   btnSave: { backgroundColor: accent },
   btnDisabled: { opacity: 0.5 },
-  btnSaveText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  btnSaveText: { color: onAccent, fontSize: 14, fontWeight: '700' },
 });

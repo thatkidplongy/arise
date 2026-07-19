@@ -410,6 +410,13 @@ def set_avatar(db: Session, player: Player, avatar: str) -> None:
     db.commit()
 
 
+def _owned(db: Session, model, row_id: str, player: Player):
+    """Fetch a row by id only if it belongs to this player — the ownership guard
+    every personal-list mutation (reminders, groceries, notes, journal) shares."""
+    row = db.get(model, row_id)
+    return row if row is not None and row.player_id == player.id else None
+
+
 def add_reminder(db: Session, player: Player, text: str) -> None:
     text = (text or "").strip()[:200]
     if text:
@@ -418,25 +425,24 @@ def add_reminder(db: Session, player: Player, text: str) -> None:
 
 
 def remove_reminder(db: Session, player: Player, reminder_id: str) -> None:
-    row = db.get(Reminder, reminder_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, Reminder, reminder_id, player)
+    if row is not None:
         db.delete(row)
         db.commit()
 
 
 def toggle_reminder(db: Session, player: Player, reminder_id: str, done: bool) -> None:
     """Check a to-do off (or back on). Done items stay in the list as a record."""
-    row = db.get(Reminder, reminder_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, Reminder, reminder_id, player)
+    if row is not None:
         row.done = done
         row.done_at = utcnow() if done else None
         db.commit()
 
 
 def add_quest_note(db: Session, player: Player, quest_id: str, day: str, text: str) -> None:
-    """Save a reflection for a quest, scoped to its current period. Only reflective
-    quests offer a prompt, but any note that arrives is kept — the client won't send
-    one otherwise."""
+    """Save a reflection for a quest, scoped to its current period. The client sends
+    one only from a 'write' step, but any note that arrives is kept."""
     text = (text or "").strip()[:2000]
     if not text:
         return
@@ -451,15 +457,15 @@ def add_quest_note(db: Session, player: Player, quest_id: str, day: str, text: s
 def update_quest_note(db: Session, player: Player, note_id: str, text: str) -> None:
     """Edit an existing reflection in place (the modal editor saves through here)."""
     text = (text or "").strip()[:2000]
-    row = db.get(QuestNote, note_id)
-    if row is not None and row.player_id == player.id and text:
+    row = _owned(db, QuestNote, note_id, player)
+    if row is not None and text:
         row.text = text
         db.commit()
 
 
 def remove_quest_note(db: Session, player: Player, note_id: str) -> None:
-    row = db.get(QuestNote, note_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, QuestNote, note_id, player)
+    if row is not None:
         db.delete(row)
         db.commit()
 
@@ -474,15 +480,15 @@ def add_journal_entry(db: Session, player: Player, day: str, text: str) -> None:
 
 def update_journal_entry(db: Session, player: Player, entry_id: str, text: str) -> None:
     text = (text or "").strip()[:5000]
-    row = db.get(JournalEntry, entry_id)
-    if row is not None and row.player_id == player.id and text:
+    row = _owned(db, JournalEntry, entry_id, player)
+    if row is not None and text:
         row.text = text
         db.commit()
 
 
 def remove_journal_entry(db: Session, player: Player, entry_id: str) -> None:
-    row = db.get(JournalEntry, entry_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, JournalEntry, entry_id, player)
+    if row is not None:
         db.delete(row)
         db.commit()
 
@@ -495,16 +501,16 @@ def add_grocery(db: Session, player: Player, name: str) -> None:
 
 
 def remove_grocery(db: Session, player: Player, item_id: str) -> None:
-    row = db.get(GroceryItem, item_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, GroceryItem, item_id, player)
+    if row is not None:
         db.delete(row)
         db.commit()
 
 
 def toggle_grocery(db: Session, player: Player, item_id: str, bought: bool) -> None:
     """Mark a grocery bought (or not). Bought items stay in the list as a record."""
-    row = db.get(GroceryItem, item_id)
-    if row is not None and row.player_id == player.id:
+    row = _owned(db, GroceryItem, item_id, player)
+    if row is not None:
         row.bought = bought
         row.bought_at = utcnow() if bought else None
         db.commit()

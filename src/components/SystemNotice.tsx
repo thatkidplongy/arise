@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text, withAlpha } from '@/theme';
+import { accent, onAccent, surface, text, withAlpha } from '@/theme';
 
 /**
  * The System pop-up — level ups, rank ups, achievements. One at a time from
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 44,
   },
   okText: {
-    color: '#FBF5EB',
+    color: onAccent,
     fontWeight: '700',
     fontSize: 14,
   },

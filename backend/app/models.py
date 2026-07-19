@@ -59,11 +59,6 @@ class QuestDef(Base):
     target: Mapped[int] = mapped_column(Integer, default=1)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort: Mapped[int] = mapped_column(Integer, default=0)
-    # When true, this quest is completed BY writing: checking it off opens the
-    # journal editor, and saving the entry is what marks it done. `log_prompt` is
-    # the question shown (a sensible default is used if it's blank).
-    requires_log: Mapped[bool] = mapped_column(Boolean, default=False)
-    log_prompt: Mapped[str] = mapped_column(String, default="")
 
 
 class Completion(Base):

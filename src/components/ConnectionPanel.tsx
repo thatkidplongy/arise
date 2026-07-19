@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, text } from '@/theme';
+import { accent, feedback, onAccent, text } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
 
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   retryText: {
-    color: '#FBF5EB',
+    color: onAccent,
     fontWeight: '700',
     fontSize: 14,
   },

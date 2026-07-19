@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, text, withAlpha } from '@/theme';
+import { onAccent, STAT_META, text, withAlpha } from '@/theme';
 
 /** Craft's interview-mode toggle — steady growth vs interview-prep quests. */
 export function InterviewModeCard() {
@@ -42,9 +42,9 @@ export function InterviewModeCard() {
         <Ionicons
           name={on ? 'checkmark-circle' : 'ellipse-outline'}
           size={18}
-          color={on ? '#FBF5EB' : STAT_META.CFT.color}
+          color={on ? onAccent : STAT_META.CFT.color}
         />
-        <Text style={[styles.toggleText, { color: on ? '#FBF5EB' : STAT_META.CFT.color }]}>
+        <Text style={[styles.toggleText, { color: on ? onAccent : STAT_META.CFT.color }]}>
           {saving
             ? 'Saving…'
             : on

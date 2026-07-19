@@ -6,7 +6,7 @@ import { SystemPanel } from '@/components/SystemPanel';
 import type { ApiInsight, InsightKind } from '@/lib/api';
 import { useMotivation, type PendingCapture } from '@/store/useMotivation';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
 
 // Normalise a link so we can spot the same video pasted twice — mirrors the
 // server's clean_url enough to guard against re-hitting the API for a dupe.
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   },
   btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
   btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#FBF5EB', fontSize: 14, fontWeight: '700' },
+  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   gate: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 10, textAlign: 'center' },
   hint: { color: text.faint, fontSize: 12, lineHeight: 17, marginTop: 10 },
   error: { color: feedback.danger, fontSize: 12, lineHeight: 17 },
