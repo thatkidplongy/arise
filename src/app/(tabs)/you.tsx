@@ -5,9 +5,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AvatarEditor } from '@/components/AvatarEditor';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
-import type { ApiWeekReview } from '@/lib/api';
+import type { ApiState, ApiWeekReview } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, STAT_META, surface, text } from '@/theme';
+import { accent, feedback, STAT_META, surface, text } from '@/theme';
 
 // The occasional screens live here rather than crowding the tab bar. Adding more
 // later? Drop another row in — the bar stays at five.
@@ -52,35 +52,83 @@ function WeekReview({ review }: { review: ApiWeekReview }) {
   );
 }
 
-/** A quiet record of the grocery list — what's still to buy, and how much you've
- * ticked off. Editing lives on the Body tab; here it's compact chips that wrap, so
- * it stays short and uses the width. Capped, with a "+N more" when the list is long. */
-const GROCERY_CAP = 12;
+/** "Jul 18" from an ISO timestamp, or '' when there's none. */
+function shortDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-function GroceryRecord({ items }: { items: { id: string; name: string; bought: boolean }[] }) {
-  const toBuy = items.filter((g) => !g.bought);
-  const bought = items.length - toBuy.length;
-  const shown = toBuy.slice(0, GROCERY_CAP);
-  const overflow = toBuy.length - shown.length;
+type DoneRow = { id: string; label: string; when: string };
+
+/** One labelled group of finished items — each with when it was done, an undo (put
+ * it back on its list) and a × (remove for good). */
+function CompletedGroup({
+  label,
+  rows,
+  onUndo,
+  onDelete,
+  spaced,
+}: {
+  label: string;
+  rows: DoneRow[];
+  onUndo: (id: string) => void;
+  onDelete: (id: string) => void;
+  spaced?: boolean;
+}) {
   return (
-    <SystemPanel title="Groceries" sub={`${toBuy.length} to buy`}>
-      {toBuy.length ? (
-        <View style={styles.groceryWrap}>
-          {shown.map((g) => (
-            <View key={g.id} style={styles.groceryChip}>
-              <Text style={styles.groceryChipText}>{g.name}</Text>
-            </View>
-          ))}
-          {overflow > 0 ? (
-            <Pressable onPress={() => router.push('/body')} style={styles.groceryMoreChip}>
-              <Text style={styles.groceryMoreText}>+{overflow} more</Text>
-            </Pressable>
-          ) : null}
+    <View style={spaced ? styles.groupSpaced : undefined}>
+      <Text style={styles.groupLabel}>{label}</Text>
+      {rows.map((r) => (
+        <View key={r.id} style={styles.doneRow}>
+          <Ionicons name="checkmark-circle" size={17} color={feedback.success} />
+          <Text style={styles.doneLabel} numberOfLines={1}>
+            {r.label}
+          </Text>
+          {r.when ? <Text style={styles.doneWhen}>{r.when}</Text> : null}
+          <Pressable onPress={() => onUndo(r.id)} hitSlop={8} accessibilityLabel={`Undo ${r.label}`}>
+            <Ionicons name="arrow-undo-outline" size={16} color={accent} />
+          </Pressable>
+          <Pressable onPress={() => onDelete(r.id)} hitSlop={8} accessibilityLabel={`Delete ${r.label}`}>
+            <Text style={styles.remove}>×</Text>
+          </Pressable>
         </View>
-      ) : (
-        <Text style={styles.groceryDone}>All bought — nothing left on the list.</Text>
-      )}
-      {bought ? <Text style={styles.groceryMeta}>{bought} already bought</Text> : null}
+      ))}
+    </View>
+  );
+}
+
+/** The record of finished to-dos and bought groceries. They land here once ticked
+ * off their lists; undo puts one back. Nothing shows until something's completed. */
+function Completed({ reminders, grocery }: Pick<ApiState, 'reminders' | 'grocery'>) {
+  const toggleReminder = useSystem((s) => s.toggleReminder);
+  const removeReminder = useSystem((s) => s.removeReminder);
+  const toggleGrocery = useSystem((s) => s.toggleGrocery);
+  const removeGrocery = useSystem((s) => s.removeGrocery);
+
+  const todos = reminders.filter((r) => r.done);
+  const bought = grocery.filter((g) => g.bought);
+  if (todos.length + bought.length === 0) return null;
+
+  return (
+    <SystemPanel title="Completed" sub={`${todos.length + bought.length} done`}>
+      {todos.length ? (
+        <CompletedGroup
+          label="TO-DOS"
+          rows={todos.map((r) => ({ id: r.id, label: r.text, when: shortDate(r.done_at) }))}
+          onUndo={(id) => void toggleReminder(id, false)}
+          onDelete={(id) => void removeReminder(id)}
+        />
+      ) : null}
+      {bought.length ? (
+        <CompletedGroup
+          label="GROCERIES"
+          rows={bought.map((g) => ({ id: g.id, label: g.name, when: shortDate(g.bought_at) }))}
+          onUndo={(id) => void toggleGrocery(id, false)}
+          onDelete={(id) => void removeGrocery(id)}
+          spaced={todos.length > 0}
+        />
+      ) : null}
     </SystemPanel>
   );
 }
@@ -102,7 +150,7 @@ export default function YouScreen() {
 
       {state ? <WeekReview review={state.week_review} /> : null}
 
-      {state && state.grocery.length ? <GroceryRecord items={state.grocery} /> : null}
+      {state ? <Completed reminders={state.reminders} grocery={state.grocery} /> : null}
 
       <SystemPanel>
         {ITEMS.map((it, i) => (
@@ -139,22 +187,17 @@ const styles = StyleSheet.create({
   weekNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
   weekLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
   weekTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
-  groceryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  groceryChip: {
-    backgroundColor: surface.raised,
-    borderRadius: 99,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  groupSpaced: { marginTop: 16 },
+  groupLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
+  doneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
   },
-  groceryChipText: { color: text.primary, fontSize: 13, fontWeight: '600' },
-  groceryMoreChip: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 99,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  groceryMoreText: { color: accent, fontSize: 13, fontWeight: '700' },
-  groceryDone: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  groceryMeta: { color: text.faint, fontSize: 12, marginTop: 8 },
+  doneLabel: { color: text.secondary, fontSize: 13, lineHeight: 18, flex: 1 },
+  doneWhen: { color: text.faint, fontSize: 11 },
+  remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
 });

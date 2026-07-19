@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChecklistPanel } from '@/components/ChecklistPanel';
@@ -10,8 +10,14 @@ import { feedback, text, withAlpha } from '@/theme';
 /** Today's line — a deterministic daily pick from the server. Tapping shuffles to
  * another captured quote — no attribution, no navigation (Inspire is its own tab). */
 export function DailyQuote({ initialText }: { initialText: string }) {
+  // Reset to the server's daily pick whenever it changes, the "adjust state during
+  // render" way (no effect); shuffle can still swap `line` in between.
   const [line, setLine] = useState(initialText);
-  useEffect(() => setLine(initialText), [initialText]);
+  const [seed, setSeed] = useState(initialText);
+  if (seed !== initialText) {
+    setSeed(initialText);
+    setLine(initialText);
+  }
 
   const shuffle = async () => {
     const insights = await fetchInsights(); // cached, or lazy-loaded on first tap
@@ -36,19 +42,21 @@ export function DailyQuote({ initialText }: { initialText: string }) {
   );
 }
 
-/** A checkable to-do list — tick items off (they stay, as a record) or × to delete. */
+/** A checkable to-do list — only what's still open. Ticking an item moves it to the
+ * You tab's Completed record (where it can be undone), so it leaves this list. */
 export function Reminders({ items }: { items: { id: string; text: string; done: boolean }[] }) {
   const addReminder = useSystem((s) => s.addReminder);
   const toggleReminder = useSystem((s) => s.toggleReminder);
   const removeReminder = useSystem((s) => s.removeReminder);
-  const open = items.filter((r) => !r.done).length;
+  const open = items.filter((r) => !r.done);
 
   return (
     <ChecklistPanel
       title="To-do"
-      sub={items.length ? `${open} left` : undefined}
-      items={items.map((r) => ({ id: r.id, label: r.text, checked: r.done }))}
+      sub={open.length ? `${open.length} left` : undefined}
+      items={open.map((r) => ({ id: r.id, label: r.text, checked: false }))}
       placeholder="Add a to-do…"
+      emptyHint="Nothing to do right now. Add a line, or enjoy the clear list."
       onAdd={(t) => void addReminder(t)}
       onToggle={(id, done) => void toggleReminder(id, done)}
       onRemove={(id) => void removeReminder(id)}

@@ -104,8 +104,10 @@ export interface ApiState {
   quests: ApiQuest[];
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
-  reminders: { id: string; text: string; done: boolean }[]; // a checkable to-do list on Status
-  grocery: { id: string; name: string; bought: boolean }[]; // things to buy, ticked once bought
+  // Personal lists. Open items show on their tab (to-dos on Status, groceries on
+  // Body); finished ones move to the You tab's Completed record, dated by *_at.
+  reminders: { id: string; text: string; done: boolean; done_at: string | null }[];
+  grocery: { id: string; name: string; bought: boolean; bought_at: string | null }[];
   journal: ApiJournalEntry[]; // free-form daily entries, newest first
   reflections: ApiReflection[]; // quest-linked takeaways, newest first
 }

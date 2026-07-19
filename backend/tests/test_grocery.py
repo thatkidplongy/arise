@@ -29,15 +29,18 @@ def test_grocery_toggle_keeps_bought_items(client):
     gid = s["grocery"][0]["id"]
     assert s["grocery"][0]["bought"] is False
 
-    # Buy it — it stays in the list as bought (a record), not removed.
+    # Buy it — it stays in the list as bought (a record), not removed, and is
+    # stamped with when (the You tab's Completed record shows this).
     s = client.post(f"/grocery/{gid}/toggle?day={DAY}", json={"bought": True}).json()
-    assert next(g for g in s["grocery"] if g["id"] == gid)["bought"] is True
+    bought = next(g for g in s["grocery"] if g["id"] == gid)
+    assert bought["bought"] is True and bought["bought_at"] is not None
     assert len(s["grocery"]) == 1
 
     # A fresh still-to-buy item sorts ahead of the bought one.
     s = client.post(f"/grocery?day={DAY}", json={"name": "Malunggay"}).json()
     assert [g["bought"] for g in s["grocery"]] == [False, True]
 
-    # Toggle back to unbought.
+    # Toggle back to unbought — the bought timestamp clears too.
     s = client.post(f"/grocery/{gid}/toggle?day={DAY}", json={"bought": False}).json()
-    assert next(g for g in s["grocery"] if g["id"] == gid)["bought"] is False
+    reopened = next(g for g in s["grocery"] if g["id"] == gid)
+    assert reopened["bought"] is False and reopened["bought_at"] is None

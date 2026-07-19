@@ -29,15 +29,18 @@ def test_reminder_toggle_keeps_done_items(client):
     rid = s["reminders"][0]["id"]
     assert s["reminders"][0]["done"] is False
 
-    # Check it off — it stays in the list as done (a record), not removed.
+    # Check it off — it stays in the list as done (a record), not removed, and is
+    # stamped with when it was finished (the You tab's Completed record shows this).
     s = client.post(f"/reminders/{rid}/toggle?day={DAY}", json={"done": True}).json()
-    assert next(r for r in s["reminders"] if r["id"] == rid)["done"] is True
+    done = next(r for r in s["reminders"] if r["id"] == rid)
+    assert done["done"] is True and done["done_at"] is not None
     assert len(s["reminders"]) == 1
 
     # A fresh open to-do sorts ahead of the done one.
     s = client.post(f"/reminders?day={DAY}", json={"text": "Water plants"}).json()
     assert [r["done"] for r in s["reminders"]] == [False, True]
 
-    # Toggle back to open.
+    # Toggle back to open — the finish timestamp clears too.
     s = client.post(f"/reminders/{rid}/toggle?day={DAY}", json={"done": False}).json()
-    assert next(r for r in s["reminders"] if r["id"] == rid)["done"] is False
+    reopened = next(r for r in s["reminders"] if r["id"] == rid)
+    assert reopened["done"] is False and reopened["done_at"] is None

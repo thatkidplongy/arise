@@ -408,12 +408,14 @@ class ReminderOut(BaseModel):
     id: str
     text: str
     done: bool
+    done_at: datetime | None = None  # when it was ticked — powers the Completed record
 
 
 class GroceryOut(BaseModel):
     id: str
     name: str
     bought: bool
+    bought_at: datetime | None = None  # when it was bought — powers the Completed record
 
 
 class ReflectionOut(BaseModel):

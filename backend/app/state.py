@@ -508,17 +508,18 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "total_completions": agg["total_completions"],
         },
         "reminders": [
-            {"id": r.id, "text": r.text, "done": r.done}
-            # Open to-dos first (by when added), then done ones — the list is a
-            # record of what's left and what's finished.
+            {"id": r.id, "text": r.text, "done": r.done, "done_at": r.done_at}
+            # Open to-dos first (by when added), then done ones. The client shows the
+            # open ones on Status and the finished ones on the You tab's record.
             for r in sorted(
                 db.query(Reminder).filter_by(player_id=player.id),
                 key=lambda r: (r.done, r.created_at),
             )
         ],
         "grocery": [
-            {"id": g.id, "name": g.name, "bought": g.bought}
-            # Still-to-buy first, bought ones settle to the bottom.
+            {"id": g.id, "name": g.name, "bought": g.bought, "bought_at": g.bought_at}
+            # Still-to-buy first, bought ones settle to the bottom. The client shows
+            # to-buy on the Body tab and bought ones on the You tab's record.
             for g in sorted(
                 db.query(GroceryItem).filter_by(player_id=player.id),
                 key=lambda g: (g.bought, g.created_at),
