@@ -423,145 +423,145 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     ],
     # ── Side ─────────────────────────────────────────────────────────────────
     "s-drill": [  # STR
-        ("New Technique", "Drill a shot you struggle with", [
+        ("New Technique", "150 reps of a shot you struggle with", [
             "Pick one weak shot",
             "150 focused reps (feeding or wall practice)",
         ]),
-        ("Weak Spot", "Attack the shot you avoid", [
+        ("Weak Spot", "20 min on the shot you avoid in games", [
             "Choose the shot you dodge in games",
             "20 min: slow reps → game-speed reps",
         ]),
-        ("Plyo Set", "One sharp plyo set", [
+        ("Plyo Set", "5×5 max-effort jump squats, full rest", [
             "5 × 5 max-effort jump squats",
             "Full rest between sets — don't rush",
         ]),
-        ("Home Strength", "Quick strength top-up", [
+        ("Home Strength", "3 rounds: squats, push-ups, plank", [
             "3 × 12 squats, 3 × 10 push-ups, 3 × 30s plank",
         ]),
-        ("Footwork Ladder", "Agility footwork", [
+        ("Footwork Ladder", "10 min ladder + shadow footwork", [
             "5 min ladder drills",
             "5 min shadow footwork to all corners",
         ]),
-        ("Grip & Wrist", "Wrist and forearm for smashes", [
+        ("Grip & Wrist", "Wrist curls + racket figure-8s", [
             "3 × 15 wrist curls (light weight or band)",
             "2 min racket figure-8s",
         ]),
     ],
     "s-brave": [  # CRE
-        ("Beyond the Comfort Zone", "Draw what you avoid", [
+        ("Beyond the Comfort Zone", "20 min drawing a subject you avoid", [
             "Pick your avoided subject",
             "20 min, no erasing the first pass",
         ]),
-        ("New Sound", "Beat in a new genre", [
+        ("New Sound", "Make a beat in a genre you don't", [
             "Pick a genre you don't make",
             "Copy its groove, then twist it",
         ]),
-        ("Cover It", "Recreate a beat or riff", [
+        ("Cover It", "Rebuild a track's main loop by ear", [
             "Choose a track you love",
             "Rebuild its main loop by ear",
         ]),
-        ("Odd Angle", "Unusual photo/video angle", [
+        ("Odd Angle", "Shoot 10 photos, none at eye level", [
             "Shoot low, high, or through something",
             "10 frames, no eye-level shots",
         ]),
-        ("New Medium", "Try an unfamiliar tool", [
-            "Pick a tool or app you rarely use",
-            "Make one small thing with it",
+        ("New Medium", "20 min making one small thing in a new tool", [
+            "Pick a tool or app you rarely open (Procreate, Blender, a synth…)",
+            "Spend 20 min making one small, finished thing with it",
         ]),
-        ("From Imagination", "No reference", [
+        ("From Imagination", "Draw or compose with no reference", [
             "Draw or compose fully from your head",
             "Accept that it'll be rough",
         ]),
-        ("Screen Study", "Watch with a creative eye", [
+        ("Screen Study", "Watch one scene for how it's made", [
             "Watch a scene or episode",
             "Note one thing about its shots, story, or edit",
         ]),
-        ("Poem from a Prompt", "Stretch your writing", [
+        ("Poem from a Prompt", "Write a poem from a random prompt", [
             "Pick a random word, object, or line",
             "Write a poem you wouldn't normally write",
         ]),
-        ("New Style", "Try a dance style you don't do", [
+        ("New Style", "Learn one move in a new dance style", [
             "Pick a style outside your comfort — hip-hop, house, contemporary…",
             "Learn one signature move from a tutorial",
         ]),
-        ("Sing Outside Your Lane", "Try a vocal style you don't", [
+        ("Sing Outside Your Lane", "Learn one phrase in a vocal style you avoid", [
             "Pick a style you avoid — falsetto, belt, harmony, a new genre",
             "Learn one short phrase in it from a tutorial",
         ]),
     ],
     "s-nature": [  # SPI — grounded, introspective
-        ("Nature Attunement", "Mindful time outdoors", [
+        ("Nature Attunement", "10 min outside, noticing each sense", [
             "Walk or sit outside 10 min",
             "Notice 5 things with each sense",
         ]),
-        ("Green Hour", "Outside, no phone", [
+        ("Green Hour", "15 min outdoors, phone away", [
             "Phone away",
             "15 min just being outdoors",
         ]),
-        ("Walk Meditation", "Slow, attentive walk", [
+        ("Walk Meditation", "A slow walk, breath matched to steps", [
             "Walk slowly",
             "Match your breath to your steps",
         ]),
-        ("One Full Breath", "3 min breathing", [
+        ("One Full Breath", "3 min: inhale 4s, exhale 6s", [
             "Inhale 4s, exhale 6s",
             "Repeat for 3 min",
         ]),
-        ("Thought Audit", "5 min writing", [
+        ("Thought Audit", "5 min brain-dump onto paper", [
             "Dump every thought onto paper",
             "Circle the one that matters most",
         ]),
-        ("Single-Task", "Full attention on one thing", [
+        ("Single-Task", "Do one ordinary task slowly, no multitasking", [
             "Pick one ordinary task",
             "Do it slowly, no multitasking",
         ]),
     ],
     "s-ally": [  # CHA — ambivert mix
-        ("New Ally", "A conversation with someone new", [
+        ("New Ally", "A real conversation with someone new", [
             "Ask their name and one real question",
             "Listen more than you talk",
         ]),
-        ("First Contact", "Start with a stranger", [
+        ("First Contact", "Break the ice with a stranger", [
             "A comment or question is enough",
             "Keep it light",
         ]),
-        ("Ask a Question", "Learn about someone you know", [
+        ("Ask a Question", "Ask someone you know something new", [
             "Ask something you've never asked them",
         ]),
-        ("Reconnect", "Reach someone you've drifted from", [
+        ("Reconnect", "Message someone you've drifted from", [
             "Send the message you've been putting off",
         ]),
-        ("Listen Fully", "Mostly listen", [
+        ("Listen Fully", "Mostly listen — let them talk", [
             "Let them talk",
             "Ask follow-ups — don't redirect to you",
         ]),
     ],
     "s-code": [  # INT
-        ("Arcane Study: Code", "30 min learning to code", [
+        ("Arcane Study: Code", "30 min on one lesson, typed by hand", [
             "Follow one freeCodeCamp lesson or docs page",
             "Type every example by hand — no copy-paste",
         ]),
-        ("Debug Something", "Fix or refactor", [
+        ("Debug Something", "Fix one bug, then test it", [
             "Find one bug or one messy function in your code",
             "Fix it, then write a test that proves it works",
         ]),
-        ("Math Reps", "20 min practice", [
+        ("Math Reps", "10 timed problems at your level", [
             "Do 10 problems at your current level",
             "Time the last 5 — beat your first-half pace",
         ]),
-        ("Japanese Study", "20 min structured", [
+        ("Japanese Study", "20 min: grammar/kanji + flashcards", [
             "15 min: one grammar point or 5 kanji (write each 3×)",
             "5 min: flashcard review (Anki or WaniKani)",
         ]),
-        ("Read the Docs", "30 min deep on a tool you use", [
+        ("Read the Docs", "30 min in the docs for a tool you use", [
             "Pick a tool/language you use (e.g. Python, React, git)",
             "Read one section you've always skipped",
             "Try one thing from it in a scratch file",
         ]),
-        ("Explain It", "Learn it, then teach it", [
+        ("Explain It", "Learn a concept, then explain it simply", [
             "Learn one concept you're shaky on",
             "Write it in your own words in 5 sentences",
         ]),
-        ("Down the Rabbit Hole", "Follow your curiosity", [
+        ("Down the Rabbit Hole", "Chase one nagging question to an answer", [
             "Pick one question that's been nagging you",
             "Read until it clicks, then note the answer in a line",
         ]),
@@ -629,27 +629,27 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     "s-wealth": [  # side — a quick, optional money action
-        ("Extra Coin", "One quick earning action", [
-            "Spend 15 min toward income",
-            "Sell, pitch, apply, or list something",
+        ("Extra Coin", "15 min on one real earning action", [
+            "Pick one: sell, pitch, apply, or list something",
+            "Spend 15 min and actually send or post it",
         ]),
-        ("Learn & Earn", "Study a paid skill", [
+        ("Learn & Earn", "One tutorial on a paid skill, then try it", [
             "Watch one tutorial on a skill people pay for",
-            "Try it once yourself",
+            "Try it once on a tiny real example",
         ]),
-        ("Declutter for Cash", "Turn stuff into money", [
+        ("Declutter for Cash", "List one unused thing for sale", [
             "Find one thing you don't use",
             "List it for sale",
         ]),
-        ("Price It Right", "Value your work fairly", [
+        ("Price It Right", "Set a fair price for your work", [
             "Look up what your skill usually charges",
             "Adjust your price to match your worth",
         ]),
-        ("Network Node", "Meet someone in the field", [
+        ("Network Node", "Message one person in your field", [
             "Message one person who earns where you'd like to",
             "Ask one genuine question",
         ]),
-        ("Idea Bank", "Capture an income idea", [
+        ("Idea Bank", "Note one income idea + its first step", [
             "Write down one way you could make money",
             "Note the first small step to test it",
         ]),
@@ -738,23 +738,23 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     "s-craft": [  # side — a quick, optional craft rep
-        ("Sharpen the Axe", "A focused craft rep", [
+        ("Sharpen the Axe", "15 min drilling one skill, typed by hand", [
             "15 min improving one skill you use daily",
             "Type every example by hand — no copy-paste",
         ]),
-        ("Docs Deep-Dive", "Deepen a tool you use", [
+        ("Docs Deep-Dive", "Read a docs section you skip, then try it", [
             "Read one docs section you always skip",
             "Try one thing from it in a scratch file",
         ]),
-        ("Code Review", "Practise reading critically", [
+        ("Code Review", "Review one PR, leave one real comment", [
             "Review one open PR (yours or open-source)",
             "Leave one substantive, specific comment",
         ]),
-        ("One Kata", "A quick problem rep", [
+        ("One Kata", "Solve one small problem in 20 min", [
             "Solve one small problem in 20 minutes",
             "Then read a cleaner solution and compare",
         ]),
-        ("Whiteboard It", "Explain your last project", [
+        ("Whiteboard It", "Sketch a project's architecture from memory", [
             "Sketch the architecture of something you built",
             "Name one thing you'd redesign now",
         ]),
