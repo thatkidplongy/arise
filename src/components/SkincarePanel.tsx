@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { SearchRow } from '@/components/SearchRow';
+import { useSearch } from '@/hooks/useSearch';
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { useBody } from '@/query/useBody';
@@ -118,29 +120,15 @@ function ProductPicks({ picks, country }: { picks: ApiSkincarePick[]; country: s
  * help pigmentation & pores, and anything gentle to be aware of. */
 function ProductLookup() {
   const { searchProducts } = useBody();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ApiSkincareProduct[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [note, setNote] = useState('');
+  const { query, setQuery, results, searching, note, run } = useSearch<ApiSkincareProduct>(searchProducts, {
+    empty: 'No match with a readable ingredient list — try the brand and product name together.',
+    error: 'Lookup unavailable right now — try again in a bit.',
+  });
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
-  const run = async () => {
-    const q = query.trim();
-    if (!q) return;
-    setSearching(true);
-    setNote('');
+  const search = () => {
     setOpenIdx(null);
-    try {
-      const items = await searchProducts(q);
-      setResults(items);
-      if (items.length === 0) {
-        setNote('No match with a readable ingredient list — try the brand and product name together.');
-      }
-    } catch {
-      setNote('Lookup unavailable right now — try again in a bit.');
-      setResults([]);
-    }
-    setSearching(false);
+    void run();
   };
 
   return (
@@ -149,25 +137,15 @@ function ProductLookup() {
       <Text style={styles.lookupHint}>
         Search any product to read its ingredients and see which actives suit pigmentation & pores.
       </Text>
-      <View style={styles.searchRow}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={run}
-          returnKeyType="search"
-          style={[styles.addInput, styles.searchInput]}
-          placeholder="e.g. CeraVe moisturising lotion"
-          placeholderTextColor={text.faint}
-          maxLength={80}
-        />
-        <Pressable onPress={run} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-          {searching ? (
-            <ActivityIndicator size="small" color={TONE} />
-          ) : (
-            <Text style={[styles.addBtnText, { color: TONE }]}>Search</Text>
-          )}
-        </Pressable>
-      </View>
+      <SearchRow
+        value={query}
+        onChangeText={setQuery}
+        onSubmit={search}
+        searching={searching}
+        placeholder="e.g. CeraVe moisturising lotion"
+        tone={TONE}
+        maxLength={80}
+      />
       {note ? <Text style={styles.lookupNote}>{note}</Text> : null}
 
       {results.map((p, i) => {
@@ -337,17 +315,6 @@ const styles = StyleSheet.create({
   },
   lookupTitle: { color: text.primary, fontSize: 14, fontWeight: '700' },
   lookupHint: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 2, marginBottom: 10 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchInput: { marginBottom: 0 },
-  searchBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    minWidth: 74,
-    alignItems: 'center',
-  },
   lookupNote: { color: text.secondary, fontSize: 12, marginTop: 10 },
   product: {
     marginTop: 12,

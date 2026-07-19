@@ -1,16 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { SearchRow } from '@/components/SearchRow';
+import { useSearch } from '@/hooks/useSearch';
 import type { ApiBook, ApiBookShelf } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { accent, surface, text } from '@/theme';
@@ -37,10 +30,10 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
   const searchBooks = useSystem((s) => s.searchBooks);
   const suggestBooks = useSystem((s) => s.suggestBooks);
 
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ApiBook[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [note, setNote] = useState('');
+  const { query, setQuery, results, searching, note, run, reset } = useSearch<ApiBook>(searchBooks, {
+    empty: 'No matches — try another title, or just type it below.',
+    error: 'Book search is unavailable right now — type the title below.',
+  });
   const [shelves, setShelves] = useState<ApiBookShelf[]>([]);
 
   useEffect(() => {
@@ -54,49 +47,20 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const run = async () => {
-    const q = query.trim();
-    if (!q) return;
-    setSearching(true);
-    setNote('');
-    try {
-      const items = await searchBooks(q);
-      setResults(items);
-      if (!items.length) setNote('No matches — try another title, or just type it below.');
-    } catch {
-      setNote('Book search is unavailable right now — type the title below.');
-      setResults([]);
-    }
-    setSearching(false);
-  };
-
   const pick = (b: ApiBook) => {
     onPick(b.title, estChapters(b.pages));
-    setResults([]);
-    setQuery('');
-    setNote('');
+    reset();
   };
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.searchRow}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={run}
-          returnKeyType="search"
-          style={[styles.input, styles.searchInput]}
-          placeholder="Search a book (title or author)"
-          placeholderTextColor={text.faint}
-        />
-        <Pressable onPress={run} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-          {searching ? (
-            <ActivityIndicator size="small" color={accent} />
-          ) : (
-            <Text style={styles.searchBtnText}>Search</Text>
-          )}
-        </Pressable>
-      </View>
+      <SearchRow
+        value={query}
+        onChangeText={setQuery}
+        onSubmit={run}
+        searching={searching}
+        placeholder="Search a book (title or author)"
+      />
       {note ? <Text style={styles.note}>{note}</Text> : null}
 
       {results.length > 0 ? (
@@ -158,28 +122,6 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12 },
-  searchRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: surface.base,
-  },
-  searchInput: { flex: 1 },
-  searchBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    minWidth: 74,
-    alignItems: 'center',
-  },
-  searchBtnText: { color: accent, fontSize: 13, fontWeight: '700' },
   note: { color: text.secondary, fontSize: 12, marginTop: 8 },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   results: { marginTop: 8 },
