@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
@@ -12,7 +12,7 @@ import { DailyQuote, Reminders } from '@/components/StatusCards';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import { dateKey } from '@/lib/dates';
-import { useAvatar } from '@/store/useAvatar';
+import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, surface, text, withAlpha } from '@/theme';
 
@@ -108,13 +108,9 @@ function Reading({ reading }: { reading: ApiReading }) {
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
   const toggleRest = useSystem((s) => s.toggleRest);
-  const avatarUri = useAvatar((s) => s.uri);
-  const loadAvatar = useAvatar((s) => s.load);
   const hasAvatar = state?.player.has_avatar ?? false;
+  const { uri: avatarUri } = useAvatar(hasAvatar); // query auto-loads when there's one
   const [restPending, setRestPending] = useState(false);
-  useEffect(() => {
-    if (hasAvatar && avatarUri === null) void loadAvatar();
-  }, [hasAvatar, avatarUri, loadAvatar]);
 
   if (!state) {
     return (

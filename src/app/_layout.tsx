@@ -1,3 +1,4 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -6,6 +7,7 @@ import { View } from 'react-native';
 import { SystemNoticeHost } from '@/components/SystemNotice';
 import { ToastHost } from '@/components/Toast';
 import { startAutoUpdate } from '@/lib/autoUpdate';
+import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
 import { surface, text } from '@/theme';
 
@@ -26,6 +28,7 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <QueryClientProvider client={queryClient}>
     <View style={{ flex: 1, backgroundColor: surface.base }}>
       <StatusBar style="dark" />
       <ThemeProvider
@@ -52,5 +55,6 @@ export default function RootLayout() {
       <ToastHost />
       <SystemNoticeHost />
     </View>
+    </QueryClientProvider>
   );
 }

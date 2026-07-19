@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ProgressRing } from '@/components/ProgressRing';
 import { toBoundedDataUri } from '@/lib/image';
-import { useAvatar } from '@/store/useAvatar';
+import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
 import { accent, onAccent, surface, text, withAlpha } from '@/theme';
 
@@ -13,15 +12,8 @@ import { accent, onAccent, surface, text, withAlpha } from '@/theme';
  * Displayed elsewhere (Status) read-only via useAvatar. */
 export function AvatarEditor() {
   const hasAvatar = useSystem((s) => s.state?.player.has_avatar ?? false);
-  const uri = useAvatar((s) => s.uri);
-  const busy = useAvatar((s) => s.busy);
-  const progress = useAvatar((s) => s.progress);
-  const load = useAvatar((s) => s.load);
-  const save = useAvatar((s) => s.save);
-
-  useEffect(() => {
-    if (hasAvatar && uri === null) void load();
-  }, [hasAvatar, uri, load]);
+  // The query auto-loads (gated on hasAvatar); no manual load effect needed.
+  const { uri, busy, progress, save } = useAvatar(hasAvatar);
 
   const pick = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
