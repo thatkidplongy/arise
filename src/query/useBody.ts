@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type ApiBody, type ApiBodyProfile } from '@/lib/api';
+import { api, type ApiBody, type ApiBodyProfile, type FoodEntry } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 
 import { authed } from './authed';
 import { qk } from './keys';
-
-type FoodEntry = { name: string; grams: number; kcal: number; protein_g: number; fibre_g: number };
 
 /**
  * The Body tab's data (nutrition + skincare for the day) as a React Query. Reads

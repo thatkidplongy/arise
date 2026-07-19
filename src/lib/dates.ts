@@ -16,12 +16,14 @@ export function prettyDay(day: string): string {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
 
-/** Group already-newest-first items into day buckets, preserving order. */
+/** Bucket items that are already ordered so same-day entries are adjacent (e.g.
+ * newest-first) into day groups, preserving order. O(n) — only compares the last
+ * bucket, so it relies on that ordering (both callers sort before calling). */
 export function groupByDay<T extends { day: string }>(items: T[]): { day: string; items: T[] }[] {
   const out: { day: string; items: T[] }[] = [];
   for (const e of items) {
-    const bucket = out.find((b) => b.day === e.day);
-    if (bucket) bucket.items.push(e);
+    const last = out[out.length - 1];
+    if (last && last.day === e.day) last.items.push(e);
     else out.push({ day: e.day, items: [e] });
   }
   return out;

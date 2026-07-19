@@ -5,7 +5,7 @@ import { BackLink } from '@/components/BackLink';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import type { ApiHistoryItem } from '@/lib/api';
-import { dateKey } from '@/lib/dates';
+import { dateKey, groupByDay } from '@/lib/dates';
 import { useHistory } from '@/query/useHistory';
 import type { StatKey } from '@/types';
 import { STAT_META, surface, text, withAlpha } from '@/theme';
@@ -23,18 +23,6 @@ function dayLabel(day: string, today: string): string {
   const diff = Math.round((t.getTime() - d.getTime()) / 86_400_000);
   if (diff === 1) return 'Yesterday';
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-/** Contiguous runs of same-day items — the list is already newest-first, so this
- * preserves order without sorting. */
-function groupByDay(items: ApiHistoryItem[]): { day: string; items: ApiHistoryItem[] }[] {
-  const groups: { day: string; items: ApiHistoryItem[] }[] = [];
-  for (const it of items) {
-    const last = groups[groups.length - 1];
-    if (last && last.day === it.day) last.items.push(it);
-    else groups.push({ day: it.day, items: [it] });
-  }
-  return groups;
 }
 
 function Row({ item }: { item: ApiHistoryItem }) {

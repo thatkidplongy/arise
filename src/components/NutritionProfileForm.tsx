@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiBodyProfile } from '@/lib/api';
+import { num } from '@/lib/num';
 import { useBody } from '@/query/useBody';
 import { accent, onAccent, STAT_META, surface, text } from '@/theme';
 
@@ -52,10 +53,6 @@ function Segmented({
   );
 }
 
-function num(v: string, fallback = 0): number {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 /** The one-time body inputs (sex, age, height, weight, activity, location, goal).
  * Owns its own drafts; `onDone` closes it (after a save, or on cancel). */

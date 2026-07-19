@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
+import { COUNTRY_LABEL } from '@/lib/country';
 import { useBody } from '@/query/useBody';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
 
 const TONE = STAT_META.CFT.color;
-const COUNTRY_LABEL: Record<string, string> = { PH: 'the Philippines' };
 
 function Routine({
   title,

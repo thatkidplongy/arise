@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
+import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
 import { accent, onAccent, STAT_KEYS, STAT_META, surface, text, withAlpha } from '@/theme';
-
-type SaveState = 'idle' | 'saving' | 'done';
 
 // Tap-to-add focus suggestions for the less-obvious attributes. Tapping one adds
 // it to that attribute's focus set (same as typing it). Extend per stat as needed.
@@ -28,21 +27,24 @@ export function FocusAreasCard() {
   const [removedFocus, setRemovedFocus] = useState<{ stat: string; item: string; index: number } | null>(
     null,
   );
-  const [focusSave, setFocusSave] = useState<SaveState>('idle');
+  const focusSave = useSaveState();
 
-  // Reset the drafts when the saved values actually change (keyed on their
-  // values, so a background refresh doesn't clobber mid-edit typing).
-  useEffect(() => {
+  // Reset the drafts when the saved values actually change (keyed on their JSON,
+  // so a background refresh doesn't clobber mid-edit typing) — the "adjust state
+  // during render" pattern, so no effect and no cascading re-render.
+  const [prefsSeed, setPrefsSeed] = useState(prefsKey);
+  if (prefsSeed !== prefsKey) {
+    setPrefsSeed(prefsKey);
     const p = state?.preferences ?? {};
     setFocusDraft(Object.fromEntries(STAT_KEYS.map((k) => [k, p[k] ?? []])));
     setRemovedFocus(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefsKey]);
-  useEffect(() => {
+  }
+  const [levelsSeed, setLevelsSeed] = useState(levelsKey);
+  if (levelsSeed !== levelsKey) {
+    setLevelsSeed(levelsKey);
     const l = state?.levels ?? {};
     setLevelDraft(Object.fromEntries(STAT_KEYS.map((k) => [k, l[k] ?? ''])));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelsKey]);
+  }
 
   if (!state) return null;
 
@@ -101,8 +103,7 @@ export function FocusAreasCard() {
     persist(next, levelDraft);
   };
 
-  const saveFocusFlow = async () => {
-    setFocusSave('saving');
+  const saveFocusFlow = () => {
     setRemovedFocus(null);
     // Fold in any text still sitting in an add-field, so typing then Save works
     // even if you didn't tap Add first.
@@ -119,13 +120,7 @@ export function FocusAreasCard() {
     setFocusInput({});
     const levels: Record<string, string> = {};
     for (const k of STAT_KEYS) levels[k] = (levelDraft[k] ?? '').trim();
-    await savePreferences(merged, levels);
-    if (useSystem.getState().status === 'online') {
-      setFocusSave('done');
-      setTimeout(() => setFocusSave('idle'), 1600);
-    } else {
-      setFocusSave('idle');
-    }
+    void focusSave.run(() => savePreferences(merged, levels));
   };
 
   return (
@@ -220,13 +215,11 @@ export function FocusAreasCard() {
         </View>
       ) : null}
       <Pressable
-        disabled={focusSave === 'saving'}
-        style={({ pressed }) => [styles.btn, (pressed || focusSave === 'saving') && { opacity: 0.8 }]}
+        disabled={focusSave.state === 'saving'}
+        style={({ pressed }) => [styles.btn, (pressed || focusSave.state === 'saving') && { opacity: 0.8 }]}
         onPress={saveFocusFlow}
       >
-        <Text style={styles.btnText}>
-          {focusSave === 'saving' ? 'Saving…' : focusSave === 'done' ? 'Saved ✓' : 'Save notes'}
-        </Text>
+        <Text style={styles.btnText}>{saveLabel(focusSave.state, 'Save notes')}</Text>
       </Pressable>
     </SystemPanel>
   );

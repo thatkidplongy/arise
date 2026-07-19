@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, onAccent, surface, text } from '@/theme';
-
-type SaveState = 'idle' | 'saving' | 'done';
 
 export default function SettingsScreen() {
   const state = useSystem((s) => s.state);
@@ -26,47 +25,35 @@ export default function SettingsScreen() {
   const [urlDraft, setUrlDraft] = useState(serverUrl);
   const [tokenDraft, setTokenDraft] = useState(apiToken);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [nameSave, setNameSave] = useState<SaveState>('idle');
-  const [northStarSave, setNorthStarSave] = useState<SaveState>('idle');
-  const [linkSave, setLinkSave] = useState<SaveState>('idle');
+  const nameSave = useSaveState();
+  const northStarSave = useSaveState();
+  const linkSave = useSaveState();
   const [resetting, setResetting] = useState(false);
 
-  useEffect(() => setNameDraft(state?.player.name ?? ''), [state?.player.name]);
-  useEffect(() => setNorthStarDraft(state?.player.north_star ?? ''), [state?.player.north_star]);
-  useEffect(() => setUrlDraft(serverUrl), [serverUrl]);
-  useEffect(() => setTokenDraft(apiToken), [apiToken]);
+  // Keep each draft synced to its source, resetting only when that source itself
+  // changes — React's "adjust state during render" pattern (no effect, no cascade).
+  // Each check is independent so editing one field isn't clobbered by another's sync.
+  const srcName = state?.player.name ?? '';
+  const srcNorthStar = state?.player.north_star ?? '';
+  const [seeds, setSeeds] = useState({ name: srcName, northStar: srcNorthStar, url: serverUrl, token: apiToken });
+  if (seeds.name !== srcName) { setSeeds((s) => ({ ...s, name: srcName })); setNameDraft(srcName); }
+  if (seeds.northStar !== srcNorthStar) { setSeeds((s) => ({ ...s, northStar: srcNorthStar })); setNorthStarDraft(srcNorthStar); }
+  if (seeds.url !== serverUrl) { setSeeds((s) => ({ ...s, url: serverUrl })); setUrlDraft(serverUrl); }
+  if (seeds.token !== apiToken) { setSeeds((s) => ({ ...s, token: apiToken })); setTokenDraft(apiToken); }
 
-  // Show "Saved" briefly on success; drop back to idle if the call failed
-  // (a failure already surfaces via the link status / a notice).
-  const settle = (set: (s: SaveState) => void) => {
-    if (useSystem.getState().status === 'online') {
-      set('done');
-      setTimeout(() => set('idle'), 1600);
-    } else {
-      set('idle');
-    }
-  };
+  const saveLink = () =>
+    void linkSave.run(async () => {
+      setApiToken(tokenDraft);
+      setServerUrl(urlDraft);
+      await refresh();
+    });
 
-  const saveLink = async () => {
-    setLinkSave('saving');
-    setApiToken(tokenDraft);
-    setServerUrl(urlDraft);
-    await refresh();
-    settle(setLinkSave);
-  };
-
-  const saveNameFlow = async () => {
+  const saveNameFlow = () => {
     if (!nameDraft.trim()) return;
-    setNameSave('saving');
-    await saveName(nameDraft.trim());
-    settle(setNameSave);
+    void nameSave.run(() => saveName(nameDraft.trim()));
   };
 
-  const saveNorthStarFlow = async () => {
-    setNorthStarSave('saving');
-    await saveNorthStar(northStarDraft.trim());
-    settle(setNorthStarSave);
-  };
+  const saveNorthStarFlow = () => void northStarSave.run(() => saveNorthStar(northStarDraft.trim()));
 
   const statusColor =
     status === 'online'
@@ -105,13 +92,11 @@ export default function SettingsScreen() {
             maxLength={280}
           />
           <Pressable
-            disabled={northStarSave === 'saving'}
-            style={({ pressed }) => [styles.btn, (pressed || northStarSave === 'saving') && { opacity: 0.8 }]}
+            disabled={northStarSave.state === 'saving'}
+            style={({ pressed }) => [styles.btn, (pressed || northStarSave.state === 'saving') && { opacity: 0.8 }]}
             onPress={saveNorthStarFlow}
           >
-            <Text style={styles.btnText}>
-              {northStarSave === 'saving' ? 'Saving…' : northStarSave === 'done' ? 'Saved ✓' : 'Save North Star'}
-            </Text>
+            <Text style={styles.btnText}>{saveLabel(northStarSave.state, 'Save North Star')}</Text>
           </Pressable>
         </SystemPanel>
       ) : null}
@@ -141,14 +126,14 @@ export default function SettingsScreen() {
           placeholderTextColor={text.faint}
         />
         <Pressable
-          disabled={linkSave === 'saving'}
-          style={({ pressed }) => [styles.btn, (pressed || linkSave === 'saving') && { opacity: 0.8 }]}
+          disabled={linkSave.state === 'saving'}
+          style={({ pressed }) => [styles.btn, (pressed || linkSave.state === 'saving') && { opacity: 0.8 }]}
           onPress={saveLink}
         >
           <Text style={styles.btnText}>
-            {linkSave === 'saving'
+            {linkSave.state === 'saving'
               ? 'Reconnecting…'
-              : linkSave === 'done'
+              : linkSave.state === 'done'
                 ? 'Reconnected ✓'
                 : 'Save and reconnect'}
           </Text>
@@ -165,13 +150,11 @@ export default function SettingsScreen() {
           maxLength={24}
         />
         <Pressable
-          disabled={nameSave === 'saving'}
-          style={({ pressed }) => [styles.btn, (pressed || nameSave === 'saving') && { opacity: 0.8 }]}
+          disabled={nameSave.state === 'saving'}
+          style={({ pressed }) => [styles.btn, (pressed || nameSave.state === 'saving') && { opacity: 0.8 }]}
           onPress={saveNameFlow}
         >
-          <Text style={styles.btnText}>
-            {nameSave === 'saving' ? 'Saving…' : nameSave === 'done' ? 'Saved ✓' : 'Save'}
-          </Text>
+          <Text style={styles.btnText}>{saveLabel(nameSave.state, 'Save')}</Text>
         </Pressable>
       </SystemPanel>
 

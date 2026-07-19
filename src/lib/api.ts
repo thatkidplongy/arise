@@ -172,6 +172,9 @@ export interface ApiFoodEntry {
   fibre_g: number;
 }
 
+/** The fields sent when logging food — a food entry without its server id. */
+export type FoodEntry = Omit<ApiFoodEntry, 'id'>;
+
 export interface ApiFoodDay {
   entries: ApiFoodEntry[];
   total_kcal: number;
@@ -456,12 +459,8 @@ export const api = {
       30000, // vision is slower than the usual call
     ),
 
-  logFood: (
-    base: string,
-    token: string,
-    entry: { name: string; grams: number; kcal: number; protein_g: number; fibre_g: number },
-    day: string,
-  ) => request<ApiBody>(base, `/food/log?day=${day}`, token, { method: 'POST', body: JSON.stringify(entry) }),
+  logFood: (base: string, token: string, entry: FoodEntry, day: string) =>
+    request<ApiBody>(base, `/food/log?day=${day}`, token, { method: 'POST', body: JSON.stringify(entry) }),
 
   removeFood: (base: string, token: string, entryId: string, day: string) =>
     request<ApiBody>(base, `/food/log/${entryId}?day=${day}`, token, { method: 'DELETE' }),

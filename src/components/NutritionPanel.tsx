@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion } from '@/lib/api';
+import { COUNTRY_LABEL } from '@/lib/country';
 import { toBoundedDataUri, splitDataUri } from '@/lib/image';
+import { num } from '@/lib/num';
 import { useBody } from '@/query/useBody';
 import { accent, feedback, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
 
@@ -13,17 +15,12 @@ import { SystemPanel } from './SystemPanel';
 import { XpBar } from './XpBar';
 
 const TONE = STAT_META.CFT.color; // a calm tone for the Body tab
-const COUNTRY_LABEL: Record<string, string> = { PH: 'the Philippines' };
 const GROUPS: { tag: ApiSuggestion['tag']; label: string }[] = [
   { tag: 'meal', label: 'Balanced meals' },
   { tag: 'protein', label: 'Protein-rich' },
   { tag: 'fibre', label: 'Fibre-rich' },
 ];
 
-function num(v: string, fallback = 0): number {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 export function NutritionPanel() {
   const { body, search, analyzePhoto, logFood, removeFood } = useBody();

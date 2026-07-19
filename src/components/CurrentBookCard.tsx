@@ -4,10 +4,9 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BookPicker } from '@/components/BookPicker';
 import { SystemPanel } from '@/components/SystemPanel';
+import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
 import { accent, onAccent, surface, text, withAlpha } from '@/theme';
-
-type SaveState = 'idle' | 'saving' | 'done';
 
 /** Set / change the book you're reading — search Open Library or browse shelves,
  * then save. Lives on the Status screen, just under the reading-progress panel. */
@@ -19,28 +18,24 @@ export function CurrentBookCard() {
   // reading is shown in the banner below, not pre-filled here.
   const [bookDraft, setBookDraft] = useState('');
   const [chaptersDraft, setChaptersDraft] = useState('');
-  const [bookSave, setBookSave] = useState<SaveState>('idle');
+  const bookSave = useSaveState();
 
   if (!state) return null;
 
   const current = state.player.current_book;
   const currentChapters = state.player.current_book_chapters;
 
-  const canSave = bookDraft.trim().length > 0 && bookSave !== 'saving';
+  const canSave = bookDraft.trim().length > 0 && bookSave.state !== 'saving';
 
   const saveBookFlow = async () => {
     const title = bookDraft.trim();
     if (!title) return; // never clear the current book with an empty save
-    setBookSave('saving');
     const chapters = Math.max(0, parseInt(chaptersDraft, 10) || 0);
-    await saveBook(title, chapters);
-    if (useSystem.getState().status === 'online') {
-      setBookDraft(''); // don't persist the entry — the banner now reflects it
+    const online = await bookSave.run(() => saveBook(title, chapters));
+    if (online) {
+      // Don't persist the entry — the banner now reflects it.
+      setBookDraft('');
       setChaptersDraft('');
-      setBookSave('done');
-      setTimeout(() => setBookSave('idle'), 1600);
-    } else {
-      setBookSave('idle');
     }
   };
 
@@ -90,9 +85,7 @@ export function CurrentBookCard() {
         style={({ pressed }) => [styles.btn, (pressed || !canSave) && { opacity: 0.5 }]}
         onPress={saveBookFlow}
       >
-        <Text style={styles.btnText}>
-          {bookSave === 'saving' ? 'Saving…' : bookSave === 'done' ? 'Saved ✓' : current ? 'Change book' : 'Save book'}
-        </Text>
+        <Text style={styles.btnText}>{saveLabel(bookSave.state, current ? 'Change book' : 'Save book')}</Text>
       </Pressable>
     </SystemPanel>
   );
