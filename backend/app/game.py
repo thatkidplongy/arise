@@ -12,6 +12,17 @@ DAILY_CLEAR_ID = "daily-clear"
 # by resting today."
 REST_DAY_ID = "rest-day"
 
+
+def is_rest(quest_id: str) -> bool:
+    """True for the rest-day marker — keeps the streak, but isn't a quest."""
+    return quest_id == REST_DAY_ID
+
+
+def is_marker(quest_id: str) -> bool:
+    """True for a bookkeeping completion row (rest day or daily-clear bonus) rather
+    than a real quest completion. One place to ask, so new markers stay in sync."""
+    return quest_id in (REST_DAY_ID, DAILY_CLEAR_ID)
+
 # Rank requires level AND best-ever streak, so consistency can't be skipped.
 RANK_GATES = [
     {"rank": "E", "level": 1, "streak": 0},

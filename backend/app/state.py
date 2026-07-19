@@ -60,6 +60,15 @@ def completions_of(db: Session, player: Player) -> list[Completion]:
     return db.query(Completion).filter_by(player_id=player.id).all()
 
 
+def _step_checks_by(db: Session, player: Player) -> dict[tuple[str, str], set[int]]:
+    """Ticked step indices grouped by (quest_id, period_key) for this player — the
+    read model and the progression inputs both need this same grouping."""
+    checks: dict[tuple[str, str], set[int]] = {}
+    for c in db.query(StepCheck).filter_by(player_id=player.id):
+        checks.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
+    return checks
+
+
 def _parse_focus(raw: str) -> list[str]:
     """The focus column holds a JSON list of tags. Tolerate a bare legacy string."""
     try:
@@ -104,14 +113,12 @@ def _progression_inputs(db: Session, player: Player) -> tuple[dict[str, set[str]
     completed: set[tuple[str, str]] = set()
     rest_on: set[str] = set()
     for r in rows:
-        if r.quest_id == game.REST_DAY_ID:
+        if game.is_rest(r.quest_id):
             rest_on.add(r.day)
-        elif r.quest_id != game.DAILY_CLEAR_ID:
+        elif not game.is_marker(r.quest_id):
             completed.add((r.quest_id, r.day))
 
-    checks: dict[tuple[str, str], set[int]] = {}
-    for c in db.query(StepCheck).filter_by(player_id=player.id):
-        checks.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
+    checks = _step_checks_by(db, player)
 
     real_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
     rest_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
@@ -177,23 +184,47 @@ def _jp_week(player: Player, day: str) -> int:
     return max(1, elapsed // 7 + 1)
 
 
-def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
-    """The full step list a quest shows today — generated content if present,
-    else the pool — always with the mandatory (leveled) floor prepended. Shared by
-    the read model and the step-toggle write path so they never disagree."""
-    level = progression_levels(db, player, day).get(quest.stat, 0)
-    chapters = player.current_book_chapters
+def resolve_content(
+    quest: QuestDef,
+    day: str,
+    *,
+    prefs: dict[str, list[str]],
+    gen_by: dict[tuple[str, str], dict],
+    level: int,
+    book: str,
+    chapters: int,
+    interview: bool,
+    jp_week: int,
+) -> tuple[str, str, list[str], str]:
+    """The (title, desc, steps, resource) a quest shows today: LLM-generated
+    content if present (with the mandatory leveled floor re-applied), else the
+    handcrafted pool. The single resolver both the read model (`_quest_out`) and
+    the step-toggle write path (`resolve_steps`) use, so a ticked step index and
+    the displayed steps can never drift apart. Pure — inputs are pre-resolved."""
     pk = quests.period_key(quest.cadence, day)
-    g = db.get(
-        GeneratedQuest,
-        {"player_id": player.id, "quest_id": quest.id, "period_key": pk},
+    gen = gen_by.get((quest.id, pk))
+    if gen is not None:
+        steps = quests.floor_for(quest, book, level, chapters) + gen["steps"]
+        return gen["title"], gen["desc"], steps, gen["resource"]
+    return quests.content_for(
+        quest, day, prefs.get(quest.stat), book, level, chapters,
+        interview=interview, jp_week=jp_week,
     )
-    if g is not None:
-        return quests.floor_for(quest, player.current_book, level, chapters) + _gen_steps(g.steps)
-    prefs = preferences_of(db, player)
-    _, _, steps, _ = quests.content_for(
-        quest, day, prefs.get(quest.stat), player.current_book, level, chapters,
-        interview=player.interview_mode, jp_week=_jp_week(player, day),
+
+
+def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
+    """The step list a quest shows today, for the step-toggle write path — the same
+    content the read model renders (see `resolve_content`), so a tick lands on the
+    step the client actually showed."""
+    _, _, steps, _ = resolve_content(
+        quest, day,
+        prefs=preferences_of(db, player),
+        gen_by=generated_by(db, player),
+        level=progression_levels(db, player, day).get(quest.stat, 0),
+        book=player.current_book,
+        chapters=player.current_book_chapters,
+        interview=player.interview_mode,
+        jp_week=_jp_week(player, day),
     )
     return steps
 
@@ -283,17 +314,17 @@ def snapshot(agg: dict) -> Snapshot:
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
                levels=None, chapters=0, interview=False, jp_week=0, notes_by=None) -> dict:
-    level = (levels or {}).get(q.stat, 0)
     pk = quests.period_key(q.cadence, day)
-    gen = (gen_by or {}).get((q.id, pk))
-    if gen is not None:  # LLM-personalised, with the mandatory floor re-applied
-        title, desc = gen["title"], gen["desc"]
-        steps = quests.floor_for(q, book, level, chapters) + gen["steps"]
-        resource = gen["resource"]
-    else:
-        title, desc, steps, resource = quests.content_for(
-            q, day, prefs.get(q.stat), book, level, chapters, interview=interview, jp_week=jp_week
-        )
+    title, desc, steps, resource = resolve_content(
+        q, day,
+        prefs=prefs,
+        gen_by=gen_by or {},
+        level=(levels or {}).get(q.stat, 0),
+        book=book,
+        chapters=chapters,
+        interview=interview,
+        jp_week=jp_week,
+    )
     checked = checks_by.get((q.id, pk), set())
     return {
         "id": q.id,
@@ -354,7 +385,7 @@ def history_of(db: Session, player: Player, limit: int = 200) -> list[dict]:
         .filter_by(player_id=player.id)
         .order_by(Completion.at.desc())
     ):
-        if r.quest_id in (game.REST_DAY_ID, game.DAILY_CLEAR_ID):
+        if game.is_marker(r.quest_id):
             continue
         q = by_id.get(r.quest_id)
         out.append({
@@ -381,7 +412,7 @@ def week_review_of(rows: list[Completion], defs: list[QuestDef], day: str) -> di
     by_stat: dict[str, int] = {}
     completions = 0
     for r in week_rows:
-        if r.quest_id in (game.REST_DAY_ID, game.DAILY_CLEAR_ID):
+        if game.is_marker(r.quest_id):
             continue
         q = by_id.get(r.quest_id)
         if q is None:
@@ -397,6 +428,78 @@ def week_review_of(rows: list[Completion], defs: list[QuestDef], day: str) -> di
         "by_stat": by_stat,
         "top_stat": max(by_stat, key=by_stat.get) if by_stat else None,
     }
+
+
+def _reflections_and_notes(
+    db: Session, player: Player, defs: list[QuestDef]
+) -> tuple[dict[tuple[str, str], list[dict]], list[dict]]:
+    """Group this-period quest notes onto their quest (so each card shows what's
+    been jotted) and collect them all, newest first, for the Reflections view."""
+    stat_by_qid = {q.id: q.stat for q in defs}
+    notes_by: dict[tuple[str, str], list[dict]] = {}
+    reflections: list[dict] = []
+    for n in sorted(db.query(QuestNote).filter_by(player_id=player.id), key=lambda n: n.created_at):
+        notes_by.setdefault((n.quest_id, n.period_key), []).append(
+            {"id": n.id, "text": n.text, "step": n.step_index}
+        )
+        reflections.append({
+            "id": n.id,
+            "quest_id": n.quest_id,
+            "stat": stat_by_qid.get(n.quest_id, ""),
+            "prompt": n.prompt or "",
+            "day": n.day,
+            "text": n.text,
+            "created_at": n.created_at,
+        })
+    reflections.reverse()  # newest first
+    return notes_by, reflections
+
+
+def _journal_of(db: Session, player: Player) -> list[dict]:
+    """Free-form daily journal entries, newest first (no quest attached)."""
+    return [
+        {"id": e.id, "day": e.day, "text": e.text, "created_at": e.created_at}
+        for e in db.query(JournalEntry)
+        .filter_by(player_id=player.id)
+        .order_by(JournalEntry.created_at.desc())
+    ]
+
+
+def _reminders_of(db: Session, player: Player) -> list[dict]:
+    """The to-do list: open items first (by when added), finished ones after. The
+    client shows the open ones on Status and the finished ones on the You record."""
+    return [
+        {"id": r.id, "text": r.text, "done": r.done, "done_at": r.done_at}
+        for r in sorted(
+            db.query(Reminder).filter_by(player_id=player.id),
+            key=lambda r: (r.done, r.created_at),
+        )
+    ]
+
+
+def _grocery_of(db: Session, player: Player) -> list[dict]:
+    """The grocery list: still-to-buy first, bought ones settle to the bottom. The
+    client shows to-buy on the Body tab and bought ones on the You record."""
+    return [
+        {"id": g.id, "name": g.name, "bought": g.bought, "bought_at": g.bought_at}
+        for g in sorted(
+            db.query(GroceryItem).filter_by(player_id=player.id),
+            key=lambda g: (g.bought, g.created_at),
+        )
+    ]
+
+
+def _achievements_of(db: Session, player: Player) -> list[dict]:
+    """Every achievement with its unlocked_at (None while still locked)."""
+    unlocks = {
+        u.achievement_id: u.unlocked_at
+        for u in db.query(AchievementUnlock).filter_by(player_id=player.id)
+    }
+    return [
+        {"id": a.id, "name": a.name, "desc": a.desc, "title_reward": a.title_reward,
+         "unlocked_at": unlocks.get(a.id)}
+        for a in ACHIEVEMENTS
+    ]
 
 
 def build_state(db: Session, player: Player, day: str) -> dict:
@@ -421,7 +524,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
 
     dailies = [q for q in defs if q.cadence == "daily"]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
-    resting = any(r.quest_id == game.REST_DAY_ID and r.day == day for r in rows)
+    resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
 
     # Reading review: a book is never reset by a week ending — it carries on, with
     # its progress intact, for as many weeks as it takes. The gentle "did you
@@ -437,46 +540,12 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         and player.book_review_week != week
     )
 
-    checks_by: dict[tuple[str, str], set[int]] = {}
-    for c in db.query(StepCheck).filter_by(player_id=player.id):
-        checks_by.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
-
-    # Quest reflections: group this-period notes onto their quest (so the card shows
-    # what's been jotted), and collect them all for the Reflections view.
-    stat_by_qid = {q.id: q.stat for q in defs}
-    notes_by: dict[tuple[str, str], list[dict]] = {}
-    reflections: list[dict] = []
-    for n in sorted(db.query(QuestNote).filter_by(player_id=player.id), key=lambda n: n.created_at):
-        notes_by.setdefault((n.quest_id, n.period_key), []).append(
-            {"id": n.id, "text": n.text, "step": n.step_index}
-        )
-        reflections.append({
-            "id": n.id,
-            "quest_id": n.quest_id,
-            "stat": stat_by_qid.get(n.quest_id, ""),
-            "prompt": n.prompt or "",
-            "day": n.day,
-            "text": n.text,
-            "created_at": n.created_at,
-        })
-    reflections.reverse()  # newest first
-
-    # Free-form daily journal — anything the hunter wrote for the day, no quest.
-    journal = [
-        {"id": e.id, "day": e.day, "text": e.text, "created_at": e.created_at}
-        for e in db.query(JournalEntry)
-        .filter_by(player_id=player.id)
-        .order_by(JournalEntry.created_at.desc())
-    ]
+    checks_by = _step_checks_by(db, player)
+    notes_by, reflections = _reflections_and_notes(db, player, defs)
 
     def undoable_id(quest: QuestDef) -> str | None:
         todays = [r for r in rows if r.quest_id == quest.id and r.day == day]
         return max(todays, key=lambda r: r.at).id if todays else None
-
-    unlocks = {
-        u.achievement_id: u.unlocked_at
-        for u in db.query(AchievementUnlock).filter_by(player_id=player.id)
-    }
 
     return {
         "player": {
@@ -523,38 +592,13 @@ def build_state(db: Session, player: Player, day: str) -> dict:
                        _jp_week(player, day), notes_by)
             for q in defs
         ],
-        "achievements": [
-            {
-                "id": a.id,
-                "name": a.name,
-                "desc": a.desc,
-                "title_reward": a.title_reward,
-                "unlocked_at": unlocks.get(a.id),
-            }
-            for a in ACHIEVEMENTS
-        ],
+        "achievements": _achievements_of(db, player),
         "record": {
             "active_days": len(agg["active_days"]),
             "total_completions": agg["total_completions"],
         },
-        "reminders": [
-            {"id": r.id, "text": r.text, "done": r.done, "done_at": r.done_at}
-            # Open to-dos first (by when added), then done ones. The client shows the
-            # open ones on Status and the finished ones on the You tab's record.
-            for r in sorted(
-                db.query(Reminder).filter_by(player_id=player.id),
-                key=lambda r: (r.done, r.created_at),
-            )
-        ],
-        "grocery": [
-            {"id": g.id, "name": g.name, "bought": g.bought, "bought_at": g.bought_at}
-            # Still-to-buy first, bought ones settle to the bottom. The client shows
-            # to-buy on the Body tab and bought ones on the You tab's record.
-            for g in sorted(
-                db.query(GroceryItem).filter_by(player_id=player.id),
-                key=lambda g: (g.bought, g.created_at),
-            )
-        ],
-        "journal": journal,  # free-form daily entries, newest first
+        "reminders": _reminders_of(db, player),
+        "grocery": _grocery_of(db, player),
+        "journal": _journal_of(db, player),  # free-form daily entries, newest first
         "reflections": reflections,  # quest-linked takeaways, newest first
     }

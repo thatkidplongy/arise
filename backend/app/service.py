@@ -326,7 +326,7 @@ def _profile(db: Session, player: Player, day: str) -> dict:
     cutoff = (date.fromisoformat(day) - timedelta(days=7)).isoformat()
     counts: dict[str, int] = {}
     for r in completions_of(db, player):
-        if r.day >= cutoff and r.quest_id not in (game.DAILY_CLEAR_ID, game.REST_DAY_ID):
+        if r.day >= cutoff and not game.is_marker(r.quest_id):
             counts[r.quest_id] = counts.get(r.quest_id, 0) + 1
     return {
         "name": player.name,

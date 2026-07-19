@@ -14,6 +14,27 @@ def _quest(state, qid):
     return next(q for q in state["quests"] if q["id"] == qid)
 
 
+def test_read_and_write_paths_resolve_identical_steps(client):
+    """The steps the client renders (read model) must equal the steps the
+    step-toggle write path validates a tick against — if they drift, a ticked
+    index maps to a different displayed step. This guards the shared resolver."""
+    from app import state as state_mod
+    from app.db import SessionLocal
+
+    s = _state(client)
+    with SessionLocal() as db:
+        player = state_mod.get_or_create_player(db)
+        defs = {q.id: q for q in state_mod.quest_defs(db)}
+        checked = 0
+        for q in s["quests"]:
+            quest = defs[q["id"]]
+            if quest.target != 1:
+                continue  # the step checklist only applies to single-completion quests
+            assert state_mod.resolve_steps(db, player, quest, DAY) == q["steps"], q["id"]
+            checked += 1
+        assert checked > 0  # we actually exercised some quests
+
+
 def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
