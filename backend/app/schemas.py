@@ -245,6 +245,17 @@ class BookReviewOut(BaseModel):
     book: str
 
 
+class WeekReviewOut(BaseModel):
+    """A recap of the current ISO week, for the 'This week' summary."""
+    week: str
+    xp: int
+    completions: int   # quest completions this week (excludes rest/bonus)
+    active_days: int   # distinct days you showed up (rest days included)
+    days_cleared: int  # days all dailies were cleared
+    by_stat: dict[str, int]  # completions per attribute this week
+    top_stat: str | None     # the attribute leaned into most (None if nothing yet)
+
+
 class ReadingOut(BaseModel):
     """Read-only progress on the current book, for the Status screen."""
     book: str
@@ -357,6 +368,7 @@ class StateOut(BaseModel):
     today: TodayOut
     book_review: BookReviewOut
     reading: ReadingOut | None  # progress on the current book, or null when none set
+    week_review: WeekReviewOut  # a gentle recap of the current ISO week
     next_rank: RankGateOut | None
     preferences: dict[str, list[str]]
     levels: dict[str, str]

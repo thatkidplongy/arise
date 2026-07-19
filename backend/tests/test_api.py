@@ -218,3 +218,13 @@ def test_reset(client):
     assert r.status_code == 200
     assert r.json()["player"]["total_xp"] == 0
     assert r.json()["record"]["total_completions"] == 0
+
+
+def test_week_review_recaps_the_week(client):
+    assert client.get(f"/state?day={DAY}").json()["week_review"]["completions"] == 0
+    s = client.post("/completions", json={"quest_id": "d-train", "day": DAY}).json()["state"]
+    wr = s["week_review"]
+    assert wr["completions"] == 1 and wr["xp"] > 0
+    assert wr["active_days"] == 1
+    assert wr["top_stat"] == "STR" and wr["by_stat"].get("STR") == 1
+    assert wr["week"].startswith("2026-W")

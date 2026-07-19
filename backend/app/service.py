@@ -102,11 +102,12 @@ def _revoke_bonus_if_needed(db: Session, player: Player, day: str) -> None:
 def _remove_one_completion(db: Session, player: Player, quest: QuestDef, day: str) -> bool:
     """Remove the most recent completion of `quest` in the period containing `day`."""
     rows = completions_of(db, player)
-    if quest.cadence == "weekly":
-        wk = game.week_key(day)
-        candidates = [r for r in rows if r.quest_id == quest.id and game.week_key(r.day) == wk]
-    else:
-        candidates = [r for r in rows if r.quest_id == quest.id and r.day == day]
+    # Match the quest's own period (weekly + side share the ISO-week period).
+    pk = quests.period_key(quest.cadence, day)
+    candidates = [
+        r for r in rows
+        if r.quest_id == quest.id and quests.period_key(quest.cadence, r.day) == pk
+    ]
     if not candidates:
         return False
     row = max(candidates, key=lambda r: r.at)

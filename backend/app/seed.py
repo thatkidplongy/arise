@@ -17,7 +17,7 @@ SEED_QUESTS = [
     dict(id="w-piece", title="Finish a Piece", desc="Complete one drawing, start to finish", stat="CRE", xp=40, cadence="weekly", target=1),
     dict(id="w-tome", title="Clear the Tome", desc="Finish 3 chapters of your current book", stat="INT", xp=40, cadence="weekly", target=1),
     dict(id="w-still", title="Deep Stillness", desc="One 30-minute meditation session", stat="SPI", xp=30, cadence="weekly", target=1),
-    # Side quests — optional bonus XP, once per day each
+    # Side quests — optional bonus XP, once per week each
     dict(id="s-drill", title="New Technique", desc="Practice a badminton shot or drill you struggle with", stat="STR", xp=15, cadence="side", target=1),
     dict(id="s-brave", title="Beyond the Comfort Zone", desc="Draw a subject you usually avoid", stat="CRE", xp=15, cadence="side", target=1),
     dict(id="s-nature", title="Nature Attunement", desc="Meditate or take a mindful walk outdoors", stat="SPI", xp=15, cadence="side", target=1),

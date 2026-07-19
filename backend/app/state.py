@@ -198,9 +198,10 @@ def _count(rows: list[Completion], quest_id: str, day: str | None = None, week: 
 
 
 def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
-    if quest.cadence == "weekly":
-        return _count(rows, quest.id, week=game.week_key(day))
-    return _count(rows, quest.id, day=day)
+    # Dailies count within the day; weekly and side count within the ISO week.
+    if quest.cadence == "daily":
+        return _count(rows, quest.id, day=day)
+    return _count(rows, quest.id, week=game.week_key(day))
 
 
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
@@ -321,6 +322,33 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion], in
     }
 
 
+def week_review_of(rows: list[Completion], defs: list[QuestDef], day: str) -> dict:
+    """A gentle recap of the current ISO week: what got done, XP earned, days you
+    showed up, days fully cleared, and the area you leaned into. Pure derive-on-read."""
+    week = game.week_key(day)
+    by_id = {d.id: d for d in defs}
+    week_rows = [r for r in rows if game.week_key(r.day) == week]
+    by_stat: dict[str, int] = {}
+    completions = 0
+    for r in week_rows:
+        if r.quest_id in (game.REST_DAY_ID, game.DAILY_CLEAR_ID):
+            continue
+        q = by_id.get(r.quest_id)
+        if q is None:
+            continue
+        by_stat[q.stat] = by_stat.get(q.stat, 0) + 1
+        completions += 1
+    return {
+        "week": week,
+        "xp": sum(r.xp for r in week_rows),
+        "completions": completions,
+        "active_days": len({r.day for r in week_rows}),
+        "days_cleared": len({r.day for r in week_rows if r.quest_id == game.DAILY_CLEAR_ID}),
+        "by_stat": by_stat,
+        "top_stat": max(by_stat, key=by_stat.get) if by_stat else None,
+    }
+
+
 def build_state(db: Session, player: Player, day: str) -> dict:
     defs = quest_defs(db)
     rows = completions_of(db, player)
@@ -381,6 +409,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "reading": reading_of(db, player, day, rows, prog_levels.get("INT", 0)),
+        "week_review": week_review_of(rows, defs, day),
         "stats": [
             {"key": k, **game.stat_level_info(agg["by_stat"][k])} for k in game.STAT_KEYS
         ],

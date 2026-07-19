@@ -3,7 +3,7 @@
 The quests are stable *slots*: their id, stat, xp, cadence and target never
 change (so completions, streaks and achievements keep counting). What rotates is
 each slot's title + description + steps, picked from a hand-written pool by a
-hash of the period — the day for daily/side quests, the ISO week for weekly ones.
+hash of the period — the day for daily quests, the ISO week for weekly and side.
 Same board all day, a fresh one tomorrow. No storage, no external service, no cost.
 
 Each variant is (title, desc, steps): the desc is the one-line "what", and steps
@@ -997,9 +997,10 @@ TIER: dict[str, int] = {
 
 
 def period_key(cadence: str, day: str) -> str:
-    """Weekly quests rotate per ISO week; daily and side rotate per day. Also the
-    scope a quest's step-checks belong to."""
-    return game.week_key(day) if cadence == "weekly" else day
+    """Weekly AND side quests rotate per ISO week (a side quest is a once-a-week
+    optional bonus); only dailies rotate per day. Also the scope a quest's
+    step-checks belong to."""
+    return day if cadence == "daily" else game.week_key(day)
 
 
 # Back-compat alias used within this module.

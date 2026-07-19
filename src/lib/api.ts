@@ -73,6 +73,7 @@ export interface ApiState {
   };
   book_review: { pending: boolean; book: string };
   reading: ApiReading | null; // progress on the current book, or null when none set
+  week_review: ApiWeekReview; // a gentle recap of the current ISO week
   next_rank: { rank: Rank; level: number; streak: number } | null;
   preferences: Partial<Record<StatKey, string[]>>;
   levels: Partial<Record<StatKey, string>>;
@@ -84,6 +85,17 @@ export interface ApiState {
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
   reminders: { id: string; text: string }[]; // a plain personal list on Status
+}
+
+/** A recap of the current ISO week, for the "This week" summary. */
+export interface ApiWeekReview {
+  week: string;
+  xp: number;
+  completions: number;
+  active_days: number;
+  days_cleared: number;
+  by_stat: Partial<Record<StatKey, number>>;
+  top_stat: StatKey | null;
 }
 
 /** Read-only progress on the current book, for the Status screen. */

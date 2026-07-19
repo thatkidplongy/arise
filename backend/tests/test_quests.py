@@ -1,5 +1,7 @@
 """Unit tests for the deterministic quest generator — no database involved."""
 
+from datetime import date, timedelta
+
 from app import quests
 from app.models import QuestDef
 
@@ -10,8 +12,10 @@ def _q(qid: str, stat: str, cadence: str, target: int = 1) -> QuestDef:
 
 def test_period_key():
     assert quests.period_key("daily", "2026-07-18") == "2026-07-18"
-    assert quests.period_key("side", "2026-07-18") == "2026-07-18"
-    assert quests.period_key("weekly", "2026-07-18").startswith("2026-W")
+    # Side quests are a once-a-week optional bonus — same ISO-week period as weekly.
+    wk = quests.period_key("weekly", "2026-07-18")
+    assert wk.startswith("2026-W")
+    assert quests.period_key("side", "2026-07-18") == wk
 
 
 def test_content_is_deterministic_and_well_formed():
@@ -130,13 +134,18 @@ def test_all_pool_variants_are_triples_with_text():
 def test_side_quest_focus_overrides_and_rotates():
     q = _q("s-drill", "STR", "side")
     focus = ["backhand", "smash footwork", "net play"]
+    # Side rotates weekly now, so sample one day per week across several weeks.
     seen = set()
-    for d in range(10, 25):
-        title, desc, steps, _ = quests.content_for(q, f"2026-07-{d:02d}", focus)
+    d = date(2026, 1, 5)
+    for _ in range(12):
+        desc = quests.content_for(q, d.isoformat(), focus)[1]
         assert desc.startswith("Your focus: ")
         seen.add(desc.removeprefix("Your focus: "))
+        d += timedelta(days=7)
     assert seen <= set(focus)  # only ever picks from the set
-    assert len(seen) > 1  # and rotates through it
+    assert len(seen) > 1  # and rotates through it across weeks
+    # Stable within a single ISO week (Mon vs Fri of the same week match).
+    assert quests.content_for(q, "2026-07-13", focus)[1] == quests.content_for(q, "2026-07-17", focus)[1]
 
 
 def test_no_focus_uses_pool():

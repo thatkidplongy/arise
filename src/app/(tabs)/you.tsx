@@ -5,8 +5,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AvatarEditor } from '@/components/AvatarEditor';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import type { ApiWeekReview } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text } from '@/theme';
+import { accent, STAT_META, surface, text } from '@/theme';
 
 // The occasional screens live here rather than crowding the tab bar. Adding more
 // later? Drop another row in — the bar stays at five.
@@ -15,6 +16,40 @@ const ITEMS = [
   { icon: 'compass-outline', label: 'Focus areas', sub: 'Tailor your quests · interview mode', route: '/focus' },
   { icon: 'settings-outline', label: 'Settings', sub: 'North Star · system link · your record', route: '/settings' },
 ] as const;
+
+/** A gentle recap of the current ISO week — what got done, not what was missed. */
+function WeekReview({ review }: { review: ApiWeekReview }) {
+  const top = review.top_stat ? STAT_META[review.top_stat] : null;
+  const cells = [
+    { n: review.completions, label: 'quests' },
+    { n: review.xp, label: 'XP' },
+    { n: review.active_days, label: 'days shown up' },
+    { n: review.days_cleared, label: 'days cleared' },
+  ];
+  return (
+    <SystemPanel title="This week" sub={review.completions ? `${review.completions} done` : undefined}>
+      {review.completions === 0 ? (
+        <Text style={styles.weekEmpty}>A fresh week — whatever you do from here counts.</Text>
+      ) : (
+        <>
+          <View style={styles.weekRow}>
+            {cells.map((c) => (
+              <View key={c.label} style={styles.weekCell}>
+                <Text style={styles.weekNum}>{c.n.toLocaleString()}</Text>
+                <Text style={styles.weekLabel}>{c.label}</Text>
+              </View>
+            ))}
+          </View>
+          {top ? (
+            <Text style={styles.weekTop}>
+              Leaning into <Text style={{ color: top.color, fontWeight: '700' }}>{top.label}</Text> most this week.
+            </Text>
+          ) : null}
+        </>
+      )}
+    </SystemPanel>
+  );
+}
 
 export default function YouScreen() {
   const state = useSystem((s) => s.state);
@@ -30,6 +65,8 @@ export default function YouScreen() {
           </Text>
         ) : null}
       </View>
+
+      {state ? <WeekReview review={state.week_review} /> : null}
 
       <SystemPanel>
         {ITEMS.map((it, i) => (
@@ -60,4 +97,10 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowLabel: { color: text.primary, fontSize: 15, fontWeight: '600' },
   rowSub: { color: text.secondary, fontSize: 12 },
+  weekEmpty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
+  weekRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 12 },
+  weekCell: { width: '46%' },
+  weekNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
+  weekLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
+  weekTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
 });
