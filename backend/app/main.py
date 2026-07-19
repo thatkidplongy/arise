@@ -1,3 +1,4 @@
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -44,6 +45,18 @@ app.add_middleware(
 def health() -> dict:
     """Open, unauthenticated — for uptime checks and reachability probes."""
     return {"status": "ok", "system": "arise"}
+
+
+@app.get("/version")
+def version() -> dict:
+    """The build id (the content-hashed entry bundle) currently served. The web app
+    polls this on open and silently reloads its code when it differs from what's
+    running, so a new build reaches you without a manual refresh. Open, like /health."""
+    idx = WEB_DIR / "index.html"
+    if not idx.is_file():
+        return {"build": ""}
+    m = re.search(r"entry-[a-f0-9]+\.js", idx.read_text())
+    return {"build": m.group(0) if m else ""}
 
 
 # Everything else requires the bearer token (when ARISE_API_TOKEN is set).

@@ -67,6 +67,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("reminders", "done", "BOOLEAN DEFAULT 0"),
     ("reminders", "done_at", "DATETIME"),
     ("players", "japanese_started_week", "VARCHAR DEFAULT ''"),
+    ("insights", "kind", "VARCHAR DEFAULT 'motivation'"),
+    ("quest_defs", "requires_log", "BOOLEAN DEFAULT 0"),
+    ("quest_defs", "log_prompt", "VARCHAR DEFAULT ''"),
 ]
 
 

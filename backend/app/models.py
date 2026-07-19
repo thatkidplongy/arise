@@ -59,6 +59,11 @@ class QuestDef(Base):
     target: Mapped[int] = mapped_column(Integer, default=1)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort: Mapped[int] = mapped_column(Integer, default=0)
+    # When true, this quest is completed BY writing: checking it off opens the
+    # journal editor, and saving the entry is what marks it done. `log_prompt` is
+    # the question shown (a sensible default is used if it's blank).
+    requires_log: Mapped[bool] = mapped_column(Boolean, default=False)
+    log_prompt: Mapped[str] = mapped_column(String, default="")
 
 
 class Completion(Base):
@@ -196,6 +201,10 @@ class Insight(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     source_url: Mapped[str] = mapped_column(String)
     source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
+    # What kind of capture: 'motivation' (quotes + a daily nudge) or 'tips' (a
+    # practical playbook of steps). Drives which Gemini prompt distils it and where
+    # it lands in the Inspire tab. Only motivation quotes feed the Status nudge.
+    kind: Mapped[str] = mapped_column(String, default="motivation")
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     summary: Mapped[str] = mapped_column(String, default="")
     takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
@@ -215,4 +224,50 @@ class Reminder(Base):
     text: Mapped[str] = mapped_column(String)
     done: Mapped[bool] = mapped_column(Boolean, default=False)
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class QuestNote(Base):
+    """What the hunter wrote down for a quest whose `requires_log` is set — a
+    takeaway, an idea, a line to keep. Scoped to the quest's period (day for
+    dailies, ISO week for weekly/side) and dated, so the Journal reads back by date.
+    Kept forever; the note is the point, not the tick."""
+
+    __tablename__ = "quest_notes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    quest_id: Mapped[str] = mapped_column(String)  # quest slug, e.g. 'd-wealth'
+    period_key: Mapped[str] = mapped_column(String)  # day or ISO week the note belongs to
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    text: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class JournalEntry(Base):
+    """A free-form daily journal entry — anything the hunter wants to note for the
+    day, tied to no quest. Markdown, dated, kept forever. Distinct from QuestNote
+    (which is a takeaway earned by completing a reflective quest)."""
+
+    __tablename__ = "journal_entries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    text: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GroceryItem(Base):
+    """Something to buy — tick it once it's in the basket. Bought items stay (with
+    when they were bought), so the list doubles as a record of what you got. No
+    scheduling, no weekly reset; just add, buy, tidy up when you like."""
+
+    __tablename__ = "grocery_items"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    name: Mapped[str] = mapped_column(String)
+    bought: Mapped[bool] = mapped_column(Boolean, default=False)
+    bought_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -2,14 +2,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Markdown } from '@/components/Markdown';
+import { NoteEditorModal } from '@/components/NoteEditorModal';
 import type { ApiQuest } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
+
+// Contexts where a "write"/"note" verb means DO, not journal (write code, record
+// audio, practise kana, repeat N times…). Kept out so those stay normal check-offs.
+// Nouns allow a trailing plural; "5×" / "N times" / "N reps" flag drills.
+const DOING_CONTEXT =
+  /\b(code|snippet|program|function|script|midi|audio|footage|clip|melody|beat|chord|scale|loanword|kana|kanji|katakana|hiragana|push-?up|squat|lunge|plank)s?\b|\d\s*×|\b\d+\s*(times|reps?)\b/;
+
+/** A step whose point is to write/reflect something down (vs. a "do" step). Tapping
+ * such a step opens the editor so what you write gets logged. Best-effort by wording;
+ * the LLM is also told to phrase reflection steps as "Write down…/Note down…/Reflect on…"
+ * so new quests get caught. See backend llm.generate. */
+export function isWriteStep(step: string): boolean {
+  const s = step.trim().toLowerCase();
+  // Unambiguous journaling signals, anywhere in the step.
+  if (/\b(jot|reflect|summari[sz]e|journal)\b/.test(s)) return true;
+  if (/in your own words|key ?takeaway|\btakeaway\b/.test(s)) return true;
+  if (/\b(one|two|three|four|five|six|\d+)[- ]sentence/.test(s)) return true;
+  if (/what (did|do) you (learn|notice|take away|think)|one thing you (learned|noticed|realised|realized)/.test(s))
+    return true;
+  // A writing verb leads the step (write/note/describe/explain/reflect/jot) — unless
+  // it's really a "do" step (write code, note the MIDI…).
+  if (/^(write|note|describe|explain|reflect|jot)\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
+  // "write … down" split across the phrase, e.g. "write your plan down".
+  if (/\bwrite\b/.test(s) && /\bdown\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
+  return false;
+}
 
 export function QuestCard({ quest }: { quest: ApiQuest }) {
   const complete = useSystem((s) => s.complete);
   const undo = useSystem((s) => s.undo);
   const toggleStep = useSystem((s) => s.toggleStep);
+  const addQuestNote = useSystem((s) => s.addQuestNote);
+  const updateQuestNote = useSystem((s) => s.updateQuestNote);
+  const removeQuestNote = useSystem((s) => s.removeQuestNote);
   const [busy, setBusy] = useState(false);
 
   const isDone = quest.done >= quest.target;
@@ -36,10 +67,54 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
     setBusy(false);
   };
 
+  // The writing editor (a modal). Opens when you tap a "write" step, or when you
+  // tap an already-saved entry to edit it.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [notePrompt, setNotePrompt] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteInitial, setNoteInitial] = useState('');
+  const [pendingStep, setPendingStep] = useState<number | null>(null);
+
+  const openEditNote = (n: { id: string; text: string }) => {
+    setPendingStep(null);
+    setEditingNoteId(n.id);
+    setNoteInitial(n.text);
+    setNotePrompt('Edit your entry');
+    setNoteOpen(true);
+  };
+
+  const saveNote = async (t: string) => {
+    setNoteOpen(false);
+    if (editingNoteId) {
+      void updateQuestNote(editingNoteId, t);
+      return;
+    }
+    // A fresh entry written from a step: log it, then tick that step (which may
+    // complete the quest if it was the last one).
+    const step = pendingStep;
+    setPendingStep(null);
+    await addQuestNote(quest.id, t);
+    if (step != null) await toggleStep(quest, step);
+  };
+
   const completeOrUndo = () => {
     if (busy) return;
     if (!isDone) run(() => complete(quest));
     else if (canUndoToday) run(() => undo(quest));
+  };
+
+  // Tapping a step. A "write" step being ticked opens the editor first (saving
+  // logs it and ticks the step); every other tap just toggles the step.
+  const onStepPress = (i: number) => {
+    if (!quest.steps_done[i] && isWriteStep(quest.steps[i])) {
+      setEditingNoteId(null);
+      setNoteInitial('');
+      setNotePrompt(quest.steps[i]);
+      setPendingStep(i);
+      setNoteOpen(true);
+      return;
+    }
+    run(() => toggleStep(quest, i));
   };
 
   const inner = (
@@ -62,7 +137,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
               useChecklist ? (
                 <Pressable
                   key={i}
-                  onPress={() => run(() => toggleStep(quest, i))}
+                  onPress={() => onStepPress(i)}
                   hitSlop={4}
                   style={styles.stepRow}
                 >
@@ -81,6 +156,9 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
                   <Text style={[styles.stepText, quest.steps_done[i] && styles.stepTextDone]}>
                     {step}
                   </Text>
+                  {isWriteStep(step) && !quest.steps_done[i] ? (
+                    <Ionicons name="create-outline" size={13} color={meta.color} style={styles.stepPen} />
+                  ) : null}
                 </Pressable>
               ) : (
                 <View key={i} style={styles.stepRow}>
@@ -102,6 +180,22 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
           <Text style={[styles.progress, { color: meta.color }]}>
             {Math.min(quest.done, quest.target)} of {quest.target} this week
           </Text>
+        ) : null}
+
+        {/* What you wrote on this quest's write-steps — tap to edit, × to remove. */}
+        {quest.notes.length > 0 ? (
+          <View style={styles.notes}>
+            {quest.notes.map((n) => (
+              <View key={n.id} style={styles.noteItem}>
+                <Pressable style={styles.noteItemBody} onPress={() => openEditNote(n)}>
+                  <Markdown value={n.text} />
+                </Pressable>
+                <Pressable onPress={() => void removeQuestNote(n.id)} hitSlop={8}>
+                  <Text style={styles.noteX}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
         ) : null}
 
         {isDone ? (
@@ -149,23 +243,41 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
     </>
   );
 
+  const noteModal = (
+    <NoteEditorModal
+      visible={noteOpen}
+      prompt={notePrompt}
+      initial={noteInitial}
+      onSave={saveNote}
+      onClose={() => setNoteOpen(false)}
+    />
+  );
+
   // Checklist quests aren't tap-to-complete as a whole (you tick steps or tap the
   // check); everything else keeps the whole-card tap.
   if (useChecklist) {
-    return <View style={[styles.card, isDone && styles.cardDone]}>{inner}</View>;
+    return (
+      <>
+        <View style={[styles.card, isDone && styles.cardDone]}>{inner}</View>
+        {noteModal}
+      </>
+    );
   }
 
   return (
-    <Pressable
-      onPress={completeOrUndo}
-      style={({ pressed }) => [
-        styles.card,
-        isDone && styles.cardDone,
-        pressed && { backgroundColor: withAlpha(meta.color, 0.06), borderColor: meta.color },
-      ]}
-    >
-      {inner}
-    </Pressable>
+    <>
+      <Pressable
+        onPress={completeOrUndo}
+        style={({ pressed }) => [
+          styles.card,
+          isDone && styles.cardDone,
+          pressed && { backgroundColor: withAlpha(meta.color, 0.06), borderColor: meta.color },
+        ]}
+      >
+        {inner}
+      </Pressable>
+      {noteModal}
+    </>
   );
 }
 
@@ -250,6 +362,7 @@ const styles = StyleSheet.create({
     color: text.faint,
     textDecorationLine: 'line-through',
   },
+  stepPen: { marginTop: 1 },
   progress: {
     fontSize: 12,
     fontWeight: '600',
@@ -282,6 +395,29 @@ const styles = StyleSheet.create({
     color: text.secondary,
     fontSize: 12,
     fontWeight: '600',
+  },
+  notes: {
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+    gap: 7,
+  },
+  noteItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: withAlpha(feedback.gold, 0.07),
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  noteItemBody: { flex: 1 },
+  noteX: {
+    color: text.faint,
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: -2,
   },
   right: {
     alignItems: 'center',

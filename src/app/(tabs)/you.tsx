@@ -12,6 +12,7 @@ import { accent, STAT_META, surface, text } from '@/theme';
 // The occasional screens live here rather than crowding the tab bar. Adding more
 // later? Drop another row in — the bar stays at five.
 const ITEMS = [
+  { icon: 'book-outline', label: 'Journal', sub: 'Write freely · quest reflections', route: '/journal' },
   { icon: 'trophy-outline', label: 'Achievements', sub: 'Titles & milestones', route: '/achievements' },
   { icon: 'compass-outline', label: 'Focus areas', sub: 'Tailor your quests · interview mode', route: '/focus' },
   { icon: 'settings-outline', label: 'Settings', sub: 'North Star · system link · your record', route: '/settings' },
@@ -51,6 +52,39 @@ function WeekReview({ review }: { review: ApiWeekReview }) {
   );
 }
 
+/** A quiet record of the grocery list — what's still to buy, and how much you've
+ * ticked off. Editing lives on the Body tab; here it's compact chips that wrap, so
+ * it stays short and uses the width. Capped, with a "+N more" when the list is long. */
+const GROCERY_CAP = 12;
+
+function GroceryRecord({ items }: { items: { id: string; name: string; bought: boolean }[] }) {
+  const toBuy = items.filter((g) => !g.bought);
+  const bought = items.length - toBuy.length;
+  const shown = toBuy.slice(0, GROCERY_CAP);
+  const overflow = toBuy.length - shown.length;
+  return (
+    <SystemPanel title="Groceries" sub={`${toBuy.length} to buy`}>
+      {toBuy.length ? (
+        <View style={styles.groceryWrap}>
+          {shown.map((g) => (
+            <View key={g.id} style={styles.groceryChip}>
+              <Text style={styles.groceryChipText}>{g.name}</Text>
+            </View>
+          ))}
+          {overflow > 0 ? (
+            <Pressable onPress={() => router.push('/body')} style={styles.groceryMoreChip}>
+              <Text style={styles.groceryMoreText}>+{overflow} more</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : (
+        <Text style={styles.groceryDone}>All bought — nothing left on the list.</Text>
+      )}
+      {bought ? <Text style={styles.groceryMeta}>{bought} already bought</Text> : null}
+    </SystemPanel>
+  );
+}
+
 export default function YouScreen() {
   const state = useSystem((s) => s.state);
 
@@ -67,6 +101,8 @@ export default function YouScreen() {
       </View>
 
       {state ? <WeekReview review={state.week_review} /> : null}
+
+      {state && state.grocery.length ? <GroceryRecord items={state.grocery} /> : null}
 
       <SystemPanel>
         {ITEMS.map((it, i) => (
@@ -103,4 +139,22 @@ const styles = StyleSheet.create({
   weekNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
   weekLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
   weekTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
+  groceryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  groceryChip: {
+    backgroundColor: surface.raised,
+    borderRadius: 99,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  groceryChipText: { color: text.primary, fontSize: 13, fontWeight: '600' },
+  groceryMoreChip: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 99,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  groceryMoreText: { color: accent, fontSize: 13, fontWeight: '700' },
+  groceryDone: { color: text.secondary, fontSize: 13, lineHeight: 19 },
+  groceryMeta: { color: text.faint, fontSize: 12, marginTop: 8 },
 });

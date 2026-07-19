@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { api, type ApiInsight } from '@/lib/api';
+import { api, type ApiInsight, type InsightKind } from '@/lib/api';
 
 import { link } from './link';
 import { useSystem } from './useSystem';
@@ -9,6 +9,7 @@ import { useSystem } from './useSystem';
 export interface PendingCapture {
   tempId: string;
   url: string;
+  kind: InsightKind;
   status: 'working' | 'error';
   error?: string;
 }
@@ -30,7 +31,7 @@ interface MotivationStore {
   error: string | null;
 
   fetch: () => Promise<void>;
-  add: (url: string) => void; // fire-and-forget; progress lives on `pending`
+  add: (url: string, kind: InsightKind) => void; // fire-and-forget; progress lives on `pending`
   retry: (tempId: string) => void;
   dismiss: (tempId: string) => void;
   remove: (id: string) => Promise<void>;
@@ -50,10 +51,10 @@ export const useMotivation = create<MotivationStore>((set, get) => {
   // Runs a capture in the background: its pending card shows a spinner until this
   // resolves, then it's swapped for the finished insight (or marked with an error
   // + retry). Lives in the store, not the screen, so it survives navigating away.
-  const run = async (tempId: string, url: string) => {
+  const run = async (tempId: string, url: string, kind: InsightKind) => {
     const { serverUrl, apiToken } = link();
     try {
-      const insight = await api.addInsight(serverUrl, apiToken, url);
+      const insight = await api.addInsight(serverUrl, apiToken, url, kind);
       set((s) => ({
         // Dedupe by id: if this video was already captured (the backend returns
         // the existing insight), move it to the top rather than listing it twice.
@@ -88,10 +89,10 @@ export const useMotivation = create<MotivationStore>((set, get) => {
       }
     },
 
-    add: (url) => {
+    add: (url, kind) => {
       const tempId = `pending-${++seq}`;
-      set((s) => ({ pending: [{ tempId, url, status: 'working' as const }, ...s.pending] }));
-      void run(tempId, url);
+      set((s) => ({ pending: [{ tempId, url, kind, status: 'working' as const }, ...s.pending] }));
+      void run(tempId, url, kind);
     },
 
     retry: (tempId) => {
@@ -102,7 +103,7 @@ export const useMotivation = create<MotivationStore>((set, get) => {
           x.tempId === tempId ? { ...x, status: 'working' as const, error: undefined } : x,
         ),
       }));
-      void run(tempId, p.url);
+      void run(tempId, p.url, p.kind);
     },
 
     dismiss: (tempId) => set((s) => ({ pending: s.pending.filter((x) => x.tempId !== tempId) })),

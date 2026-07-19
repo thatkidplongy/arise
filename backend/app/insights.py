@@ -44,6 +44,7 @@ def to_out(row: Insight) -> dict:
         "id": row.id,
         "source_url": row.source_url,
         "source": row.source,
+        "kind": row.kind or "motivation",
         "title": row.title,
         "summary": row.summary,
         "takeaways": _loads(row.takeaways),
@@ -62,20 +63,21 @@ def list_insights(db: Session, player_id: str) -> list[dict]:
     return [to_out(r) for r in rows]
 
 
-def add_insight(db: Session, player_id: str, url: str) -> dict:
-    """Fetch + distil + persist one capture. Raises:
+def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation") -> dict:
+    """Fetch + distil + persist one capture. `kind` is 'motivation' (quotes + a daily
+    nudge) or 'tips' (a practical playbook). Raises:
     - ValueError('no Supadata key') when the transcript service isn't configured
     - NoTranscript when the video has no usable speech to work from
     - any transport/parse error from Supadata or Gemini
     The route maps each of these to a clean HTTP response."""
+    kind = "tips" if kind == "tips" else "motivation"
     canonical = transcript.clean_url(url)
-    # Idempotent: if this video is already captured, return it instead of
-    # re-fetching + re-distilling. This makes re-pasting a link a no-op (no wasted
-    # Supadata/Gemini calls, no rate-limit error) — e.g. after the app was closed
-    # mid-capture and the in-flight card was lost.
+    # Idempotent per (url, kind): re-pasting a link under the same mode is a no-op
+    # (no wasted Supadata/Gemini calls). The same video can still be kept once as
+    # motivation and once as tips, since those distil to different things.
     existing = (
         db.query(Insight)
-        .filter_by(player_id=player_id, source_url=canonical)
+        .filter_by(player_id=player_id, source_url=canonical, kind=kind)
         .first()
     )
     if existing is not None:
@@ -84,11 +86,12 @@ def add_insight(db: Session, player_id: str, url: str) -> dict:
     text = (fetched.get("text") or "").strip()
     if len(text) < 20:  # nothing meaningful to distil (music-only, silent, etc.)
         raise NoTranscript()
-    distilled = llm.distill_motivation(text)
+    distilled = llm.distill_tips(text) if kind == "tips" else llm.distill_motivation(text)
     row = Insight(
         player_id=player_id,
         source_url=canonical,
         source=fetched.get("source", "web"),
+        kind=kind,
         title=_title_for(url, fetched.get("source", "web")),
         summary=distilled["summary"],
         takeaways=json.dumps(distilled["takeaways"]),
@@ -108,9 +111,15 @@ def remove_insight(db: Session, player_id: str, insight_id: str) -> None:
 
 
 def _all_quotes(db: Session, player_id: str) -> list[dict]:
-    """Every quote across all captures, tagged with where it came from."""
+    """Every quote across motivational captures, tagged with where it came from.
+    Tips captures carry no quotes and never feed the Status nudge."""
     out: list[dict] = []
-    for r in db.query(Insight).filter_by(player_id=player_id).order_by(Insight.created_at):
+    rows = (
+        db.query(Insight)
+        .filter_by(player_id=player_id, kind="motivation")
+        .order_by(Insight.created_at)
+    )
+    for r in rows:
         for q in _loads(r.quotes):
             out.append({"text": q, "source_title": r.title, "insight_id": r.id})
     return out

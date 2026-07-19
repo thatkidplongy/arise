@@ -18,9 +18,12 @@ from .models import (
     AchievementUnlock,
     Completion,
     GeneratedQuest,
+    GroceryItem,
+    JournalEntry,
     Player,
     Preference,
     QuestDef,
+    QuestNote,
     Reminder,
     StepCheck,
     utcnow,
@@ -427,6 +430,83 @@ def toggle_reminder(db: Session, player: Player, reminder_id: str, done: bool) -
     if row is not None and row.player_id == player.id:
         row.done = done
         row.done_at = utcnow() if done else None
+        db.commit()
+
+
+def add_quest_note(db: Session, player: Player, quest_id: str, day: str, text: str) -> None:
+    """Save a reflection for a quest, scoped to its current period. Only reflective
+    quests offer a prompt, but any note that arrives is kept — the client won't send
+    one otherwise."""
+    text = (text or "").strip()[:2000]
+    if not text:
+        return
+    quest = next((q for q in quest_defs(db) if q.id == quest_id), None)
+    if quest is None:
+        raise HTTPException(404, f"Unknown quest: {quest_id}")
+    pk = quests.period_key(quest.cadence, day)
+    db.add(QuestNote(player_id=player.id, quest_id=quest_id, period_key=pk, day=day, text=text))
+    db.commit()
+
+
+def update_quest_note(db: Session, player: Player, note_id: str, text: str) -> None:
+    """Edit an existing reflection in place (the modal editor saves through here)."""
+    text = (text or "").strip()[:2000]
+    row = db.get(QuestNote, note_id)
+    if row is not None and row.player_id == player.id and text:
+        row.text = text
+        db.commit()
+
+
+def remove_quest_note(db: Session, player: Player, note_id: str) -> None:
+    row = db.get(QuestNote, note_id)
+    if row is not None and row.player_id == player.id:
+        db.delete(row)
+        db.commit()
+
+
+def add_journal_entry(db: Session, player: Player, day: str, text: str) -> None:
+    """Write a free-form entry for the day (Markdown). Unlinked to any quest."""
+    text = (text or "").strip()[:5000]
+    if text:
+        db.add(JournalEntry(player_id=player.id, day=day, text=text))
+        db.commit()
+
+
+def update_journal_entry(db: Session, player: Player, entry_id: str, text: str) -> None:
+    text = (text or "").strip()[:5000]
+    row = db.get(JournalEntry, entry_id)
+    if row is not None and row.player_id == player.id and text:
+        row.text = text
+        db.commit()
+
+
+def remove_journal_entry(db: Session, player: Player, entry_id: str) -> None:
+    row = db.get(JournalEntry, entry_id)
+    if row is not None and row.player_id == player.id:
+        db.delete(row)
+        db.commit()
+
+
+def add_grocery(db: Session, player: Player, name: str) -> None:
+    name = (name or "").strip()[:120]
+    if name:
+        db.add(GroceryItem(player_id=player.id, name=name))
+        db.commit()
+
+
+def remove_grocery(db: Session, player: Player, item_id: str) -> None:
+    row = db.get(GroceryItem, item_id)
+    if row is not None and row.player_id == player.id:
+        db.delete(row)
+        db.commit()
+
+
+def toggle_grocery(db: Session, player: Player, item_id: str, bought: bool) -> None:
+    """Mark a grocery bought (or not). Bought items stay in the list as a record."""
+    row = db.get(GroceryItem, item_id)
+    if row is not None and row.player_id == player.id:
+        row.bought = bought
+        row.bought_at = utcnow() if bought else None
         db.commit()
 
 

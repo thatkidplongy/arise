@@ -49,6 +49,26 @@ export interface ApiQuest {
   target: number;
   done: number;
   undoable_id: string | null;
+  note_prompt: string; // a journal prompt for reflective quests, else ''
+  notes: { id: string; text: string }[]; // notes jotted this period for this quest
+}
+
+/** One quest-linked reflection (from a requires_log quest). */
+export interface ApiReflection {
+  id: string;
+  quest_id: string;
+  stat: StatKey;
+  day: string;
+  text: string;
+  created_at: string;
+}
+
+/** One free-form daily journal entry (unlinked to any quest). */
+export interface ApiJournalEntry {
+  id: string;
+  day: string;
+  text: string;
+  created_at: string;
 }
 
 export interface ApiAchievement {
@@ -85,6 +105,9 @@ export interface ApiState {
   achievements: ApiAchievement[];
   record: { active_days: number; total_completions: number };
   reminders: { id: string; text: string; done: boolean }[]; // a checkable to-do list on Status
+  grocery: { id: string; name: string; bought: boolean }[]; // things to buy, ticked once bought
+  journal: ApiJournalEntry[]; // free-form daily entries, newest first
+  reflections: ApiReflection[]; // quest-linked takeaways, newest first
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
@@ -244,10 +267,13 @@ export interface ApiBookShelf {
 
 // ── Inspire (captured motivational videos → distilled insights) ──────────────
 
+export type InsightKind = 'motivation' | 'tips';
+
 export interface ApiInsight {
   id: string;
   source_url: string;
   source: string; // tiktok | instagram | youtube | web
+  kind: InsightKind; // 'motivation' (quotes + daily nudge) or 'tips' (a playbook)
   title: string; // @handle / short label
   summary: string;
   takeaways: string[];
@@ -446,12 +472,12 @@ export const api = {
   getInsights: (base: string, token: string) =>
     request<ApiInsight[]>(base, '/insights', token),
 
-  addInsight: (base: string, token: string, url: string) =>
+  addInsight: (base: string, token: string, url: string, kind: InsightKind = 'motivation') =>
     request<ApiInsight>(
       base,
       '/insights',
       token,
-      { method: 'POST', body: JSON.stringify({ url }) },
+      { method: 'POST', body: JSON.stringify({ url, kind }) },
       60000, // fetch a transcript + distil it — the slowest call in the app
     ),
 
@@ -510,4 +536,52 @@ export const api = {
 
   removeReminder: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/reminders/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Grocery list (things to buy) ──────────────────────────────────────────
+  addGrocery: (base: string, token: string, name: string, day: string) =>
+    request<ApiState>(base, `/grocery?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+
+  toggleGrocery: (base: string, token: string, id: string, bought: boolean, day: string) =>
+    request<ApiState>(base, `/grocery/${id}/toggle?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ bought }),
+    }),
+
+  removeGrocery: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/grocery/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Quest journal (reflection notes) ──────────────────────────────────────
+  addQuestNote: (base: string, token: string, questId: string, text: string, day: string) =>
+    request<ApiState>(base, `/quest-notes`, token, {
+      method: 'POST',
+      body: JSON.stringify({ quest_id: questId, text, day }),
+    }),
+
+  updateQuestNote: (base: string, token: string, id: string, text: string, day: string) =>
+    request<ApiState>(base, `/quest-notes/${id}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ text, day }),
+    }),
+
+  removeQuestNote: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/quest-notes/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Journal (free-form daily entries) ─────────────────────────────────────
+  addJournalEntry: (base: string, token: string, text: string, day: string) =>
+    request<ApiState>(base, `/journal`, token, {
+      method: 'POST',
+      body: JSON.stringify({ text, day }),
+    }),
+
+  updateJournalEntry: (base: string, token: string, id: string, text: string, day: string) =>
+    request<ApiState>(base, `/journal/${id}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ text, day }),
+    }),
+
+  removeJournalEntry: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/journal/${id}?day=${day}`, token, { method: 'DELETE' }),
 };

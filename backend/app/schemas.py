@@ -40,6 +40,8 @@ class InterviewModeIn(BaseModel):
 
 class InsightAddIn(BaseModel):
     url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL")
+    kind: str = Field(default="motivation", pattern=r"^(motivation|tips)$",
+                      description="'motivation' (quotes + daily nudge) or 'tips' (a practical playbook)")
 
 
 class AvatarIn(BaseModel):
@@ -52,6 +54,35 @@ class ReminderIn(BaseModel):
 
 class ReminderToggleIn(BaseModel):
     done: bool
+
+
+class GroceryIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class GroceryToggleIn(BaseModel):
+    bought: bool
+
+
+class QuestNoteIn(BaseModel):
+    quest_id: str
+    text: str = Field(min_length=1, max_length=2000)  # lightweight Markdown
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
+
+
+class QuestNoteUpdateIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)  # lightweight Markdown
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
+
+
+class JournalEntryIn(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)  # free-form Markdown
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
+
+
+class JournalEntryUpdateIn(BaseModel):
+    text: str = Field(min_length=1, max_length=5000)
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
 # ── Body (standalone wellness tools) ──────────────────────────────────────────
@@ -311,6 +342,11 @@ class RankGateOut(BaseModel):
     streak: int
 
 
+class QuestNoteOut(BaseModel):
+    id: str
+    text: str
+
+
 class QuestOut(BaseModel):
     id: str
     title: str
@@ -324,6 +360,8 @@ class QuestOut(BaseModel):
     target: int
     done: int
     undoable_id: str | None
+    note_prompt: str  # the journal prompt when the quest's requires_log is set, else ""
+    notes: list[QuestNoteOut]  # notes jotted this period for this quest
 
 
 class AchievementOut(BaseModel):
@@ -344,6 +382,7 @@ class InsightOut(BaseModel):
     id: str
     source_url: str
     source: str  # tiktok | instagram | youtube | web
+    kind: str  # motivation | tips
     title: str
     summary: str
     takeaways: list[str]
@@ -368,6 +407,31 @@ class ReminderOut(BaseModel):
     done: bool
 
 
+class GroceryOut(BaseModel):
+    id: str
+    name: str
+    bought: bool
+
+
+class ReflectionOut(BaseModel):
+    """One quest-linked reflection (from a requires_log quest), for the Reflections
+    view of the Journal."""
+    id: str
+    quest_id: str
+    stat: str  # STR | CRE | SPI | CHA | INT | WLT | CFT — colours/labels the entry
+    day: str
+    text: str
+    created_at: datetime
+
+
+class JournalEntryOut(BaseModel):
+    """One free-form daily journal entry (unlinked to any quest)."""
+    id: str
+    day: str
+    text: str
+    created_at: datetime
+
+
 class StateOut(BaseModel):
     player: PlayerOut
     stats: list[StatOut]
@@ -387,6 +451,9 @@ class StateOut(BaseModel):
     achievements: list[AchievementOut]
     record: RecordOut
     reminders: list[ReminderOut]  # a plain personal list shown on Status
+    grocery: list[GroceryOut]  # things to buy — ticked off once bought
+    journal: list[JournalEntryOut]  # free-form daily entries, newest first
+    reflections: list[ReflectionOut]  # quest-linked takeaways, newest first
 
 
 class EventOut(BaseModel):

@@ -106,6 +106,15 @@ interface SystemStore {
   addReminder: (text: string) => Promise<void>;
   toggleReminder: (id: string, done: boolean) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
+  addGrocery: (name: string) => Promise<void>;
+  toggleGrocery: (id: string, bought: boolean) => Promise<void>;
+  removeGrocery: (id: string) => Promise<void>;
+  addQuestNote: (questId: string, text: string) => Promise<void>;
+  updateQuestNote: (id: string, text: string) => Promise<void>;
+  removeQuestNote: (id: string) => Promise<void>;
+  addJournalEntry: (text: string) => Promise<void>;
+  updateJournalEntry: (id: string, text: string) => Promise<void>;
+  removeJournalEntry: (id: string) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
@@ -302,6 +311,105 @@ export const useSystem = create<SystemStore>()(
         const { serverUrl, apiToken, notices } = get();
         try {
           const state = await api.removeReminder(serverUrl, apiToken, id, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      addGrocery: async (name) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.addGrocery(serverUrl, apiToken, name, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      toggleGrocery: async (id, bought) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.toggleGrocery(serverUrl, apiToken, id, bought, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      removeGrocery: async (id) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.removeGrocery(serverUrl, apiToken, id, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      addQuestNote: async (questId, text) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.addQuestNote(serverUrl, apiToken, questId, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      updateQuestNote: async (id, text) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updateQuestNote(serverUrl, apiToken, id, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      removeQuestNote: async (id) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.removeQuestNote(serverUrl, apiToken, id, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      addJournalEntry: async (text) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.addJournalEntry(serverUrl, apiToken, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      updateJournalEntry: async (id, text) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.updateJournalEntry(serverUrl, apiToken, id, text, dateKey());
+          set({ state, status: 'online' });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: [...notices, notice] });
+        }
+      },
+
+      removeJournalEntry: async (id) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const state = await api.removeJournalEntry(serverUrl, apiToken, id, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
           const { status, notice } = errorOutcome(e);

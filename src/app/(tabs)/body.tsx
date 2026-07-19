@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { GroceryPanel } from '@/components/GroceryPanel';
 import { NutritionPanel } from '@/components/NutritionPanel';
 import { Screen } from '@/components/Screen';
 import { SkincarePanel } from '@/components/SkincarePanel';
@@ -29,6 +30,7 @@ export default function BodyScreen() {
       {body ? (
         <>
           <NutritionPanel />
+          <GroceryPanel />
           <SkincarePanel />
         </>
       ) : (

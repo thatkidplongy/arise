@@ -8,9 +8,12 @@ from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CompleteIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
-                      InsightAddIn, InsightOut, InterviewModeIn, PlayerIn,
-                      PreferencesIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
-                      SkincareProductOut, SkincareStepIn, StateOut, StepResult, StepToggleIn)
+                      GroceryIn, GroceryToggleIn, InsightAddIn, InsightOut,
+                      InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
+                      PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
+                      ReminderIn, ReminderToggleIn, SkincareCheckIn,
+                      SkincareProductOut, SkincareStepIn, StateOut, StepResult,
+                      StepToggleIn)
 
 router = APIRouter()
 
@@ -292,7 +295,7 @@ def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
     if not llm.enabled():
         raise HTTPException(503, "Distilling needs a Gemini key (set ARISE_LLM_API_KEY).")
     try:
-        return insights.add_insight(db, player.id, body_in.url)
+        return insights.add_insight(db, player.id, body_in.url, body_in.kind)
     except insights.NoTranscript:
         raise HTTPException(422, "No speech found in that video — it may be music- or text-only.")
     except Exception:
@@ -354,4 +357,82 @@ def toggle_reminder(reminder_id: str, body_in: ReminderToggleIn,
 def remove_reminder(reminder_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
     player = state.get_or_create_player(db)
     service.remove_reminder(db, player, reminder_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+# ── Grocery list (things to buy; tick when bought) ────────────────────────────
+
+
+@router.post("/grocery", response_model=StateOut)
+def add_grocery(body_in: GroceryIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Add something to buy. It shows as a checklist on Body and the You hub."""
+    player = state.get_or_create_player(db)
+    service.add_grocery(db, player, body_in.name)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/grocery/{item_id}/toggle", response_model=StateOut)
+def toggle_grocery(item_id: str, body_in: GroceryToggleIn,
+                   day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Mark a grocery bought (or back to unbought). Bought items stay as a record."""
+    player = state.get_or_create_player(db)
+    service.toggle_grocery(db, player, item_id, body_in.bought)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.delete("/grocery/{item_id}", response_model=StateOut)
+def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_grocery(db, player, item_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+# ── Quest journal (reflection notes) ──────────────────────────────────────────
+
+
+@router.post("/quest-notes", response_model=StateOut)
+def add_quest_note(body_in: QuestNoteIn, db: Session = Depends(get_db)):
+    """Save what you wrote for a reflective quest. Kept, dated, in the Journal."""
+    player = state.get_or_create_player(db)
+    service.add_quest_note(db, player, body_in.quest_id, _valid_day(body_in.day), body_in.text)
+    return state.build_state(db, player, _valid_day(body_in.day))
+
+
+@router.post("/quest-notes/{note_id}", response_model=StateOut)
+def update_quest_note(note_id: str, body_in: QuestNoteUpdateIn, db: Session = Depends(get_db)):
+    """Edit a saved reflection (the modal editor saves through here)."""
+    player = state.get_or_create_player(db)
+    service.update_quest_note(db, player, note_id, body_in.text)
+    return state.build_state(db, player, _valid_day(body_in.day))
+
+
+@router.delete("/quest-notes/{note_id}", response_model=StateOut)
+def remove_quest_note(note_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_quest_note(db, player, note_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+# ── Journal (free-form daily entries) ─────────────────────────────────────────
+
+
+@router.post("/journal", response_model=StateOut)
+def add_journal_entry(body_in: JournalEntryIn, db: Session = Depends(get_db)):
+    """Write anything for the day — a free journal entry, unlinked to any quest."""
+    player = state.get_or_create_player(db)
+    service.add_journal_entry(db, player, _valid_day(body_in.day), body_in.text)
+    return state.build_state(db, player, _valid_day(body_in.day))
+
+
+@router.post("/journal/{entry_id}", response_model=StateOut)
+def update_journal_entry(entry_id: str, body_in: JournalEntryUpdateIn, db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.update_journal_entry(db, player, entry_id, body_in.text)
+    return state.build_state(db, player, _valid_day(body_in.day))
+
+
+@router.delete("/journal/{entry_id}", response_model=StateOut)
+def remove_journal_entry(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_journal_entry(db, player, entry_id)
     return state.build_state(db, player, _valid_day(day))

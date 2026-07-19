@@ -18,9 +18,12 @@ from .models import (
     AchievementUnlock,
     Completion,
     GeneratedQuest,
+    GroceryItem,
+    JournalEntry,
     Player,
     Preference,
     QuestDef,
+    QuestNote,
     Reminder,
     StepCheck,
 )
@@ -279,7 +282,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, chapters=0, interview=False, jp_week=0) -> dict:
+               levels=None, chapters=0, interview=False, jp_week=0, notes_by=None) -> dict:
     level = (levels or {}).get(q.stat, 0)
     pk = quests.period_key(q.cadence, day)
     gen = (gen_by or {}).get((q.id, pk))
@@ -305,6 +308,10 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         "target": q.target,
         "done": done_count(rows, q, day),
         "undoable_id": undoable_id(q),
+        # A quest flagged `requires_log` is completed by writing; its prompt (or a
+        # default) drives the editor and what's written is kept in the Journal.
+        "note_prompt": (q.log_prompt or quests.DEFAULT_LOG_PROMPT) if q.requires_log else "",
+        "notes": (notes_by or {}).get((q.id, pk), []),
     }
 
 
@@ -401,6 +408,31 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     for c in db.query(StepCheck).filter_by(player_id=player.id):
         checks_by.setdefault((c.quest_id, c.period_key), set()).add(c.step_index)
 
+    # Quest reflections: group this-period notes onto their quest (so the card shows
+    # what's been jotted), and collect them all for the Reflections view.
+    stat_by_qid = {q.id: q.stat for q in defs}
+    notes_by: dict[tuple[str, str], list[dict]] = {}
+    reflections: list[dict] = []
+    for n in sorted(db.query(QuestNote).filter_by(player_id=player.id), key=lambda n: n.created_at):
+        notes_by.setdefault((n.quest_id, n.period_key), []).append({"id": n.id, "text": n.text})
+        reflections.append({
+            "id": n.id,
+            "quest_id": n.quest_id,
+            "stat": stat_by_qid.get(n.quest_id, ""),
+            "day": n.day,
+            "text": n.text,
+            "created_at": n.created_at,
+        })
+    reflections.reverse()  # newest first
+
+    # Free-form daily journal — anything the hunter wrote for the day, no quest.
+    journal = [
+        {"id": e.id, "day": e.day, "text": e.text, "created_at": e.created_at}
+        for e in db.query(JournalEntry)
+        .filter_by(player_id=player.id)
+        .order_by(JournalEntry.created_at.desc())
+    ]
+
     def undoable_id(quest: QuestDef) -> str | None:
         todays = [r for r in rows if r.quest_id == quest.id and r.day == day]
         return max(todays, key=lambda r: r.at).id if todays else None
@@ -452,7 +484,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.current_book_chapters, player.interview_mode,
-                       _jp_week(player, day))
+                       _jp_week(player, day), notes_by)
             for q in defs
         ],
         "achievements": [
@@ -478,4 +510,14 @@ def build_state(db: Session, player: Player, day: str) -> dict:
                 key=lambda r: (r.done, r.created_at),
             )
         ],
+        "grocery": [
+            {"id": g.id, "name": g.name, "bought": g.bought}
+            # Still-to-buy first, bought ones settle to the bottom.
+            for g in sorted(
+                db.query(GroceryItem).filter_by(player_id=player.id),
+                key=lambda g: (g.bought, g.created_at),
+            )
+        ],
+        "journal": journal,  # free-form daily entries, newest first
+        "reflections": reflections,  # quest-linked takeaways, newest first
     }

@@ -167,3 +167,50 @@ def test_capture_reports_no_speech(client, monkeypatch):
                         lambda url, **kw: {"lang": "", "text": "", "source": "tiktok"})
     r = client.post("/insights", json={"url": "https://www.tiktok.com/@x/video/1"})
     assert r.status_code == 422
+
+
+# ── Tips mode (a second kind of capture) ──────────────────────────────────────
+
+
+def test_tips_capture_uses_the_tips_distiller(db, monkeypatch):
+    monkeypatch.setattr(transcript, "fetch",
+                        lambda url, **kw: {"lang": "en", "text": "How to meal prep in an hour.", "source": "youtube"})
+    monkeypatch.setattr(llm, "distill_motivation",
+                        lambda t, **kw: {"summary": "MOTIV", "takeaways": ["m"], "quotes": ["Q"]})
+    monkeypatch.setattr(llm, "distill_tips",
+                        lambda t, **kw: {"summary": "Batch-cook once a week.",
+                                         "takeaways": ["Pick 3 proteins", "Cook in bulk"], "quotes": []})
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://youtu.be/abc123", kind="tips")
+    assert out["kind"] == "tips"
+    assert out["summary"] == "Batch-cook once a week."
+    assert out["takeaways"] == ["Pick 3 proteins", "Cook in bulk"]
+    assert out["quotes"] == []  # tips carry no quotes
+
+
+def test_tips_quotes_never_feed_the_daily_nudge(db, monkeypatch):
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {"lang": "en", "text": "x" * 40, "source": "web"})
+    player = state.get_or_create_player(db)
+    # Even if a tips capture somehow carried a quote, it must not surface on Status.
+    monkeypatch.setattr(llm, "distill_tips",
+                        lambda t, **kw: {"summary": "s", "takeaways": ["do this"], "quotes": ["SNEAKY"]})
+    insights.add_insight(db, player.id, "https://youtu.be/tips1", kind="tips")
+    assert insights.daily_quote(db, player.id, DAY) is None
+
+    # A motivation capture's quote does surface.
+    monkeypatch.setattr(llm, "distill_motivation",
+                        lambda t, **kw: {"summary": "s", "takeaways": ["t"], "quotes": ["REAL"]})
+    insights.add_insight(db, player.id, "https://youtu.be/mot1", kind="motivation")
+    assert insights.daily_quote(db, player.id, DAY)["text"] == "REAL"
+
+
+def test_same_url_can_be_both_motivation_and_tips(db, monkeypatch):
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {"lang": "en", "text": "y" * 40, "source": "youtube"})
+    monkeypatch.setattr(llm, "distill_motivation", lambda t, **kw: {"summary": "m", "takeaways": [], "quotes": ["Q"]})
+    monkeypatch.setattr(llm, "distill_tips", lambda t, **kw: {"summary": "t", "takeaways": ["step"], "quotes": []})
+    player = state.get_or_create_player(db)
+    url = "https://youtu.be/dual"
+    a = insights.add_insight(db, player.id, url, kind="motivation")
+    b = insights.add_insight(db, player.id, url, kind="tips")
+    assert a["id"] != b["id"]
+    assert {i["kind"] for i in insights.list_insights(db, player.id)} == {"motivation", "tips"}

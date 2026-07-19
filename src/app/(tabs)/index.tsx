@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import type { ApiReading } from '@/lib/api';
@@ -107,9 +107,11 @@ function Reading({ reading }: { reading: ApiReading }) {
 
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
+  const toggleRest = useSystem((s) => s.toggleRest);
   const avatarUri = useAvatar((s) => s.uri);
   const loadAvatar = useAvatar((s) => s.load);
   const hasAvatar = state?.player.has_avatar ?? false;
+  const [restPending, setRestPending] = useState(false);
   useEffect(() => {
     if (hasAvatar && avatarUri === null) void loadAvatar();
   }, [hasAvatar, avatarUri, loadAvatar]);
@@ -124,6 +126,13 @@ export default function StatusScreen() {
   }
 
   const { player, stats, streak, today, next_rank } = state;
+
+  const onRest = async () => {
+    if (restPending) return;
+    setRestPending(true);
+    await toggleRest();
+    setRestPending(false);
+  };
 
   return (
     <Screen>
@@ -205,6 +214,32 @@ export default function StatusScreen() {
           <Text style={styles.restNote}>Your streak is safe. Rest is part of it.</Text>
         ) : null}
       </SystemPanel>
+
+      {/* Rest is part of the path — never a failure. */}
+      <Pressable
+        onPress={onRest}
+        disabled={restPending}
+        style={({ pressed }) => [
+          styles.rest,
+          today.resting && styles.restOn,
+          (pressed || restPending) && { opacity: 0.85 },
+        ]}
+      >
+        {restPending ? (
+          <ActivityIndicator size="small" color={accent} />
+        ) : (
+          <>
+            <Text style={[styles.restTitle, today.resting && { color: feedback.success }]}>
+              {today.resting ? 'You’re resting today 🌙' : 'Take a rest day'}
+            </Text>
+            <Text style={styles.restSub}>
+              {today.resting
+                ? 'Your streak is safe. Tap to undo.'
+                : 'Not feeling it? Rest still counts — your streak stays.'}
+            </Text>
+          </>
+        )}
+      </Pressable>
 
       {state.reading ? <Reading reading={state.reading} /> : null}
 
@@ -289,6 +324,33 @@ const styles = StyleSheet.create({
     color: feedback.success,
     fontSize: 12,
     marginTop: 10,
+  },
+  rest: {
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 11,
+    borderStyle: 'dashed',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    minHeight: 64,
+    justifyContent: 'center',
+  },
+  restOn: {
+    borderStyle: 'solid',
+    backgroundColor: withAlpha(feedback.success, 0.06),
+    borderColor: withAlpha(feedback.success, 0.4),
+  },
+  restTitle: {
+    color: text.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  restSub: {
+    color: text.faint,
+    fontSize: 12,
+    textAlign: 'center',
   },
   readingBook: { color: text.primary, fontSize: 15, fontWeight: '700', marginBottom: 12, lineHeight: 21 },
   readingMeta: { color: text.secondary, fontSize: 12, lineHeight: 17, marginTop: 10 },

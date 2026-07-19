@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CurrentBookCard } from '@/components/CurrentBookCard';
@@ -9,12 +8,10 @@ import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, text, withAlpha } from '@/theme';
 
 export default function QuestsScreen() {
   const state = useSystem((s) => s.state);
-  const toggleRest = useSystem((s) => s.toggleRest);
-  const [pending, setPending] = useState(false);
 
   if (!state) {
     return (
@@ -36,13 +33,6 @@ export default function QuestsScreen() {
     block,
     items: daily.filter((q) => blockOf(q.stat, q.title) === block.key),
   })).filter((g) => g.items.length > 0);
-
-  const onRest = async () => {
-    if (pending) return;
-    setPending(true);
-    await toggleRest();
-    setPending(false);
-  };
 
   return (
     <Screen>
@@ -98,32 +88,6 @@ export default function QuestsScreen() {
 
       {/* Reading is the Grow floor — set/browse your book right by its quests. */}
       <CurrentBookCard />
-
-      {/* Rest is part of the path — never a failure. */}
-      <Pressable
-        onPress={onRest}
-        disabled={pending}
-        style={({ pressed }) => [
-          styles.rest,
-          isResting && styles.restOn,
-          (pressed || pending) && { opacity: 0.85 },
-        ]}
-      >
-        {pending ? (
-          <ActivityIndicator size="small" color={accent} />
-        ) : (
-          <>
-            <Text style={[styles.restTitle, isResting && { color: feedback.success }]}>
-              {isResting ? 'You’re resting today 🌙' : 'Take a rest day'}
-            </Text>
-            <Text style={styles.restSub}>
-              {isResting
-                ? 'Your streak is safe. Tap to undo.'
-                : 'Not feeling it? Rest still counts — your streak stays.'}
-            </Text>
-          </>
-        )}
-      </Pressable>
     </Screen>
   );
 }
@@ -157,32 +121,5 @@ const styles = StyleSheet.create({
   nowBlock: {
     borderColor: withAlpha(accent, 0.55),
     backgroundColor: withAlpha(accent, 0.05),
-  },
-  rest: {
-    alignItems: 'center',
-    gap: 3,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 11,
-    borderStyle: 'dashed',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    minHeight: 64,
-    justifyContent: 'center',
-  },
-  restOn: {
-    borderStyle: 'solid',
-    backgroundColor: withAlpha(feedback.success, 0.06),
-    borderColor: withAlpha(feedback.success, 0.4),
-  },
-  restTitle: {
-    color: text.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  restSub: {
-    color: text.faint,
-    fontSize: 12,
-    textAlign: 'center',
   },
 });

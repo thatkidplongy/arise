@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { SystemNoticeHost } from '@/components/SystemNotice';
 import { ToastHost } from '@/components/Toast';
+import { startAutoUpdate } from '@/lib/autoUpdate';
 import { useSystem } from '@/store/useSystem';
 import { surface, text } from '@/theme';
 
@@ -12,6 +13,8 @@ export default function RootLayout() {
   // First contact with the System server, after the persisted settings
   // have been rehydrated from storage.
   useEffect(() => {
+    // Silently pick up a newer web build on open (web/PWA only; no-op elsewhere).
+    startAutoUpdate();
     if (useSystem.persist.hasHydrated()) {
       void useSystem.getState().refresh();
       return;

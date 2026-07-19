@@ -77,6 +77,11 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
         "aim a little beyond last time — never stagnant. Keep 2–4 short steps. For learning quests add a",
         "'resource': ONE popular, genuinely well-known source (a real book with",
         "author, a real YouTube channel, or a trusted site) — else empty string.",
+        "When a step's whole point is to write/reflect something down — a takeaway,",
+        "a summary, a realization, a plan — phrase it beginning with 'Write down',",
+        "'Note down', 'Reflect on', or 'Summarise', so the app can offer a place to",
+        "write it. (A step that produces something else — code, a drawing, a recording",
+        "— must NOT start with those words.)",
         "Do NOT include a mandatory 'floor' step (push-ups, read-a-chapter, etc.);",
         "the app adds those itself. Return only the requested slots.",
         "",
@@ -275,14 +280,25 @@ def _parse_distillation(payload: dict) -> dict:
     }
 
 
-def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
-    """One Gemini call → {summary, takeaways[], quotes[]} from a video transcript.
+_TIPS_PROMPT = (
+    "You distil a how-to / advice video's transcript into a practical playbook a "
+    "person can act on, for a personal wellness app with a warm, encouraging voice. "
+    "This video is USEFUL INFORMATION, not motivation — capture the substance, not the "
+    "vibe. From the transcript, return:\n"
+    "• summary: ONE plain sentence naming what this teaches.\n"
+    "• takeaways: 2–6 concrete, actionable steps or tips — each a short line the person "
+    "could actually do, specific and in a sensible order, no hype or filler.\n"
+    "• quotes: return an empty array (this is a tips capture, not a motivational one).\n"
+    "If the transcript is empty or has no real substance, return empty arrays.\n"
+    "Return JSON only: {summary, takeaways[], quotes[]}."
+)
 
-    Raises on any transport/parse error; the caller surfaces a clean message. Called
-    on demand when the user captures a video, never in the background."""
+
+def _distill(prompt: str, transcript: str, timeout: float) -> dict:
+    """Shared Gemini call for a distillation → {summary, takeaways[], quotes[]}."""
     body = {
         "contents": [{"parts": [
-            {"text": _DISTIL_PROMPT},
+            {"text": prompt},
             {"text": "TRANSCRIPT:\n" + transcript.strip()},
         ]}],
         "generationConfig": {
@@ -296,6 +312,20 @@ def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
     # free-tier burst limit (429) with a couple of retries rather than failing.
     payload = net.post_json(url, body, timeout=timeout, retries=2)
     return _parse_distillation(payload)
+
+
+def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
+    """One Gemini call → {summary, takeaways[], quotes[]} from a motivational video.
+
+    Raises on any transport/parse error; the caller surfaces a clean message. Called
+    on demand when the user captures a video, never in the background."""
+    return _distill(_DISTIL_PROMPT, transcript, timeout)
+
+
+def distill_tips(transcript: str, timeout: float = 25.0) -> dict:
+    """Like distill_motivation, but for a how-to video: takeaways are practical steps
+    and quotes come back empty (nothing to resurface as a daily nudge)."""
+    return _distill(_TIPS_PROMPT, transcript, timeout)
 
 
 def log_failure(err: Exception) -> None:

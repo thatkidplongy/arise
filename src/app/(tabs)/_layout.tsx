@@ -77,6 +77,7 @@ export default function TabsLayout() {
           it stays at a clean five. `href: null` hides the button, not the route. */}
       <Tabs.Screen name="focus" options={{ href: null, title: 'Focus' }} />
       <Tabs.Screen name="achievements" options={{ href: null, title: 'Achievements' }} />
+      <Tabs.Screen name="journal" options={{ href: null, title: 'Journal' }} />
       <Tabs.Screen name="settings" options={{ href: null, title: 'Settings' }} />
     </Tabs>
   );
