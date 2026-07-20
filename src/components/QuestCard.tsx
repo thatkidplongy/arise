@@ -5,10 +5,64 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
+import { useCollapse } from '@/hooks/useCollapse';
 import type { ApiQuest } from '@/lib/api';
 import { isWriteStep } from '@/lib/quests';
+import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
 import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
+
+/** One written reflection on a quest. Short notes show inline; long or multi-line
+ * ones (the glossaries some log-steps produce) fold to a one-line preview so they
+ * don't swamp the card — tap the bar to unfold, tap the text to edit, × to remove. */
+function QuestNote({
+  text: value,
+  color,
+  onEdit,
+  onRemove,
+}: {
+  text: string;
+  color: string;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const long = value.includes('\n') || value.length > 100;
+  const { open, toggle } = useCollapse(long, long);
+
+  if (!long) {
+    return (
+      <View style={styles.noteItem}>
+        <Pressable style={styles.noteItemBody} onPress={onEdit}>
+          <Markdown value={value} />
+        </Pressable>
+        <Pressable onPress={onRemove} hitSlop={8}>
+          <Text style={styles.noteX}>×</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.noteItem, styles.noteItemCol]}>
+      <View style={styles.noteBar}>
+        <Pressable style={styles.noteBarTap} onPress={toggle} hitSlop={4}>
+          <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={color} />
+          <Text style={styles.notePreview} numberOfLines={1}>
+            {open ? 'Your note' : snippet(value)}
+          </Text>
+        </Pressable>
+        <Pressable onPress={onRemove} hitSlop={8}>
+          <Text style={styles.noteX}>×</Text>
+        </Pressable>
+      </View>
+      {open ? (
+        <Pressable onPress={onEdit}>
+          <Markdown value={value} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
 
 export function QuestCard({ quest }: { quest: ApiQuest }) {
   const complete = useSystem((s) => s.complete);
@@ -185,18 +239,18 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
           </Text>
         ) : null}
 
-        {/* What you wrote on this quest's write-steps — tap to edit, × to remove. */}
+        {/* What you wrote on this quest's write-steps — tap to edit, × to remove.
+            Long notes fold to a preview so they don't swamp the card. */}
         {quest.notes.length > 0 ? (
           <View style={styles.notes}>
             {quest.notes.map((n) => (
-              <View key={n.id} style={styles.noteItem}>
-                <Pressable style={styles.noteItemBody} onPress={() => openEditNote(n)}>
-                  <Markdown value={n.text} />
-                </Pressable>
-                <Pressable onPress={() => void removeQuestNote(n.id)} hitSlop={8}>
-                  <Text style={styles.noteX}>×</Text>
-                </Pressable>
-              </View>
+              <QuestNote
+                key={n.id}
+                text={n.text}
+                color={meta.color}
+                onEdit={() => openEditNote(n)}
+                onRemove={() => void removeQuestNote(n.id)}
+              />
             ))}
           </View>
         ) : null}
@@ -424,7 +478,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
+  noteItemCol: { flexDirection: 'column', gap: 6 },
   noteItemBody: { flex: 1 },
+  noteBar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  noteBarTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  notePreview: { flex: 1, color: text.secondary, fontSize: 12 },
   noteX: {
     color: text.faint,
     fontSize: 18,
