@@ -296,6 +296,13 @@ def aggregate(rows: list[Completion], defs: list[QuestDef]) -> dict:
     }
 
 
+def _top_stat(by_stat: dict[str, int]) -> str | None:
+    """The attribute leaned into most (highest weight), or None when nothing counts
+    yet — `aggregate` seeds every stat at 0, so an empty run must read as None."""
+    top = max(by_stat, key=by_stat.get) if by_stat else None
+    return top if top is not None and by_stat.get(top, 0) > 0 else None
+
+
 def snapshot(agg: dict) -> Snapshot:
     return Snapshot(
         total_xp=agg["total_xp"],
@@ -596,6 +603,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "record": {
             "active_days": len(agg["active_days"]),
             "total_completions": agg["total_completions"],
+            "xp": agg["total_xp"],
+            "days_cleared": len(agg["bonus_days"]),
+            # The area leaned into most across all time (by XP), or None if nothing yet.
+            "top_stat": _top_stat(agg["by_stat"]),
         },
         "reminders": _reminders_of(db, player),
         "grocery": _grocery_of(db, player),

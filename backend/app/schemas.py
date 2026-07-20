@@ -377,6 +377,9 @@ class AchievementOut(BaseModel):
 class RecordOut(BaseModel):
     active_days: int
     total_completions: int
+    xp: int                  # total XP earned all time
+    days_cleared: int        # days every daily was cleared, all time
+    top_stat: str | None     # the attribute leaned into most overall (None if nothing yet)
 
 
 class InsightOut(BaseModel):

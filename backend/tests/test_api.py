@@ -254,6 +254,18 @@ def test_reset(client):
     assert r.json()["record"]["total_completions"] == 0
 
 
+def test_record_is_all_time(client):
+    assert client.get(f"/state?day={DAY}").json()["record"]["total_completions"] == 0
+    # A completion on an earlier week still counts toward the all-time record, even
+    # though it has dropped out of "this week".
+    client.post("/completions", json={"quest_id": "d-train", "day": "2026-07-06"})
+    rec = client.post("/completions", json={"quest_id": "d-train", "day": DAY}).json()["state"]["record"]
+    assert rec["total_completions"] == 2
+    assert rec["active_days"] == 2
+    assert rec["xp"] > 0
+    assert rec["top_stat"] == "STR"
+
+
 def test_week_review_recaps_the_week(client):
     assert client.get(f"/state?day={DAY}").json()["week_review"]["completions"] == 0
     s = client.post("/completions", json={"quest_id": "d-train", "day": DAY}).json()["state"]
