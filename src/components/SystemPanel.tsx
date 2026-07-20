@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewProps } from 'react-native';
 
+import { useCollapse } from '@/hooks/useCollapse';
 import { surface, text } from '@/theme';
 
 interface Props extends ViewProps {
@@ -24,9 +24,8 @@ export function SystemPanel({
   style,
   ...rest
 }: Props) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
-  const canCollapse = collapsible && !!title;
-  const isOpen = !canCollapse || !collapsed;
+  const canCollapse = !!collapsible && !!title;
+  const { open: isOpen, toggle } = useCollapse(canCollapse, defaultCollapsed);
 
   const header = title ? (
     <View
@@ -49,7 +48,7 @@ export function SystemPanel({
     <View style={[styles.panel, style]} {...rest}>
       {canCollapse ? (
         <Pressable
-          onPress={() => setCollapsed((c) => !c)}
+          onPress={toggle}
           style={({ pressed }) => (pressed ? styles.headerPressed : undefined)}
           accessibilityRole="button"
           accessibilityState={{ expanded: isOpen }}

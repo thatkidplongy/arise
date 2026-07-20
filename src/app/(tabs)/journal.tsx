@@ -1,30 +1,45 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { Markdown } from '@/components/Markdown';
+import { DataTable, type Column } from '@/components/DataTable';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
-import { groupByDay, prettyDay } from '@/lib/dates';
+import type { ApiJournalEntry, ApiReflection } from '@/lib/api';
+import { dateKey, shortDay } from '@/lib/dates';
+import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
+import type { StatKey } from '@/types';
 import { accent, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
 
 type Tab = 'journal' | 'reflections';
+type Filter = StatKey | 'all';
 
 export default function JournalScreen() {
   const state = useSystem((s) => s.state);
   const addJournalEntry = useSystem((s) => s.addJournalEntry);
-  const updateJournalEntry = useSystem((s) => s.updateJournalEntry);
-  const removeJournalEntry = useSystem((s) => s.removeJournalEntry);
-  const removeQuestNote = useSystem((s) => s.removeQuestNote);
 
   const [tab, setTab] = useState<Tab>('journal');
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [initial, setInitial] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  const today = dateKey();
+  const reflections = state?.reflections ?? [];
+  const journal = state?.journal ?? [];
+
+  // The categories actually present, in the app's canonical order, for the chips.
+  // Depends on the stable state slice (not the `?? []` copy) so it only recomputes
+  // when reflections actually change.
+  const cats = useMemo(() => {
+    const present = new Set((state?.reflections ?? []).map((r) => r.stat));
+    return (Object.keys(STAT_META) as StatKey[]).filter((k) => present.has(k));
+  }, [state?.reflections]);
+  const shownReflections =
+    filter === 'all' ? reflections : reflections.filter((r) => r.stat === filter);
 
   if (!state) {
     return (
@@ -35,24 +50,61 @@ export default function JournalScreen() {
     );
   }
 
-  const journal = state.journal;
-  const reflections = state.reflections;
+  const open = (kind: 'journal' | 'reflection', id: string) =>
+    router.push({ pathname: '/entry', params: { kind, id } });
 
-  const openNew = () => {
-    setEditingId(null);
-    setInitial('');
-    setEditorOpen(true);
-  };
-  const openEdit = (e: { id: string; text: string }) => {
-    setEditingId(e.id);
-    setInitial(e.text);
-    setEditorOpen(true);
-  };
-  const save = (t: string) => {
-    setEditorOpen(false);
-    if (editingId) void updateJournalEntry(editingId, t);
-    else void addJournalEntry(t);
-  };
+  const journalCols: Column<ApiJournalEntry>[] = [
+    {
+      key: 'text',
+      header: 'Entry',
+      render: (e) => (
+        <Text style={styles.title} numberOfLines={2}>
+          {snippet(e.text) || '(empty)'}
+        </Text>
+      ),
+    },
+    {
+      key: 'day',
+      header: 'Date',
+      width: 62,
+      align: 'right',
+      render: (e) => <Text style={styles.date}>{shortDay(e.day, today)}</Text>,
+    },
+  ];
+
+  const reflectionCols: Column<ApiReflection>[] = [
+    {
+      key: 'cat',
+      width: 30,
+      render: (r) => {
+        const meta = STAT_META[r.stat];
+        return (
+          <View style={[styles.iconBox, { backgroundColor: withAlpha(meta?.color ?? text.faint, 0.13) }]}>
+            <Ionicons name={meta?.icon ?? 'bookmark'} size={14} color={meta?.color ?? text.faint} />
+          </View>
+        );
+      },
+    },
+    {
+      key: 'text',
+      header: 'Reflection',
+      render: (r) => (
+        <>
+          <Text style={styles.title} numberOfLines={2}>
+            {snippet(r.prompt) || snippet(r.text) || '(empty)'}
+          </Text>
+          <Text style={styles.sub}>{STAT_META[r.stat]?.label ?? 'Note'}</Text>
+        </>
+      ),
+    },
+    {
+      key: 'day',
+      header: 'Date',
+      width: 56,
+      align: 'right',
+      render: (r) => <Text style={styles.date}>{shortDay(r.day, today)}</Text>,
+    },
+  ];
 
   return (
     <Screen>
@@ -76,7 +128,7 @@ export default function JournalScreen() {
         <>
           <Text style={styles.intro}>A free space — write anything you want for the day.</Text>
           <Pressable
-            onPress={openNew}
+            onPress={() => setComposerOpen(true)}
             style={({ pressed }) => [styles.writeBtn, pressed && { opacity: 0.85 }]}
           >
             <Ionicons name="create-outline" size={16} color={onAccent} />
@@ -85,73 +137,81 @@ export default function JournalScreen() {
 
           {journal.length === 0 ? (
             <SystemPanel>
-              <Text style={styles.empty}>Nothing written yet. Tap above to start today's entry.</Text>
+              <Text style={styles.empty}>Nothing written yet. Tap above to start today&apos;s entry.</Text>
             </SystemPanel>
           ) : (
-            groupByDay(journal).map((group) => (
-              <SystemPanel key={group.day} title={prettyDay(group.day)}>
-                {group.items.map((e) => (
-                  <View key={e.id} style={styles.entry}>
-                    <Pressable style={styles.entryBody} onPress={() => openEdit(e)}>
-                      <Markdown value={e.text} />
-                    </Pressable>
-                    <Pressable onPress={() => void removeJournalEntry(e.id)} hitSlop={8}>
-                      <Text style={styles.entryX}>×</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </SystemPanel>
-            ))
+            <DataTable
+              columns={journalCols}
+              rows={journal}
+              keyExtractor={(e) => e.id}
+              onRowPress={(e) => open('journal', e.id)}
+              title="Entries"
+              sub={`${journal.length}`}
+              collapsible
+            />
           )}
         </>
       ) : (
         <>
           <Text style={styles.intro}>
-            What you wrote to complete your log quests — reading, money, craft, stillness — by day.
+            What you wrote to complete your log quests — reading, money, craft, stillness. Tap one to read it in full.
           </Text>
-          {reflections.length === 0 ? (
+
+          {cats.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chips}
+            >
+              {(['all', ...cats] as Filter[]).map((c) => {
+                const on = filter === c;
+                const meta = c === 'all' ? null : STAT_META[c];
+                const color = meta?.color ?? accent;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setFilter(c)}
+                    style={[styles.chip, on && { backgroundColor: withAlpha(color, 0.14), borderColor: color }]}
+                  >
+                    {meta ? <Ionicons name={meta.icon} size={12} color={on ? color : text.faint} /> : null}
+                    <Text style={[styles.chipText, on && { color }]}>{meta?.label ?? 'All'}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
+          {shownReflections.length === 0 ? (
             <SystemPanel>
               <Text style={styles.empty}>
-                Nothing yet. Complete a log quest by writing what you learned — it lands here.
+                {reflections.length === 0
+                  ? 'Nothing yet. Complete a log quest by writing what you learned — it lands here.'
+                  : 'No reflections in this category yet.'}
               </Text>
             </SystemPanel>
           ) : (
-            groupByDay(reflections).map((group) => (
-              <SystemPanel key={group.day} title={prettyDay(group.day)}>
-                {group.items.map((e) => {
-                  const meta = STAT_META[e.stat] ?? null;
-                  return (
-                    <View key={e.id} style={styles.entry}>
-                      <View
-                        style={[styles.tag, { backgroundColor: withAlpha(meta?.color ?? text.faint, 0.14) }]}
-                      >
-                        <Ionicons name={meta?.icon ?? 'bookmark'} size={13} color={meta?.color ?? text.faint} />
-                      </View>
-                      <View style={styles.reflectionBody}>
-                        <Text style={[styles.entryStat, { color: meta?.color ?? text.secondary }]}>
-                          {meta?.label ?? 'Note'}
-                        </Text>
-                        {e.prompt ? <Text style={styles.entryPrompt}>{e.prompt}</Text> : null}
-                        <Markdown value={e.text} />
-                      </View>
-                      <Pressable onPress={() => void removeQuestNote(e.id)} hitSlop={8}>
-                        <Text style={styles.entryX}>×</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </SystemPanel>
-            ))
+            <DataTable
+              columns={reflectionCols}
+              rows={shownReflections}
+              keyExtractor={(r) => r.id}
+              onRowPress={(r) => open('reflection', r.id)}
+              title={filter === 'all' ? 'Reflections' : STAT_META[filter].label}
+              sub={`${shownReflections.length}`}
+              collapsible
+            />
           )}
         </>
       )}
 
       <NoteEditorModal
-        visible={editorOpen}
-        prompt={editingId ? 'Edit your entry' : "What's on your mind today?"}
-        initial={initial}
-        onSave={save}
-        onClose={() => setEditorOpen(false)}
+        visible={composerOpen}
+        prompt="What's on your mind today?"
+        initial=""
+        onSave={(t) => {
+          setComposerOpen(false);
+          void addJournalEntry(t);
+        }}
+        onClose={() => setComposerOpen(false)}
       />
     </Screen>
   );
@@ -185,25 +245,20 @@ const styles = StyleSheet.create({
   },
   writeText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  entry: {
+  chips: { gap: 7, paddingVertical: 1, paddingRight: 4 },
+  chip: {
     flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-    paddingVertical: 9,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  entryBody: { flex: 1 },
-  reflectionBody: { flex: 1, gap: 3 },
-  tag: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
   },
-  entryStat: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
-  entryPrompt: { color: text.secondary, fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
-  entryX: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
+  chipText: { color: text.faint, fontSize: 12, fontWeight: '600' },
+  iconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  title: { color: text.primary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  sub: { color: text.faint, fontSize: 11, marginTop: 1 },
+  date: { color: text.secondary, fontSize: 12, fontWeight: '600' },
 });

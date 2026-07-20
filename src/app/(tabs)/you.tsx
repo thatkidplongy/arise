@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AvatarEditor } from '@/components/AvatarEditor';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
-import type { ApiState, ApiWeekReview } from '@/lib/api';
+import type { ApiState } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, STAT_META, surface, text } from '@/theme';
 
@@ -19,32 +19,33 @@ const ITEMS = [
   { icon: 'settings-outline', label: 'Settings', sub: 'North Star · system link · your record', route: '/settings' },
 ] as const;
 
-/** A gentle recap of the current ISO week — what got done, not what was missed. */
-function WeekReview({ review }: { review: ApiWeekReview }) {
-  const top = review.top_stat ? STAT_META[review.top_stat] : null;
+/** The all-time record — everything you've done since the start, not just this
+ * week. Momentum for the current week lives on Status (the streak). */
+function Lifetime({ record }: { record: ApiState['record'] }) {
+  const top = record.top_stat ? STAT_META[record.top_stat] : null;
   const cells = [
-    { n: review.completions, label: 'quests' },
-    { n: review.xp, label: 'XP' },
-    { n: review.active_days, label: 'days shown up' },
-    { n: review.days_cleared, label: 'days cleared' },
+    { n: record.total_completions, label: 'quests' },
+    { n: record.xp, label: 'XP' },
+    { n: record.active_days, label: 'days shown up' },
+    { n: record.days_cleared, label: 'days cleared' },
   ];
   return (
-    <SystemPanel title="This week" sub={review.completions ? `${review.completions} done` : undefined}>
-      {review.completions === 0 ? (
-        <Text style={styles.weekEmpty}>A fresh week — whatever you do from here counts.</Text>
+    <SystemPanel title="All time" sub={record.total_completions ? `${record.total_completions} done` : undefined}>
+      {record.total_completions === 0 ? (
+        <Text style={styles.statEmpty}>Your record starts with your first quest. Whenever you&apos;re ready.</Text>
       ) : (
         <>
-          <View style={styles.weekRow}>
+          <View style={styles.statRow}>
             {cells.map((c) => (
-              <View key={c.label} style={styles.weekCell}>
-                <Text style={styles.weekNum}>{c.n.toLocaleString()}</Text>
-                <Text style={styles.weekLabel}>{c.label}</Text>
+              <View key={c.label} style={styles.statCell}>
+                <Text style={styles.statNum}>{c.n.toLocaleString()}</Text>
+                <Text style={styles.statLabel}>{c.label}</Text>
               </View>
             ))}
           </View>
           {top ? (
-            <Text style={styles.weekTop}>
-              Leaning into <Text style={{ color: top.color, fontWeight: '700' }}>{top.label}</Text> most this week.
+            <Text style={styles.statTop}>
+              Leaning into <Text style={{ color: top.color, fontWeight: '700' }}>{top.label}</Text> most overall.
             </Text>
           ) : null}
         </>
@@ -112,7 +113,7 @@ function Completed({ reminders, grocery }: Pick<ApiState, 'reminders' | 'grocery
   if (todos.length + bought.length === 0) return null;
 
   return (
-    <SystemPanel title="Completed" sub={`${todos.length + bought.length} done`}>
+    <SystemPanel title="Completed" sub={`${todos.length + bought.length} done`} collapsible defaultCollapsed>
       {todos.length ? (
         <CompletedGroup
           label="TO-DOS"
@@ -149,7 +150,7 @@ export default function YouScreen() {
         ) : null}
       </View>
 
-      {state ? <WeekReview review={state.week_review} /> : null}
+      {state ? <Lifetime record={state.record} /> : null}
 
       {state ? <Completed reminders={state.reminders} grocery={state.grocery} /> : null}
 
@@ -182,12 +183,12 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowLabel: { color: text.primary, fontSize: 15, fontWeight: '600' },
   rowSub: { color: text.secondary, fontSize: 12 },
-  weekEmpty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  weekRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 12 },
-  weekCell: { width: '46%' },
-  weekNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
-  weekLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
-  weekTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
+  statEmpty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 12 },
+  statCell: { width: '46%' },
+  statNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
+  statLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
+  statTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
   groupSpaced: { marginTop: 16 },
   groupLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
   doneRow: {

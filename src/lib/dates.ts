@@ -16,15 +16,15 @@ export function prettyDay(day: string): string {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
 
-/** Bucket items that are already ordered so same-day entries are adjacent (e.g.
- * newest-first) into day groups, preserving order. O(n) — only compares the last
- * bucket, so it relies on that ordering (both callers sort before calling). */
-export function groupByDay<T extends { day: string }>(items: T[]): { day: string; items: T[] }[] {
-  const out: { day: string; items: T[] }[] = [];
-  for (const e of items) {
-    const last = out[out.length - 1];
-    if (last && last.day === e.day) last.items.push(e);
-    else out.push({ day: e.day, items: [e] });
-  }
-  return out;
+/** Compact day for a table column: 'Today' / 'Yesterday' / 'Jul 15', relative to
+ * `today` (a 'YYYY-MM-DD'). Kept short so it sits in a narrow trailing column. */
+export function shortDay(day: string, today: string): string {
+  if (day === today) return 'Today';
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return day;
+  const [ty, tm, td] = today.split('-').map(Number);
+  // Whole-day gap via UTC epoch of the calendar dates — no timezone drift.
+  const diff = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86_400_000);
+  if (diff === 1) return 'Yesterday';
+  return `${MONTHS[m - 1]} ${d}`;
 }

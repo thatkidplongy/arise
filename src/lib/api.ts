@@ -103,7 +103,13 @@ export interface ApiState {
   daily_quote: ApiDailyQuote | null; // a rotating pull-quote from captured videos
   quests: ApiQuest[];
   achievements: ApiAchievement[];
-  record: { active_days: number; total_completions: number };
+  record: {
+    active_days: number;
+    total_completions: number;
+    xp: number;
+    days_cleared: number;
+    top_stat: StatKey | null;
+  };
   // Personal lists. Open items show on their tab (to-dos on Status, groceries on
   // Body); finished ones move to the You tab's Completed record, dated by *_at.
   reminders: { id: string; text: string; done: boolean; done_at: string | null }[];
