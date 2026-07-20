@@ -11,6 +11,7 @@ def test_money_add_totals_remove(client):
     s = client.post(f"/money?day={DAY}", json={"amount": 500, "direction": "in", "note": "gig"}).json()
     m = s["money"]
     assert len(m["entries"]) == 1 and m["today_in"] == 500 and m["week_in"] == 500
+    assert m["balance"] == 500  # remaining = in − out
 
     s = client.post(f"/money?day={DAY}", json={"amount": 120.5, "direction": "out", "note": "lunch"}).json()
     m = s["money"]
@@ -24,6 +25,7 @@ def test_money_add_totals_remove(client):
     assert len(m["entries"]) == 3
     assert m["week_out"] == 120.5      # last week's 999 excluded
     assert m["today_out"] == 120.5     # and it's not today either
+    assert m["balance"] == -619.5      # 500 − 120.5 − 999, all time
 
     # Remove the lunch line.
     lunch_id = next(e["id"] for e in m["entries"] if e["note"] == "lunch")

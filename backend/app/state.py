@@ -535,12 +535,15 @@ def _money_of(db: Session, player: Player, day: str) -> dict:
          "day": r.day, "created_at": r.created_at}
         for r in sorted(rows, key=lambda r: r.created_at, reverse=True)
     ]
+    always = lambda r: True  # noqa: E731 — all-time predicate
     return {
         "entries": entries,
         "today_in": total("in", lambda r: r.day == day),
         "today_out": total("out", lambda r: r.day == day),
         "week_in": total("in", lambda r: game.week_key(r.day) == week),
         "week_out": total("out", lambda r: game.week_key(r.day) == week),
+        # Money remaining = everything in minus everything out, all time.
+        "balance": round(total("in", always) - total("out", always), 2),
     }
 
 

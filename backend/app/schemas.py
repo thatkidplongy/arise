@@ -462,6 +462,7 @@ class MoneyOut(BaseModel):
     today_out: float
     week_in: float
     week_out: float
+    balance: float  # money remaining — all time in minus out
 
 
 class PriorityOut(BaseModel):

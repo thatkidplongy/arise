@@ -41,6 +41,13 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
 
   return (
     <SystemPanel title="Money" sub={money.entries.length ? `${money.entries.length} logged` : undefined}>
+      <View style={styles.balanceRow}>
+        <Text style={styles.balanceLabel}>Remaining</Text>
+        <Text style={[styles.balance, { color: money.balance < 0 ? feedback.danger : text.primary }]}>
+          {peso(money.balance)}
+        </Text>
+      </View>
+
       <View style={styles.totals}>
         <View style={styles.totalCell}>
           <Text style={[styles.totalNum, { color: feedback.success }]}>{peso(money.week_in)}</Text>
@@ -135,6 +142,17 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
 }
 
 const styles = StyleSheet.create({
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: surface.hairline,
+  },
+  balanceLabel: { color: text.secondary, fontSize: 13, fontWeight: '600' },
+  balance: { fontSize: 26, fontWeight: '800' },
   totals: { flexDirection: 'row', gap: 12 },
   totalCell: { flex: 1 },
   totalNum: { fontSize: 20, fontWeight: '700' },

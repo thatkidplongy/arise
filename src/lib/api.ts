@@ -146,6 +146,7 @@ export interface ApiMoney {
   today_out: number;
   week_in: number;
   week_out: number;
+  balance: number; // money remaining — all time in minus out
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
