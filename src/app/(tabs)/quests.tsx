@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
+import { PriorityBoard } from '@/components/PriorityCard';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
@@ -53,6 +54,8 @@ export default function QuestsScreen() {
       </View>
 
       <ReadingReview />
+
+      <PriorityBoard priorities={state.priorities} />
 
       <Text style={styles.rhythmNote}>
         {isResting

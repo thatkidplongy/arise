@@ -10,6 +10,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
+                      MoneyIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult,
@@ -393,6 +394,44 @@ def toggle_grocery(item_id: str, body_in: GroceryToggleIn,
 def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
     player = state.get_or_create_player(db)
     service.remove_grocery(db, player, item_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+# ── Money log (in/out, with today/this-week totals on You) ────────────────────
+
+
+@router.post("/money", response_model=StateOut)
+def add_money(body_in: MoneyIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Log an amount in (income) or out (spending) for the day."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, d)
+    return state.build_state(db, player, d)
+
+
+@router.delete("/money/{entry_id}", response_model=StateOut)
+def remove_money(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_money(db, player, entry_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+# ── Priority (a self-set focus pinned on top of the plan) ─────────────────────
+
+
+@router.post("/priority", response_model=StateOut)
+def set_priority(body_in: PriorityIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Pin a priority for one attribute — it sits on top of that category's plan."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    service.set_priority(db, player, body_in.stat, body_in.focus, body_in.scope, d)
+    return state.build_state(db, player, d)
+
+
+@router.delete("/priority/{stat}", response_model=StateOut)
+def clear_priority(stat: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.clear_priority(db, player, stat)
     return state.build_state(db, player, _valid_day(day))
 
 

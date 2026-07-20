@@ -102,6 +102,7 @@ export interface ApiState {
   transcript_enabled: boolean; // true when a Supadata key is set (Inspire capture on)
   daily_quote: ApiDailyQuote | null; // a rotating pull-quote from captured videos
   quests: ApiQuest[];
+  priorities: ApiPriority[]; // self-set focuses pinned on top of the plan, one per attribute
   achievements: ApiAchievement[];
   record: {
     active_days: number;
@@ -114,8 +115,37 @@ export interface ApiState {
   // Body); finished ones move to the You tab's Completed record, dated by *_at.
   reminders: { id: string; text: string; done: boolean; done_at: string | null }[];
   grocery: { id: string; name: string; bought: boolean; bought_at: string | null }[];
+  money: ApiMoney; // the money log (in/out) + today/this-week totals, on You
   journal: ApiJournalEntry[]; // free-form daily entries, newest first
   reflections: ApiReflection[]; // quest-linked takeaways, newest first
+}
+
+/** A self-set priority for one attribute, pinned on top of that category's plan. */
+export interface ApiPriority {
+  stat: StatKey;
+  focus: string;
+  scope: 'day' | 'week' | 'open';
+  title: string;
+  note: string;
+  steps: string[];
+}
+
+/** One line in the money log — an amount in (income) or out (spending). */
+export interface ApiMoneyEntry {
+  id: string;
+  amount: number;
+  direction: 'in' | 'out';
+  note: string;
+  day: string;
+  created_at: string;
+}
+
+export interface ApiMoney {
+  entries: ApiMoneyEntry[]; // newest first
+  today_in: number;
+  today_out: number;
+  week_in: number;
+  week_out: number;
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
@@ -577,6 +607,32 @@ export const api = {
 
   removeGrocery: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/grocery/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Money log (in/out) ────────────────────────────────────────────────────
+  addMoney: (
+    base: string, token: string,
+    amount: number, direction: 'in' | 'out', note: string, day: string,
+  ) =>
+    request<ApiState>(base, `/money?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ amount, direction, note }),
+    }),
+
+  removeMoney: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/money/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Priority (a per-attribute focus pinned on top of the plan) ────────────
+  setPriority: (
+    base: string, token: string,
+    stat: StatKey, focus: string, scope: 'day' | 'week' | 'open', day: string,
+  ) =>
+    request<ApiState>(base, `/priority?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ stat, focus, scope }),
+    }),
+
+  clearPriority: (base: string, token: string, stat: StatKey, day: string) =>
+    request<ApiState>(base, `/priority/${stat}?day=${day}`, token, { method: 'DELETE' }),
 
   // ── Quest journal (reflection notes) ──────────────────────────────────────
   addQuestNote: (

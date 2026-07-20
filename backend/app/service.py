@@ -20,6 +20,7 @@ from .models import (
     GeneratedQuest,
     GroceryItem,
     JournalEntry,
+    MoneyEntry,
     Player,
     Preference,
     QuestDef,
@@ -544,6 +545,56 @@ def toggle_grocery(db: Session, player: Player, item_id: str, bought: bool) -> N
     if row is not None:
         row.bought = bought
         row.bought_at = utcnow() if bought else None
+        db.commit()
+
+
+def add_money(db: Session, player: Player, amount: float, direction: str, note: str, day: str) -> None:
+    """Log one money line — an amount in or out, on the given day. Amount is stored
+    positive; `direction` ('in'|'out') carries the meaning."""
+    if amount <= 0 or direction not in ("in", "out"):
+        return
+    db.add(MoneyEntry(
+        player_id=player.id, amount=float(amount), direction=direction,
+        note=(note or "").strip()[:120], day=day,
+    ))
+    db.commit()
+
+
+def remove_money(db: Session, player: Player, entry_id: str) -> None:
+    row = _owned(db, MoneyEntry, entry_id, player)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+
+
+def _load_priorities(player: Player) -> dict:
+    try:
+        data = json.loads(player.priorities or "{}")
+        return data if isinstance(data, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+def set_priority(db: Session, player: Player, stat: str, focus: str, scope: str, day: str) -> None:
+    """Pin a priority for one attribute, on top of that category's plan. `scope` is
+    'day' | 'week' | 'open'; the period stamps when it was set so day/week
+    priorities expire on their own. Setting a stat again replaces its priority."""
+    focus = (focus or "").strip()[:60]
+    if stat not in game.STAT_KEYS or not focus:
+        return
+    if scope not in ("day", "week", "open"):
+        scope = "week"
+    period = day if scope == "day" else (game.week_key(day) if scope == "week" else "")
+    data = _load_priorities(player)
+    data[stat] = {"focus": focus, "scope": scope, "period": period}
+    player.priorities = json.dumps(data)
+    db.commit()
+
+
+def clear_priority(db: Session, player: Player, stat: str) -> None:
+    data = _load_priorities(player)
+    if data.pop(stat, None) is not None:
+        player.priorities = json.dumps(data)
         db.commit()
 
 

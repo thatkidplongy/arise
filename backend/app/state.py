@@ -20,6 +20,7 @@ from .models import (
     GeneratedQuest,
     GroceryItem,
     JournalEntry,
+    MoneyEntry,
     Player,
     Preference,
     QuestDef,
@@ -496,6 +497,53 @@ def _grocery_of(db: Session, player: Player) -> list[dict]:
     ]
 
 
+def _priorities_of(player: Player, day: str) -> list[dict]:
+    """The pinned priorities (one per attribute), each still in scope — they sit on
+    top of the plan for their category. 'day' lives for its day, 'week' for its ISO
+    week, 'open' until cleared. Content is handcrafted (free). Ordered by STAT_KEYS."""
+    try:
+        stored = json.loads(player.priorities or "{}")
+    except (ValueError, TypeError):
+        stored = {}
+    out: list[dict] = []
+    for stat in game.STAT_KEYS:
+        p = stored.get(stat)
+        if not isinstance(p, dict) or not p.get("focus"):
+            continue
+        scope, period = p.get("scope", "week"), p.get("period", "")
+        if scope == "day" and period != day:
+            continue
+        if scope == "week" and period != game.week_key(day):
+            continue
+        title, note, steps = quests.priority_content(p["focus"])
+        out.append({"stat": stat, "focus": p["focus"], "scope": scope,
+                    "title": title, "note": note, "steps": steps})
+    return out
+
+
+def _money_of(db: Session, player: Player, day: str) -> dict:
+    """The money log, newest first, with today's and this ISO week's in/out totals —
+    the figures the You tab's tracker shows."""
+    rows = db.query(MoneyEntry).filter_by(player_id=player.id).all()
+    week = game.week_key(day)
+
+    def total(direction: str, pred) -> float:
+        return round(sum(r.amount for r in rows if r.direction == direction and pred(r)), 2)
+
+    entries = [
+        {"id": r.id, "amount": r.amount, "direction": r.direction, "note": r.note,
+         "day": r.day, "created_at": r.created_at}
+        for r in sorted(rows, key=lambda r: r.created_at, reverse=True)
+    ]
+    return {
+        "entries": entries,
+        "today_in": total("in", lambda r: r.day == day),
+        "today_out": total("out", lambda r: r.day == day),
+        "week_in": total("in", lambda r: game.week_key(r.day) == week),
+        "week_out": total("out", lambda r: game.week_key(r.day) == week),
+    }
+
+
 def _achievements_of(db: Session, player: Player) -> list[dict]:
     """Every achievement with its unlocked_at (None while still locked)."""
     unlocks = {
@@ -608,8 +656,10 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             # The area leaned into most across all time (by XP), or None if nothing yet.
             "top_stat": _top_stat(agg["by_stat"]),
         },
+        "priorities": _priorities_of(player, day),
         "reminders": _reminders_of(db, player),
         "grocery": _grocery_of(db, player),
+        "money": _money_of(db, player, day),
         "journal": _journal_of(db, player),  # free-form daily entries, newest first
         "reflections": reflections,  # quest-linked takeaways, newest first
     }

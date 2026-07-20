@@ -1,6 +1,7 @@
 """Pydantic models — the API contract. FastAPI renders these at /docs."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -62,6 +63,18 @@ class GroceryIn(BaseModel):
 
 class GroceryToggleIn(BaseModel):
     bought: bool
+
+
+class MoneyIn(BaseModel):
+    amount: float = Field(gt=0, le=1_000_000_000)
+    direction: Literal["in", "out"]  # money in (income) or out (spending)
+    note: str = Field("", max_length=120)
+
+
+class PriorityIn(BaseModel):
+    stat: str = Field(min_length=3, max_length=3)     # the attribute to prioritise (STR, CRE, …)
+    focus: str = Field(min_length=1, max_length=60)   # e.g. "abs", "passive income"
+    scope: Literal["day", "week", "open"] = "week"    # today / this ISO week / until cleared
 
 
 class QuestNoteIn(BaseModel):
@@ -433,6 +446,34 @@ class GroceryOut(BaseModel):
     bought_at: datetime | None = None  # when it was bought — powers the Completed record
 
 
+class MoneyEntryOut(BaseModel):
+    id: str
+    amount: float
+    direction: str  # 'in' | 'out'
+    note: str
+    day: str
+    created_at: datetime
+
+
+class MoneyOut(BaseModel):
+    """The money log plus the totals the You tab shows — today and this ISO week."""
+    entries: list[MoneyEntryOut]  # newest first
+    today_in: float
+    today_out: float
+    week_in: float
+    week_out: float
+
+
+class PriorityOut(BaseModel):
+    """A pinned priority for one attribute — sits on top of that category's plan."""
+    stat: str   # STR | CRE | SPI | CHA | INT | WLT | CFT
+    focus: str
+    scope: str  # 'day' | 'week' | 'open'
+    title: str
+    note: str
+    steps: list[str]
+
+
 class ReflectionOut(BaseModel):
     """One quest-linked reflection (from a requires_log quest), for the Reflections
     view of the Journal."""
@@ -469,10 +510,12 @@ class StateOut(BaseModel):
     transcript_enabled: bool  # true when a Supadata key is set (Inspire capture is on)
     daily_quote: DailyQuoteOut | None  # a rotating pull-quote from captured videos
     quests: list[QuestOut]
+    priorities: list[PriorityOut]  # self-set focuses pinned on top of the plan, one per attribute
     achievements: list[AchievementOut]
     record: RecordOut
     reminders: list[ReminderOut]  # a plain personal list shown on Status
     grocery: list[GroceryOut]  # things to buy — ticked off once bought
+    money: MoneyOut  # the money log (in/out) + today/this-week totals, on You
     journal: list[JournalEntryOut]  # free-form daily entries, newest first
     reflections: list[ReflectionOut]  # quest-linked takeaways, newest first
 

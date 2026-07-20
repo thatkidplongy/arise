@@ -41,6 +41,11 @@ class Player(Base):
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Self-set priorities that sit on top of the plan, one per attribute (e.g.
+    # STR → "abs" this week). JSON: {stat: {focus, scope, period}} where scope is
+    # 'day' | 'week' | 'open' and period is the day or ISO week it was set, so a
+    # day/week priority expires on its own. '{}' = nothing pinned.
+    priorities: Mapped[str] = mapped_column(String, default="{}")
     # Optional profile picture as a small data-URI (base64). Kept OUT of the main
     # /state payload (only `has_avatar` is exposed there); fetched on its own route.
     avatar: Mapped[str] = mapped_column(String, default="")
@@ -271,4 +276,21 @@ class GroceryItem(Base):
     name: Mapped[str] = mapped_column(String)
     bought: Mapped[bool] = mapped_column(Boolean, default=False)
     bought_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MoneyEntry(Base):
+    """One line in the money log — an amount in (income) or out (spending) with a
+    short note, on the day it happened. The You tab totals today and this week from
+    these, and the wealth daily's 'log spending' step points here so there's a real
+    place to record it."""
+
+    __tablename__ = "money_entries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    amount: Mapped[float] = mapped_column(Float)  # always positive; direction carries the sign
+    direction: Mapped[str] = mapped_column(String)  # 'in' (income) | 'out' (spending)
+    note: Mapped[str] = mapped_column(String, default="")
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

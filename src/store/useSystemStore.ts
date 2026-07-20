@@ -114,6 +114,10 @@ export interface SystemStore {
   addGrocery: (name: string) => Promise<void>;
   toggleGrocery: (id: string, bought: boolean) => Promise<void>;
   removeGrocery: (id: string) => Promise<void>;
+  addMoney: (amount: number, direction: 'in' | 'out', note: string) => Promise<void>;
+  removeMoney: (id: string) => Promise<void>;
+  setPriority: (stat: StatKey, focus: string, scope: 'day' | 'week' | 'open') => Promise<void>;
+  clearPriority: (stat: StatKey) => Promise<void>;
   addQuestNote: (questId: string, text: string, prompt?: string, stepIndex?: number | null) => Promise<void>;
   updateQuestNote: (id: string, text: string) => Promise<void>;
   removeQuestNote: (id: string) => Promise<void>;
@@ -264,6 +268,10 @@ export const useSystemStore = create<SystemStore>()(
       addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
       toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
       removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
+      addMoney: (amount, direction, note) => mutate((b, t, d) => api.addMoney(b, t, amount, direction, note, d)),
+      removeMoney: (id) => mutate((b, t, d) => api.removeMoney(b, t, id, d)),
+      setPriority: (stat, focus, scope) => mutate((b, t, d) => api.setPriority(b, t, stat, focus, scope, d)),
+      clearPriority: (stat) => mutate((b, t, d) => api.clearPriority(b, t, stat, d)),
       addQuestNote: (questId, text, prompt = '', stepIndex = null) =>
         mutate((b, t, d) => api.addQuestNote(b, t, questId, text, d, prompt, stepIndex)),
       updateQuestNote: (id, text) => mutate((b, t, d) => api.updateQuestNote(b, t, id, text, d)),
