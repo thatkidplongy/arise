@@ -3,7 +3,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion } from '@/lib/api';
+import { SearchRow } from '@/components/SearchRow';
+import { useSearch } from '@/hooks/useSearch';
+import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion, FoodEntry } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { toBoundedDataUri, splitDataUri } from '@/lib/image';
 import { num } from '@/lib/num';
@@ -21,57 +23,149 @@ const GROUPS: { tag: ApiSuggestion['tag']; label: string }[] = [
   { tag: 'fibre', label: 'Fibre-rich' },
 ];
 
+// A hand-entered / estimated food, as edited before logging. Collapses what used
+// to be two parallel scalar clumps (manual m*, estimate e*) into one shape.
+type MacroDraft = { name: string; kcal: string; protein: string; fibre: string };
+const EMPTY_MACRO: MacroDraft = { name: '', kcal: '', protein: '', fibre: '' };
 
-export function NutritionPanel() {
-  const { body, search, analyzePhoto, logFood, removeFood } = useBody();
+const macroEntry = (m: MacroDraft, fallbackName: string): FoodEntry => ({
+  name: m.name.trim() || fallbackName,
+  grams: 0,
+  kcal: Math.round(num(m.kcal)),
+  protein_g: Math.round(num(m.protein)),
+  fibre_g: Math.round(num(m.fibre)),
+});
 
-  const profile = body?.profile ?? null;
-  const targets = body?.targets ?? null;
-  const food = body?.food;
-  const suggestions = body?.suggestions ?? [];
+/** The kcal / protein / fibre number-inputs — shared by the manual-entry and
+ * photo-estimate forms, which both edit a MacroDraft. */
+function MacroInputs({ macro, set }: { macro: MacroDraft; set: (m: MacroDraft) => void }) {
+  const field = (key: 'kcal' | 'protein' | 'fibre', placeholder: string, maxLength: number) => (
+    <TextInput
+      value={macro[key]}
+      onChangeText={(v) => set({ ...macro, [key]: v.replace(/[^0-9]/g, '') })}
+      style={[styles.input, styles.searchInput]}
+      keyboardType="number-pad"
+      placeholder={placeholder}
+      placeholderTextColor={text.faint}
+      maxLength={maxLength}
+    />
+  );
+  return (
+    <View style={styles.searchRow}>
+      {field('kcal', 'kcal', 5)}
+      {field('protein', 'protein g', 3)}
+      {field('fibre', 'fibre g', 3)}
+    </View>
+  );
+}
 
-  const [editing, setEditing] = useState(false);
-  const showForm = editing || !profile;
-
-  // Food logging.
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ApiFoodSearchItem[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchNote, setSearchNote] = useState('');
-  const [selected, setSelected] = useState<ApiFoodSearchItem | null>(null);
-  const [grams, setGrams] = useState('100');
-  const [manual, setManual] = useState(false);
-  const [mName, setMName] = useState('');
-  const [mKcal, setMKcal] = useState('');
-  const [mProtein, setMProtein] = useState('');
-  const [mFibre, setMFibre] = useState('');
-
-  // Photo estimate.
+/** Estimate a meal from a photo (or read a nutrition label), then adjust and log. */
+function PhotoEstimate() {
+  const { analyzePhoto, logFood } = useBody();
   const [analyzing, setAnalyzing] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [estimate, setEstimate] = useState<ApiFoodEstimate | null>(null);
-  const [eName, setEName] = useState('');
-  const [eKcal, setEKcal] = useState('');
-  const [eProtein, setEProtein] = useState('');
-  const [eFibre, setEFibre] = useState('');
+  const [macro, setMacro] = useState<MacroDraft>(EMPTY_MACRO);
 
-  const openEdit = () => setEditing(true);
-
-  const runSearch = async () => {
-    const q = query.trim();
-    if (!q) return;
-    setSearching(true);
-    setSearchNote('');
-    setSelected(null);
-    try {
-      const items = await search(q);
-      setResults(items);
-      if (items.length === 0) setSearchNote('No matches — try another term or log it by hand.');
-    } catch {
-      setSearchNote('Lookup unavailable right now — you can still log it by hand.');
-      setResults([]);
+  const pickAndAnalyze = async () => {
+    setPhotoError('');
+    const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.4, base64: true, allowsEditing: true });
+    if (res.canceled || !res.assets?.[0]) return;
+    // Downscale (bounded but still legible for label reading) — on web the picker
+    // returns the full-res photo, which would otherwise fail to upload.
+    const dataUri = await toBoundedDataUri(res.assets[0], 1024, 0.7);
+    if (!dataUri) {
+      setPhotoError('Could not read that image — try another, or log by hand.');
+      return;
     }
-    setSearching(false);
+    const { base64, mime } = splitDataUri(dataUri);
+    setAnalyzing(true);
+    try {
+      const est = await analyzePhoto(base64, mime);
+      setEstimate(est);
+      setMacro({ name: est.name, kcal: String(est.kcal), protein: String(est.protein_g), fibre: String(est.fibre_g) });
+    } catch {
+      setPhotoError('Couldn’t read that photo — try another shot, or log it by hand.');
+    }
+    setAnalyzing(false);
+  };
+
+  const add = async () => {
+    await logFood(macroEntry(macro, 'Meal'));
+    setEstimate(null);
+  };
+
+  return (
+    <View style={styles.photoBox}>
+      {estimate ? (
+        <View style={styles.estimate}>
+          <Text style={styles.estimateTitle}>
+            {estimate.source === 'label'
+              ? 'Read from the label — check it looks right'
+              : 'Photo estimate — adjust anything that looks off'}
+          </Text>
+          <TextInput
+            value={macro.name}
+            onChangeText={(v) => setMacro({ ...macro, name: v })}
+            style={styles.input}
+            placeholder="What is it?"
+            placeholderTextColor={text.faint}
+            maxLength={80}
+          />
+          <MacroInputs macro={macro} set={setMacro} />
+          {estimate.note ? (
+            <Text style={styles.estimateNote}>
+              {estimate.source === 'label' ? '' : 'Assumed: '}{estimate.note}
+            </Text>
+          ) : null}
+          <Text style={styles.estimateNote}>
+            {estimate.source === 'label'
+              ? 'These are per serving — adjust if you ate more or less.'
+              : 'Photo estimates are rough — tweak anything before saving.'}
+          </Text>
+          <View style={styles.searchRow}>
+            <Pressable onPress={add} style={({ pressed }) => [styles.btn, styles.flex1, pressed && { opacity: 0.8 }]}>
+              <Text style={styles.btnText}>Add to log</Text>
+            </Pressable>
+            <Pressable onPress={() => setEstimate(null)} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
+              <Text style={[styles.searchBtnText, { color: text.secondary }]}>Discard</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <>
+          <Pressable
+            onPress={pickAndAnalyze}
+            disabled={analyzing}
+            style={({ pressed }) => [styles.photoBtn, (pressed || analyzing) && { opacity: 0.85 }]}
+          >
+            {analyzing ? (
+              <ActivityIndicator size="small" color={TONE} />
+            ) : (
+              <Ionicons name="camera-outline" size={18} color={TONE} />
+            )}
+            <Text style={styles.photoBtnText}>{analyzing ? 'Reading your photo…' : 'Estimate from a photo'}</Text>
+          </Pressable>
+          {photoError ? <Text style={styles.searchNote}>{photoError}</Text> : null}
+        </>
+      )}
+    </View>
+  );
+}
+
+/** Search a food (Open Food Facts), pick a portion, and log it. */
+function FoodSearch({ onManual }: { onManual: () => void }) {
+  const { search, logFood } = useBody();
+  const { query, setQuery, results, setResults, searching, note, run } = useSearch<ApiFoodSearchItem>(search, {
+    empty: 'No matches — try another term or log it by hand.',
+    error: 'Lookup unavailable right now — you can still log it by hand.',
+  });
+  const [selected, setSelected] = useState<ApiFoodSearchItem | null>(null);
+  const [grams, setGrams] = useState('100');
+
+  const doSearch = () => {
+    setSelected(null);
+    void run();
   };
 
   const addSelected = async () => {
@@ -90,66 +184,117 @@ export function NutritionPanel() {
     setQuery('');
   };
 
-  const addManual = async () => {
-    const name = mName.trim();
-    if (!name) return;
-    await logFood({
-      name,
-      grams: 0,
-      kcal: Math.round(num(mKcal)),
-      protein_g: Math.round(num(mProtein)),
-      fibre_g: Math.round(num(mFibre)),
-    });
-    setMName('');
-    setMKcal('');
-    setMProtein('');
-    setMFibre('');
-    setManual(false);
+  return (
+    <>
+      <SearchRow
+        value={query}
+        onChangeText={setQuery}
+        onSubmit={doSearch}
+        searching={searching}
+        placeholder="Search a food (e.g. banana, oats)"
+        tone={TONE}
+      />
+      {note ? <Text style={styles.searchNote}>{note}</Text> : null}
+      {results.map((r, i) => {
+        const on = selected === r;
+        return (
+          <View key={`${r.name}-${i}`}>
+            <Pressable onPress={() => setSelected(on ? null : r)} style={styles.result}>
+              <Text style={styles.resultName} numberOfLines={1}>
+                {r.name}
+                {r.brand ? <Text style={styles.resultBrand}> · {r.brand}</Text> : null}
+              </Text>
+              <Text style={styles.resultKcal}>
+                per 100g: {r.kcal_100g} kcal · {r.protein_100g}g protein · {r.fibre_100g}g fibre
+              </Text>
+            </Pressable>
+            {on ? (
+              <View style={styles.gramsRow}>
+                <TextInput
+                  value={grams}
+                  onChangeText={(v) => setGrams(v.replace(/[^0-9]/g, ''))}
+                  style={[styles.input, styles.gramsInput]}
+                  keyboardType="number-pad"
+                  placeholder="grams"
+                  placeholderTextColor={text.faint}
+                  maxLength={4}
+                />
+                <Text style={styles.gramsPreview}>
+                  ≈ {Math.round((r.kcal_100g * Math.max(0, num(grams))) / 100)} kcal
+                </Text>
+                <Pressable onPress={addSelected} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}>
+                  <Text style={styles.addBtnText}>Add</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
+      <Pressable onPress={onManual}>
+        <Text style={styles.manualLink}>or log it by hand</Text>
+      </Pressable>
+    </>
+  );
+}
+
+/** Log a food by hand when search can't find it. */
+function ManualEntry({ onSearch }: { onSearch: () => void }) {
+  const { logFood } = useBody();
+  const [macro, setMacro] = useState<MacroDraft>(EMPTY_MACRO);
+
+  const add = async () => {
+    if (!macro.name.trim()) return;
+    await logFood(macroEntry(macro, ''));
+    setMacro(EMPTY_MACRO);
+    onSearch();
   };
+
+  return (
+    <>
+      <TextInput
+        value={macro.name}
+        onChangeText={(v) => setMacro({ ...macro, name: v })}
+        style={styles.input}
+        placeholder="What did you eat?"
+        placeholderTextColor={text.faint}
+        maxLength={80}
+      />
+      <MacroInputs macro={macro} set={setMacro} />
+      <View style={styles.searchRow}>
+        <Pressable onPress={add} style={({ pressed }) => [styles.btn, styles.flex1, pressed && { opacity: 0.8 }]}>
+          <Text style={styles.btnText}>Add</Text>
+        </Pressable>
+        <Pressable onPress={onSearch} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
+          <Text style={[styles.searchBtnText, { color: text.secondary }]}>Search instead</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
+/** The "add a food" box — search by default, with a toggle to hand-entry. */
+function AddFood() {
+  const [manual, setManual] = useState(false);
+  return (
+    <View style={styles.addBox}>
+      {manual ? <ManualEntry onSearch={() => setManual(false)} /> : <FoodSearch onManual={() => setManual(true)} />}
+    </View>
+  );
+}
+
+export function NutritionPanel() {
+  const { body, logFood, removeFood } = useBody();
+
+  const profile = body?.profile ?? null;
+  const targets = body?.targets ?? null;
+  const food = body?.food;
+  const suggestions = body?.suggestions ?? [];
+
+  const [editing, setEditing] = useState(false);
+  const showForm = editing || !profile;
 
   const logSuggestion = (s: ApiSuggestion) =>
     logFood({ name: s.name, grams: 0, kcal: s.kcal, protein_g: s.protein_g, fibre_g: s.fibre_g });
-
-  const pickAndAnalyze = async () => {
-    setPhotoError('');
-    const res = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.4,
-      base64: true,
-      allowsEditing: true,
-    });
-    if (res.canceled || !res.assets?.[0]) return;
-    // Downscale (bounded but still legible for label reading) — on web the picker
-    // returns the full-res photo, which would otherwise fail to upload.
-    const dataUri = await toBoundedDataUri(res.assets[0], 1024, 0.7);
-    if (!dataUri) {
-      setPhotoError('Could not read that image — try another, or log by hand.');
-      return;
-    }
-    const { base64, mime } = splitDataUri(dataUri);
-    setAnalyzing(true);
-    try {
-      const est = await analyzePhoto(base64, mime);
-      setEstimate(est);
-      setEName(est.name);
-      setEKcal(String(est.kcal));
-      setEProtein(String(est.protein_g));
-      setEFibre(String(est.fibre_g));
-    } catch {
-      setPhotoError('Couldn’t read that photo — try another shot, or log it by hand.');
-    }
-    setAnalyzing(false);
-  };
-
-  const addEstimate = async () => {
-    await logFood({
-      name: eName.trim() || 'Meal',
-      grams: 0,
-      kcal: Math.round(num(eKcal)),
-      protein_g: Math.round(num(eProtein)),
-      fibre_g: Math.round(num(eFibre)),
-    });
-    setEstimate(null);
-  };
 
   // ── Profile form ──────────────────────────────────────────────────────────
   if (showForm) {
@@ -200,7 +345,7 @@ export function NutritionPanel() {
               BMI {targets.bmi} · {targets.bmi_category} · healthy {targets.healthy_low}–{targets.healthy_high} kg
               {targets.goal_weight ? ` · goal ${targets.goal_weight} kg` : ''}
             </Text>
-            <Pressable onPress={openEdit}>
+            <Pressable onPress={() => setEditing(true)}>
               <Text style={styles.editLink}>Edit</Text>
             </Pressable>
           </View>
@@ -265,198 +410,8 @@ export function NutritionPanel() {
         </View>
       ) : null}
 
-      {/* Photo estimate */}
-      <View style={styles.photoBox}>
-        {estimate ? (
-          <View style={styles.estimate}>
-            <Text style={styles.estimateTitle}>
-              {estimate.source === 'label' ? 'Read from the label — check it looks right' : 'Photo estimate — adjust anything that looks off'}
-            </Text>
-            <TextInput
-              value={eName}
-              onChangeText={setEName}
-              style={styles.input}
-              placeholder="What is it?"
-              placeholderTextColor={text.faint}
-              maxLength={80}
-            />
-            <View style={styles.searchRow}>
-              <TextInput
-                value={eKcal}
-                onChangeText={(v) => setEKcal(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="kcal"
-                placeholderTextColor={text.faint}
-                maxLength={5}
-              />
-              <TextInput
-                value={eProtein}
-                onChangeText={(v) => setEProtein(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="protein g"
-                placeholderTextColor={text.faint}
-                maxLength={3}
-              />
-              <TextInput
-                value={eFibre}
-                onChangeText={(v) => setEFibre(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="fibre g"
-                placeholderTextColor={text.faint}
-                maxLength={3}
-              />
-            </View>
-            {estimate.note ? (
-              <Text style={styles.estimateNote}>
-                {estimate.source === 'label' ? '' : 'Assumed: '}{estimate.note}
-              </Text>
-            ) : null}
-            <Text style={styles.estimateNote}>
-              {estimate.source === 'label'
-                ? 'These are per serving — adjust if you ate more or less.'
-                : 'Photo estimates are rough — tweak anything before saving.'}
-            </Text>
-            <View style={styles.searchRow}>
-              <Pressable onPress={addEstimate} style={({ pressed }) => [styles.btn, styles.flex1, pressed && { opacity: 0.8 }]}>
-                <Text style={styles.btnText}>Add to log</Text>
-              </Pressable>
-              <Pressable onPress={() => setEstimate(null)} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.searchBtnText, { color: text.secondary }]}>Discard</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <>
-            <Pressable
-              onPress={pickAndAnalyze}
-              disabled={analyzing}
-              style={({ pressed }) => [styles.photoBtn, (pressed || analyzing) && { opacity: 0.85 }]}
-            >
-              {analyzing ? (
-                <ActivityIndicator size="small" color={TONE} />
-              ) : (
-                <Ionicons name="camera-outline" size={18} color={TONE} />
-              )}
-              <Text style={styles.photoBtnText}>
-                {analyzing ? 'Reading your photo…' : 'Estimate from a photo'}
-              </Text>
-            </Pressable>
-            {photoError ? <Text style={styles.searchNote}>{photoError}</Text> : null}
-          </>
-        )}
-      </View>
-
-      {/* Add a food */}
-      <View style={styles.addBox}>
-        {!manual ? (
-          <>
-            <View style={styles.searchRow}>
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                onSubmitEditing={runSearch}
-                returnKeyType="search"
-                style={[styles.input, styles.searchInput]}
-                placeholder="Search a food (e.g. banana, oats)"
-                placeholderTextColor={text.faint}
-              />
-              <Pressable onPress={runSearch} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-                {searching ? <ActivityIndicator size="small" color={TONE} /> : <Text style={[styles.searchBtnText, { color: TONE }]}>Search</Text>}
-              </Pressable>
-            </View>
-            {searchNote ? <Text style={styles.searchNote}>{searchNote}</Text> : null}
-            {results.map((r, i) => {
-              const on = selected === r;
-              return (
-                <View key={`${r.name}-${i}`}>
-                  <Pressable onPress={() => setSelected(on ? null : r)} style={styles.result}>
-                    <Text style={styles.resultName} numberOfLines={1}>
-                      {r.name}
-                      {r.brand ? <Text style={styles.resultBrand}> · {r.brand}</Text> : null}
-                    </Text>
-                    <Text style={styles.resultKcal}>
-                      per 100g: {r.kcal_100g} kcal · {r.protein_100g}g protein · {r.fibre_100g}g fibre
-                    </Text>
-                  </Pressable>
-                  {on ? (
-                    <View style={styles.gramsRow}>
-                      <TextInput
-                        value={grams}
-                        onChangeText={(v) => setGrams(v.replace(/[^0-9]/g, ''))}
-                        style={[styles.input, styles.gramsInput]}
-                        keyboardType="number-pad"
-                        placeholder="grams"
-                        placeholderTextColor={text.faint}
-                        maxLength={4}
-                      />
-                      <Text style={styles.gramsPreview}>
-                        ≈ {Math.round((r.kcal_100g * Math.max(0, num(grams))) / 100)} kcal
-                      </Text>
-                      <Pressable onPress={addSelected} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}>
-                        <Text style={styles.addBtnText}>Add</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-            <Pressable onPress={() => setManual(true)}>
-              <Text style={styles.manualLink}>or log it by hand</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <TextInput
-              value={mName}
-              onChangeText={setMName}
-              style={styles.input}
-              placeholder="What did you eat?"
-              placeholderTextColor={text.faint}
-              maxLength={80}
-            />
-            <View style={styles.searchRow}>
-              <TextInput
-                value={mKcal}
-                onChangeText={(v) => setMKcal(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="kcal"
-                placeholderTextColor={text.faint}
-                maxLength={5}
-              />
-              <TextInput
-                value={mProtein}
-                onChangeText={(v) => setMProtein(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="protein g"
-                placeholderTextColor={text.faint}
-                maxLength={3}
-              />
-              <TextInput
-                value={mFibre}
-                onChangeText={(v) => setMFibre(v.replace(/[^0-9]/g, ''))}
-                style={[styles.input, styles.searchInput]}
-                keyboardType="number-pad"
-                placeholder="fibre g"
-                placeholderTextColor={text.faint}
-                maxLength={3}
-              />
-            </View>
-            <View style={styles.searchRow}>
-              <Pressable onPress={addManual} style={({ pressed }) => [styles.btn, styles.flex1, pressed && { opacity: 0.8 }]}>
-                <Text style={styles.btnText}>Add</Text>
-              </Pressable>
-              <Pressable onPress={() => setManual(false)} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.searchBtnText, { color: text.secondary }]}>Search instead</Text>
-              </Pressable>
-            </View>
-          </>
-        )}
-      </View>
+      <PhotoEstimate />
+      <AddFood />
     </SystemPanel>
   );
 }
