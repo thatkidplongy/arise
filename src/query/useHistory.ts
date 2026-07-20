@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { api } from '@/lib/api';
 
 import { authed } from './authed';
 import { qk } from './keys';
@@ -11,7 +10,7 @@ import { qk } from './keys';
 export function useHistory() {
   const query = useQuery({
     queryKey: qk.history,
-    queryFn: () => authed((b, t) => api.getHistory(b, t)),
+    queryFn: () => authed((c) => c.getHistory()),
   });
   return { history: query.data ?? [], loading: query.isPending };
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type ApiBody, type ApiBodyProfile, type FoodEntry } from '@/lib/api';
+import { type ApiBody, type ApiBodyProfile, type FoodEntry } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 
 import { authed } from './authed';
@@ -19,35 +19,35 @@ export function useBody() {
 
   const query = useQuery({
     queryKey: qk.body(day),
-    queryFn: () => authed((b, t) => api.getBody(b, t, day)),
+    queryFn: () => authed((c) => c.getBody(day)),
   });
 
   const onSuccess = (body: ApiBody) => qc.setQueryData(qk.body(day), body);
 
   const saveProfileMut = useMutation({
-    mutationFn: (p: ApiBodyProfile) => authed((b, t) => api.setBodyProfile(b, t, p, day)),
+    mutationFn: (p: ApiBodyProfile) => authed((c) => c.setBodyProfile(p, day)),
     onSuccess,
   });
   const logFoodMut = useMutation({
-    mutationFn: (e: FoodEntry) => authed((b, t) => api.logFood(b, t, e, day)),
+    mutationFn: (e: FoodEntry) => authed((c) => c.logFood(e, day)),
     onSuccess,
   });
   const removeFoodMut = useMutation({
-    mutationFn: (id: string) => authed((b, t) => api.removeFood(b, t, id, day)),
+    mutationFn: (id: string) => authed((c) => c.removeFood(id, day)),
     onSuccess,
   });
   const addStepMut = useMutation({
     mutationFn: (v: { routine: 'AM' | 'PM'; text: string }) =>
-      authed((b, t) => api.addSkincareStep(b, t, v.routine, v.text, day)),
+      authed((c) => c.addSkincareStep(v.routine, v.text, day)),
     onSuccess,
   });
   const removeStepMut = useMutation({
-    mutationFn: (id: string) => authed((b, t) => api.removeSkincareStep(b, t, id, day)),
+    mutationFn: (id: string) => authed((c) => c.removeSkincareStep(id, day)),
     onSuccess,
   });
   const toggleStepMut = useMutation({
     mutationFn: (v: { id: string; done: boolean }) =>
-      authed((b, t) => api.checkSkincare(b, t, v.id, v.done, day)),
+      authed((c) => c.checkSkincare(v.id, v.done, day)),
     onSuccess,
   });
 
@@ -60,8 +60,8 @@ export function useBody() {
     addStep: (routine: 'AM' | 'PM', text: string) => addStepMut.mutateAsync({ routine, text }),
     removeStep: (id: string) => removeStepMut.mutateAsync(id),
     toggleStep: (id: string, done: boolean) => toggleStepMut.mutateAsync({ id, done }),
-    search: (q: string) => authed((b, t) => api.searchFood(b, t, q)),
-    searchProducts: (q: string) => authed((b, t) => api.searchSkincare(b, t, q)),
-    analyzePhoto: (image: string, mime: string) => authed((b, t) => api.analyzeFood(b, t, image, mime)),
+    search: (q: string) => authed((c) => c.searchFood(q)),
+    searchProducts: (q: string) => authed((c) => c.searchSkincare(q)),
+    analyzePhoto: (image: string, mime: string) => authed((c) => c.analyzeFood(image, mime)),
   };
 }

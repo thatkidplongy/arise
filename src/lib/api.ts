@@ -607,3 +607,23 @@ export const api = {
   removeJournalEntry: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/journal/${id}?day=${day}`, token, { method: 'DELETE' }),
 };
+
+/** The API surface with the server base + token bound in, so callers pass only
+ * the meaningful args (day, ids, payloads). Each method drops its leading
+ * `(base, token)`; `day` stays a parameter since it varies per call. */
+export type ApiClient = {
+  [K in keyof typeof api]: (typeof api)[K] extends (base: string, token: string, ...args: infer A) => infer R
+    ? (...args: A) => R
+    : never;
+};
+
+/** Bind `api` to one server + token. Built by mapping over `api` so a new
+ * endpoint is picked up automatically — nothing to re-thread here. */
+export function createClient(base: string, token: string): ApiClient {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(api) as (keyof typeof api)[]) {
+    const fn = api[key] as (...args: unknown[]) => unknown;
+    out[key] = (...args: unknown[]) => fn(base, token, ...args);
+  }
+  return out as ApiClient;
+}
