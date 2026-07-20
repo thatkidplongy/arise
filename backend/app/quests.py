@@ -827,6 +827,24 @@ FOCUS_TITLES: dict[str, str] = {
     "CFT": "Focused Craft",
 }
 
+# Concrete steps for a focused side quest — attribute-flavoured, with the chosen
+# focus dropped in ({f}), so it reads as real tasks rather than a bare "Your focus:".
+FOCUS_STEPS: dict[str, list[str]] = {
+    "STR": ["Warm up, then 15 focused minutes on {f}", "Push one set or drill past comfortable"],
+    "CRE": ["Spend 15–20 minutes creating on {f}", "Make one choice you don't usually make"],
+    "SPI": ["Take 10 quiet minutes on {f}", "Notice what shifts — breath, body, mood"],
+    "CHA": ["Do one real thing for {f} today", "Reach out or show up — don't just plan it"],
+    "INT": ["Spend 15 focused minutes on {f}", "Keep the one idea worth remembering"],
+    "WLT": ["Take one concrete action on {f}", "Make it real — send, log, or set it up"],
+    "CFT": ["Spend 20 focused minutes on {f}", "Ship one small improvement"],
+}
+
+
+def focus_steps(stat: str, focus: str) -> list[str]:
+    """Real, checkable tasks for a focused side quest, with `focus` interpolated."""
+    tmpl = FOCUS_STEPS.get(stat, ["Spend 15 focused minutes on {f}", "Do one concrete thing toward it"])
+    return [s.replace("{f}", focus) for s in tmpl]
+
 # Daily non-negotiables, LEVELED. Each daily below has a floor that's prepended
 # to that day's rotating steps and met every day no matter which variant shows —
 # but it *climbs* with the attribute's progression level (see progression.py).
@@ -1294,7 +1312,7 @@ def content_for(
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
-        return title, f"Your focus: {chosen}", floor_for(quest, book, level, chapters), ""
+        return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
     title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
     steps = floor_for(quest, book, level, chapters) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")
