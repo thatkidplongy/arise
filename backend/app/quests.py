@@ -12,7 +12,7 @@ prompts) so a quest tells you exactly what to do, not just its theme.
 
 Some daily slots also carry a *non-negotiable* floor (see FLOORS): a small core
 prepended to that day's steps and met every day regardless of the variant (e.g.
-push-ups + plank on the physical daily). The floor is *leveled* — it starts
+push-ups + plank + an explosive core slam on the physical daily). The floor is *leveled* — it starts
 gentle and climbs as the hunter shows up consistently (see progression.py), so
 there's no stagnation. Where a quest is about learning, it points at a trusted
 source (see RESOURCES), matched to the variant.
@@ -24,7 +24,7 @@ the complicated stuff — learn-how-to-learn before domains, principles before
 tactics.
 
 The pools are tuned to the hunter's real interests:
-  STR  badminton + strength, plyometrics, home workouts; push-ups/plank floor
+  STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
@@ -567,33 +567,33 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     # ── Wealth (WLT) ──────────────────────────────────────────────────────────
-    "d-wealth": [  # daily — a small money habit: learn, manage, or earn a little
+    "d-wealth": [  # daily — money that matters: dodge debt, save with diskarte, build passive income
         ("Ledger Study", "Track today's money", [
-            "Add up today's spending into categories",
-            "Name one expense you could trim this week",
+            "Log today's money in and out in the tracker (You tab)",
+            "Spot one leak — a fee, subscription, or interest — and plan to kill it",
         ]),
         ("Money Class", "10 min learning", [
-            "Read or watch one lesson on money, investing, or business",
-            "Write the single idea in a sentence",
+            "Read or watch one lesson on getting out of debt, saving, or passive income",
+            "Write the single idea you'll actually use in a sentence",
         ]),
         ("Skill to Sell", "Sharpen an earning skill", [
             "15 min improving a skill people pay for",
-            "Note who would pay for it, and roughly how much",
+            "Note who'd pay for it — and how it could earn without your hours later",
         ]),
-        ("Offer Draft", "Package what you make", [
-            "Describe one thing you could sell — a beat, edit, photo, or bit of code",
-            "Put a price on it",
+        ("Offer Draft", "Package something that can earn again", [
+            "Describe one thing you could sell more than once — a beat, preset, template, or bit of code",
+            "Put a price on it, and note where it could sell on autopilot",
         ]),
-        ("Market Watch", "Understand the game", [
-            "Read one business or market headline",
-            "Ask: who makes money here, and how?",
+        ("Market Watch", "Learn how money makes money", [
+            "Read one thing on a passive-income vehicle — dividends, index funds, high-yield savings, rent",
+            "Note how it would pay you without trading your time",
         ]),
-        ("Budget Tune", "Widen the gap", [
-            "Review one spending category",
-            "Move a little more toward saving or investing",
+        ("Budget Tune", "Save with diskarte", [
+            "Pick one saving move: pay yourself first, auto-transfer, envelope, or an ipon challenge",
+            "Move a set amount to savings before you spend a peso",
         ]),
         ("Value Reps", "Learn the language of money", [
-            "Learn one term (compounding, margin, cash flow, runway…)",
+            "Learn one term that protects you — interest, APR, compounding, emergency fund, dividend",
             "Explain it in your own words",
         ]),
         ("Micro-Hustle", "One small income action", [
@@ -836,13 +836,19 @@ FOCUS_TITLES: dict[str, str] = {
 # have a floor; Creativity and Connection stay floor-free (a single rotating
 # action is the day's commitment) and progress by content band instead.
 FLOORS: dict[str, list[list[str]]] = {
-    "d-train": [  # STR — progressive overload on the daily minimum
-        ["5 push-ups (or knee push-ups — form first)", "20s plank"],
-        ["8 push-ups (good form)", "30s plank"],
-        ["10 push-ups", "40s plank"],
-        ["12 push-ups", "45s plank"],
-        ["15 push-ups", "50s plank"],
-        ["20 push-ups", "60s plank"],  # cap — maintain
+    "d-train": [  # STR — progressive overload + an explosive (plyometric) core rep
+        ["5 push-ups (or knee push-ups — form first)", "20s plank",
+         "10 overhead slams (ball, bag, or water jug) — explode down, brace hard"],
+        ["8 push-ups (good form)", "30s plank",
+         "12 overhead slams — full reach, sharp slam"],
+        ["10 push-ups", "40s plank",
+         "8 rotational slams per side — snap through the hips"],
+        ["12 push-ups", "45s plank",
+         "10 rotational slams per side — sharp, athletic rotation"],
+        ["15 push-ups", "50s plank",
+         "8 explosive sit-up throws + 8 rotational slams per side"],
+        ["20 push-ups", "60s plank",
+         "12 rotational slams per side + 10 overhead slams — max intent, reset between"],  # cap
     ],
     "d-meditate": [  # SPI — from a pause, toward a real sit
         ["Pause for 3 slow breaths before you begin"],
@@ -852,13 +858,13 @@ FLOORS: dict[str, list[list[str]]] = {
         ["Settle for 3 minutes before you begin"],
         ["Settle for 5 minutes before you begin"],  # cap
     ],
-    "d-wealth": [  # WLT — awareness deepening into management
-        ["Log today's spending — everything in and out"],
-        ["Log today's spending, sorted into a few categories"],
-        ["Log today's money in and out; name one expense you could trim"],
-        ["Log today's money in and out; note the gap between them"],
-        ["Log today's money; nudge a little toward this week's target"],
-        ["Quick money check-in: today's in and out, and how the week's tracking"],  # cap
+    "d-wealth": [  # WLT — awareness deepening into management (logs in the You-tab tracker)
+        ["Log today's money in the tracker (You tab) — everything in and out"],
+        ["Log today's money in the tracker; watch what leaks to fees or interest"],
+        ["Log today's money in the tracker; name one expense to trim, and pay yourself first"],
+        ["Log today's money in the tracker; keep the gap positive — save before you spend"],
+        ["Log today's money in the tracker; nudge toward this week's saving target"],
+        ["Money check-in in the tracker (You): today's in/out, the week's gap, and no new debt"],  # cap
     ],
     "d-craft": [  # CFT — a deep-work minimum that grows as the habit sets in
         ["Show up to the code — 15 focused minutes, one small rep"],
@@ -1064,6 +1070,69 @@ def days_to_finish(level: int) -> int:
     """How many days a book should take at this reading level — the denominator
     the Status screen uses to show reading progress. Higher level → fewer days."""
     return _READING_PACE_DAYS[max(0, min(level, len(_READING_PACE_DAYS) - 1))]
+
+
+# A self-set priority that sits on top of the plan (e.g. "abs this week"). Common
+# asks get a handcrafted frame; anything else gets a clean generic one. Matched by
+# keyword substring on the lowercased focus — no LLM, always free.
+PRIORITY_TEMPLATES: list[tuple[tuple[str, ...], str, str, list[str]]] = [
+    (("abs", "core", "six pack", "midsection"),
+     "Abs & core",
+     "Explosive core, a little every day — on top of your usual training.",
+     ["Add a hard core-slam finisher to today's session",
+      "Brace through every rep — quality over count",
+      "Keep protein up, junk down"]),
+    (("save", "saving", "ipon", "budget"),
+     "Saving diskarte",
+     "Keep more of what you earn — pay yourself first.",
+     ["Move a set amount to savings before you spend",
+      "Kill one leak (a fee, sub, or impulse buy)",
+      "Log the day's money in the tracker (You tab)"]),
+    (("passive", "invest", "dividend", "index"),
+     "Passive income",
+     "Build money that works while you sleep.",
+     ["Learn one passive vehicle — index fund, dividend, HYSA, rent",
+      "Do one concrete step toward setting it up",
+      "Note the next action to grow it"]),
+    (("debt", "utang", "loan", "interest"),
+     "Kill the debt",
+     "Starve the interest, protect your future income.",
+     ["List what you owe and its interest rate",
+      "Throw an extra bit at the highest-rate one",
+      "Take on no new debt today"]),
+    (("read", "book"),
+     "Read more",
+     "Chip away at the book, every day.",
+     ["Read past today's reading floor",
+      "Note the one idea worth keeping"]),
+    (("badminton", "smash", "footwork", "court"),
+     "Badminton sharpening",
+     "Small technical reps on top of training.",
+     ["Drill one weak shot for 10 focused minutes",
+      "Add fast footwork or shadow swings",
+      "Note one thing to fix next session"]),
+    (("sleep", "rest", "recovery"),
+     "Sleep & recovery",
+     "Guard your recovery — it powers everything else.",
+     ["Set a wind-down time tonight and hold it",
+      "Screens off 30 min before bed",
+      "Note how rested you felt"]),
+]
+
+
+def priority_content(focus: str) -> tuple[str, str, list[str]]:
+    """Handcrafted (title, note, steps) for a pinned priority, matched by keyword.
+    Anything unmatched gets a clean generic frame — no LLM, always free."""
+    f = (focus or "").strip().lower()
+    for keys, title, note, steps in PRIORITY_TEMPLATES:
+        if any(k in f for k in keys):
+            return title, note, list(steps)
+    label = (focus or "").strip()[:60]
+    return (
+        label or "Your priority",
+        "Your focus right now — a little toward it each day.",
+        ["Do one concrete thing toward this today", "Note what you did"],
+    )
 
 
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters: int = 0) -> list[str]:

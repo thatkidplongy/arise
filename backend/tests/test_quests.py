@@ -34,14 +34,17 @@ def test_daily_content_rotates_across_days():
 
 
 def test_daily_floor_is_always_present():
-    # The physical daily carries a non-negotiable floor (push-ups + plank) that
-    # shows every day regardless of which conditioning variant is picked. At Lv0
-    # it's the gentlest tier of FLOORS.
+    # The physical daily carries a non-negotiable floor (push-ups + plank + a core
+    # rep) that shows every day regardless of which conditioning variant is picked.
+    # At Lv0 it's the gentlest tier of FLOORS.
     q = _q("d-train", "STR", "daily")
+    floor0 = quests.FLOORS["d-train"][0]
     for d in range(10, 25):
         _, _, steps, _ = quests.content_for(q, f"2026-07-{d:02d}")
-        assert steps[:2] == quests.FLOORS["d-train"][0]  # floor comes first
+        assert steps[: len(floor0)] == floor0  # floor comes first
         assert any("plank" in s for s in steps)
+        # An explosive (plyometric) core rep is always on top, whatever the workout.
+        assert any("slam" in s for s in steps)
 
 
 def test_floor_climbs_with_level():
@@ -49,11 +52,12 @@ def test_floor_climbs_with_level():
     q = _q("d-train", "STR", "daily")
     lv0 = quests.content_for(q, "2026-07-18", level=0)[2]
     lv5 = quests.content_for(q, "2026-07-18", level=5)[2]
-    assert lv0[:2] == quests.FLOORS["d-train"][0]
-    assert lv5[:2] == quests.FLOORS["d-train"][5]
+    floors = quests.FLOORS["d-train"]
+    assert lv0[: len(floors[0])] == floors[0]
+    assert lv5[: len(floors[5])] == floors[5]
     assert "5 push-ups" in lv0[0] and "20 push-ups" in lv5[0]
     # Beyond the cap it just holds at the top tier — no runaway numbers.
-    assert quests.content_for(q, "2026-07-18", level=99)[2][:2] == quests.FLOORS["d-train"][-1]
+    assert quests.content_for(q, "2026-07-18", level=99)[2][: len(floors[-1])] == floors[-1]
 
 
 def test_reading_floor_scales_by_level_and_book():
