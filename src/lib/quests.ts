@@ -20,6 +20,9 @@ export function isWriteStep(step: string): boolean {
   if (/\b(one|two|three|four|five|six|\d+)[- ]sentence/.test(s)) return true;
   if (/what (did|do) you (learn|notice|take away|think)|one thing you (learned|noticed|realised|realized)/.test(s))
     return true;
+  // A step phrased as a question is a prompt to answer in writing (journaling),
+  // not a do-step — e.g. "What drained me?", "Ask: how do I feel right now?".
+  if (s.endsWith('?') && !DOING_CONTEXT.test(s)) return true;
   // A writing verb leads the step — unless it's really a "do" step.
   if (/^(write|note|describe|explain|reflect|jot)\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
   // "write … down" split across the phrase, e.g. "write your plan down".
