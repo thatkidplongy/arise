@@ -21,9 +21,19 @@ export function FocusAreasCard() {
 
   const prefsKey = JSON.stringify(state?.preferences ?? {});
   const levelsKey = JSON.stringify(state?.levels ?? {});
-  const [focusDraft, setFocusDraft] = useState<Record<string, string[]>>({});
+  // Seed the drafts from what's already saved AT MOUNT — not just on later changes.
+  // (Initialising to {} and waiting for a change left the card blank whenever state
+  // was already cached, and the next chip edit then persisted empties over every
+  // other attribute — silent data loss.)
+  const [focusDraft, setFocusDraft] = useState<Record<string, string[]>>(() => {
+    const p = state?.preferences ?? {};
+    return Object.fromEntries(STAT_KEYS.map((k) => [k, p[k] ?? []]));
+  });
   const [focusInput, setFocusInput] = useState<Record<string, string>>({});
-  const [levelDraft, setLevelDraft] = useState<Record<string, string>>({});
+  const [levelDraft, setLevelDraft] = useState<Record<string, string>>(() => {
+    const l = state?.levels ?? {};
+    return Object.fromEntries(STAT_KEYS.map((k) => [k, l[k] ?? '']));
+  });
   const [removedFocus, setRemovedFocus] = useState<{ stat: string; item: string; index: number } | null>(
     null,
   );
