@@ -16,7 +16,7 @@ def test_priority_per_category(client):
     s = client.post(f"/priority?day={DAY}", json={"stat": "STR", "focus": "work on my abs", "scope": "week"}).json()
     p = _prio(s, "STR")
     assert p and p["title"] == "Abs & core" and p["scope"] == "week"
-    assert any("slam" in x.lower() or "core" in x.lower() for x in p["steps"])
+    assert any("core" in x.lower() or "tuck" in x.lower() for x in p["steps"])
 
     # A second category can hold its own priority at the same time.
     s = client.post(f"/priority?day={DAY}", json={"stat": "WLT", "focus": "passive income", "scope": "open"}).json()

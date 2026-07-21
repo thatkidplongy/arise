@@ -44,7 +44,7 @@ def test_daily_floor_is_always_present():
         assert steps[: len(floor0)] == floor0  # floor comes first
         assert any("plank" in s for s in steps)
         # An explosive (plyometric) core rep is always on top, whatever the workout.
-        assert any("slam" in s for s in steps)
+        assert any("tuck jump" in s for s in steps)
 
 
 def test_floor_climbs_with_level():

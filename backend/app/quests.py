@@ -12,7 +12,7 @@ prompts) so a quest tells you exactly what to do, not just its theme.
 
 Some daily slots also carry a *non-negotiable* floor (see FLOORS): a small core
 prepended to that day's steps and met every day regardless of the variant (e.g.
-push-ups + plank + an explosive core slam on the physical daily). The floor is *leveled* — it starts
+push-ups + plank + an explosive core rep on the physical daily). The floor is *leveled* — it starts
 gentle and climbs as the hunter shows up consistently (see progression.py), so
 there's no stagnation. Where a quest is about learning, it points at a trusted
 source (see RESOURCES), matched to the variant.
@@ -854,19 +854,19 @@ def focus_steps(stat: str, focus: str) -> list[str]:
 # have a floor; Creativity and Connection stay floor-free (a single rotating
 # action is the day's commitment) and progress by content band instead.
 FLOORS: dict[str, list[list[str]]] = {
-    "d-train": [  # STR — progressive overload + an explosive (plyometric) core rep
+    "d-train": [  # STR — progressive overload + an explosive, home-only core rep (no equipment)
         ["5 push-ups (or knee push-ups — form first)", "20s plank",
-         "10 overhead slams (ball, bag, or water jug) — explode down, brace hard"],
+         "6 tuck jumps — knees to chest, land soft and quiet"],
         ["8 push-ups (good form)", "30s plank",
-         "12 overhead slams — full reach, sharp slam"],
+         "8 tuck jumps — land soft, reset between reps"],
         ["10 push-ups", "40s plank",
-         "8 rotational slams per side — snap through the hips"],
+         "10 tuck jumps + 20s fast mountain climbers"],
         ["12 push-ups", "45s plank",
-         "10 rotational slams per side — sharp, athletic rotation"],
+         "12 tuck jumps + 12 explosive V-ups"],
         ["15 push-ups", "50s plank",
-         "8 explosive sit-up throws + 8 rotational slams per side"],
+         "15 tuck jumps + 15 explosive V-ups"],
         ["20 push-ups", "60s plank",
-         "12 rotational slams per side + 10 overhead slams — max intent, reset between"],  # cap
+         "20 tuck jumps + 20 explosive V-ups — max intent, reset between"],  # cap
     ],
     "d-meditate": [  # SPI — from a pause, toward a real sit
         ["Pause for 3 slow breaths before you begin"],
@@ -1097,7 +1097,7 @@ PRIORITY_TEMPLATES: list[tuple[tuple[str, ...], str, str, list[str]]] = [
     (("abs", "core", "six pack", "midsection"),
      "Abs & core",
      "Explosive core, a little every day — on top of your usual training.",
-     ["Add a hard core-slam finisher to today's session",
+     ["Add an explosive core finisher — tuck jumps or V-ups",
       "Brace through every rep — quality over count",
       "Keep protein up, junk down"]),
     (("save", "saving", "ipon", "budget"),
