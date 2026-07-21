@@ -209,15 +209,15 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
       {history && history.entries.length === 0 ? (
         <Text style={styles.empty}>{loading ? 'Loading…' : 'Nothing logged this period.'}</Text>
       ) : (
-        (history?.entries ?? []).map((e) => {
+        (history?.entries ?? []).map((e, i) => {
           const color = e.direction === 'in' ? feedback.success : feedback.danger;
           return (
-            <View key={e.id} style={styles.entry}>
+            <View key={e.id} style={[styles.entry, i === 0 && styles.entryFirst]}>
               <View style={[styles.dot, { backgroundColor: color }]} />
               <Text style={styles.entryNote} numberOfLines={1}>
                 {e.note || (e.direction === 'in' ? 'Money in' : 'Spending')}
               </Text>
-              <Text style={styles.entryDay}>{shortDay(e.day, today)}</Text>
+              {scope !== 'day' ? <Text style={styles.entryDay}>{shortDay(e.day, today)}</Text> : null}
               <Text style={[styles.entryAmount, { color }]}>
                 {e.direction === 'in' ? '+' : '−'}
                 {peso(e.amount)}
@@ -315,11 +315,14 @@ const styles = StyleSheet.create({
   entry: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    paddingVertical: 8,
+    gap: 11,
+    paddingVertical: 11,
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
   },
+  // The first row sits below the add form — give it clear air and no divider, so
+  // no hairline hugs the amount input.
+  entryFirst: { borderTopWidth: 0, marginTop: 14 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   entryNote: { flex: 1, minWidth: 0, color: text.secondary, fontSize: 13 },
   entryDay: { color: text.faint, fontSize: 11 },
