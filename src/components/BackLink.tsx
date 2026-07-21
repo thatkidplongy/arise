@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { type Href, router } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { accent } from '@/theme';
 
-/** A small "‹ Back" affordance for screens reached from the You hub (or via a
- * deep link / another screen). Returns to wherever you came from, falling back
- * to the You hub when there's no history (e.g. a fresh PWA deep-link). */
-export function BackLink({ label = 'Back' }: { label?: string }) {
+/** A small "‹ Back" affordance for screens reached from a hub. Pass `to` to name
+ * where it returns — needed inside the Tabs navigator, where router.back() drops
+ * you on the initial tab (Status) rather than the hub you actually came from.
+ * Without `to` it falls back to history, then the You hub. */
+export function BackLink({ label = 'Back', to = '/you' }: { label?: string; to?: Href }) {
   return (
     <Pressable
-      onPress={() => (router.canGoBack() ? router.back() : router.replace('/you'))}
+      onPress={() => router.replace(to)}
       style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.6 }]}
       hitSlop={8}
     >

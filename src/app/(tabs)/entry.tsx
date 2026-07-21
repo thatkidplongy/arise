@@ -37,7 +37,7 @@ export default function EntryScreen() {
   if (!state) {
     return (
       <Screen>
-        <BackLink />
+        <BackLink to="/journal" />
         <ConnectionPanel />
       </Screen>
     );
@@ -53,7 +53,7 @@ export default function EntryScreen() {
   if (!item) {
     return (
       <Screen>
-        <BackLink label="Journal" />
+        <BackLink label="Journal" to="/journal" />
         <SystemPanel>
           <Text style={styles.gone}>This entry is no longer here — it may have been deleted.</Text>
         </SystemPanel>
@@ -69,8 +69,7 @@ export default function EntryScreen() {
   const remove = () => {
     if (kind === 'reflection') void removeQuestNote(item.id);
     else void removeJournalEntry(item.id);
-    if (router.canGoBack()) router.back();
-    else router.replace('/journal');
+    router.replace('/journal');
   };
 
   const meta = refl ? STAT_META[refl.stat as StatKey] ?? null : null;
@@ -78,7 +77,7 @@ export default function EntryScreen() {
 
   return (
     <Screen>
-      <BackLink label="Journal" />
+      <BackLink label="Journal" to="/journal" />
 
       <View style={styles.head}>
         {meta ? (
