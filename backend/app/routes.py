@@ -10,7 +10,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
-                      MoneyIn, PriorityIn,
+                      MoneyIn, MoneyHistoryOut, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult,
@@ -414,6 +414,17 @@ def remove_money(entry_id: str, day: str | None = Query(None), db: Session = Dep
     player = state.get_or_create_player(db)
     service.remove_money(db, player, entry_id)
     return state.build_state(db, player, _valid_day(day))
+
+
+@router.get("/money/history", response_model=MoneyHistoryOut)
+def money_history(
+    scope: str = Query("week"),
+    day: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """One period of the money log (scope = day | week | month) anchored on `day`."""
+    player = state.get_or_create_player(db)
+    return state.money_history(db, player, scope, _valid_day(day))
 
 
 # ── Priority (a self-set focus pinned on top of the plan) ─────────────────────

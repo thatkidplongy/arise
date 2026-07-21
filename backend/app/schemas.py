@@ -456,13 +456,33 @@ class MoneyEntryOut(BaseModel):
 
 
 class MoneyOut(BaseModel):
-    """The money log plus the totals the You tab shows — today and this ISO week."""
-    entries: list[MoneyEntryOut]  # newest first
+    """The money *summary* for the tracker headline — today and this ISO week's
+    in/out, plus the all-time balance. Entries live at /money/history (per period),
+    so /state stays small however much history accrues."""
     today_in: float
     today_out: float
     week_in: float
     week_out: float
     balance: float  # money remaining — all time in minus out
+
+
+class MoneyBucketOut(BaseModel):
+    day: str
+    earned: float
+    spent: float
+
+
+class MoneyHistoryOut(BaseModel):
+    """One period (day / week / month) of the money log — entries, per-day buckets
+    for the chart, and earned/spent/net totals."""
+    scope: str
+    start: str
+    end: str
+    earned: float
+    spent: float
+    net: float
+    buckets: list[MoneyBucketOut]
+    entries: list[MoneyEntryOut]
 
 
 class PriorityOut(BaseModel):

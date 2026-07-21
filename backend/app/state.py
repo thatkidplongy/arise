@@ -8,7 +8,7 @@ handful of rows; when it grows, they become SQL queries with the same contract.
 
 import json
 
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -526,28 +526,85 @@ def _priorities_of(player: Player, day: str) -> list[dict]:
 
 
 def _money_of(db: Session, player: Player, day: str) -> dict:
-    """The money log, newest first, with today's and this ISO week's in/out totals —
-    the figures the You tab's tracker shows."""
+    """The money *summary* the tracker headline needs — today's and this ISO week's
+    in/out, plus the all-time balance. Deliberately no entry list: entries are
+    fetched per-period from /money/history, so /state stays small no matter how
+    much history piles up."""
     rows = db.query(MoneyEntry).filter_by(player_id=player.id).all()
     week = game.week_key(day)
 
     def total(direction: str, pred) -> float:
         return round(sum(r.amount for r in rows if r.direction == direction and pred(r)), 2)
 
-    entries = [
-        {"id": r.id, "amount": r.amount, "direction": r.direction, "note": r.note,
-         "day": r.day, "created_at": r.created_at}
-        for r in sorted(rows, key=lambda r: r.created_at, reverse=True)
-    ]
     always = lambda r: True  # noqa: E731 — all-time predicate
     return {
-        "entries": entries,
         "today_in": total("in", lambda r: r.day == day),
         "today_out": total("out", lambda r: r.day == day),
         "week_in": total("in", lambda r: game.week_key(r.day) == week),
         "week_out": total("out", lambda r: game.week_key(r.day) == week),
         # Money remaining = everything in minus everything out, all time.
         "balance": round(total("in", always) - total("out", always), 2),
+    }
+
+
+def _period_range(scope: str, day: str) -> tuple[str, str]:
+    """The [start, end] 'YYYY-MM-DD' span for a day / ISO week / calendar month
+    containing `day` (both inclusive)."""
+    d = date.fromisoformat(day)
+    if scope == "day":
+        return day, day
+    if scope == "month":
+        start = d.replace(day=1)
+        end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        return start.isoformat(), end.isoformat()
+    monday = d - timedelta(days=d.weekday())  # week (Mon–Sun)
+    return monday.isoformat(), (monday + timedelta(days=6)).isoformat()
+
+
+def money_history(db: Session, player: Player, scope: str, day: str) -> dict:
+    """One period of the money log — its entries (newest first), per-day buckets for
+    the chart, and earned/spent/net totals. Bounded by the period, so reviewing
+    months of history is many small reads rather than one giant payload."""
+    if scope not in ("day", "week", "month"):
+        scope = "week"
+    start, end = _period_range(scope, day)
+    rows = (
+        db.query(MoneyEntry)
+        .filter(MoneyEntry.player_id == player.id, MoneyEntry.day >= start, MoneyEntry.day <= end)
+        .all()
+    )
+    buckets: dict[str, dict] = {}
+    cur, last = date.fromisoformat(start), date.fromisoformat(end)
+    while cur <= last:
+        buckets[cur.isoformat()] = {"day": cur.isoformat(), "earned": 0.0, "spent": 0.0}
+        cur += timedelta(days=1)
+    earned = spent = 0.0
+    for r in rows:
+        b = buckets.get(r.day)
+        if b is None:
+            continue
+        if r.direction == "in":
+            b["earned"] += r.amount
+            earned += r.amount
+        else:
+            b["spent"] += r.amount
+            spent += r.amount
+    return {
+        "scope": scope,
+        "start": start,
+        "end": end,
+        "earned": round(earned, 2),
+        "spent": round(spent, 2),
+        "net": round(earned - spent, 2),
+        "buckets": [
+            {"day": b["day"], "earned": round(b["earned"], 2), "spent": round(b["spent"], 2)}
+            for b in (buckets[k] for k in sorted(buckets))
+        ],
+        "entries": [
+            {"id": r.id, "amount": r.amount, "direction": r.direction, "note": r.note,
+             "day": r.day, "created_at": r.created_at}
+            for r in sorted(rows, key=lambda r: r.created_at, reverse=True)
+        ],
     }
 
 

@@ -199,8 +199,27 @@ def test_step_checklist_autocompletes_and_reverses(client):
 
 
 def test_step_toggle_rejected_for_multi_target(client):
-    r = client.post("/steps", json={"quest_id": "w-badminton", "step_index": 0, "day": DAY})
+    # No seeded quest is multi-target now (the badminton weekly is a single-session
+    # checklist), so insert one to prove step-toggling is still rejected for them.
+    from app.db import SessionLocal
+    from app.models import QuestDef
+
+    s = SessionLocal()
+    s.add(QuestDef(id="w-multi", title="Multi", desc="", stat="STR", xp=10,
+                   cadence="weekly", target=3, sort=99))
+    s.commit()
+    s.close()
+    r = client.post("/steps", json={"quest_id": "w-multi", "step_index": 0, "day": DAY})
     assert r.status_code == 400
+
+
+def test_badminton_weekly_is_single_checklist(client):
+    # The physical weekly is a single-session checklist (target 1), so its steps
+    # tick like the other weeklies rather than being tap-to-log guidance.
+    q = _quest(_state(client), "w-badminton")
+    assert q["target"] == 1 and len(q["steps"]) > 0
+    r = client.post("/steps", json={"quest_id": "w-badminton", "step_index": 0, "day": DAY})
+    assert r.status_code == 200
 
 
 def test_daily_clear_bonus(client):

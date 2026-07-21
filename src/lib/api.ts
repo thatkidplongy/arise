@@ -141,13 +141,35 @@ export interface ApiMoneyEntry {
   created_at: string;
 }
 
+/** The money summary in /state — headline figures only; entries come per-period
+ * from getMoneyHistory so /state never carries the whole log. */
 export interface ApiMoney {
-  entries: ApiMoneyEntry[]; // newest first
   today_in: number;
   today_out: number;
   week_in: number;
   week_out: number;
   balance: number; // money remaining — all time in minus out
+}
+
+export type MoneyScope = 'day' | 'week' | 'month';
+
+export interface ApiMoneyBucket {
+  day: string;
+  earned: number;
+  spent: number;
+}
+
+/** One period of the money log (day / week / month) — entries, per-day buckets
+ * for the chart, and earned/spent/net totals. */
+export interface ApiMoneyHistory {
+  scope: MoneyScope;
+  start: string;
+  end: string;
+  earned: number;
+  spent: number;
+  net: number;
+  buckets: ApiMoneyBucket[];
+  entries: ApiMoneyEntry[];
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
@@ -622,6 +644,9 @@ export const api = {
 
   removeMoney: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/money/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  getMoneyHistory: (base: string, token: string, scope: MoneyScope, day: string) =>
+    request<ApiMoneyHistory>(base, `/money/history?scope=${scope}&day=${day}`, token),
 
   // ── Priority (a per-attribute focus pinned on top of the plan) ────────────
   setPriority: (

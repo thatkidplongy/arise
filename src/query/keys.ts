@@ -4,6 +4,7 @@ export const qk = {
   avatar: ['avatar'] as const,
   body: (day: string) => ['body', day] as const,
   history: ['history'] as const,
+  money: (scope: string, day: string) => ['money-history', scope, day] as const,
   insights: ['insights'] as const,
   state: (day: string) => ['state', day] as const,
 };
