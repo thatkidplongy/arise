@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -42,6 +42,16 @@ function bulletLines(value: string, sel: Sel): { value: string; sel: Sel } {
   return { value: next, sel: { start: caret, end: caret } };
 }
 
+/** Wrap the selection in a ``` fenced code block on its own lines (empty block,
+ * cursor inside, when there's no selection). */
+function codeBlock(value: string, sel: Sel): { value: string; sel: Sel } {
+  const selected = value.slice(sel.start, sel.end);
+  const block = '```\n' + selected + '\n```';
+  const next = value.slice(0, sel.start) + block + value.slice(sel.end);
+  const caret = sel.start + 4; // just after the opening ```\n
+  return { value: next, sel: { start: caret, end: caret + selected.length } };
+}
+
 export function NoteEditorModal({
   visible,
   prompt,
@@ -56,15 +66,19 @@ export function NoteEditorModal({
   onClose: () => void;
 }) {
   const [value, setValue] = useState(initial);
-  const [sel, setSel] = useState<Sel>({ start: 0, end: 0 });
+  const [sel, setSel] = useState<Sel>({ start: initial.length, end: initial.length });
 
-  // Reset to the note being edited (or blank) each time the modal opens.
-  useEffect(() => {
+  // Reset the draft when a new edit session opens (modal shown, or a different
+  // note passed in) — derived during render, so no setState-in-effect.
+  const sessionKey = visible ? `open:${initial}` : 'closed';
+  const [prevSession, setPrevSession] = useState(sessionKey);
+  if (sessionKey !== prevSession) {
+    setPrevSession(sessionKey);
     if (visible) {
       setValue(initial);
       setSel({ start: initial.length, end: initial.length });
     }
-  }, [visible, initial]);
+  }
 
   const apply = (fn: (v: string, s: Sel) => { value: string; sel: Sel }) => {
     const r = fn(value, sel);
@@ -113,6 +127,12 @@ export function NoteEditorModal({
                 <Ionicons name="list-outline" size={16} color={text.secondary} />
                 <Text style={styles.toolText}>List</Text>
               </Pressable>
+              <Pressable
+                onPress={() => apply(codeBlock)}
+                style={({ pressed }) => [styles.tool, pressed && styles.toolOn]}
+              >
+                <Ionicons name="code-slash" size={16} color={text.secondary} />
+              </Pressable>
             </View>
 
             <TextInput
@@ -130,8 +150,9 @@ export function NoteEditorModal({
               maxLength={2000}
             />
             <Text style={styles.hint}>
-              Use <Text style={styles.b}>**bold**</Text>, <Text style={styles.i}>_italic_</Text>{' '}
-              and <Text style={styles.mono}>-</Text> for lists.
+              Use <Text style={styles.b}>**bold**</Text>, <Text style={styles.i}>_italic_</Text>,{' '}
+              <Text style={styles.mono}>`code`</Text>, <Text style={styles.mono}>```</Text> for code
+              blocks, and <Text style={styles.mono}>-</Text> for lists.
             </Text>
 
             <View style={styles.actions}>

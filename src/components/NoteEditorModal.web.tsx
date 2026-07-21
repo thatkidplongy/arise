@@ -50,6 +50,21 @@ const CSS = `
   color: ${text.secondary};
   font-style: italic;
 }
+.${EDITOR_CLASS} code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: ${withAlpha(text.primary, 0.07)};
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.${EDITOR_CLASS} pre {
+  background: ${withAlpha(text.primary, 0.06)};
+  border: 1px solid ${surface.hairline};
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.${EDITOR_CLASS} pre code { background: transparent; padding: 0; font-size: 12.5px; line-height: 18px; }
 .${EDITOR_CLASS} p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: ${text.faint};
@@ -68,6 +83,15 @@ function useEditorStyles() {
     el.textContent = CSS;
     document.head.appendChild(el);
   }, []);
+}
+
+/** A compact toolbar button; `on` lights it when that mark/block is active. */
+function Btn({ on, onPress, children }: { on?: boolean; onPress: () => void; children: React.ReactNode }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.tool, on && styles.toolOn]}>
+      {children}
+    </Pressable>
+  );
 }
 
 export function NoteEditorModal({
@@ -113,6 +137,7 @@ export function NoteEditorModal({
       bullet: e?.isActive("bulletList") ?? false,
       ordered: e?.isActive("orderedList") ?? false,
       quote: e?.isActive("blockquote") ?? false,
+      code: e?.isActive("codeBlock") ?? false,
       empty: e?.isEmpty ?? true,
     }),
   });
@@ -125,21 +150,6 @@ export function NoteEditorModal({
   };
 
   const disabled = state?.empty ?? true;
-
-  // A compact toolbar button; `on` lights it when that mark/block is active.
-  const Btn = ({
-    on,
-    onPress,
-    children,
-  }: {
-    on?: boolean;
-    onPress: () => void;
-    children: React.ReactNode;
-  }) => (
-    <Pressable onPress={onPress} style={[styles.tool, on && styles.toolOn]}>
-      {children}
-    </Pressable>
-  );
 
   return (
     <Modal
@@ -206,6 +216,12 @@ export function NoteEditorModal({
               onPress={() => editor?.chain().focus().toggleBlockquote().run()}
             >
               <Text style={[styles.toolText, { fontSize: 17 }]}>❝</Text>
+            </Btn>
+            <Btn
+              on={state?.code}
+              onPress={() => editor?.chain().focus().toggleCodeBlock().run()}
+            >
+              <Ionicons name="code-slash" size={16} color={text.secondary} />
             </Btn>
           </View>
 
