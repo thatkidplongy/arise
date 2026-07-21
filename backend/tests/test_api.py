@@ -48,6 +48,9 @@ def test_state_shape(client):
     assert "push-ups" in q["steps"][0]
     # …and an explosive (plyometric) core rep is always on top, whatever the workout.
     assert any("slam" in st for st in q["steps"])
+    # Quests stay lean: ≤3 steps when there's a mandatory floor, ≤2 without one.
+    assert len(q["steps"]) <= 3
+    assert len(_quest(s, "d-sketch")["steps"]) <= 2  # CRE daily has no floor
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
     # Craft opens with its deep-work floor and defaults to steady growth (not interview).

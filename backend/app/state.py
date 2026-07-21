@@ -203,14 +203,16 @@ def resolve_content(
     the step-toggle write path (`resolve_steps`) use, so a ticked step index and
     the displayed steps can never drift apart. Pure — inputs are pre-resolved."""
     pk = quests.period_key(quest.cadence, day)
+    floor = quests.floor_for(quest, book, level, chapters)
     gen = gen_by.get((quest.id, pk))
     if gen is not None:
-        steps = quests.floor_for(quest, book, level, chapters) + gen["steps"]
+        steps = quests.cap_steps(floor + gen["steps"], len(floor))
         return gen["title"], gen["desc"], steps, gen["resource"]
-    return quests.content_for(
+    title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level, chapters,
         interview=interview, jp_week=jp_week,
     )
+    return title, desc, quests.cap_steps(steps, len(floor)), resource
 
 
 def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
@@ -464,12 +466,14 @@ def _reflections_and_notes(
 
 
 def _journal_of(db: Session, player: Player) -> list[dict]:
-    """Free-form daily journal entries, newest first (no quest attached)."""
+    """Free-form daily journal entries, most-recently-updated first (falling back to
+    created_at for entries written before edits were tracked)."""
+    rows = db.query(JournalEntry).filter_by(player_id=player.id).all()
+    rows.sort(key=lambda e: e.updated_at or e.created_at, reverse=True)
     return [
-        {"id": e.id, "day": e.day, "text": e.text, "created_at": e.created_at}
-        for e in db.query(JournalEntry)
-        .filter_by(player_id=player.id)
-        .order_by(JournalEntry.created_at.desc())
+        {"id": e.id, "day": e.day, "text": e.text,
+         "created_at": e.created_at, "updated_at": e.updated_at or e.created_at}
+        for e in rows
     ]
 
 

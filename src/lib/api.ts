@@ -69,6 +69,7 @@ export interface ApiJournalEntry {
   day: string;
   text: string;
   created_at: string;
+  updated_at: string; // last edit (or created_at) — the Journal sorts by this
 }
 
 export interface ApiAchievement {

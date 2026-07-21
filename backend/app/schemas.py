@@ -493,6 +493,7 @@ class JournalEntryOut(BaseModel):
     day: str
     text: str
     created_at: datetime
+    updated_at: datetime  # last edit (or created_at) — the Journal sorts by this
 
 
 class StateOut(BaseModel):

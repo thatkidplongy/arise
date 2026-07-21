@@ -72,6 +72,7 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("quest_notes", "step_index", "INTEGER"),
     ("insights", "steps", "VARCHAR DEFAULT '[]'"),
     ("players", "priorities", "VARCHAR DEFAULT '{}'"),
+    ("journal_entries", "updated_at", "DATETIME"),
 ]
 
 

@@ -515,6 +515,7 @@ def update_journal_entry(db: Session, player: Player, entry_id: str, text: str) 
     row = _owned(db, JournalEntry, entry_id, player)
     if row is not None and text:
         row.text = text
+        row.updated_at = utcnow()  # bumps it to the top of the journal
         db.commit()
 
 

@@ -262,6 +262,9 @@ class JournalEntry(Base):
     day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
     text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Bumped on every edit; the Journal list sorts by this so freshly-edited entries
+    # surface to the top (falls back to created_at for rows written before this).
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class GroceryItem(Base):

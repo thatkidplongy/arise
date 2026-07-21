@@ -1153,6 +1153,13 @@ def priority_content(focus: str) -> tuple[str, str, list[str]]:
     )
 
 
+def cap_steps(steps: list[str], floor_len: int) -> list[str]:
+    """Keep a quest lean and glanceable: at most 2 steps, or 3 when it carries a
+    mandatory floor. Floor steps come first, so they're the ones kept up to the cap;
+    extra variety beyond that is trimmed."""
+    return steps[: 3 if floor_len > 0 else 2]
+
+
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters: int = 0) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
