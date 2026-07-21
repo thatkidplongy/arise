@@ -13,7 +13,7 @@ SEED_QUESTS = [
     dict(id="d-read", title="Grimoire Study", desc="Read for 20 minutes", stat="INT", xp=10, cadence="daily", target=1),
     dict(id="d-jp", title="Japanese", desc="Study Japanese — kana, kanji, grammar or vocab", stat="INT", xp=10, cadence="daily", target=1),
     # Weekly quests — the raids
-    dict(id="w-badminton", title="Dungeon Raid: Badminton", desc="Play a badminton session", stat="STR", xp=40, cadence="weekly", target=2),
+    dict(id="w-badminton", title="Dungeon Raid: Badminton", desc="Play a badminton session", stat="STR", xp=40, cadence="weekly", target=1),
     dict(id="w-hangout", title="Party Gathering", desc="Spend real time with people you like", stat="CHA", xp=50, cadence="weekly", target=1),
     dict(id="w-piece", title="Finish a Piece", desc="Complete one drawing, start to finish", stat="CRE", xp=40, cadence="weekly", target=1),
     dict(id="w-tome", title="Clear the Tome", desc="Finish 3 chapters of your current book", stat="INT", xp=40, cadence="weekly", target=1),
