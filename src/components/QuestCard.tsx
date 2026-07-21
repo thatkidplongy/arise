@@ -371,6 +371,9 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+    // On web, a flex child won't shrink below its content unless minWidth is 0 —
+    // without this, a wide note line spills over the +XP / check column.
+    minWidth: 0,
     gap: 2,
   },
   title: {
@@ -477,12 +480,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 10,
+    overflow: 'hidden', // clip any stray horizontal spill from a long note line
   },
   noteItemCol: { flexDirection: 'column', gap: 6 },
-  noteItemBody: { flex: 1 },
+  noteItemBody: { flex: 1, minWidth: 0 },
   noteBar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  noteBarTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  notePreview: { flex: 1, color: text.secondary, fontSize: 12 },
+  noteBarTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  notePreview: { flex: 1, minWidth: 0, color: text.secondary, fontSize: 12 },
   noteX: {
     color: text.faint,
     fontSize: 18,

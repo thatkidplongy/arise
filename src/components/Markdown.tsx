@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   h3: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
   bulletRow: { flexDirection: 'row', gap: 7, alignItems: 'flex-start' },
   marker: { lineHeight: 19, minWidth: 14 },
-  bulletText: { flex: 1 },
+  bulletText: { flex: 1, minWidth: 0 },
   quoteRow: {
     borderLeftWidth: 3,
     borderLeftColor: surface.hairline,
