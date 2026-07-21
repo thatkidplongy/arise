@@ -33,10 +33,12 @@ def test_note_saves_shows_on_quest_and_journal(client):
 
 
 def test_notes_are_scoped_to_the_quest_period(client):
-    client.post("/quest-notes", json={"quest_id": "d-read", "text": "day one", "day": DAY})
+    # d-train shows every day (Physical is always in rotation), so it's the daily to
+    # test day-scoping with.
+    client.post("/quest-notes", json={"quest_id": "d-train", "text": "day one", "day": DAY})
     # A different day is a different daily period — the note doesn't leak into it.
     s = client.get(f"/state?day={NEXT_DAY}").json()
-    assert _quest(s, "d-read")["notes"] == []
+    assert _quest(s, "d-train")["notes"] == []
     # But the Journal keeps it (it's a history across all days).
     assert [e["text"] for e in s["reflections"]] == ["day one"]
 

@@ -39,7 +39,11 @@ def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
         assert key in s
-    assert len(s["quests"]) == 22
+    # Dailies rotate — Physical every day plus one group — so not all 8 show at once.
+    from app.state import active_daily_ids
+
+    shown_daily = {q["id"] for q in s["quests"] if q["cadence"] == "daily"}
+    assert shown_daily == active_daily_ids(DAY) and "d-train" in shown_daily
     assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"}
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
@@ -50,7 +54,9 @@ def test_state_shape(client):
     assert any("slam" in st for st in q["steps"])
     # Quests stay lean: ≤3 steps when there's a mandatory floor, ≤2 without one.
     assert len(q["steps"]) <= 3
-    assert len(_quest(s, "d-sketch")["steps"]) <= 2  # CRE daily has no floor
+    # A non-floored daily (Creativity) caps at 2 — checked on a day it's in rotation.
+    sketch = _quest(client.get("/state?day=2026-07-19").json(), "d-sketch")
+    assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
     # Craft opens with its deep-work floor and defaults to steady growth (not interview).
@@ -196,6 +202,22 @@ def test_step_checklist_autocompletes_and_reverses(client):
     assert r["completed"] is False
     assert _quest(r["state"], "d-train")["done"] == 0
     assert r["state"]["player"]["total_xp"] == 0
+
+
+def test_daily_rotation(client):
+    from app.state import active_daily_ids
+
+    # Physical shows every day; the other dailies rotate over a 3-day cycle.
+    seen = []
+    for d in ("2026-07-18", "2026-07-19", "2026-07-20"):
+        shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
+        assert "d-train" in shown and shown == active_daily_ids(d)
+        seen.append(shown)
+    assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
+    # Across the full cycle every daily comes around.
+    assert set().union(*seen) == {
+        "d-train", "d-read", "d-wealth", "d-craft", "d-sketch", "d-jp", "d-meditate", "d-connect",
+    }
 
 
 def test_step_toggle_rejected_for_multi_target(client):

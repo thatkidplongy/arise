@@ -255,9 +255,28 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
     return _count(rows, quest.id, week=game.week_key(day))
 
 
+# Physical and Reading show every day; the other dailies rotate over a 3-day cycle,
+# so each day is a lighter set (the two mandatories + one group). Every area still
+# comes around within three days. Keyed on the date's ordinal so it advances daily.
+_DAILY_ALWAYS = ("d-train", "d-read")
+_DAILY_ROTATION: list[list[str]] = [
+    ["d-wealth", "d-craft"],       # build & money
+    ["d-sketch", "d-jp"],          # create & language
+    ["d-meditate", "d-connect"],   # inner & social
+]
+
+
+def active_daily_ids(day: str) -> set[str]:
+    """The daily quests shown on `day`: Physical + Reading always, plus one rotating
+    group so the daily load stays light. Non-daily quests are unaffected."""
+    idx = date.fromisoformat(day).toordinal() % len(_DAILY_ROTATION)
+    return {*_DAILY_ALWAYS, *_DAILY_ROTATION[idx]}
+
+
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
-    dailies = [q for q in defs if q.cadence == "daily"]
-    return all(_count(rows, q.id, day=day) >= q.target for q in dailies)
+    active = active_daily_ids(day)
+    dailies = [q for q in defs if q.cadence == "daily" and q.id in active]
+    return bool(dailies) and all(_count(rows, q.id, day=day) >= q.target for q in dailies)
 
 
 def has_bonus(rows: list[Completion], day: str) -> bool:
@@ -641,7 +660,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    dailies = [q for q in defs if q.cadence == "daily"]
+    active_ids = active_daily_ids(day)  # Physical + today's rotating group
+    dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
 
@@ -710,6 +730,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
                        prog_levels, player.current_book_chapters, player.interview_mode,
                        _jp_week(player, day), notes_by)
             for q in defs
+            if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],
         "achievements": _achievements_of(db, player),
         "record": {
