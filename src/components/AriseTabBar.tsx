@@ -1,24 +1,24 @@
-import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CONTENT_MAX_WIDTH } from '@/components/Screen';
-import { accent, surface, text, withAlpha } from '@/theme';
+import { CONTENT_MAX_WIDTH } from "@/components/Screen";
+import { accent, surface, text, withAlpha } from "@/theme";
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
+type IconName = ComponentProps<typeof Ionicons>["name"];
 
 /** Icon per visible tab — outline when idle, filled when active. Keyed by route
  * name so the tab bar owns its glyphs (the screens only set their title). */
 const ICONS: Record<string, { on: IconName; off: IconName }> = {
-  index: { on: 'person', off: 'person-outline' },
-  quests: { on: 'flash', off: 'flash-outline' },
-  body: { on: 'body', off: 'body-outline' },
-  inspire: { on: 'flame', off: 'flame-outline' },
-  you: { on: 'person-circle', off: 'person-circle-outline' },
+  index: { on: "person", off: "person-outline" },
+  quests: { on: "flash", off: "flash-outline" },
+  body: { on: "nutrition", off: "nutrition-outline" },
+  inspire: { on: "flame", off: "flame-outline" },
+  you: { on: "person-circle", off: "person-circle-outline" },
 };
-const FALLBACK_GLYPH = { on: 'ellipse', off: 'ellipse-outline' } as const;
+const FALLBACK_GLYPH = { on: "ellipse", off: "ellipse-outline" } as const;
 
 const PILL_W = 56;
 const PILL_H = 36;
@@ -28,19 +28,37 @@ const EDGE_PAD = 8;
 
 // A snappy spring carries the pill; a looser, slower one carries the shadow, so it
 // lags behind mid-slide. The shadow then fades out over SHADOW_FADE_MS.
-const PILL_SPRING = { stiffness: 280, damping: 26, mass: 1, useNativeDriver: false } as const;
-const SHADOW_SPRING = { stiffness: 110, damping: 16, mass: 1, useNativeDriver: false } as const;
+const PILL_SPRING = {
+  stiffness: 280,
+  damping: 26,
+  mass: 1,
+  useNativeDriver: false,
+} as const;
+const SHADOW_SPRING = {
+  stiffness: 110,
+  damping: 16,
+  mass: 1,
+  useNativeDriver: false,
+} as const;
 const SHADOW_FADE_MS = 380;
 const FADE_MS = 180;
 
 type Route = { key: string; name: string };
-type Options = { title?: string; tabBarButton?: unknown; tabBarItemStyle?: unknown };
+type Options = {
+  title?: string;
+  tabBarButton?: unknown;
+  tabBarItemStyle?: unknown;
+};
 type TabBarProps = {
   state: { index: number; routes: Route[] };
   descriptors: Record<string, { options: Options }>;
   navigation: {
     navigate: (name: string) => void;
-    emit: (e: { type: 'tabPress'; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
+    emit: (e: {
+      type: "tabPress";
+      target: string;
+      canPreventDefault: true;
+    }) => { defaultPrevented: boolean };
   };
 };
 
@@ -61,10 +79,14 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
     () =>
       state.routes.filter((r) => {
         const o = descriptors[r.key]?.options;
-        const itemStyle = o?.tabBarItemStyle as { display?: string } | undefined;
-        return !(typeof o?.tabBarButton === 'function' || itemStyle?.display === 'none');
+        const itemStyle = o?.tabBarItemStyle as
+          | { display?: string }
+          | undefined;
+        return !(
+          typeof o?.tabBarButton === "function" || itemStyle?.display === "none"
+        );
       }),
-    [state.routes, descriptors],
+    [state.routes, descriptors]
   );
 
   const count = visible.length;
@@ -83,7 +105,11 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
   useEffect(() => {
     if (tabW <= 0) return;
     if (!onScreen) {
-      Animated.timing(pillOpacity, { toValue: 0, duration: FADE_MS, useNativeDriver: false }).start();
+      Animated.timing(pillOpacity, {
+        toValue: 0,
+        duration: FADE_MS,
+        useNativeDriver: false,
+      }).start();
       return;
     }
     if (!ready.current) {
@@ -93,12 +119,23 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
       ready.current = true;
     } else {
       Animated.spring(mainX, { toValue: activeIndex, ...PILL_SPRING }).start();
-      Animated.spring(shadowX, { toValue: activeIndex, ...SHADOW_SPRING }).start();
+      Animated.spring(shadowX, {
+        toValue: activeIndex,
+        ...SHADOW_SPRING,
+      }).start();
       // Reveal the trailing shadow for the slide, then fade it back under the pill.
       shadowVis.setValue(1);
-      Animated.timing(shadowVis, { toValue: 0, duration: SHADOW_FADE_MS, useNativeDriver: false }).start();
+      Animated.timing(shadowVis, {
+        toValue: 0,
+        duration: SHADOW_FADE_MS,
+        useNativeDriver: false,
+      }).start();
     }
-    Animated.timing(pillOpacity, { toValue: 1, duration: FADE_MS, useNativeDriver: false }).start();
+    Animated.timing(pillOpacity, {
+      toValue: 1,
+      duration: FADE_MS,
+      useNativeDriver: false,
+    }).start();
   }, [activeIndex, onScreen, tabW, mainX, shadowX, pillOpacity, shadowVis]);
 
   // Map the active-index animated value to the pill's x-offset within the row.
@@ -111,21 +148,45 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
       : 0;
 
   const onPress = (route: Route, focused: boolean) => {
-    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    const event = navigation.emit({
+      type: "tabPress",
+      target: route.key,
+      canPreventDefault: true,
+    });
     if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
   };
 
   return (
     <View style={styles.strip}>
       <View
-        style={[styles.row, { paddingBottom: insets.bottom + EDGE_PAD, height: BAR_CONTENT_H + insets.bottom }]}
+        style={[
+          styles.row,
+          {
+            paddingBottom: insets.bottom + EDGE_PAD,
+            height: BAR_CONTENT_H + insets.bottom,
+          },
+        ]}
         onLayout={(e) => setRowW(e.nativeEvent.layout.width)}
       >
         <Animated.View
-          style={[styles.pill, styles.shadowTint, { opacity: shadowVis, transform: [{ translateX: slideFor(shadowX) }] }]}
+          style={[
+            styles.pill,
+            styles.shadowTint,
+            {
+              opacity: shadowVis,
+              transform: [{ translateX: slideFor(shadowX) }],
+            },
+          ]}
         />
         <Animated.View
-          style={[styles.pill, styles.mainTint, { opacity: pillOpacity, transform: [{ translateX: slideFor(mainX) }] }]}
+          style={[
+            styles.pill,
+            styles.mainTint,
+            {
+              opacity: pillOpacity,
+              transform: [{ translateX: slideFor(mainX) }],
+            },
+          ]}
         />
         {visible.map((route, i) => {
           const focused = i === activeIndex;
@@ -141,7 +202,11 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
               accessibilityState={{ selected: focused }}
               accessibilityLabel={title}
             >
-              <Ionicons name={focused ? glyph.on : glyph.off} size={24} color={color} />
+              <Ionicons
+                name={focused ? glyph.on : glyph.off}
+                size={24}
+                color={color}
+              />
               <Text style={[styles.label, { color }]} numberOfLines={1}>
                 {title}
               </Text>
@@ -160,26 +225,26 @@ const styles = StyleSheet.create({
     borderTopColor: surface.hairline,
   },
   row: {
-    flexDirection: 'row',
-    position: 'relative',
-    width: '100%',
+    flexDirection: "row",
+    position: "relative",
+    width: "100%",
     maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingTop: EDGE_PAD,
   },
   tab: {
     flex: 1,
     zIndex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 5,
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     lineHeight: 16,
   },
   pill: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 0,
     left: 0,
     top: PILL_TOP,

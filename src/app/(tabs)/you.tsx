@@ -17,6 +17,7 @@ const ITEMS = [
   { icon: 'trophy-outline', label: 'Achievements', sub: 'Titles & milestones', route: '/achievements' },
   { icon: 'time-outline', label: 'Quest history', sub: 'Every quest you’ve finished', route: '/history' },
   { icon: 'compass-outline', label: 'Focus areas', sub: 'Tailor your quests · interview mode', route: '/focus' },
+  { icon: 'sparkles-outline', label: 'Skincare', sub: 'Your AM / PM routine', route: '/skincare' },
   { icon: 'settings-outline', label: 'Settings', sub: 'North Star · system link · your record', route: '/settings' },
 ] as const;
 

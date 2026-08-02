@@ -2,17 +2,17 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { GroceryPanel } from '@/components/GroceryPanel';
-import { NutritionPanel } from '@/components/NutritionPanel';
 import { Screen } from '@/components/Screen';
+import { SkincarePanel } from '@/components/SkincarePanel';
 import { useBody } from '@/query/useBody';
 import { text } from '@/theme';
 
-export default function FoodScreen() {
+export default function SkincareScreen() {
   const { body, refetch } = useBody();
 
-  // Refetch whenever the tab comes into focus, so it's fresh without a manual pull.
+  // Refetch whenever the screen comes into focus, so it's fresh without a manual pull.
   useFocusEffect(
     useCallback(() => {
       void refetch();
@@ -21,18 +21,12 @@ export default function FoodScreen() {
 
   return (
     <Screen>
+      <BackLink to="/you" />
       <View style={styles.head}>
-        <Text style={styles.h1}>Food</Text>
-        <Text style={styles.sub}>Eat with intention — nourish, don’t punish.</Text>
+        <Text style={styles.h1}>Skincare</Text>
+        <Text style={styles.sub}>Your simple AM / PM routine — a small daily kindness.</Text>
       </View>
-      {body ? (
-        <>
-          <NutritionPanel />
-          <GroceryPanel />
-        </>
-      ) : (
-        <ConnectionPanel />
-      )}
+      {body ? <SkincarePanel /> : <ConnectionPanel />}
     </Screen>
   );
 }

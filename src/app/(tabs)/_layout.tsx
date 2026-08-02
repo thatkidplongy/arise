@@ -15,7 +15,7 @@ export default function TabsLayout() {
       {/* The five primary destinations. Icons live in AriseTabBar; screens set titles. */}
       <Tabs.Screen name="index" options={{ title: 'Status' }} />
       <Tabs.Screen name="quests" options={{ title: 'Quests' }} />
-      <Tabs.Screen name="body" options={{ title: 'Body' }} />
+      <Tabs.Screen name="body" options={{ title: 'Food' }} />
       <Tabs.Screen name="inspire" options={{ title: 'Fuel' }} />
       <Tabs.Screen name="you" options={{ title: 'You' }} />
 
@@ -27,6 +27,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="journal" options={{ href: null, title: 'Journal' }} />
       <Tabs.Screen name="entry" options={{ href: null, title: 'Entry' }} />
       <Tabs.Screen name="money" options={{ href: null, title: 'Money' }} />
+      <Tabs.Screen name="skincare" options={{ href: null, title: 'Skincare' }} />
       <Tabs.Screen name="settings" options={{ href: null, title: 'Settings' }} />
     </Tabs>
   );

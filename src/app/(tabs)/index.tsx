@@ -186,6 +186,8 @@ export default function StatusScreen() {
         ))}
       </SystemPanel>
 
+      <Reminders items={state.reminders} />
+
       <SystemPanel
         title="Today"
         sub={
@@ -243,8 +245,6 @@ export default function StatusScreen() {
 
       {/* Set / change the book you're reading — grouped with its progress above. */}
       <CurrentBookCard />
-
-      <Reminders items={state.reminders} />
 
       {next_rank ? (
         <SystemPanel title="Next rank">
