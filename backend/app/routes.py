@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 from . import body, books, insights, llm, nutrition, service, skincare, state, transcript
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
-                      BookIn, BookReviewIn, BookOut, BookShelfOut, CompleteIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn,
+                      CommitmentPatch, CompleteIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
-                      GroceryIn, GroceryToggleIn, HistoryItemOut, InsightAddIn,
+                      GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
-                      MoneyIn, MoneyHistoryOut, PriorityIn,
+                      MoneyIn, MoneyHistoryOut, PayCommitmentIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult,
@@ -402,11 +403,20 @@ def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = De
 
 @router.post("/money", response_model=StateOut)
 def add_money(body_in: MoneyIn, day: str | None = Query(None), db: Session = Depends(get_db)):
-    """Log an amount in (income) or out (spending) for the day."""
+    """Log an amount in (income) or out (spending) for the day. `bucket` tags spending
+    against the 50/30/20 rule; it's ignored on money in."""
     player = state.get_or_create_player(db)
     d = _valid_day(day)
-    service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, d)
+    service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, d, bucket=body_in.bucket)
     return state.build_state(db, player, d)
+
+
+@router.delete("/money", response_model=StateOut)
+def reset_money(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Clear the whole money log — a fresh start, balance back to zero."""
+    player = state.get_or_create_player(db)
+    service.reset_money(db, player)
+    return state.build_state(db, player, _valid_day(day))
 
 
 @router.delete("/money/{entry_id}", response_model=StateOut)
@@ -425,6 +435,73 @@ def money_history(
     """One period of the money log (scope = day | week | month) anchored on `day`."""
     player = state.get_or_create_player(db)
     return state.money_history(db, player, scope, _valid_day(day))
+
+
+# ── Budget (take-home pay + the standing commitments it's divided across) ─────
+
+
+@router.put("/budget/income", response_model=StateOut)
+def set_income(body_in: IncomeIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Set monthly take-home pay — the base every 50/30/20 line is computed from."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    service.set_monthly_income(db, player, body_in.monthly_income, d)
+    return state.build_state(db, player, d)
+
+
+@router.post("/budget/commitments", response_model=StateOut)
+def add_commitment(body_in: CommitmentIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Add a standing monthly commitment — a bill, or a planned allowance."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    service.add_commitment(
+        db, player, body_in.label, body_in.amount, body_in.bucket, body_in.due_day, body_in.variable
+    )
+    return state.build_state(db, player, d)
+
+
+@router.patch("/budget/commitments/{commitment_id}", response_model=StateOut)
+def update_commitment(
+    commitment_id: str,
+    body_in: CommitmentPatch,
+    day: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Edit one commitment. Only the fields sent are touched."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    if not service.update_commitment(
+        db, player, commitment_id,
+        label=body_in.label, amount=body_in.amount, bucket=body_in.bucket,
+        due_day=body_in.due_day, variable=body_in.variable, active=body_in.active,
+    ):
+        raise HTTPException(status_code=404, detail="No such commitment")
+    return state.build_state(db, player, d)
+
+
+@router.delete("/budget/commitments/{commitment_id}", response_model=StateOut)
+def remove_commitment(commitment_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    player = state.get_or_create_player(db)
+    service.remove_commitment(db, player, commitment_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/budget/commitments/{commitment_id}/pay", response_model=StateOut)
+def pay_commitment(
+    commitment_id: str,
+    body_in: PayCommitmentIn | None = None,
+    day: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Log a standing commitment as paid — writes the money-log entry for you, tagged
+    to the right bucket, so a bill is never typed twice. 409 when it's already been
+    paid this month, since paying twice would double-count against the bucket."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    amount = body_in.amount if body_in else None
+    if not service.pay_commitment(db, player, commitment_id, d, amount):
+        raise HTTPException(status_code=409, detail="No such commitment, or already paid this month")
+    return state.build_state(db, player, d)
 
 
 # ── Priority (a self-set focus pinned on top of the plan) ─────────────────────

@@ -73,6 +73,12 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("insights", "steps", "VARCHAR DEFAULT '[]'"),
     ("players", "priorities", "VARCHAR DEFAULT '{}'"),
     ("journal_entries", "updated_at", "DATETIME"),
+    ("players", "monthly_income", "FLOAT DEFAULT 0"),
+    ("players", "budget_start_month", "VARCHAR DEFAULT ''"),
+    # Nullable on purpose: entries logged before the budget existed stay untagged
+    # rather than being retro-sorted into a bucket they never had.
+    ("money_entries", "bucket", "VARCHAR"),
+    ("money_entries", "commitment_id", "VARCHAR"),
 ]
 
 

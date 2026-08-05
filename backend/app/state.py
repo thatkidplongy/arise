@@ -16,6 +16,7 @@ from . import body, game, insights, llm, progression, quests, transcript
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
+    BudgetCommitment,
     Completion,
     GeneratedQuest,
     GroceryItem,
@@ -561,8 +562,75 @@ def _money_of(db: Session, player: Player, day: str) -> dict:
         "today_out": total("out", lambda r: r.day == day),
         "week_in": total("in", lambda r: game.week_key(r.day) == week),
         "week_out": total("out", lambda r: game.week_key(r.day) == week),
-        # Money remaining = everything in minus everything out, all time.
-        "balance": round(total("in", always) - total("out", always), 2),
+        # One pool: the take-home salary IS the money coming in, so it's the base of
+        # what's remaining. Anything still logged in/out adjusts it; spending draws it
+        # down. With no in-entries (the usual case) this is simply salary − spending,
+        # the same figure the budget shows.
+        "balance": round((player.monthly_income or 0) + total("in", always) - total("out", always), 2),
+    }
+
+
+def _budget_of(db: Session, player: Player, day: str) -> dict:
+    """Take-home pay, the standing commitments it's divided across, and what's
+    actually been spent this month against each bucket.
+
+    Raw figures only. The 50/30/20 targets and the derived savings number are *not*
+    computed here: the worksheet recalculates them as you type, so the formulas live
+    in one place on the client (src/lib/budget.ts) rather than in two that can
+    disagree.
+
+    `paid_this_month` on each commitment is what stops rent being typed twice — the
+    app shows unpaid ones as a tappable list and one tap writes the ledger entry."""
+    rows = (
+        db.query(BudgetCommitment)
+        .filter(BudgetCommitment.player_id == player.id)
+        # Dated bills first in due order, then undated allowances (due_day 0). The
+        # leading term is a boolean — 0 for dated, 1 for not — so "no date" sinks to
+        # the bottom instead of floating above the 1st of the month.
+        .order_by(BudgetCommitment.due_day == 0, BudgetCommitment.due_day, BudgetCommitment.created_at)
+        .all()
+    )
+
+    month = day[:7]  # 'YYYY-MM'
+    spent = (
+        db.query(MoneyEntry)
+        .filter(
+            MoneyEntry.player_id == player.id,
+            MoneyEntry.direction == "out",
+            MoneyEntry.day.startswith(month),
+        )
+        .all()
+    )
+    paid_ids = {e.commitment_id for e in spent if e.commitment_id}
+
+    def total(bucket: str | None) -> float:
+        return round(sum(e.amount for e in spent if e.bucket == bucket), 2)
+
+    return {
+        "monthly_income": round(player.monthly_income or 0, 2),
+        "start_month": player.budget_start_month or "",
+        "month": month,
+        "commitments": [
+            {
+                "id": r.id,
+                "label": r.label,
+                "amount": r.amount,
+                "bucket": r.bucket,
+                "due_day": r.due_day,
+                "variable": r.variable,
+                "active": r.active,
+                "paid_this_month": r.id in paid_ids,
+            }
+            for r in rows
+        ],
+        # What actually left the wallet this month, per bucket. `untagged` is
+        # spending from before the budget existed (or logged without a tag) — surfaced
+        # honestly rather than folded into a bucket it was never assigned.
+        "actual": {
+            "needs": total("needs"),
+            "wants": total("wants"),
+            "untagged": total(None),
+        },
     }
 
 
@@ -621,7 +689,8 @@ def money_history(db: Session, player: Player, scope: str, day: str) -> dict:
         ],
         "entries": [
             {"id": r.id, "amount": r.amount, "direction": r.direction, "note": r.note,
-             "day": r.day, "created_at": r.created_at}
+             "day": r.day, "created_at": r.created_at,
+             "bucket": r.bucket, "commitment_id": r.commitment_id}
             for r in sorted(rows, key=lambda r: r.created_at, reverse=True)
         ],
     }
@@ -745,6 +814,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "reminders": _reminders_of(db, player),
         "grocery": _grocery_of(db, player),
         "money": _money_of(db, player, day),
+        "budget": _budget_of(db, player, day),
         "journal": _journal_of(db, player),  # free-form daily entries, newest first
         "reflections": reflections,  # quest-linked takeaways, newest first
     }

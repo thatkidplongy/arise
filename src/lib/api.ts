@@ -117,6 +117,7 @@ export interface ApiState {
   reminders: { id: string; text: string; done: boolean; done_at: string | null }[];
   grocery: { id: string; name: string; bought: boolean; bought_at: string | null }[];
   money: ApiMoney; // the money log (in/out) + today/this-week totals, on You
+  budget: ApiBudget; // take-home pay + standing commitments, for the 50/30/20 worksheet
   journal: ApiJournalEntry[]; // free-form daily entries, newest first
   reflections: ApiReflection[]; // quest-linked takeaways, newest first
 }
@@ -139,6 +140,8 @@ export interface ApiMoneyEntry {
   note: string;
   day: string;
   created_at: string;
+  bucket: 'needs' | 'wants' | null; // null = untagged spending (or income)
+  commitment_id: string | null; // set when logged by paying a standing commitment
 }
 
 /** The money summary in /state — headline figures only; entries come per-period
@@ -170,6 +173,44 @@ export interface ApiMoneyHistory {
   net: number;
   buckets: ApiMoneyBucket[];
   entries: ApiMoneyEntry[];
+}
+
+/** The three shares of the 50/30/20 rule. Only needs and wants can be committed
+ * to — savings is whatever income the other two leave behind. */
+export type BudgetBucket = 'needs' | 'wants' | 'savings';
+
+/** One standing monthly commitment: a bill you owe, which doubles as a planned
+ * line in the worksheet. `variable` marks an allowance (groceries) whose real
+ * amount moves month to month, so `amount` is a plan rather than a bill. */
+export interface ApiCommitment {
+  id: string;
+  label: string;
+  amount: number;
+  bucket: 'needs' | 'wants';
+  due_day: number; // day of the month, 0 = no fixed date
+  variable: boolean;
+  active: boolean; // inactive rows keep their history without counting
+  paid_this_month: boolean; // already logged this month, so it's off the due list
+}
+
+/** What actually left the wallet this month, per bucket. `untagged` is spending
+ * from before the budget existed — reported as itself, never folded into a bucket
+ * it was never assigned to. */
+export interface ApiBudgetActual {
+  needs: number;
+  wants: number;
+  untagged: number;
+}
+
+/** The budget as stored — raw take-home pay and commitments. Targets, totals and
+ * the derived savings figure are computed by readBudget in @/lib/budget, so the
+ * worksheet recalculates as you type and the formulas live in exactly one place. */
+export interface ApiBudget {
+  monthly_income: number; // 0 = not set yet
+  start_month: string; // 'YYYY-MM' the budget began, '' before pay is set
+  month: string; // the 'YYYY-MM' the actuals below cover
+  commitments: ApiCommitment[];
+  actual: ApiBudgetActual;
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */
@@ -636,17 +677,59 @@ export const api = {
   addMoney: (
     base: string, token: string,
     amount: number, direction: 'in' | 'out', note: string, day: string,
+    bucket: 'needs' | 'wants' | null = null,
   ) =>
     request<ApiState>(base, `/money?day=${day}`, token, {
       method: 'POST',
-      body: JSON.stringify({ amount, direction, note }),
+      body: JSON.stringify({ amount, direction, note, bucket }),
     }),
 
   removeMoney: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/money/${id}?day=${day}`, token, { method: 'DELETE' }),
 
+  resetMoney: (base: string, token: string, day: string) =>
+    request<ApiState>(base, `/money?day=${day}`, token, { method: 'DELETE' }),
+
   getMoneyHistory: (base: string, token: string, scope: MoneyScope, day: string) =>
     request<ApiMoneyHistory>(base, `/money/history?scope=${scope}&day=${day}`, token),
+
+  // ── Budget (take-home pay + the commitments it's divided across) ──────────
+  setIncome: (base: string, token: string, monthlyIncome: number, day: string) =>
+    request<ApiState>(base, `/budget/income?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify({ monthly_income: monthlyIncome }),
+    }),
+
+  addCommitment: (
+    base: string, token: string,
+    commitment: { label: string; amount: number; bucket: 'needs' | 'wants'; due_day?: number; variable?: boolean },
+    day: string,
+  ) =>
+    request<ApiState>(base, `/budget/commitments?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify(commitment),
+    }),
+
+  updateCommitment: (
+    base: string, token: string, id: string,
+    patch: Partial<{ label: string; amount: number; bucket: 'needs' | 'wants'; due_day: number; variable: boolean; active: boolean }>,
+    day: string,
+  ) =>
+    request<ApiState>(base, `/budget/commitments/${id}?day=${day}`, token, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  removeCommitment: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/budget/commitments/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  /** Log a commitment as paid — writes the money-log entry, tagged, so a bill is
+   * never typed twice. `amount` overrides the plan (for variable allowances). */
+  payCommitment: (base: string, token: string, id: string, day: string, amount?: number) =>
+    request<ApiState>(base, `/budget/commitments/${id}/pay?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ amount: amount ?? null }),
+    }),
 
   // ── Priority (a per-attribute focus pinned on top of the plan) ────────────
   setPriority: (

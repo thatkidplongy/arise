@@ -1,23 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { SystemPanel } from '@/components/SystemPanel';
 import type { ApiMoney, MoneyScope } from '@/lib/api';
 import { dateKey, shortDay } from '@/lib/dates';
-import { num } from '@/lib/num';
+import { peso } from '@/lib/money';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, surface, text, withAlpha } from '@/theme';
 
 const CHART_HALF = 30; // px each side of the baseline (earned up, spent down)
 const SCOPES: MoneyScope[] = ['day', 'week', 'month'];
 const SCOPE_LABEL: Record<MoneyScope, string> = { day: 'Day', week: 'Week', month: 'Month' };
 
-function peso(n: number): string {
-  return `₱${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
 function shiftDay(key: string, delta: number): string {
   const [y, m, d] = key.split('-').map(Number);
   return dateKey(new Date(y, m - 1, d + delta));
@@ -37,24 +35,22 @@ function weekdayNarrow(key: string): string {
 }
 
 /**
- * The money log on its own screen. A headline balance from /state, a Day/Week/
- * Month period stepper, a diverging bar chart (earned up, spent down) and the
- * period's entries — each period fetched on demand from /money/history, so
- * browsing months of history stays fast and /state never carries the whole log.
+ * A read-only picture of money over time: the headline balance from /state, a
+ * Day/Week/Month period stepper, per-period totals, and a diverging bar chart
+ * (earned above the line, spent below). Each period is fetched on demand from
+ * /money/history, so browsing months of history stays fast. Logging and the
+ * 50/30/20 plan live in the budget worksheet above — this is just the view.
  */
 export function MoneyTracker({ money }: { money: ApiMoney }) {
-  const addMoney = useSystem((s) => s.addMoney);
-  const removeMoney = useSystem((s) => s.removeMoney);
+  const resetMoney = useSystem((s) => s.resetMoney);
   const qc = useQueryClient();
 
   const today = dateKey();
   const [scope, setScope] = useState<MoneyScope>('week');
   const [anchor, setAnchor] = useState(today);
-  const [direction, setDirection] = useState<'in' | 'out'>('out');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  const { history, loading } = useMoneyHistory(scope, anchor);
+  const { history } = useMoneyHistory(scope, anchor);
 
   const chooseScope = (s: MoneyScope) => {
     setScope(s);
@@ -65,17 +61,10 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
   const atLatest = history ? history.end >= today : anchor >= today;
 
   const refresh = () => void qc.invalidateQueries({ queryKey: ['money-history'] });
-  const submit = async () => {
-    const value = num(amount);
-    if (value <= 0) return;
-    setAmount('');
-    setNote('');
-    setAnchor(today); // jump to where the entry lands
-    await addMoney(value, direction, note.trim());
-    refresh();
-  };
-  const remove = async (id: string) => {
-    await removeMoney(id);
+  const reset = async () => {
+    setConfirmReset(false);
+    setAnchor(today);
+    await resetMoney();
     refresh();
   };
 
@@ -99,11 +88,27 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
   return (
     <SystemPanel title="Money">
       <View style={styles.balanceRow}>
-        <Text style={styles.balanceLabel}>Remaining</Text>
+        <View style={styles.balanceLeft}>
+          <Text style={styles.balanceLabel}>Remaining</Text>
+          {/* Start the log over — e.g. a new pay period. Guarded, since it can't be undone. */}
+          <Pressable onPress={() => setConfirmReset(true)} hitSlop={6} accessibilityLabel="Reset money log">
+            <Text style={styles.resetLink}>Reset</Text>
+          </Pressable>
+        </View>
         <Text style={[styles.balance, { color: money.balance < 0 ? feedback.danger : text.primary }]}>
           {peso(money.balance)}
         </Text>
       </View>
+
+      <ConfirmModal
+        visible={confirmReset}
+        title="Reset money?"
+        message="A full fresh start: your take-home salary, the 50/30/20 budget lines, and every logged in/out are all cleared, and the balance goes back to ₱0. This can’t be undone."
+        confirmLabel="Reset"
+        destructive
+        onConfirm={() => void reset()}
+        onCancel={() => setConfirmReset(false)}
+      />
 
       {/* Period scope */}
       <View style={styles.scopeRow}>
@@ -162,72 +167,8 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
             ))}
           </View>
         </View>
-      ) : null}
-
-      {/* Add */}
-      <View style={styles.dirRow}>
-        {(['out', 'in'] as const).map((dir) => {
-          const on = direction === dir;
-          const color = dir === 'in' ? feedback.success : feedback.danger;
-          return (
-            <Pressable
-              key={dir}
-              onPress={() => setDirection(dir)}
-              style={[styles.dirBtn, on && { backgroundColor: withAlpha(color, 0.14), borderColor: color }]}
-            >
-              <Text style={[styles.dirText, on && { color }]}>{dir === 'in' ? 'Money in' : 'Money out'}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={styles.addRow}>
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="₱ amount"
-          placeholderTextColor={text.faint}
-          keyboardType="numeric"
-          style={[styles.input, styles.amount]}
-          returnKeyType="done"
-          onSubmitEditing={submit}
-        />
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="note (optional)"
-          placeholderTextColor={text.faint}
-          style={[styles.input, styles.note]}
-          returnKeyType="done"
-          onSubmitEditing={submit}
-        />
-        <Pressable onPress={submit} style={({ pressed }) => [styles.add, pressed && { opacity: 0.85 }]} accessibilityLabel="Log amount">
-          <Ionicons name="add" size={20} color={onAccent} />
-        </Pressable>
-      </View>
-
-      {/* Period entries */}
-      {history && history.entries.length === 0 ? (
-        <Text style={styles.empty}>{loading ? 'Loading…' : 'Nothing logged this period.'}</Text>
       ) : (
-        (history?.entries ?? []).map((e, i) => {
-          const color = e.direction === 'in' ? feedback.success : feedback.danger;
-          return (
-            <View key={e.id} style={[styles.entry, i === 0 && styles.entryFirst]}>
-              <View style={[styles.dot, { backgroundColor: color }]} />
-              <Text style={styles.entryNote} numberOfLines={1}>
-                {e.note || (e.direction === 'in' ? 'Money in' : 'Spending')}
-              </Text>
-              {scope !== 'day' ? <Text style={styles.entryDay}>{shortDay(e.day, today)}</Text> : null}
-              <Text style={[styles.entryAmount, { color }]}>
-                {e.direction === 'in' ? '+' : '−'}
-                {peso(e.amount)}
-              </Text>
-              <Pressable onPress={() => void remove(e.id)} hitSlop={8} accessibilityLabel="Remove">
-                <Text style={styles.remove}>×</Text>
-              </Pressable>
-            </View>
-          );
-        })
+        <Text style={styles.empty}>Not enough logged this period to chart yet.</Text>
       )}
     </SystemPanel>
   );
@@ -243,7 +184,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: surface.hairline,
   },
+  balanceLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   balanceLabel: { color: text.secondary, fontSize: 13, fontWeight: '600' },
+  resetLink: { color: text.faint, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
   balance: { fontSize: 26, fontWeight: '800' },
   scopeRow: { flexDirection: 'row', gap: 6 },
   scopeBtn: {
@@ -280,52 +223,5 @@ const styles = StyleSheet.create({
     color: text.faint,
     fontSize: 10,
   },
-  dirRow: { flexDirection: 'row', gap: 8, marginTop: 18 },
-  dirBtn: {
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 8,
-  },
-  dirText: { color: text.faint, fontSize: 12, fontWeight: '600' },
-  addRow: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    color: text.primary,
-    fontSize: 14,
-    backgroundColor: surface.card,
-  },
-  amount: { width: 96 },
-  note: { flex: 1 },
-  add: {
-    width: 40,
-    height: 40,
-    borderRadius: 9,
-    backgroundColor: accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   empty: { color: text.faint, fontSize: 13, textAlign: 'center', marginTop: 12 },
-  entry: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    paddingVertical: 11,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  // The first row sits below the add form — give it clear air and no divider, so
-  // no hairline hugs the amount input.
-  entryFirst: { borderTopWidth: 0, marginTop: 14 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  entryNote: { flex: 1, minWidth: 0, color: text.secondary, fontSize: 13 },
-  entryDay: { color: text.faint, fontSize: 11 },
-  entryAmount: { fontSize: 13, fontWeight: '700' },
-  remove: { color: text.faint, fontSize: 18, fontWeight: '700', marginTop: -2 },
 });

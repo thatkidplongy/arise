@@ -56,6 +56,29 @@ def test_money_history_scopes(client):
     assert client.get(f"/state?day={DAY}").json()["player"]["total_xp"] == 0
 
 
+def test_reset_clears_money_and_budget(client):
+    # One pool → one reset. Set up a salary, a commitment, and some spending.
+    client.put(f"/budget/income?day={DAY}", json={"monthly_income": 50000})
+    client.post(f"/budget/commitments?day={DAY}", json={"label": "Rent", "amount": 12000, "bucket": "needs"})
+    client.post(f"/money?day={DAY}", json={"amount": 120.5, "direction": "out", "note": "lunch"})
+    client.post(f"/money?day={LAST_WEEK}", json={"amount": 999, "direction": "out"})
+
+    # Salary is the pool, so remaining = salary − everything spent.
+    assert client.get(f"/state?day={DAY}").json()["money"]["balance"] == 50000 - 120.5 - 999
+
+    s = client.request("DELETE", f"/money?day={DAY}").json()
+    assert s["money"] == {"today_in": 0, "today_out": 0, "week_in": 0, "week_out": 0, "balance": 0}
+    # Reset is a full fresh start: salary and commitments go too, not just the log.
+    assert s["budget"]["monthly_income"] == 0 and s["budget"]["start_month"] == ""
+    assert s["budget"]["commitments"] == []
+    assert _hist(client, "month")["entries"] == []
+    assert _hist(client, "day", LAST_WEEK)["spent"] == 0
+
+    # Resetting an already-clear pool is harmless, and logging still works after.
+    client.request("DELETE", f"/money?day={DAY}")
+    assert client.post(f"/money?day={DAY}", json={"amount": 20, "direction": "out"}).json()["money"]["balance"] == -20
+
+
 def test_money_rejects_bad_input(client):
     assert client.post(f"/money?day={DAY}", json={"amount": 0, "direction": "in"}).status_code == 422
     assert client.post(f"/money?day={DAY}", json={"amount": 10, "direction": "sideways"}).status_code == 422

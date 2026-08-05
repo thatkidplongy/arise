@@ -16,6 +16,7 @@ from . import game, llm, progression, quests
 from .achievements import ACHIEVEMENTS
 from .models import (
     AchievementUnlock,
+    BudgetCommitment,
     Completion,
     GeneratedQuest,
     GroceryItem,
@@ -549,20 +550,182 @@ def toggle_grocery(db: Session, player: Player, item_id: str, bought: bool) -> N
         db.commit()
 
 
-def add_money(db: Session, player: Player, amount: float, direction: str, note: str, day: str) -> None:
+# The buckets spending can be divided across. Savings is deliberately absent: it's
+# the remainder of income after these two, not something you spend into.
+BUDGET_BUCKETS = ("needs", "wants")
+
+
+def add_money(
+    db: Session,
+    player: Player,
+    amount: float,
+    direction: str,
+    note: str,
+    day: str,
+    bucket: str | None = None,
+    commitment_id: str | None = None,
+) -> None:
     """Log one money line — an amount in or out, on the given day. Amount is stored
-    positive; `direction` ('in'|'out') carries the meaning."""
+    positive; `direction` ('in'|'out') carries the meaning.
+
+    `bucket` tags spending against the 50/30/20 rule and only applies to money out —
+    income isn't divided, it's what the division is *of*. `commitment_id` marks the
+    entry as the payment of a standing commitment."""
     if amount <= 0 or direction not in ("in", "out"):
         return
     db.add(MoneyEntry(
         player_id=player.id, amount=float(amount), direction=direction,
         note=(note or "").strip()[:120], day=day,
+        bucket=bucket if (direction == "out" and bucket in BUDGET_BUCKETS) else None,
+        commitment_id=commitment_id,
     ))
     db.commit()
 
 
+def pay_commitment(db: Session, player: Player, commitment_id: str, day: str, amount: float | None = None) -> bool:
+    """Log a standing commitment as paid — one tap instead of retyping it into the
+    money log. The entry carries the commitment's label, amount and bucket, so
+    actuals build up on their own.
+
+    `amount` overrides the planned figure, which is what a variable allowance like
+    groceries needs. False when there's no such commitment, or it's already paid
+    this month — paying twice would double-count it against the bucket."""
+    row = (
+        db.query(BudgetCommitment)
+        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
+        .first()
+    )
+    if row is None or not row.active:
+        return False
+    if is_commitment_paid(db, player, commitment_id, day):
+        return False
+
+    paid = float(amount) if amount and amount > 0 else row.amount
+    add_money(db, player, paid, "out", row.label, day, bucket=row.bucket, commitment_id=row.id)
+    return True
+
+
+def is_commitment_paid(db: Session, player: Player, commitment_id: str, day: str) -> bool:
+    """Whether this commitment already has a payment logged in `day`'s month. The
+    month is the unit because commitments recur monthly — paid in August says
+    nothing about September."""
+    month = day[:7]  # 'YYYY-MM'
+    return (
+        db.query(MoneyEntry)
+        .filter(
+            MoneyEntry.player_id == player.id,
+            MoneyEntry.commitment_id == commitment_id,
+            MoneyEntry.day.startswith(month),
+        )
+        .first()
+        is not None
+    )
+
+
 def remove_money(db: Session, player: Player, entry_id: str) -> None:
     row = _owned(db, MoneyEntry, entry_id, player)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+
+
+def reset_money(db: Session, player: Player) -> int:
+    """A full money fresh start — one pool, so one reset clears it all: the in/out
+    log, the take-home salary, and the standing budget commitments. Returns how many
+    log lines were removed. Irreversible: the app guards it behind a confirm."""
+    rows = db.query(MoneyEntry).filter(MoneyEntry.player_id == player.id).all()
+    for row in rows:
+        db.delete(row)
+    for commitment in db.query(BudgetCommitment).filter(BudgetCommitment.player_id == player.id).all():
+        db.delete(commitment)
+    player.monthly_income = 0
+    player.budget_start_month = ""
+    db.commit()
+    return len(rows)
+
+
+# ── Budget: monthly income and the standing commitments it's divided across ───
+
+
+def set_monthly_income(db: Session, player: Player, income: float, day: str) -> None:
+    """Set take-home pay per month — the base every 50/30/20 line is computed from.
+    The first time it's set we stamp the month the budget began, so spending logged
+    before there was a budget is never judged against it."""
+    player.monthly_income = max(0.0, round(income, 2))
+    if player.monthly_income > 0 and not player.budget_start_month:
+        player.budget_start_month = day[:7]  # 'YYYY-MM'
+    db.commit()
+
+
+def add_commitment(
+    db: Session,
+    player: Player,
+    label: str,
+    amount: float,
+    bucket: str,
+    due_day: int = 0,
+    variable: bool = False,
+) -> BudgetCommitment | None:
+    """Add a standing monthly commitment — a bill or a planned allowance. Returns the
+    row, or None when the label is blank or the bucket isn't one we divide across."""
+    label = (label or "").strip()[:60]
+    if not label or bucket not in BUDGET_BUCKETS or amount <= 0:
+        return None
+    row = BudgetCommitment(
+        player_id=player.id,
+        label=label,
+        amount=round(amount, 2),
+        bucket=bucket,
+        due_day=due_day if 1 <= due_day <= 31 else 0,
+        variable=variable,
+    )
+    db.add(row)
+    db.commit()
+    return row
+
+
+def update_commitment(
+    db: Session,
+    player: Player,
+    commitment_id: str,
+    label: str | None = None,
+    amount: float | None = None,
+    bucket: str | None = None,
+    due_day: int | None = None,
+    variable: bool | None = None,
+    active: bool | None = None,
+) -> bool:
+    """Edit one commitment in place. Only the fields passed are touched, so the app
+    can flip `active` without resending the whole row. False when there's no match."""
+    row = (
+        db.query(BudgetCommitment)
+        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
+        .first()
+    )
+    if row is None:
+        return False
+    if label is not None and label.strip():
+        row.label = label.strip()[:60]
+    if amount is not None and amount > 0:
+        row.amount = round(amount, 2)
+    if bucket in BUDGET_BUCKETS:
+        row.bucket = bucket
+    if due_day is not None:
+        row.due_day = due_day if 1 <= due_day <= 31 else 0
+    if variable is not None:
+        row.variable = variable
+    if active is not None:
+        row.active = active
+    db.commit()
+    return True
+
+
+def remove_commitment(db: Session, player: Player, commitment_id: str) -> None:
+    row = (
+        db.query(BudgetCommitment)
+        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
+        .first()
+    )
     if row is not None:
         db.delete(row)
         db.commit()

@@ -114,8 +114,35 @@ export interface SystemStore {
   addGrocery: (name: string) => Promise<void>;
   toggleGrocery: (id: string, bought: boolean) => Promise<void>;
   removeGrocery: (id: string) => Promise<void>;
-  addMoney: (amount: number, direction: 'in' | 'out', note: string) => Promise<void>;
+  addMoney: (
+    amount: number,
+    direction: 'in' | 'out',
+    note: string,
+    bucket?: 'needs' | 'wants' | null,
+  ) => Promise<void>;
+  payCommitment: (id: string, amount?: number) => Promise<void>;
   removeMoney: (id: string) => Promise<void>;
+  resetMoney: () => Promise<void>;
+  setIncome: (monthlyIncome: number) => Promise<void>;
+  addCommitment: (commitment: {
+    label: string;
+    amount: number;
+    bucket: 'needs' | 'wants';
+    due_day?: number;
+    variable?: boolean;
+  }) => Promise<void>;
+  updateCommitment: (
+    id: string,
+    patch: Partial<{
+      label: string;
+      amount: number;
+      bucket: 'needs' | 'wants';
+      due_day: number;
+      variable: boolean;
+      active: boolean;
+    }>,
+  ) => Promise<void>;
+  removeCommitment: (id: string) => Promise<void>;
   setPriority: (stat: StatKey, focus: string, scope: 'day' | 'week' | 'open') => Promise<void>;
   clearPriority: (stat: StatKey) => Promise<void>;
   addQuestNote: (questId: string, text: string, prompt?: string, stepIndex?: number | null) => Promise<void>;
@@ -268,8 +295,15 @@ export const useSystemStore = create<SystemStore>()(
       addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
       toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
       removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
-      addMoney: (amount, direction, note) => mutate((b, t, d) => api.addMoney(b, t, amount, direction, note, d)),
+      addMoney: (amount, direction, note, bucket = null) =>
+        mutate((b, t, d) => api.addMoney(b, t, amount, direction, note, d, bucket)),
+      payCommitment: (id, amount) => mutate((b, t, d) => api.payCommitment(b, t, id, d, amount)),
       removeMoney: (id) => mutate((b, t, d) => api.removeMoney(b, t, id, d)),
+      resetMoney: () => mutate((b, t, d) => api.resetMoney(b, t, d)),
+      setIncome: (monthlyIncome) => mutate((b, t, d) => api.setIncome(b, t, monthlyIncome, d)),
+      addCommitment: (commitment) => mutate((b, t, d) => api.addCommitment(b, t, commitment, d)),
+      updateCommitment: (id, patch) => mutate((b, t, d) => api.updateCommitment(b, t, id, patch, d)),
+      removeCommitment: (id) => mutate((b, t, d) => api.removeCommitment(b, t, id, d)),
       setPriority: (stat, focus, scope) => mutate((b, t, d) => api.setPriority(b, t, stat, focus, scope, d)),
       clearPriority: (stat) => mutate((b, t, d) => api.clearPriority(b, t, stat, d)),
       addQuestNote: (questId, text, prompt = '', stepIndex = null) =>

@@ -46,6 +46,13 @@ class Player(Base):
     # 'day' | 'week' | 'open' and period is the day or ISO week it was set, so a
     # day/week priority expires on its own. '{}' = nothing pinned.
     priorities: Mapped[str] = mapped_column(String, default="{}")
+    # Monthly take-home pay, the base the 50/30/20 lines are computed from. 0 = not
+    # set yet, which is what the worksheet's empty state keys off. The three targets
+    # are always derived from this, never stored, so they can't drift out of step.
+    monthly_income: Mapped[float] = mapped_column(Float, default=0)
+    # The month the budget began ('YYYY-MM'), so spending logged before there was a
+    # budget is never retro-sorted into buckets it was never tagged with.
+    budget_start_month: Mapped[str] = mapped_column(String, default="")
     # Optional profile picture as a small data-URI (base64). Kept OUT of the main
     # /state payload (only `has_avatar` is exposed there); fetched on its own route.
     avatar: Mapped[str] = mapped_column(String, default="")
@@ -296,4 +303,35 @@ class MoneyEntry(Base):
     direction: Mapped[str] = mapped_column(String)  # 'in' (income) | 'out' (spending)
     note: Mapped[str] = mapped_column(String, default="")
     day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Which 50/30/20 bucket this spending counted against — 'needs' | 'wants', or
+    # NULL for anything logged before there was a budget. Left NULL deliberately on
+    # old rows: sorting months of past spending into buckets it was never tagged
+    # with would be invention, so untagged entries are reported as untagged.
+    bucket: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Set when this entry was logged by paying a standing commitment, which is how
+    # "is rent paid this month?" is answered without the user typing rent twice.
+    commitment_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+
+
+class BudgetCommitment(Base):
+    """One standing monthly commitment — rent, internet, a grocery allowance. These
+    are the worksheet's line items: a bill you owe every month and a planned row in
+    the budget are the same fact, so recording it once serves both.
+
+    `bucket` is 'needs' or 'wants' (never 'savings' — savings is what's left over,
+    not something you commit to spending). `variable` marks an allowance whose real
+    amount moves month to month, like groceries: `amount` is then what you're
+    planning for rather than a figure you'll be billed."""
+
+    __tablename__ = "budget_commitments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    label: Mapped[str] = mapped_column(String)
+    amount: Mapped[float] = mapped_column(Float)  # planned pesos per month, always positive
+    bucket: Mapped[str] = mapped_column(String)  # 'needs' | 'wants'
+    due_day: Mapped[int] = mapped_column(Integer, default=0)  # day of month, 0 = no fixed date
+    variable: Mapped[bool] = mapped_column(Boolean, default=False)  # an allowance, not a fixed bill
+    active: Mapped[bool] = mapped_column(Boolean, default=True)  # off keeps history without counting
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

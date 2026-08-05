@@ -69,6 +69,41 @@ class MoneyIn(BaseModel):
     amount: float = Field(gt=0, le=1_000_000_000)
     direction: Literal["in", "out"]  # money in (income) or out (spending)
     note: str = Field("", max_length=120)
+    # Which 50/30/20 bucket this spending counts against. Only meaningful on money
+    # out — income isn't divided, it's what the division is of.
+    bucket: Literal["needs", "wants"] | None = None
+
+
+class PayCommitmentIn(BaseModel):
+    """Log a standing commitment as paid. `amount` overrides the planned figure,
+    which is what a variable allowance like groceries needs."""
+    amount: float | None = Field(None, gt=0, le=1_000_000_000)
+
+
+class IncomeIn(BaseModel):
+    """Monthly take-home pay — the base the 50/30/20 lines are computed from."""
+    monthly_income: float = Field(ge=0, le=1_000_000_000)
+
+
+class CommitmentIn(BaseModel):
+    """A standing monthly commitment: a bill, or a planned allowance like groceries.
+    Only 'needs' and 'wants' — savings is the remainder, never a thing you commit to."""
+    label: str = Field(min_length=1, max_length=60)
+    amount: float = Field(gt=0, le=1_000_000_000)
+    bucket: Literal["needs", "wants"]
+    due_day: int = Field(0, ge=0, le=31)   # day of the month, 0 = no fixed date
+    variable: bool = False                # an allowance whose real amount moves
+
+
+class CommitmentPatch(BaseModel):
+    """Every field optional — the app flips `active` or nudges one amount without
+    resending the whole row."""
+    label: str | None = Field(None, min_length=1, max_length=60)
+    amount: float | None = Field(None, gt=0, le=1_000_000_000)
+    bucket: Literal["needs", "wants"] | None = None
+    due_day: int | None = Field(None, ge=0, le=31)
+    variable: bool | None = None
+    active: bool | None = None
 
 
 class PriorityIn(BaseModel):
@@ -453,6 +488,8 @@ class MoneyEntryOut(BaseModel):
     note: str
     day: str
     created_at: datetime
+    bucket: str | None = None          # 'needs' | 'wants'; null = untagged spending
+    commitment_id: str | None = None   # set when logged by paying a standing commitment
 
 
 class MoneyOut(BaseModel):
@@ -464,6 +501,40 @@ class MoneyOut(BaseModel):
     week_in: float
     week_out: float
     balance: float  # money remaining — all time in minus out
+
+
+class CommitmentOut(BaseModel):
+    """One standing monthly commitment — a worksheet line item and a bill at once."""
+    id: str
+    label: str
+    amount: float
+    bucket: Literal["needs", "wants"]
+    due_day: int      # day of the month, 0 = no fixed date
+    variable: bool    # an allowance (groceries) rather than a fixed bill
+    active: bool      # inactive rows keep their history without counting
+    paid_this_month: bool  # already logged this month, so it's off the due list
+
+
+class BudgetActualOut(BaseModel):
+    """What actually left the wallet this month, per bucket. `untagged` is spending
+    from before the budget existed — reported as itself rather than folded into a
+    bucket it was never assigned to."""
+    needs: float
+    wants: float
+    untagged: float
+
+
+class BudgetOut(BaseModel):
+    """The budget as stored: take-home pay, the commitments it's divided across, and
+    this month's actual spending. Deliberately *raw* — targets, totals and the
+    derived savings figure are computed on the client (src/lib/budget.ts) so the
+    worksheet can recalculate as you type and the formulas never exist in two places
+    that could disagree."""
+    monthly_income: float   # 0 = not set yet; the worksheet's empty state
+    start_month: str        # 'YYYY-MM' the budget began, '' before income is set
+    month: str              # the 'YYYY-MM' the actuals below cover
+    commitments: list[CommitmentOut]
+    actual: BudgetActualOut
 
 
 class MoneyBucketOut(BaseModel):
@@ -538,6 +609,7 @@ class StateOut(BaseModel):
     reminders: list[ReminderOut]  # a plain personal list shown on Status
     grocery: list[GroceryOut]  # things to buy — ticked off once bought
     money: MoneyOut  # the money log (in/out) + today/this-week totals, on You
+    budget: BudgetOut  # take-home pay + standing commitments, for the 50/30/20 worksheet
     journal: list[JournalEntryOut]  # free-form daily entries, newest first
     reflections: list[ReflectionOut]  # quest-linked takeaways, newest first
 
