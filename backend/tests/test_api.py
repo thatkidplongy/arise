@@ -75,8 +75,8 @@ def test_state_shape(client):
 
 
 def test_reading_review_flow(client):
-    # Set a book — no review the same week it started.
-    r = client.put("/book?day=2026-07-18", json={"current_book": "Atomic Habits"})
+    # Set a book with its length — no review the same week it started.
+    r = client.put("/book?day=2026-07-18", json={"current_book": "Atomic Habits", "chapters": 20})
     body = r.json()
     assert body["player"]["current_book"] == "Atomic Habits"
     assert body["book_review"]["pending"] is False
@@ -87,14 +87,16 @@ def test_reading_review_flow(client):
     later = client.get(f"/state?day={nxt}").json()
     assert later["book_review"]["pending"] is False
     assert later["player"]["current_book"] == "Atomic Habits"
-    # The check-in appears only once you've put in the reading days to finish at
-    # your pace (14 days at reading level 0). Log the reading daily 14 days running.
-    days = [f"2026-07-{d:02d}" for d in range(18, 32)]  # 18–31 Jul = 14 distinct days
-    assert len(days) == 14
-    for d in days:
+    # Nor does ticking the reading daily for weeks: showing up isn't finishing, and
+    # only the chapters you logged can say you're through the book.
+    for d in (f"2026-07-{d:02d}" for d in range(18, 32)):
         client.post("/completions", json={"quest_id": "d-read", "day": d})
-    last = days[-1]
+    last = "2026-07-31"
     st = client.get(f"/state?day={last}").json()
+    assert st["reading"]["progress"] == 0.0
+    assert st["book_review"]["pending"] is False
+    # Logging chapters that cover the book is what brings the check-in.
+    st = client.post("/reading/log", json={"chapters": 20, "label": "1–20", "day": last}).json()
     assert st["reading"]["progress"] >= 1.0
     assert st["book_review"]["pending"] is True
     # Finish it → counts, rolls to the next book, and stops asking this week.
@@ -155,10 +157,7 @@ def test_interview_mode_toggles_craft_quests(client):
     # The daily still opens with its floor, then an interview drill — and interview
     # mode opts out of the 12-week plan, which isn't what next week's interview needs.
     assert "Notion" in _quest(body, "d-craft")["steps"][0]
-    assert _quest(body, "d-craft")["title"] in {
-        "Daily DSA", "Explain Your Solution", "Pattern of the Day", "Behavioural Prep",
-        "Mock Interview", "Mock System Design", "Flashcard Fundamentals", "Timed Set",
-    }
+    assert _quest(body, "d-craft")["title"] in {v[0] for v in quests.INTERVIEW_POOLS["d-craft"]}
     # Turning it off restores steady craft growth.
     off = client.put(f"/interview?day={DAY}", json={"enabled": False}).json()
     assert off["player"]["interview_mode"] is False

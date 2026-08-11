@@ -462,12 +462,15 @@ def chapters_covered(logs: list[ReadingLog], total: int = 0) -> int:
     return max(counted, named)
 
 
-def reading_of(db: Session, player: Player, day: str, rows: list[Completion], int_level: int) -> dict | None:
+def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) -> dict | None:
     """A read-only view of progress on the current book: how far in the logged
     chapters put you, from the hunter's own logging rather than a quota the app set.
-    When the book's length is unknown there's no denominator to measure chapters
-    against, so it falls back to days of reading done (`measure` says which). None
-    when no book is set."""
+
+    When the book's length is unknown there is genuinely nothing to be a fraction of,
+    so `measure` is 'count' and there's no bar — just how many chapters you've read.
+    It used to fall back to a days target derived from the reading level, which meant
+    a better reader was quietly expected to finish sooner: the app setting the pace
+    again, in the one place it had survived. None when no book is set."""
     book = player.current_book
     if not book:
         return None
@@ -484,11 +487,7 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion], in
     days_read = len(read_days)
 
     total = player.current_book_chapters
-    days_target = quests.days_to_finish(int_level)
-    if total > 0:
-        progress = min(1.0, chapters_read / total)
-    else:
-        progress = min(1.0, days_read / days_target) if days_target else 0.0
+    progress = min(1.0, chapters_read / total) if total > 0 else 0.0
 
     return {
         "book": book,
@@ -496,9 +495,8 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion], in
         "books_finished": player.books_finished,
         "chapters_read": chapters_read,
         "days_read": days_read,
-        "days_to_finish": days_target,
         "progress": round(progress, 3),
-        "measure": "chapters" if total > 0 else "days",
+        "measure": "chapters" if total > 0 else "count",
         "logged_today": [
             {"id": log.id, "label": log.label, "chapters": log.chapters} for log in today
         ],
@@ -886,12 +884,13 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
 
     # Reading review: a book is never reset by a week ending — it carries on, with
-    # its progress intact, for as many weeks as it takes. The gentle "did you
-    # finish?" check-in appears only once the logged chapters cover the book (or,
-    # when its length is unknown, once enough days of reading are in), and then at
-    # most once a week so it never nags.
+    # its progress intact, for as many weeks as it takes. The gentle "did you finish?"
+    # check-in appears only once the logged chapters cover the book, and then at most
+    # once a week so it never nags. A book whose length you never set is never asked
+    # about at all — there's nothing to compare against, so finishing it is something
+    # only you can say (Status → Current book).
     week = game.week_key(day)
-    reading = reading_of(db, player, day, rows, prog_levels.get("INT", 0))
+    reading = reading_of(db, player, day, rows)
     review_pending = bool(
         player.current_book
         and reading

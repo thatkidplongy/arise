@@ -71,39 +71,40 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
-/** How the progress bar is counted: the chapters you've logged when the book's
- * length is known, otherwise days of reading — there's nothing to count against a
- * book of unknown length. Never a per-day quota either way. */
-function readingTally(reading: ApiReading): { label: string; value: number; max: number } {
-  if (reading.measure === 'chapters') {
-    const read = reading.chapters_read ?? 0; // absent until the backend service restarts
-    return { label: `${read} / ${reading.chapters} chapters`, value: read, max: reading.chapters };
-  }
-  return { label: `${reading.days_read} / ${reading.days_to_finish} days`, value: reading.days_read, max: reading.days_to_finish };
+/** A book whose length you never set: there's nothing to be a fraction of, so it
+ * shows the count and no bar rather than inventing a denominator. */
+function ReadingCount({ reading }: { reading: ApiReading }) {
+  const read = reading.chapters_read ?? 0;
+  return (
+    <>
+      <View style={styles.xpRow}>
+        <Text style={styles.xpLabel}>Chapters logged</Text>
+        <Text style={styles.xpValue}>{read}</Text>
+      </View>
+      <Text style={styles.readingMeta}>
+        No length set, so there’s no bar — add the total chapters below if you want one.
+        You decide when it’s finished.
+      </Text>
+    </>
+  );
 }
 
-/** Read-only reading progress — how far toward finishing the current book, built
- * from the chapters you logged. Logging lives just below in Today's reading, and
- * setting/changing the book below that. */
-function Reading({ reading }: { reading: ApiReading }) {
+/** A book whose length is known: the bar is the chapters you logged against it. */
+function ReadingBar({ reading }: { reading: ApiReading }) {
+  const read = reading.chapters_read ?? 0; // absent until the backend service restarts
   const pct = Math.round(reading.progress * 100);
   const done = pct >= 100;
-  const tally = readingTally(reading);
   return (
-    <SystemPanel
-      title="Reading"
-      sub={reading.books_finished ? `${reading.books_finished} finished` : undefined}
-    >
-      <Text style={styles.readingBook} numberOfLines={2}>
-        {reading.book}
-      </Text>
+    <>
       <View style={styles.xpRow}>
         <Text style={styles.xpLabel}>Toward finishing</Text>
-        <Text style={styles.xpValue}>{tally.label}</Text>
+        <Text style={styles.xpValue}>
+          {read} / {reading.chapters} chapters
+        </Text>
       </View>
       <XpBar
-        value={Math.min(tally.value, tally.max)}
-        max={tally.max}
+        value={Math.min(read, reading.chapters)}
+        max={reading.chapters}
         color={done ? feedback.success : accent}
         height={8}
       />
@@ -112,6 +113,27 @@ function Reading({ reading }: { reading: ApiReading }) {
           ? 'That’s the whole book by your count — the check-in will ask if you’re done.'
           : `About ${pct}% of the way, at whatever pace suits you`}
       </Text>
+    </>
+  );
+}
+
+/** Read-only reading progress — how far toward finishing the current book, built
+ * from the chapters you logged. Logging lives just below in Today's reading, and
+ * setting/changing the book below that. */
+function Reading({ reading }: { reading: ApiReading }) {
+  return (
+    <SystemPanel
+      title="Reading"
+      sub={reading.books_finished ? `${reading.books_finished} finished` : undefined}
+    >
+      <Text style={styles.readingBook} numberOfLines={2}>
+        {reading.book}
+      </Text>
+      {reading.measure === 'chapters' ? (
+        <ReadingBar reading={reading} />
+      ) : (
+        <ReadingCount reading={reading} />
+      )}
       <Text style={[styles.readingToday, { color: reading.done_today ? feedback.success : text.faint }]}>
         {reading.done_today ? '✓ Read today' : 'Not read yet today'}
       </Text>

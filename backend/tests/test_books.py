@@ -64,14 +64,33 @@ def test_furthest_chapter_reads_a_label_the_way_a_reader_would():
     assert state.furthest_chapter("published 2011") == 2011  # nothing to clamp to
 
 
-def test_reading_progress_falls_back_to_days_when_length_unknown(client):
+def test_a_book_with_no_length_gets_a_count_and_no_deadline(client):
+    """Without a chapter count there is nothing to be a fraction of. It used to
+    borrow a days target from the reading level, which quietly expected a better
+    reader to finish sooner — the app setting the pace, one last time."""
     day = "2026-07-18"
     client.put(f"/book?day={day}", json={"current_book": "Some Book"})  # no chapter count
     r = client.get(f"/state?day={day}").json()["reading"]
-    assert r["measure"] == "days" and r["days_to_finish"] == 14 and r["progress"] == 0.0
+    assert r["measure"] == "count" and r["progress"] == 0.0
+    assert "days_to_finish" not in r
 
-    r = client.post("/completions", json={"quest_id": "d-read", "day": day}).json()["state"]["reading"]
-    assert r["days_read"] == 1 and 0 < r["progress"] < 1
+    # Logging still records what you read; it just isn't measured against anything.
+    r = client.post("/reading/log", json={"chapters": 3, "label": "1–3", "day": day}).json()["reading"]
+    assert r["chapters_read"] == 3 and r["measure"] == "count" and r["progress"] == 0.0
+
+
+def test_a_book_with_no_length_is_never_asked_about(client):
+    """Nothing can tell the app you've finished it, so it never presumes to ask —
+    finishing is something only the hunter can say."""
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Some Book"})
+    for i in range(30):
+        client.post("/reading/log", json={"chapters": 1, "label": str(i + 1), "day": day})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is False
+
+    # But saying so still works, and rolls to the next book.
+    body = client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Next"}).json()
+    assert body["player"]["books_finished"] == 1 and body["player"]["current_book"] == "Next"
 
 
 def test_finishing_the_chapters_triggers_the_check_in(client):

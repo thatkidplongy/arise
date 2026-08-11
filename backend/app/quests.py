@@ -722,49 +722,82 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
 # interview-prep variants — timed DSA, mock system design, behavioural stories.
 # Same banding as POOLS; a beginner prepping still gets band-0 work. Every slot
 # keeps a band-0 variant so pool_variant always finds something when it steps down.
+#
+# Rebuilt from the hunter's own interview notes rather than generic prep. Their core
+# insight is that you're scored on whether you've *owned* things, and the tell is
+# specificity — so the reps are: say the three real stories cold with their real
+# numbers, drill the five-beat incident structure (mitigation and prevention are the
+# beats that separate senior from junior), rehearse the six question archetypes, and
+# close the gaps they've already written down honestly.
 INTERVIEW_POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     "d-craft": [
-        ("Daily DSA", "One interview problem, done right", [
-            "Pick one problem at your level (Blind 75 / NeetCode)",
-            "Solve it in 25 min — narrate your approach out loud",
-            "Read the optimal solution; name the underlying pattern",
+        ("Story A · Phone Normalisation", "The flagship, told in 90 seconds", [
+            "Tell it cold: 57 buyers, nine days, zero revenue lost, ten files touched",
+            "Land the detail that wins the room — the test whose name contradicted its assertion",
         ]),
-        ("Explain Your Solution", "Practise thinking out loud", [
-            "Solve one easy problem",
-            "Record yourself explaining it as if to an interviewer",
-            "Note where you rambled or went quiet",
+        ("Story B · Duplicate Contacts", "The irreversible-operation story", [
+            "Tell it cold: 35,182 scanned, 1,085 groups, 302 safe, 777 held back",
+            "Land the line — a duplicate is recoverable, a wrong merge is not",
         ]),
-        ("Pattern of the Day", "Drill one interview pattern", [
-            "Pick a pattern: two-pointers, sliding window, BFS/DFS, DP",
-            "Solve two short problems using it",
-            "Write the tell that signals this pattern",
+        ("Story C · The Missing API", "Proving a negative properly", [
+            "Tell it cold: five independent ways you verified the API didn't exist",
+            "Land the point — 'impossible' needs more evidence than 'possible'",
+        ]),
+        ("The Five Beats", "Structure for anything that broke", [
+            "Say the beats in order: blast radius, detection, mitigation, root cause, prevention",
+            "Beats 3 and 5 in one sentence each — if you can't, you don't know the story yet",
+        ]),
+        ("Follow-ups Cold", "The drills under each story", [
+            "Pick one story and answer three of its follow-ups without notes",
+            "Write down the one that came out weakest",
+        ]),
+        ("Investigate Under Load", "Worked yesterday, failing today", [
+            "Say the method in order: what changed, where's the time going, what's saturated",
+            "Name the usual suspects and one mitigation before the fix",
+        ]),
+        ("Constraints First", "How would you approach this?", [
+            "Restate a problem, name who suffers, then ask scale/consistency/failure before designing",
+            "Say out loud what you'd deliberately exclude, and why",
+        ]),
+        ("Design With Trade-offs", "Scored on the trade-offs, not the boxes", [
+            "Requirements → constraints → data model → components → failure modes",
+            "Volunteer what breaks first at 10× — a design with no failure modes reads as untested",
+        ]),
+        ("The Docker Answer", "What your code runs inside", [
+            "Tell the config-drift story: 41 repos, generated queue config, a validate command",
+            "Be ready for image vs container, layers, secrets locally, and why not native",
+        ]),
+        ("Tell Me About Your Project", "Four levels of why", [
+            "Problem as who suffers · the shape in three sentences · why that datastore",
+            "The hardest decision and what it traded away, then what you'd do differently",
+        ]),
+        ("Close a Known Gap", "The three you wrote down honestly", [
+            "Pick one: no load story, container internals, or design at internet scale",
+            "Do the smallest real thing that shrinks it — one p99 number closes the first",
         ]),
     ],
     "w-craft": [
         ("Behavioural Prep", "Get your stories ready", [
-            "Pick 3 stories (a conflict, a failure, a win)",
-            "Write each as Situation · Task · Action · Result",
-            "Say one out loud in under two minutes",
+            "Run the drill tracker: each story spoken under 90 seconds, from memory",
+            "Tick only what you can do cold, and note which numbers slipped",
         ]),
         ("Mock Interview", "Simulate the real thing", [
-            "Do a timed mock (Pramp, a friend, or solo)",
-            "One medium problem — talk the entire time",
+            "Timed mock, talking the entire time — a systems round, not a kata",
             "Write down two things to fix next round",
         ]),
         ("Mock System Design", "One full system-design mock", [
             "Pick a prompt and set a 45-minute timer",
-            "Requirements → high-level → deep-dive → tradeoffs",
-            "Review it against a rubric afterwards",
+            "Requirements → high-level → deep-dive → trade-offs → what breaks first",
         ]),
     ],
     "s-craft": [
-        ("Flashcard Fundamentals", "Drill the trivia they ask", [
-            "Review fundamentals: big-O, HTTP, SQL joins, OOP",
-            "Quiz yourself on five, out loud",
+        ("Spoken Answers", "Read your own answers back", [
+            "Re-read the spoken-answers page and say two of them out loud",
+            "Note any that sound recited rather than owned",
         ]),
-        ("Timed Set", "A quick timed DSA set", [
-            "Three easy/medium problems, 15 min each",
-            "No peeking until the timer's up",
+        ("Numbers Drill", "The part that can't be faked", [
+            "Recite each story's real numbers from memory, then check them",
+            "Any you missed, say the whole story again with them in",
         ]),
         ("Review a Design", "Study one system design", [
             "Read one system-design write-up",
@@ -856,10 +889,6 @@ FLOORS: dict[str, list[list[str]]] = {
     ],
 }
 
-# Only used when a book's length is unknown, so there are no chapters to count
-# progress in: how many days of reading stands in for finishing it, per reading
-# level. Higher level → a faster reader → fewer days. Never a per-day quota.
-_READING_PACE_DAYS: list[int] = [14, 10, 8, 7, 6, 5]
 
 # Where a quest is about *learning* something, point at a popular, well-trusted
 # source. Keyed by the variant's title, so the pointer matches the day's focus.
@@ -949,15 +978,20 @@ RESOURCES: dict[str, str] = {
     "Learn & Earn": "🎥 Ali Abdaal (YouTube)",
     # CFT carries its own pointers — the phase pools name the exact Notion page or
     # book chapter for the day, so there's nothing to look up by title here.
-    # CFT — interview mode
-    "Daily DSA": "🌐 NeetCode (neetcode.io)",
-    "Pattern of the Day": "🌐 NeetCode (neetcode.io)",
-    "Timed Set": "🌐 LeetCode (leetcode.com)",
-    "Mock Interview": "🌐 Pramp (pramp.com)",
-    "Mock System Design": "📖 System Design Interview — Alex Xu",
-    "Review a Design": "🌐 ByteByteGo (bytebytego.com)",
-    "Behavioural Prep": "📖 Cracking the Coding Interview — Gayle McDowell",
-    "Flashcard Fundamentals": "🌐 Tech Interview Handbook (techinterviewhandbook.org)",
+    # CFT — interview mode: their own notes are the source, not a course.
+    "Story A · Phone Normalisation": "📓 Notion · Backend Interview Notes — Story A",
+    "Story B · Duplicate Contacts": "📓 Notion · Backend Interview Notes — Story B",
+    "Story C · The Missing API": "📓 Notion · Backend Interview Notes — Story C",
+    "The Five Beats": "📓 Notion · Backend Interview Notes §1",
+    "Follow-ups Cold": "📓 Notion · Backend Interview Notes — follow-up drills",
+    "Investigate Under Load": "📓 Notion · Backend Interview Notes §3.2",
+    "Constraints First": "📓 Notion · Backend Interview Notes §3.3",
+    "Design With Trade-offs": "📓 Notion · Backend Interview Notes §3.4",
+    "The Docker Answer": "📓 Notion · Backend Interview Notes §3.5",
+    "Tell Me About Your Project": "📓 Notion · Backend Interview Notes §3.6",
+    "Close a Known Gap": "📓 Notion · Backend Interview Notes §4 — known gaps",
+    "Spoken Answers": "📓 Notion · System Design Spoken Answers",
+    "Numbers Drill": "📓 Notion · Backend Interview Notes §5 — drill tracker",
 }
 
 
@@ -994,8 +1028,15 @@ TIER: dict[str, int] = {
     "Feature End-to-End": 1, "Study a Codebase": 1, "Design a System": 2, "Deep Dive": 2,
     "Code Review": 1, "One Kata": 1, "Whiteboard It": 2,
     # CFT — interview mode
-    "Pattern of the Day": 1, "Mock Interview": 1, "Mock System Design": 2,
-    "Timed Set": 1, "Review a Design": 2,
+    "Mock Interview": 1, "Mock System Design": 2, "Review a Design": 2,
+    # CFT — interview mode, from the hunter's own notes. The stories come first
+    # (band 0: they are the load-bearing part), then the archetypes, then the
+    # gap-closing and full mocks.
+    "Story A · Phone Normalisation": 0, "Story B · Duplicate Contacts": 0,
+    "Story C · The Missing API": 0, "The Five Beats": 0, "Numbers Drill": 0,
+    "Follow-ups Cold": 1, "Investigate Under Load": 1, "Constraints First": 1,
+    "The Docker Answer": 1, "Tell Me About Your Project": 1, "Spoken Answers": 1,
+    "Design With Trade-offs": 2, "Close a Known Gap": 2,
 }
 
 
@@ -1025,13 +1066,6 @@ def reading_floor(book: str | None) -> str:
     log are what moves the book toward finished (Status → Reading)."""
     what = book or "your current book"
     return f"Read {what} at your pace, then log which chapters"
-
-
-def days_to_finish(level: int) -> int:
-    """How many days of reading stands in for finishing a book whose length is
-    unknown — the fallback denominator for reading progress when there are no
-    chapters to count. Higher reading level → fewer days."""
-    return _READING_PACE_DAYS[max(0, min(level, len(_READING_PACE_DAYS) - 1))]
 
 
 # A self-set priority that sits on top of the plan (e.g. "abs this week"). Common

@@ -395,9 +395,8 @@ class ReadingOut(BaseModel):
     books_finished: int
     chapters_read: int  # how far in the logged chapters put you (furthest named wins)
     days_read: int  # days the reading daily was done since this book began
-    days_to_finish: int  # days of reading that stands in for finishing an unknown-length book
-    progress: float  # 0..1 — chapters_read / chapters, or days_read / days_to_finish
-    measure: str  # 'chapters' when the length is known, else 'days'
+    progress: float  # 0..1 — chapters_read / chapters; 0 when the length is unknown
+    measure: str  # 'chapters' when the book's length is known, else 'count' (no bar)
     logged_today: list[ReadingLogOut]
     done_today: bool  # something logged today (or the reading daily ticked)
 

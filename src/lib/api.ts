@@ -295,9 +295,8 @@ export interface ApiReading {
   books_finished: number;
   chapters_read: number; // chapters logged since this book began
   days_read: number; // days the reading daily was done since this book began
-  days_to_finish: number; // days of reading that stands in for an unknown-length book
-  progress: number; // 0..1 — chapters_read / chapters, or days_read / days_to_finish
-  measure: 'chapters' | 'days'; // 'chapters' when the book's length is known
+  progress: number; // 0..1 — chapters_read / chapters; 0 when the length is unknown
+  measure: 'chapters' | 'count'; // 'count' = no length set, so no bar to show
   logged_today: ApiReadingLog[];
   done_today: boolean; // something logged today (or the reading daily ticked)
 }
