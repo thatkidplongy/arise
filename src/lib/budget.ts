@@ -6,11 +6,6 @@ import type { ApiBudget, ApiCommitment, BudgetBucket } from '@/lib/api';
  */
 export const BUDGET_SPLIT: Record<BudgetBucket, number> = { needs: 0.5, wants: 0.3, savings: 0.2 };
 
-/** Paydays per month — salary lands twice a month (semi-monthly), so the income
- * field collects one payday and the monthly figure everything else runs on is
- * `payday × PAYS_PER_MONTH`. The stored budget income stays monthly. */
-export const PAYS_PER_MONTH = 2;
-
 export const BUDGET_BUCKETS: BudgetBucket[] = ['needs', 'wants', 'savings'];
 
 export const BUCKET_LABEL: Record<BudgetBucket, string> = {
@@ -40,7 +35,11 @@ export interface BucketReading {
 }
 
 export interface BudgetReading {
+  /** What the lines divide: money actually received this month. Same as
+   * `received` — kept under both names since targets read as shares of income. */
   income: number;
+  /** Money actually in this month — 0 before any has landed. */
+  received: number;
   /** True once take-home pay is set; the worksheet's empty state keys off this. */
   isSet: boolean;
   needs: BucketReading;
@@ -70,7 +69,7 @@ const NO_BUDGET: ApiBudget = {
   start_month: '',
   month: '',
   commitments: [],
-  actual: { needs: 0, wants: 0, untagged: 0 },
+  actual: { income: 0, needs: 0, wants: 0, untagged: 0 },
 };
 
 function readBucket(bucket: BudgetBucket, planned: number, actual: number, income: number): BucketReading {
@@ -107,23 +106,29 @@ function readBucket(bucket: BudgetBucket, planned: number, actual: number, incom
  */
 export function readBudget(budget: ApiBudget | null | undefined): BudgetReading {
   const safe = budget ?? NO_BUDGET;
-  const income = round2(Math.max(0, safe.monthly_income ?? 0));
+  const spentSafe = safe.actual ?? NO_BUDGET.actual;
+  // The rule follows the money: it divides only what actually came in this month —
+  // paydays as they land, plus any extra. No projections: before the first payday
+  // lands there is nothing to divide, so there are no lines.
+  const received = round2(Math.max(0, spentSafe.income ?? 0));
+  const income = received;
   const commitments = safe.commitments ?? [];
   const needs = sumBucket(commitments, 'needs');
   const wants = sumBucket(commitments, 'wants');
   const savings = round2(income - needs - wants);
 
-  const spent = safe.actual ?? NO_BUDGET.actual;
-  const untagged = round2(spent.untagged ?? 0);
-  const actualNeeds = round2(spent.needs ?? 0);
-  const actualWants = round2(spent.wants ?? 0);
+  const untagged = round2(spentSafe.untagged ?? 0);
+  const actualNeeds = round2(spentSafe.needs ?? 0);
+  const actualWants = round2(spentSafe.wants ?? 0);
   // Saved so far = pay that hasn't gone anywhere yet. Untagged spending counts
   // against it too: the money is gone regardless of whether it carried a tag.
   const actualSavings = round2(income - actualNeeds - actualWants - untagged);
 
   return {
     income,
-    isSet: income > 0,
+    received,
+    // Set once payday pay is stored or money has landed — gates the empty state.
+    isSet: round2(Math.max(0, safe.monthly_income ?? 0)) > 0 || received > 0,
     needs: readBucket('needs', needs, actualNeeds, income),
     wants: readBucket('wants', wants, actualWants, income),
     savings: readBucket('savings', savings, actualSavings, income),

@@ -21,11 +21,19 @@ function line(label: string, amount: number, bucket: 'needs' | 'wants', extra: P
 }
 
 function budget(
-  monthlyIncome: number,
+  received: number,
   commitments: ApiCommitment[] = [],
-  actual: ApiBudget['actual'] = { needs: 0, wants: 0, untagged: 0 },
+  actual?: Partial<ApiBudget['actual']>,
 ): ApiBudget {
-  return { monthly_income: monthlyIncome, start_month: '2026-08', month: '2026-08', commitments, actual };
+  // The lines follow money actually in, so the helper's first argument IS the
+  // month's received income; the stored payday setting is incidental here.
+  return {
+    monthly_income: 0,
+    start_month: '2026-08',
+    month: '2026-08',
+    commitments,
+    actual: { income: received, needs: 0, wants: 0, untagged: 0, ...actual },
+  };
 }
 
 /** The scenario from the design proposal — a rent-heavy but real Philippine budget. */
@@ -113,7 +121,7 @@ describe('readBudget', () => {
     const r = readBudget({ monthly_income: 45000, start_month: '2026-08' } as never);
     expect(r.isSet).toBe(true);
     expect(r.needs.planned).toBe(0);
-    expect(r.savings.planned).toBe(45000); // nothing committed, so it all falls through
+    expect(r.savings.planned).toBe(0); // no money in yet — nothing to fall through
   });
 
   it('is unset at zero income, and every share stays 0 rather than dividing by it', () => {
@@ -130,7 +138,6 @@ describe('actuals', () => {
     const b = budget(45000, [line('Rent', 12000, 'needs'), line('Gym', 1200, 'wants')], {
       needs: 12000,
       wants: 620,
-      untagged: 0,
     });
     const r = readBudget(b);
     expect(r.needs.planned).toBe(12000);
@@ -140,7 +147,7 @@ describe('actuals', () => {
   });
 
   it('counts saved-so-far as pay that has not gone anywhere yet', () => {
-    const r = readBudget(budget(45000, [], { needs: 12000, wants: 620, untagged: 0 }));
+    const r = readBudget(budget(45000, [], { needs: 12000, wants: 620 }));
     expect(r.savings.actual).toBe(32380); // 45000 − 12000 − 620
   });
 
@@ -150,11 +157,37 @@ describe('actuals', () => {
     expect(r.savings.actual).toBe(32080); // the ₱300 still left the wallet
   });
 
+  it('divides only the money actually received this month', () => {
+    // One payday in so far: the lines split what's really there, nothing more.
+    const r = readBudget(budget(30000));
+    expect(r.income).toBe(30000);
+    expect(r.received).toBe(30000);
+    expect(r.needs.target).toBe(15000);
+    expect(r.wants.target).toBe(9000);
+    expect(r.savings.target).toBe(6000);
+  });
+
+  it('counts extra income on top — a bigger month gives bigger lines', () => {
+    // Two paydays plus a ₱5,000 gig, all logged in.
+    const r = readBudget(budget(50000));
+    expect(r.needs.target).toBe(25000); // half of what actually came in
+  });
+
+  it('never projects pay still to come — no money in, no lines', () => {
+    // Pay is set but nothing has landed: the lines stay at zero, not the plan.
+    const b = { ...budget(0, [line('Rent', 12000, 'needs')]), monthly_income: 40750 };
+    const r = readBudget(b);
+    expect(r.received).toBe(0);
+    expect(r.income).toBe(0);
+    expect(r.needs.target).toBe(0);
+    expect(r.isSet).toBe(true); // set up, just waiting on payday
+  });
+
   it('reads actuals as zero when the backend is too old to send them', () => {
     const r = readBudget({ monthly_income: 45000, start_month: '', month: '', commitments: [] } as never);
     expect(r.needs.actual).toBe(0);
     expect(r.untagged).toBe(0);
-    expect(r.savings.actual).toBe(45000);
+    expect(r.savings.actual).toBe(0); // no income received, nothing kept
   });
 });
 

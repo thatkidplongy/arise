@@ -9,7 +9,6 @@ import type { ApiBudget, ApiCommitment } from '@/lib/api';
 import {
   BUCKET_LABEL,
   BUDGET_SPLIT,
-  PAYS_PER_MONTH,
   describeBucket,
   readBudget,
   summariseBudget,
@@ -178,55 +177,40 @@ function AddLine({ bucket }: { bucket: 'needs' | 'wants' }) {
   );
 }
 
-/** The pay label + "twice a month" hint — shared by the read and edit states. */
-function IncomeLabel() {
-  return (
-    <View style={styles.incomeText}>
-      <Text style={styles.incomeLabel}>Take-home pay per payday</Text>
-      <Text style={styles.incomeHint}>paid twice a month</Text>
-    </View>
-  );
-}
-
-/** Take-home pay — everything else is a share of this, so it comes first. Salary
- * lands twice a month, so you enter one payday; the budget runs on payday × 2. */
-function IncomeField({ income }: { income: number }) {
+/** The stored payday amount — only a setting, never money. Money exists once a
+ * payday is actually logged in (the button below the field). */
+function IncomeField({ payday }: { payday: number }) {
   const setIncome = useSystem((s) => s.setIncome);
-  const payday = income / PAYS_PER_MONTH;
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState(false);
 
   const save = async () => {
     const value = num(draft);
     setEditing(false);
-    const monthly = value * PAYS_PER_MONTH;
-    if (value > 0 && monthly !== income) await setIncome(monthly);
+    if (value > 0 && value !== payday) await setIncome(value);
   };
 
   if (!editing) {
     return (
       <Pressable
         onPress={() => {
-          setDraft(income > 0 ? String(payday) : '');
+          setDraft(payday > 0 ? String(payday) : '');
           setEditing(true);
         }}
         style={styles.incomeRow}
         accessibilityLabel="Edit take-home pay per payday"
       >
-        <IncomeLabel />
-        <View style={styles.incomeFigure}>
-          <Text style={[styles.incomeValue, income === 0 && styles.incomeUnset]}>
-            {income > 0 ? peso(payday) : 'Tap to set'}
-          </Text>
-          {income > 0 ? <Text style={styles.incomeSub}>{peso(income)} a month</Text> : null}
-        </View>
+        <Text style={styles.incomeLabel}>Take-home per payday</Text>
+        <Text style={[styles.incomeValue, payday === 0 && styles.incomeUnset]}>
+          {payday > 0 ? peso(payday) : 'Tap to set'}
+        </Text>
       </Pressable>
     );
   }
 
   return (
     <View style={styles.incomeRow}>
-      <IncomeLabel />
+      <Text style={styles.incomeLabel}>Take-home per payday</Text>
       <TextInput
         value={draft}
         onChangeText={setDraft}
@@ -243,10 +227,43 @@ function IncomeField({ income }: { income: number }) {
   );
 }
 
+/** One tap when pay actually lands — logs the payday as money in. Everything
+ * follows from these entries: the balance, the graph, and the 50/30/20 lines. */
+function PaydayButton({ payday }: { payday: number }) {
+  const addMoney = useSystem((s) => s.addMoney);
+  const todayIn = useSystem((s) => s.state?.money.today_in ?? 0);
+  const qc = useQueryClient();
+  const logged = todayIn > 0; // guards a double-tap; tomorrow it's tappable again
+
+  const log = async () => {
+    await addMoney(payday, 'in', 'Payday');
+    void qc.invalidateQueries({ queryKey: ['money-history'] });
+  };
+
+  return (
+    <Pressable
+      onPress={logged ? undefined : () => void log()}
+      disabled={logged}
+      style={({ pressed }) => [styles.paydayBtn, logged && styles.paydayBtnDone, pressed && { opacity: 0.85 }]}
+      accessibilityLabel={logged ? 'Payday already logged today' : `Log payday, ${peso(payday)} in`}
+    >
+      <Ionicons
+        name={logged ? 'checkmark-circle' : 'cash-outline'}
+        size={17}
+        color={logged ? feedback.success : TONE}
+      />
+      <Text style={[styles.paydayBtnText, logged && { color: feedback.success }]}>
+        {logged ? 'Money in today — logged' : `Payday landed — log ${peso(payday)} in`}
+      </Text>
+    </Pressable>
+  );
+}
+
 function EmptyState() {
   return (
     <Text style={styles.empty}>
-      Set your payday take-home and the three monthly lines appear — 50% needs, 30% wants, 20% left to save.
+      Set what you take home each payday, then log each payday as it lands. The three lines split only money that has
+      actually come in — 50% needs, 30% wants, 20% kept.
     </Text>
   );
 }
@@ -265,6 +282,7 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
   const payCommitment = useSystem((s) => s.payCommitment);
   const qc = useQueryClient();
   const reading = readBudget(budget);
+  const payday = budget?.monthly_income ?? 0; // stored per-payday amount — a setting, not money
   const commitments = budget?.commitments ?? [];
 
   // Paying a commitment writes a money-out entry, so refresh the graph on /money.
@@ -275,10 +293,18 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
 
   return (
     <>
-      <SystemPanel title="The 50/30/20 lines">
-        <IncomeField income={reading.income} />
+      <SystemPanel
+        title="The 50/30/20 lines"
+        sub={reading.received > 0 ? `of ${peso(reading.received)} in this month` : undefined}
+      >
+        <IncomeField payday={payday} />
+        {payday > 0 ? <PaydayButton payday={payday} /> : null}
         {!reading.isSet ? (
           <EmptyState />
+        ) : reading.received === 0 ? (
+          // No money in yet this month — nothing to divide, so no lines. The rule
+          // follows real money, never a projection of pay still to come.
+          <Text style={styles.empty}>Nothing in yet this month. Log your payday when it lands and the lines follow.</Text>
         ) : (
           <>
             <BucketRow reading={reading.needs} />
@@ -327,7 +353,9 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
           Nothing to add here — savings is what your pay has left after needs and wants. Trim either list and this
           grows.
         </Text>
-        {reading.isSet ? (
+        {/* Savings only means something once money is in — same gate as the lines.
+            Before payday, commitments are just a plan, not a hole in savings. */}
+        {reading.received > 0 ? (
           <View style={styles.savingsFigure}>
             <Text style={[styles.savingsAmount, { color: colorFor(reading.savings) }]}>
               {peso(reading.savings.planned)}
@@ -352,14 +380,30 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: surface.hairline,
   },
-  incomeText: { flexShrink: 1 },
-  incomeLabel: { color: text.secondary, fontSize: 13, fontWeight: '600' },
-  incomeHint: { color: text.secondary, fontSize: 11, marginTop: 1 },
-  incomeFigure: { alignItems: 'flex-end' },
+  incomeLabel: { color: text.secondary, fontSize: 13, fontWeight: '600', flexShrink: 1 },
   incomeValue: { color: text.primary, fontSize: 20, fontWeight: '800' },
-  incomeSub: { color: text.secondary, fontSize: 11, fontWeight: '600', marginTop: 1 },
   incomeUnset: { color: TONE, fontSize: 15, fontWeight: '700' },
   incomeInput: { minWidth: 130, textAlign: 'right' },
+
+  paydayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: TAP,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: withAlpha(TONE, 0.5),
+    backgroundColor: withAlpha(TONE, 0.06),
+    marginBottom: 10,
+  },
+  paydayBtnDone: {
+    borderStyle: 'solid',
+    borderColor: withAlpha(feedback.success, 0.4),
+    backgroundColor: withAlpha(feedback.success, 0.06),
+  },
+  paydayBtnText: { color: TONE, fontSize: 13, fontWeight: '700' },
 
   bucket: { marginTop: 14 },
   bucketHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 },
