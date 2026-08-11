@@ -29,8 +29,14 @@ function useWebPullToRefresh(scrollRef: React.RefObject<ScrollView | null>, onRe
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const cb = useRef(onRefresh);
-  cb.current = onRefresh;
   const busy = useRef(false);
+
+  // Synced in an effect rather than during render. The touch listeners below are
+  // attached once and read the callback back through this ref, so it has to stay
+  // current without re-running the attach effect on every render.
+  useEffect(() => {
+    cb.current = onRefresh;
+  }, [onRefresh]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;

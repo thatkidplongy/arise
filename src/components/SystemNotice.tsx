@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
 import { accent, onAccent, surface, text, withAlpha } from '@/theme';
+import type { Notice } from '@/types';
 
 /**
  * The System pop-up — level ups, rank ups, achievements. One at a time from
@@ -10,26 +11,34 @@ import { accent, onAccent, surface, text, withAlpha } from '@/theme';
  */
 export function SystemNoticeHost() {
   const notice = useSystem((s) => s.notices[0]);
-  const dismiss = useSystem((s) => s.dismissNotice);
+  if (!notice) return null;
+  // Keyed on the id so each notice is a fresh mount: the entrance starts from the
+  // top on its own, without an effect having to reach back and reset it.
+  return <NoticeCard key={notice.id} notice={notice} />;
+}
 
-  const scale = useRef(new Animated.Value(0.9)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+/**
+ * One notice.
+ *
+ * The pop is scale-only and the box is opaque from the first frame. It used to
+ * fade in from `opacity: 0`, which is the shape that made the completion toast
+ * permanently invisible on this RN Web build when the Animated value never
+ * reached the DOM node — and a modal that swallows every tap is a worse thing to
+ * lose than a toast. If the spring never runs, this just sits at 94% and reads
+ * fine; nothing about seeing or dismissing it depends on the animation landing.
+ */
+function NoticeCard({ notice }: { notice: Notice }) {
+  const dismiss = useSystem((s) => s.dismissNotice);
+  // State, not a ref: the transform style has to read this during render.
+  const [scale] = useState(() => new Animated.Value(0.94));
 
   useEffect(() => {
-    if (!notice) return;
-    scale.setValue(0.9);
-    opacity.setValue(0);
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }),
-      Animated.timing(opacity, { toValue: 1, duration: 130, useNativeDriver: true }),
-    ]).start();
-  }, [notice?.id, notice, scale, opacity]);
-
-  if (!notice) return null;
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start();
+  }, [scale]);
 
   return (
     <View style={styles.overlay}>
-      <Animated.View style={[styles.box, { transform: [{ scale }], opacity }]}>
+      <Animated.View style={[styles.box, { transform: [{ scale }] }]}>
         <Text style={styles.kicker}>Notification</Text>
         <Text style={styles.title}>{notice.title}</Text>
         {notice.lines.map((line, i) => (

@@ -1,50 +1,60 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import type { Toast as ToastData } from '@/types';
 
 /** How long a toast lingers before auto-dismissing. The bottom bar drains over
  * exactly this span, so the two always stay in sync. */
 const TOAST_MS = 5000;
 
 /**
- * A transient floating confirmation, anchored above the tab bar. Used when a
- * quest auto-completes from ticking its last step — confirms it, and offers a
- * quick undo before fading on its own. A thin bar along the bottom drains as the
- * auto-dismiss timer runs down, so you can see how long you've got to hit Undo.
+ * A transient floating confirmation, anchored above the tab bar. Shown whenever a
+ * quest reaches done — tapping its check circle or ticking its last step — so a
+ * save that worked always says so, with a quick undo before it fades on its own. A
+ * thin bar along the bottom drains as the auto-dismiss timer runs down, so you can
+ * see how long you've got to hit Undo.
  */
 export function ToastHost() {
   const toast = useSystem((s) => s.toast);
+  if (!toast) return null;
+  // Keyed on the id so each new toast is a fresh mount: its countdown starts full
+  // without an effect having to reach back and reset it.
+  return <ToastView key={toast.id} toast={toast} />;
+}
+
+/**
+ * One toast, alive for TOAST_MS.
+ *
+ * Deliberately un-animated. An Animated.Value bound to `opacity` here never reached
+ * the DOM node on this RN Web build — the toast mounted at opacity 0 and sat there
+ * invisible, so a completion that saved perfectly looked like it had done nothing.
+ * A confirmation must not depend on an animation landing, so the countdown is plain
+ * state and the card itself is plain style. (Animated stays fine for decoration:
+ * XpBar's width does drive.)
+ */
+function ToastView({ toast }: { toast: ToastData }) {
   const undoToast = useSystem((s) => s.undoToast);
   const dismiss = useSystem((s) => s.dismissToast);
-
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(24)).current;
-  const countdown = useRef(new Animated.Value(1)).current; // 1 = full bar → 0 = gone
+  const [left, setLeft] = useState(1); // share of the toast's life remaining, 1 → 0
 
   useEffect(() => {
-    if (!toast) return;
-    opacity.setValue(0);
-    translateY.setValue(24);
-    countdown.setValue(1);
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 6 }),
-    ]).start();
-    // Width can't run on the native thread, but it's a single 3px bar — cheap.
-    Animated.timing(countdown, { toValue: 0, duration: TOAST_MS, useNativeDriver: false }).start();
+    const startedAt = Date.now();
+    const tick = setInterval(() => {
+      setLeft(Math.max(0, 1 - (Date.now() - startedAt) / TOAST_MS));
+    }, 100);
     const timer = setTimeout(() => dismiss(), TOAST_MS);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast?.id]);
-
-  if (!toast) return null;
+    return () => {
+      clearInterval(tick);
+      clearTimeout(timer);
+    };
+  }, [dismiss]);
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
-      <Animated.View style={[styles.toast, { opacity, transform: [{ translateY }] }]}>
+      <View style={styles.toast}>
         <View style={styles.badge}>
           <Ionicons name="checkmark" size={14} color={onAccent} />
         </View>
@@ -61,14 +71,8 @@ export function ToastHost() {
         >
           <Text style={styles.undoText}>Undo</Text>
         </Pressable>
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.countdown,
-            { width: countdown.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
-          ]}
-        />
-      </Animated.View>
+        <View pointerEvents="none" style={[styles.countdown, { width: `${left * 100}%` }]} />
+      </View>
     </View>
   );
 }
