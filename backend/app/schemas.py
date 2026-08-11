@@ -27,7 +27,14 @@ class PlayerIn(BaseModel):
 
 class BookIn(BaseModel):
     current_book: str = ""
-    chapters: int = 0  # optional total chapters — sets the reading pace; 0 = unknown
+    chapters: int = 0  # optional book length — the finish line, not a quota; 0 = unknown
+
+
+class ReadingLogIn(BaseModel):
+    """A sitting of reading, as the hunter counts it."""
+    chapters: int = Field(1, ge=1, le=200, description="How many chapters this sitting")
+    label: str = Field("", max_length=120, description="Which ones — '5–7', 'the intro'")
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
 class BookReviewIn(BaseModel):
@@ -43,6 +50,19 @@ class InsightAddIn(BaseModel):
     url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL")
     kind: str = Field(default="motivation", pattern=r"^(motivation|tips)$",
                       description="'motivation' (quotes + daily nudge) or 'tips' (a practical playbook)")
+
+
+class LearningIn(BaseModel):
+    kind: str = Field(default="other", pattern=r"^(book|notion|article|work|video|other)$")
+    source: str = Field("", max_length=200)  # what it was — title + chapters, a page, a URL
+    text: str = Field("", max_length=4000)  # optional notes; the source alone is enough
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
+
+
+class RecallGradeIn(BaseModel):
+    """How a recall went. 'got' pushes it further out, 'shaky' holds the spacing,
+    'missed' brings it back tomorrow."""
+    grade: str = Field(pattern=r"^(got|shaky|missed)$")
 
 
 class AvatarIn(BaseModel):
@@ -343,16 +363,25 @@ class WeekReviewOut(BaseModel):
     top_stat: str | None     # the attribute leaned into most (None if nothing yet)
 
 
+class ReadingLogOut(BaseModel):
+    """One logged sitting, for showing (and undoing) what was recorded today."""
+    id: str
+    label: str  # which chapters, verbatim ('' when only a count was given)
+    chapters: int
+
+
 class ReadingOut(BaseModel):
     """Read-only progress on the current book, for the Status screen."""
     book: str
-    chapters: int  # 0 = unknown
+    chapters: int  # the book's length; 0 = unknown
     books_finished: int
+    chapters_read: int  # how far in the logged chapters put you (furthest named wins)
     days_read: int  # days the reading daily was done since this book began
-    days_to_finish: int  # target days at the current reading pace
-    progress: float  # 0..1 — days_read / days_to_finish (capped)
-    per_day: str  # today's reading target, e.g. "Read a chapter of …"
-    done_today: bool  # reading daily already ticked today
+    days_to_finish: int  # days of reading that stands in for finishing an unknown-length book
+    progress: float  # 0..1 — chapters_read / chapters, or days_read / days_to_finish
+    measure: str  # 'chapters' when the length is known, else 'days'
+    logged_today: list[ReadingLogOut]
+    done_today: bool  # something logged today (or the reading daily ticked)
 
 
 class StatOut(BaseModel):
@@ -444,6 +473,55 @@ class InsightOut(BaseModel):
     created_at: datetime
 
 
+class LearningOut(BaseModel):
+    """One thing read or learned on a day — the raw capture, before distilling."""
+    id: str
+    day: str
+    kind: str  # book | notion | article | work | video | other
+    source: str
+    text: str
+    created_at: datetime
+
+
+class RecallOut(BaseModel):
+    """An older highlight resurfacing — the spaced half of the digest."""
+    id: str
+    text: str
+    cue: str = ""  # the question `text` answers; empty on rows distilled before cues
+    hook: str = ""  # a memory aid, only ever set for arbitrary facts
+    box: int = 0  # Leitner rung — higher means it keeps being recalled
+    day: str  # the day it was learned
+    source_label: str
+    days_ago: int
+
+
+class ThreadOut(BaseModel):
+    """The running one-sentence summary of a book, recondensed each sitting."""
+    title: str
+    summary: str
+    days: int  # sittings folded in so far
+
+
+class DigestOut(BaseModel):
+    """A built digest. `html`/`text` are the rendered email; preview returns them
+    without sending so the prompt and layout can be tuned for free."""
+    day: str
+    subject: str
+    highlights: list[str]
+    recall: list[RecallOut]
+    thread: ThreadOut | None = None
+    html: str
+    text: str
+
+
+class DigestSendOut(BaseModel):
+    """What became of one day's digest."""
+    day: str
+    status: str  # sent | skipped | failed
+    detail: str  # why, when it wasn't sent
+    highlight_count: int
+
+
 class DailyQuoteOut(BaseModel):
     """One pull-quote surfaced on Status today, rotating by the date."""
     text: str
@@ -516,9 +594,12 @@ class CommitmentOut(BaseModel):
 
 
 class BudgetActualOut(BaseModel):
-    """What actually left the wallet this month, per bucket. `untagged` is spending
-    from before the budget existed — reported as itself rather than folded into a
-    bucket it was never assigned to."""
+    """What actually moved this month. `income` is everything that came in (the
+    take-home entry plus any extra) — the figure the 50/30/20 lines divide, so the
+    rule follows real money rather than a stored setting. `untagged` is spending from
+    before the budget existed — reported as itself rather than folded into a bucket it
+    was never assigned to."""
+    income: float
     needs: float
     wants: float
     untagged: float
@@ -601,6 +682,7 @@ class StateOut(BaseModel):
     progression: dict[str, ProgressionOut]  # per-attribute earned difficulty (STR, INT, …)
     llm_enabled: bool  # true when a Gemini key is configured (quests are personalised)
     transcript_enabled: bool  # true when a Supadata key is set (Inspire capture is on)
+    digest_enabled: bool  # true when Resend is configured (the Recall email can send)
     daily_quote: DailyQuoteOut | None  # a rotating pull-quote from captured videos
     quests: list[QuestOut]
     priorities: list[PriorityOut]  # self-set focuses pinned on top of the plan, one per attribute
@@ -612,6 +694,9 @@ class StateOut(BaseModel):
     budget: BudgetOut  # take-home pay + standing commitments, for the 50/30/20 worksheet
     journal: list[JournalEntryOut]  # free-form daily entries, newest first
     reflections: list[ReflectionOut]  # quest-linked takeaways, newest first
+    learnings: list[LearningOut]  # what you logged reading/learning today
+    recall: list[RecallOut]  # older highlights coming back around, on an expanding ladder
+    thread: ThreadOut | None = None  # the running summary of the book you're reading
 
 
 class EventOut(BaseModel):

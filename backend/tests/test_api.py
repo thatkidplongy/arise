@@ -58,7 +58,7 @@ def test_state_shape(client):
     sketch = _quest(client.get("/state?day=2026-07-19").json(), "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
-    assert _quest(s, "d-read")["steps"][0].startswith("Read a chapter")
+    assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
     # Craft opens with its deep-work floor and defaults to steady growth (not interview).
     assert "minutes" in _quest(s, "d-craft")["steps"][0]
     assert s["player"]["interview_mode"] is False
@@ -76,7 +76,7 @@ def test_reading_review_flow(client):
     body = r.json()
     assert body["player"]["current_book"] == "Atomic Habits"
     assert body["book_review"]["pending"] is False
-    assert _quest(body, "d-read")["steps"][0] == "Read a chapter of Atomic Habits"
+    assert _quest(body, "d-read")["steps"][0] == "Read Atomic Habits at your pace, then log which chapters"
     # A week ending never resets the book: with no reading done, no review — the
     # book simply carries on into the next week with its progress intact.
     nxt = "2026-07-27"  # a Monday in the following ISO week
@@ -151,7 +151,7 @@ def test_generated_content_overrides_pool_but_keeps_floor(client):
     assert q["resource"] == "🎥 Example"
     assert "Do the custom thing" in q["steps"]
     # The mandatory reading floor is still re-applied on top of LLM content.
-    assert q["steps"][0].startswith("Read a chapter")
+    assert q["steps"][0].startswith("Read your current book")
 
 
 def test_levels_roundtrip_and_survive_focus_clear(client):

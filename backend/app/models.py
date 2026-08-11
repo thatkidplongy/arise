@@ -23,10 +23,11 @@ class Player(Base):
     equipped_title: Mapped[str | None] = mapped_column(String, nullable=True)
     # The life / person the hunter is reaching for — their reason, kept in view.
     north_star: Mapped[str] = mapped_column(String, default="")
-    # Reading loop: a chapter a day at a pace that climbs with level. A book runs
-    # for as many weeks as it takes — a week ending never resets it. current_book is
-    # what they're reading now; once they've read enough days to finish at their
-    # pace, the app checks in ("did you finish?") and, if so, rolls to the next.
+    # Reading loop: read at your own pace, then log what you actually got through
+    # (see ReadingLog). A book runs for as many weeks as it takes — a week ending
+    # never resets it. current_book is what they're reading now; once the logged
+    # chapters reach the book's length, the app checks in ("did you finish?") and,
+    # if so, rolls to the next. current_book_chapters is the finish line, not a quota.
     current_book: Mapped[str] = mapped_column(String, default="")
     current_book_chapters: Mapped[int] = mapped_column(Integer, default=0)  # 0 = unknown
     books_finished: Mapped[int] = mapped_column(Integer, default=0)
@@ -335,3 +336,116 @@ class BudgetCommitment(Base):
     variable: Mapped[bool] = mapped_column(Boolean, default=False)  # an allowance, not a fixed bill
     active: Mapped[bool] = mapped_column(Boolean, default=True)  # off keeps history without counting
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Learning(Base):
+    """One thing the hunter read or learned — a couple of chapters, a Notion page,
+    something that landed at work. What they *now know*, as opposed to JournalEntry,
+    which is how the day *felt*; keeping them apart means the digest reads like
+    knowledge rather than a diary.
+
+    `source` is a free label ("Atomic Habits, ch 5-6", a URL). `text` is optional:
+    naming the source is enough on a busy day, and the distiller works from the
+    name alone for a book it knows."""
+
+    __tablename__ = "learnings"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    kind: Mapped[str] = mapped_column(String, default="other")  # book|notion|article|work|video|other
+    source: Mapped[str] = mapped_column(String, default="")  # what it was — title, page, URL
+    text: Mapped[str] = mapped_column(String, default="")  # optional notes in their own words
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ReadingLog(Base):
+    """One sitting of reading, in the hunter's own units — "ch 5–7", 3 chapters.
+
+    The app doesn't set a chapters-per-day quota; it asks what was actually read and
+    counts that toward the book. `chapters` is the count progress is measured in;
+    `label` is what they typed ("5–7", "the intro"), kept verbatim so the digest can
+    name real chapters instead of guessing. `book` is the title as it stood when
+    logged, so changing books never inherits the last one's progress."""
+
+    __tablename__ = "reading_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
+    book: Mapped[str] = mapped_column(String, default="")
+    chapters: Mapped[int] = mapped_column(Integer, default=1)
+    label: Mapped[str] = mapped_column(String, default="")  # which ones, verbatim
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Highlight(Base):
+    """One distilled line worth keeping — the unit of recall. A day's learnings are
+    distilled into a handful of these once, then they're reread: tomorrow's digest,
+    and again days and weeks later. Dated, because that date is the whole mechanism
+    behind spaced repetition.
+
+    `learning_id` is NULL when the highlight came from something derived rather than
+    logged (a reading daily ticked with no note attached)."""
+
+    __tablename__ = "highlights"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    day: Mapped[str] = mapped_column(String, index=True)  # the day it was learned
+    learning_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    text: Mapped[str] = mapped_column(String)
+    # The question whose answer is `text`. Being asked and briefly failing beats being
+    # told — so the email leads with this and keeps `text` below the fold.
+    cue: Mapped[str] = mapped_column(String, default="")
+    # A memory hook, and only for arbitrary material (names, ordered lists, numbers).
+    # Deliberately empty for conceptual ideas, where a mnemonic gets in the way of
+    # the understanding that would carry them anyway.
+    hook: Mapped[str] = mapped_column(String, default="")
+    source_label: Mapped[str] = mapped_column(String, default="")  # where it came from, for display
+    # Leitner: which rung of the ladder this sits on, and the day it comes back.
+    # Being shown advances the box on its own, so never grading anything reproduces
+    # the plain expanding ladder; grading only pulls a shaky one back down.
+    box: Mapped[int] = mapped_column(Integer, default=0)
+    due: Mapped[str] = mapped_column(String, default="", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Thread(Base):
+    """A running one-sentence summary of everything read from one source so far.
+
+    Borrowed from the marginalia method: you summarise each new paragraph, but you
+    also keep recondensing *everything before it* into a single sentence. That second
+    sentence is the work — fitting a growing pile of ideas into one line forces you to
+    decide what actually matters and how the pieces connect, which is the part that
+    produces understanding rather than a pile of disconnected notes.
+
+    Here a day of reading plays the part of a paragraph. One row per source, rewritten
+    each day that source is read; `key` is the source name with chapter markers
+    stripped, so 'Deep Work, ch 2' and 'Deep Work' are the same thread."""
+
+    __tablename__ = "threads"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    key: Mapped[str] = mapped_column(String, index=True)  # normalised source name
+    title: Mapped[str] = mapped_column(String)  # as last written, for display
+    summary: Mapped[str] = mapped_column(String, default="")
+    days: Mapped[int] = mapped_column(Integer, default=0)  # days folded in so far
+    day: Mapped[str] = mapped_column(String, default="")  # last day folded in
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DigestRun(Base):
+    """A record that the digest for one day has been dealt with — at most one per
+    day, keyed on it. A manual send and the scheduled 7am job can't double-email,
+    and a failed run leaves `status`/`detail` behind to explain itself."""
+
+    __tablename__ = "digest_runs"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # the day being recapped
+    status: Mapped[str] = mapped_column(String, default="sent")  # sent | skipped | failed
+    detail: Mapped[str] = mapped_column(String, default="")  # why, when it wasn't sent
+    highlight_count: Mapped[int] = mapped_column(Integer, default=0)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

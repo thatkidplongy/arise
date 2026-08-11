@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template — do not load directly. Run `bash backend/deploy/install.sh`, which
+  substitutes __BACKEND_DIR__ / __PYTHON__ for your machine and loads it.
+  Mails yesterday's Recall digest at 07:00.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.arise.digest</string>
+
+    <!-- Sources backend/.env for ARISE_API_TOKEN (the backend holds the Gemini and
+         Resend keys itself). Unlike the backup job, this one needs the env. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>set -a; [ -f "__BACKEND_DIR__/.env" ] &amp;&amp; . "__BACKEND_DIR__/.env"; set +a; exec "__PYTHON__" "__BACKEND_DIR__/scripts/send_digest.py"</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__BACKEND_DIR__</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <!-- No RunAtLoad: unlike a backup, running this on install would mail you. -->
+
+    <key>StandardOutPath</key>
+    <string>__BACKEND_DIR__/logs/digest.log</string>
+    <key>StandardErrorPath</key>
+    <string>__BACKEND_DIR__/logs/digest.log</string>
+
+    <!-- Config lives in backend/.env (git-ignored) — see backend/.env.example:
+         • ARISE_RESEND_API_KEY  free Resend key → the digest can send
+         • ARISE_DIGEST_TO       where to send it
+         • ARISE_DIGEST_FROM     optional; default Arise <onboarding@resend.dev> -->
+</dict>
+</plist>

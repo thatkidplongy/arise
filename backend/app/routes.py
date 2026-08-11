@@ -3,17 +3,19 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import body, books, insights, llm, nutrition, service, skincare, state, transcript
+from . import (body, books, digest, insights, llm, mailer, nutrition, service, skincare,
+               state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn,
-                      CommitmentPatch, CompleteIn,
+                      CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
+                      LearningIn, LearningOut, RecallGradeIn,
                       MoneyIn, MoneyHistoryOut, PayCommitmentIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
-                      ReminderIn, ReminderToggleIn, SkincareCheckIn,
+                      ReadingLogIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult,
                       StepToggleIn)
 
@@ -139,9 +141,31 @@ def generate_quests(day: str | None = Query(None), db: Session = Depends(get_db)
 @router.put("/book", response_model=StateOut)
 def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(get_db)):
     """Set or change the book you're currently reading. Send "" to clear it.
-    Optional `chapters` sets the reading pace (a longer book asks more per day)."""
+    Optional `chapters` is the book's length — the finish line your logged chapters
+    are measured against, not a per-day target."""
     player = state.get_or_create_player(db)
     service.set_book(db, player, body.current_book, _valid_day(day), body.chapters)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/reading/log", response_model=StateOut)
+def log_reading(body: ReadingLogIn, db: Session = Depends(get_db)):
+    """Log what you actually read today — which chapters, and how many. Progress on
+    the book comes entirely from these, so nothing here is a quota you can miss.
+    Log as many sittings in a day as you like; they add up."""
+    player = state.get_or_create_player(db)
+    if not player.current_book:
+        raise HTTPException(400, "Set the book you're reading first (Status → Current book).")
+    day = _valid_day(body.day)
+    service.log_reading(db, player, day, body.chapters, body.label)
+    return state.build_state(db, player, day)
+
+
+@router.delete("/reading/log/{log_id}", response_model=StateOut)
+def remove_reading_log(log_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Take back a logged sitting."""
+    player = state.get_or_create_player(db)
+    service.remove_reading_log(db, player, log_id)
     return state.build_state(db, player, _valid_day(day))
 
 
@@ -319,6 +343,92 @@ def remove_insight(insight_id: str, db: Session = Depends(get_db)):
     player = state.get_or_create_player(db)
     insights.remove_insight(db, player.id, insight_id)
     return insights.list_insights(db, player.id)
+
+
+# ── Recall: log what you learned → a digest email the next morning ────────────
+
+
+@router.get("/learnings", response_model=list[LearningOut])
+def list_learnings(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """What you logged reading or learning on a day, oldest first."""
+    player = state.get_or_create_player(db)
+    return digest.list_learnings(db, player.id, _valid_day(day))
+
+
+@router.post("/learnings", response_model=StateOut)
+def add_learning(body_in: LearningIn, db: Session = Depends(get_db)):
+    """Log something you read or learned. The source alone is enough — notes optional."""
+    player = state.get_or_create_player(db)
+    day = _valid_day(body_in.day)
+    if not body_in.source.strip() and not body_in.text.strip():
+        raise HTTPException(400, "Give it a source or a note — something to remember it by.")
+    digest.add_learning(db, player.id, day, body_in.kind, body_in.source, body_in.text)
+    return state.build_state(db, player, day)
+
+
+@router.delete("/learnings/{learning_id}", response_model=StateOut)
+def remove_learning(learning_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Drop a logged learning."""
+    player = state.get_or_create_player(db)
+    digest.remove_learning(db, player.id, learning_id)
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.get("/digest/preview", response_model=DigestOut)
+def preview_digest(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Build a day's digest and return it rendered, without sending. Distilling is
+    idempotent, so a later send reuses these highlights rather than paying again."""
+    player = state.get_or_create_player(db)
+    valid = _valid_day(day)
+    if not llm.enabled():
+        raise HTTPException(503, "Distilling needs a Gemini key (set ARISE_LLM_API_KEY).")
+    try:
+        ctx = digest.build_context(db, player, valid)
+    except Exception:
+        raise HTTPException(502, "Couldn't distil that day — try again in a moment.")
+    return {
+        "day": valid,
+        "subject": digest.subject_for(ctx),
+        "highlights": [h["text"] for h in ctx["highlights"]],
+        "recall": ctx["recall"],
+        "thread": ctx["thread"],
+        "html": digest.render_html(ctx),
+        "text": digest.render_text(ctx),
+    }
+
+
+@router.post("/recall/{highlight_id}/grade", response_model=StateOut)
+def grade_recall(highlight_id: str, body: RecallGradeIn, day: str | None = Query(None),
+                 db: Session = Depends(get_db)):
+    """Say how a recall went, and reschedule it. Knew it → further away; no clue →
+    back tomorrow. Grading is optional: an ungraded highlight still climbs the ladder
+    each time it's shown."""
+    player = state.get_or_create_player(db)
+    valid = _valid_day(day)
+    try:
+        result = digest.grade(db, player, highlight_id, body.grade, valid)
+    except ValueError as err:
+        raise HTTPException(422, str(err))
+    if result is None:
+        raise HTTPException(404, "No such highlight.")
+    return state.build_state(db, player, valid)
+
+
+@router.post("/digest/send", response_model=DigestSendOut)
+def send_digest(day: str | None = Query(None), force: bool = Query(False),
+                db: Session = Depends(get_db)):
+    """Send a day's digest now — what the nightly job calls. At most once per day
+    unless `force`, so a manual send and the job can't both land in the inbox."""
+    player = state.get_or_create_player(db)
+    if not mailer.enabled():
+        raise HTTPException(503, "Sending needs a Resend key and a recipient "
+                                 "(set ARISE_RESEND_API_KEY and ARISE_DIGEST_TO).")
+    try:
+        return digest.send_daily(db, player, _valid_day(day), force=force)
+    except Exception as err:
+        # Say what actually broke: the nightly job's log is the only place this
+        # surfaces, and "couldn't send" alone sends you hunting.
+        raise HTTPException(502, f"Couldn't send that digest — {digest._why(err)}")
 
 
 # ── Profile avatar (kept out of /state; fetched on demand) ────────────────────

@@ -26,6 +26,7 @@ from .models import (
     Preference,
     QuestDef,
     QuestNote,
+    ReadingLog,
     Reminder,
     StepCheck,
     utcnow,
@@ -265,12 +266,34 @@ def update_player(
     db.commit()
 
 
+def log_reading(db: Session, player: Player, day: str, chapters: int, label: str) -> None:
+    """Record a sitting of reading — which chapters, and how many. This is the only
+    thing that moves a book toward finished, so it's the hunter's count rather than
+    a target the app set. Several sittings in a day are fine; they add up."""
+    db.add(ReadingLog(
+        player_id=player.id,
+        day=day,
+        book=player.current_book,
+        chapters=max(1, chapters),  # a logged sitting always counts for something
+        label=label.strip(),
+    ))
+    db.commit()
+
+
+def remove_reading_log(db: Session, player: Player, log_id: str) -> None:
+    """Take back a logged sitting — a mistyped count shouldn't be permanent."""
+    row = db.get(ReadingLog, log_id)
+    if row is not None and row.player_id == player.id:
+        db.delete(row)
+        db.commit()
+
+
 def set_book(db: Session, player: Player, current_book: str, day: str, chapters: int = 0) -> None:
     """Set (or change) the book being read. The book then carries on for as many
-    weeks as it takes — a week ending never resets it. `chapters` (optional) sets
-    the reading pace — a longer book asks more per day to keep pace; 0 leaves it
-    unknown. `book_review_week` is cleared so the finish check-in can fire once the
-    reading pace to finish is reached."""
+    weeks as it takes — a week ending never resets it. `chapters` (optional) is the
+    book's length — the finish line progress is measured against, never a per-day
+    quota; 0 leaves it unknown and progress falls back to days read.
+    `book_review_week` is cleared so the finish check-in can fire again."""
     player.current_book = (current_book or "").strip()
     player.current_book_chapters = max(0, chapters) if player.current_book else 0
     player.book_started_week = game.week_key(day) if player.current_book else ""
@@ -648,9 +671,11 @@ def reset_money(db: Session, player: Player) -> int:
 
 
 def set_monthly_income(db: Session, player: Player, income: float, day: str) -> None:
-    """Set take-home pay per month — the base every 50/30/20 line is computed from.
-    The first time it's set we stamp the month the budget began, so spending logged
-    before there was a budget is never judged against it."""
+    """Store take-home pay per payday. Deliberately *only* a setting: nothing is
+    logged and no balance moves — money exists in this app only once it actually
+    lands, via the payday money-in the user logs. The first time it's set we stamp
+    the month the budget began, so spending logged before there was a budget is
+    never judged against it."""
     player.monthly_income = max(0.0, round(income, 2))
     if player.monthly_income > 0 and not player.budget_start_month:
         player.budget_start_month = day[:7]  # 'YYYY-MM'

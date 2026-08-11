@@ -337,6 +337,185 @@ def distill_tips(transcript: str, timeout: float = 25.0) -> dict:
     return _distill(_TIPS_PROMPT, transcript, timeout)
 
 
+_LEARNING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "highlights": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "cue": {"type": "string"},
+                    "hook": {"type": "string"},
+                },
+                "required": ["text", "cue"],
+            },
+        },
+    },
+    "required": ["highlights"],
+}
+
+_LEARNING_PROMPT = (
+    "You turn a day's reading and learning into lines worth keeping, for a personal "
+    "growth app with a warm, encouraging voice. These highlights are emailed back to "
+    "the person the next morning, and again days and weeks later — so each one must "
+    "still make sense read cold, months after the source is forgotten.\n"
+    "You are given the ENTRIES for one day: what was read or learned, with the source "
+    "and any notes the person wrote themselves.\n"
+    "Return highlights: 5–10 lines across the WHOLE day, not per entry.\n"
+    "• Each is one self-contained idea — the substance, not a description of it. "
+    "Write 'Habits form through cue, craving, response, reward' — never 'the chapter "
+    "explained how habits form'.\n"
+    "• Prefer the person's own notes where they wrote any; those are what they "
+    "actually took away. Keep their wording where it's already good.\n"
+    "• For a well-known book or article named in an entry, you may draw on what that "
+    "source actually says to fill out the highlights.\n"
+    "• For a source you do not genuinely know, work ONLY from the notes given. Never "
+    "invent specifics — a vague source with no notes is worth fewer highlights, or "
+    "none. Made-up detail is worse than a short digest.\n"
+    "• Merge duplicates across entries; drop admin, feelings and filler. No hype, no "
+    "numbering, no markdown.\n"
+    "If the entries are empty or have no real substance, return an empty array.\n"
+    "\n"
+    "Each highlight also carries a CUE and, sometimes, a HOOK.\n"
+    "cue — the question this highlight is the answer to. It is asked days and weeks "
+    "later, on its own, with the answer hidden: being asked and briefly failing is "
+    "what fixes something in memory, so the cue must make the person actually "
+    "retrieve.\n"
+    "• Ask for the substance: 'What does the base rate tell you, and when is it "
+    "ignored?' — never 'What did you read about base rates?'\n"
+    "• Never leak the answer in the question. If the cue can be answered by reading "
+    "it aloud, rewrite it.\n"
+    "• No yes/no questions — they can be guessed with a coin.\n"
+    "• Name enough context to be answerable cold months later. 'What are the four "
+    "stages of a habit?' works; 'What were the four stages?' does not.\n"
+    "hook — a memory aid, ONLY when the fact is arbitrary: names, ordered lists, "
+    "coined terms, numbers, anything where there is nothing to reason from.\n"
+    "• A hook works by adding a THIRD thing that links the two you must connect — a "
+    "concrete image or tiny story, not a restatement. To tie a term to its meaning, "
+    "find something in the word itself that can be pictured, and picture it doing "
+    "what the term means.\n"
+    "• Make it vivid and physical. A picture you can see beats a clever phrase.\n"
+    "• For an idea the person could re-derive by understanding it, return an empty "
+    "string — a mnemonic competes with the understanding that would carry it anyway. "
+    "Most highlights should have no hook.\n"
+    'Return JSON only: {highlights:[{text, cue, hook}]}.'
+)
+
+
+def _parse_learning(payload: dict) -> dict:
+    """Pure: Gemini response JSON → {highlights[{text,cue,hook}]}. Testable offline.
+
+    A highlight with no usable text is dropped; one with no cue is kept but simply
+    won't be quizzed, which beats inventing a question for it."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    data = json.loads(text)
+    out: list[dict] = []
+    for item in data.get("highlights") or []:
+        if not isinstance(item, dict):
+            continue
+        body = str(item.get("text") or "").strip()
+        if not body:
+            continue
+        out.append({
+            "text": _clip(body, 240),
+            "cue": _clip(str(item.get("cue") or "").strip(), 200),
+            "hook": _clip(str(item.get("hook") or "").strip(), 160),
+        })
+    return {"highlights": out[:10]}
+
+
+_THREAD_SCHEMA = {
+    "type": "object",
+    "properties": {"summary": {"type": "string"}},
+    "required": ["summary"],
+}
+
+_THREAD_PROMPT = (
+    "You keep a single running sentence describing what someone has taken from a book "
+    "so far, for a personal growth app.\n"
+    "You are given the sentence as it stands (possibly empty, if this is the first "
+    "reading) and the NEW ideas from the latest sitting.\n"
+    "Return one sentence — the whole book so far, including the new material.\n"
+    "• ONE sentence. Not two, not a list. The constraint is the point: fitting a "
+    "growing pile of ideas into one line forces a decision about what actually "
+    "matters and how the pieces connect.\n"
+    "• Condense, never append. Do not bolt the new part onto the end of the old "
+    "sentence — rewrite the whole thing so the ideas sit together. Older material "
+    "gets compressed further to make room; that is correct, not lossy.\n"
+    "• Say what the book claims, not what the reader did. 'Thinking is split between "
+    "a fast intuitive system and a slow deliberate one, and most errors come from the "
+    "first standing in for the second' — never 'they read about System 1 and 2'.\n"
+    "• Plain words. No hype, no markdown, no naming the book.\n"
+    'Return JSON only: {summary}.'
+)
+
+
+def thread_summary(title: str, previous: str, new_lines: list[str], timeout: float = 60.0) -> str:
+    """One Gemini call → the running summary of `title`, rewritten to include today.
+
+    Raises on transport/parse failure; the caller keeps the previous sentence rather
+    than losing the thread over one bad morning."""
+    parts = [
+        f"BOOK: {title}",
+        f"SENTENCE SO FAR: {previous or '(nothing yet — this is the first sitting)'}",
+        "NEW IDEAS:\n" + "\n".join(f"- {ln}" for ln in new_lines),
+    ]
+    body = {
+        "contents": [{"parts": [{"text": _THREAD_PROMPT}, {"text": "\n\n".join(parts)}]}],
+        "generationConfig": {
+            "temperature": 0.3,
+            "responseMimeType": "application/json",
+            "responseSchema": _THREAD_SCHEMA,
+        },
+    }
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    payload = net.post_json(url, body, timeout=timeout, retries=2)
+    return _parse_thread(payload)
+
+
+def _parse_thread(payload: dict) -> str:
+    """Pure: Gemini response JSON → the one-sentence summary. Testable offline."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    return _clip(str(json.loads(text).get("summary") or "").strip(), 400)
+
+
+def _format_entries(entries: list[dict]) -> str:
+    """The day's entries as plain labelled text — one block per entry."""
+    blocks: list[str] = []
+    for e in entries:
+        parts = [f"SOURCE: {e.get('source') or 'unspecified'} ({e.get('kind') or 'other'})"]
+        note = (e.get("text") or "").strip()
+        if note:
+            parts.append(f"THEIR NOTES: {note}")
+        blocks.append("\n".join(parts))
+    return "\n\n".join(blocks)
+
+
+def distill_learning(entries: list[dict], timeout: float = 30.0) -> dict:
+    """One Gemini call → {highlights[]} for a whole day of learning.
+
+    The day goes up in a single call rather than one per entry: it's cheaper, and it
+    lets the model merge the same idea arriving from two sources. Raises on any
+    transport/parse error; the caller decides what to do."""
+    body = {
+        "contents": [{"parts": [
+            {"text": _LEARNING_PROMPT},
+            {"text": "ENTRIES:\n" + _format_entries(entries)},
+        ]}],
+        "generationConfig": {
+            "temperature": 0.3,
+            "responseMimeType": "application/json",
+            "responseSchema": _LEARNING_SCHEMA,
+        },
+    }
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    # Runs from the nightly digest job, so a free-tier burst limit is worth waiting out.
+    payload = net.post_json(url, body, timeout=timeout, retries=2)
+    return _parse_learning(payload)
+
+
 def log_failure(err: Exception) -> None:
     """A generation failure is non-fatal (we fall back); note it and move on.
 

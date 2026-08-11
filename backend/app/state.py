@@ -7,12 +7,13 @@ handful of rows; when it grows, they become SQL queries with the same contract.
 """
 
 import json
+import re
 
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import body, game, insights, llm, progression, quests, transcript
+from . import body, digest, game, insights, llm, mailer, progression, quests, transcript
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -26,6 +27,7 @@ from .models import (
     Preference,
     QuestDef,
     QuestNote,
+    ReadingLog,
     Reminder,
     StepCheck,
 )
@@ -194,7 +196,6 @@ def resolve_content(
     gen_by: dict[tuple[str, str], dict],
     level: int,
     book: str,
-    chapters: int,
     interview: bool,
     jp_week: int,
 ) -> tuple[str, str, list[str], str]:
@@ -204,13 +205,13 @@ def resolve_content(
     the step-toggle write path (`resolve_steps`) use, so a ticked step index and
     the displayed steps can never drift apart. Pure — inputs are pre-resolved."""
     pk = quests.period_key(quest.cadence, day)
-    floor = quests.floor_for(quest, book, level, chapters)
+    floor = quests.floor_for(quest, book, level)
     gen = gen_by.get((quest.id, pk))
     if gen is not None:
         steps = quests.cap_steps(floor + gen["steps"], len(floor))
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
-        quest, day, prefs.get(quest.stat), book, level, chapters,
+        quest, day, prefs.get(quest.stat), book, level,
         interview=interview, jp_week=jp_week,
     )
     return title, desc, quests.cap_steps(steps, len(floor)), resource
@@ -226,7 +227,6 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         gen_by=generated_by(db, player),
         level=progression_levels(db, player, day).get(quest.stat, 0),
         book=player.current_book,
-        chapters=player.current_book_chapters,
         interview=player.interview_mode,
         jp_week=_jp_week(player, day),
     )
@@ -343,7 +343,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, chapters=0, interview=False, jp_week=0, notes_by=None) -> dict:
+               levels=None, interview=False, jp_week=0, notes_by=None) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -351,7 +351,6 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         gen_by=gen_by or {},
         level=(levels or {}).get(q.stat, 0),
         book=book,
-        chapters=chapters,
         interview=interview,
         jp_week=jp_week,
     )
@@ -375,31 +374,87 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
     }
 
 
+def reading_logs_of(db: Session, player: Player, since: str | None = None) -> list[ReadingLog]:
+    """Every sitting logged for the *current* book, oldest first. Keyed on the title
+    as well as the start day, so changing books never inherits the last one's
+    chapters and re-reading the same title later starts from zero."""
+    q = db.query(ReadingLog).filter_by(player_id=player.id, book=player.current_book)
+    if since is not None:
+        q = q.filter(ReadingLog.day >= since)
+    return q.order_by(ReadingLog.created_at).all()
+
+
+_CHAPTER_NUMBER = re.compile(r"\d+")
+
+
+def furthest_chapter(label: str, total: int = 0) -> int:
+    """The chapter a label says you reached — the highest number in it. "21–22" means
+    you're 22 chapters into the book, not 2, which is how anyone reading it would
+    describe where they are. 0 when the label names no chapter ("the intro").
+
+    Clamped to the book's length when known, so a stray number in a label can't
+    claim you're past the last chapter."""
+    numbers = [int(n) for n in _CHAPTER_NUMBER.findall(label)]
+    if not numbers:
+        return 0
+    reached = max(numbers)
+    return min(reached, total) if total > 0 else reached
+
+
+def chapters_covered(logs: list[ReadingLog], total: int = 0) -> int:
+    """How far into the book the logged sittings put you.
+
+    The furthest chapter named wins, because that's what "how far through are you"
+    means — someone who joins mid-book at ch 21–22 is 22 in, not 2. Sittings logged
+    as a bare count still move it, so the count is a floor the furthest chapter can
+    only raise: logging ten unlabelled chapters and then naming "ch 2" mustn't wind
+    progress back to 2."""
+    counted = sum(log.chapters for log in logs)
+    named = max((furthest_chapter(log.label, total) for log in logs), default=0)
+    return max(counted, named)
+
+
 def reading_of(db: Session, player: Player, day: str, rows: list[Completion], int_level: int) -> dict | None:
-    """A read-only view of progress on the current book, measured by how many days
-    the reading daily was actually done since the book began — so the Status screen
-    can show 'how far to finishing', grounded in real quest completions rather than
-    elapsed time. None when no book is set."""
+    """A read-only view of progress on the current book: how far in the logged
+    chapters put you, from the hunter's own logging rather than a quota the app set.
+    When the book's length is unknown there's no denominator to measure chapters
+    against, so it falls back to days of reading done (`measure` says which). None
+    when no book is set."""
     book = player.current_book
     if not book:
         return None
-    days_target = quests.days_to_finish(int_level)
     start = progression.week_start(player.book_started_week) if player.book_started_week else None
+    floor = start.isoformat() if start is not None else None
+
+    logs = reading_logs_of(db, player, floor)
+    chapters_read = chapters_covered(logs, player.current_book_chapters)
+    today = [log for log in logs if log.day == day]
+
     read_days = {r.day for r in rows if r.quest_id == "d-read"}
-    if start is not None:  # only count reading done since this book began
-        floor = start.isoformat()
+    if floor is not None:  # only count reading done since this book began
         read_days = {d for d in read_days if d >= floor}
     days_read = len(read_days)
-    progress = min(1.0, days_read / days_target) if days_target else 0.0
+
+    total = player.current_book_chapters
+    days_target = quests.days_to_finish(int_level)
+    if total > 0:
+        progress = min(1.0, chapters_read / total)
+    else:
+        progress = min(1.0, days_read / days_target) if days_target else 0.0
+
     return {
         "book": book,
-        "chapters": player.current_book_chapters,
+        "chapters": total,
         "books_finished": player.books_finished,
+        "chapters_read": chapters_read,
         "days_read": days_read,
         "days_to_finish": days_target,
         "progress": round(progress, 3),
-        "per_day": quests.reading_floor(book, int_level, player.current_book_chapters),
-        "done_today": day in read_days,
+        "measure": "chapters" if total > 0 else "days",
+        "logged_today": [
+            {"id": log.id, "label": log.label, "chapters": log.chapters} for log in today
+        ],
+        "done_today": bool(today) or day in read_days,
     }
 
 
@@ -562,11 +617,10 @@ def _money_of(db: Session, player: Player, day: str) -> dict:
         "today_out": total("out", lambda r: r.day == day),
         "week_in": total("in", lambda r: game.week_key(r.day) == week),
         "week_out": total("out", lambda r: game.week_key(r.day) == week),
-        # One pool: the take-home salary IS the money coming in, so it's the base of
-        # what's remaining. Anything still logged in/out adjusts it; spending draws it
-        # down. With no in-entries (the usual case) this is simply salary − spending,
-        # the same figure the budget shows.
-        "balance": round((player.monthly_income or 0) + total("in", always) - total("out", always), 2),
+        # One pool: the take-home pay is logged as a 'money in' (see set_monthly_income),
+        # so remaining is a plain everything-in minus everything-out. That in-entry is
+        # what makes this equal the budget salary at a fresh, unspent start.
+        "balance": round(total("in", always) - total("out", always), 2),
     }
 
 
@@ -592,19 +646,20 @@ def _budget_of(db: Session, player: Player, day: str) -> dict:
     )
 
     month = day[:7]  # 'YYYY-MM'
-    spent = (
+    entries = (
         db.query(MoneyEntry)
-        .filter(
-            MoneyEntry.player_id == player.id,
-            MoneyEntry.direction == "out",
-            MoneyEntry.day.startswith(month),
-        )
+        .filter(MoneyEntry.player_id == player.id, MoneyEntry.day.startswith(month))
         .all()
     )
+    spent = [e for e in entries if e.direction == "out"]
     paid_ids = {e.commitment_id for e in spent if e.commitment_id}
 
     def total(bucket: str | None) -> float:
         return round(sum(e.amount for e in spent if e.bucket == bucket), 2)
+
+    # Everything that came in this month — take-home plus any extra. This is what the
+    # 50/30/20 lines divide, so the rule follows real money in, not a stored setting.
+    income_in = round(sum(e.amount for e in entries if e.direction == "in"), 2)
 
     return {
         "monthly_income": round(player.monthly_income or 0, 2),
@@ -627,6 +682,7 @@ def _budget_of(db: Session, player: Player, day: str) -> dict:
         # spending from before the budget existed (or logged without a tag) — surfaced
         # honestly rather than folded into a bucket it was never assigned.
         "actual": {
+            "income": income_in,
             "needs": total("needs"),
             "wants": total("wants"),
             "untagged": total(None),
@@ -736,9 +792,9 @@ def build_state(db: Session, player: Player, day: str) -> dict:
 
     # Reading review: a book is never reset by a week ending — it carries on, with
     # its progress intact, for as many weeks as it takes. The gentle "did you
-    # finish?" check-in appears only once you've put in the reading days to finish
-    # at your current pace (progress complete), and then at most once a week so it
-    # never nags.
+    # finish?" check-in appears only once the logged chapters cover the book (or,
+    # when its length is unknown, once enough days of reading are in), and then at
+    # most once a week so it never nags.
     week = game.week_key(day)
     reading = reading_of(db, player, day, rows, prog_levels.get("INT", 0))
     review_pending = bool(
@@ -793,11 +849,11 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "progression": prog,
         "llm_enabled": llm.enabled(),
         "transcript_enabled": transcript.enabled(),
+        "digest_enabled": mailer.enabled(),
         "daily_quote": insights.daily_quote(db, player.id, day),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
-                       prog_levels, player.current_book_chapters, player.interview_mode,
-                       _jp_week(player, day), notes_by)
+                       prog_levels, player.interview_mode, _jp_week(player, day), notes_by)
             for q in defs
             if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],
@@ -817,4 +873,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "budget": _budget_of(db, player, day),
         "journal": _journal_of(db, player),  # free-form daily entries, newest first
         "reflections": reflections,  # quest-linked takeaways, newest first
+        "learnings": digest.list_learnings(db, player.id, day),  # what you read today
+        "recall": digest.recall_set(db, player, day),  # older highlights coming back around
+        "thread": digest.thread_for(db, player, day),  # the running summary of the book
     }

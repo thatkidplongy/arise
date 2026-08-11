@@ -5,7 +5,7 @@ set -euo pipefail
 AGENTS="$HOME/Library/LaunchAgents"
 DOMAIN="gui/$(id -u)"
 
-for label in com.arise.backend com.arise.backup; do
+for label in com.arise.backend com.arise.backup com.arise.digest; do
   launchctl bootout "$DOMAIN/$label" 2>/dev/null || true
   rm -f "$AGENTS/$label.plist"
   echo "removed $label"

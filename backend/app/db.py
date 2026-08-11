@@ -79,6 +79,14 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # rather than being retro-sorted into a bucket they never had.
     ("money_entries", "bucket", "VARCHAR"),
     ("money_entries", "commitment_id", "VARCHAR"),
+    # Highlights distilled before recall became retrieval-based have no cue; they
+    # simply aren't quizzed rather than being asked with a made-up question.
+    ("highlights", "cue", "VARCHAR DEFAULT ''"),
+    ("highlights", "hook", "VARCHAR DEFAULT ''"),
+    # Leitner scheduling. Existing rows get due='' and are backfilled on first read
+    # rather than all coming due at once.
+    ("highlights", "box", "INTEGER DEFAULT 0"),
+    ("highlights", "due", "VARCHAR DEFAULT ''"),
 ]
 
 

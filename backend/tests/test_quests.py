@@ -60,11 +60,19 @@ def test_floor_climbs_with_level():
     assert quests.content_for(q, "2026-07-18", level=99)[2][: len(floors[-1])] == floors[-1]
 
 
-def test_reading_floor_scales_by_level_and_book():
-    # Reading climbs by pace; a longer book asks more per day to keep pace.
-    assert quests.reading_floor("A Book", 0) == "Read a chapter of A Book"
-    fast = quests.reading_floor("A Book", 5, chapters=30)
-    assert "chapters" in fast  # a 30-chapter book at a fast pace → several a day
+def test_reading_floor_asks_rather_than_setting_a_quota():
+    # No number the app picked: the floor is to read and then record what you read.
+    floor = quests.reading_floor("A Book")
+    assert "A Book" in floor and "log" in floor
+    assert not any(ch.isdigit() for ch in floor)
+    assert "your current book" in quests.reading_floor(None)
+
+
+def test_reading_floor_is_the_same_at_every_level():
+    # Levelling up a reader shouldn't quietly raise the bar they have to clear.
+    q = _q("d-read", "INT", "daily")
+    floors = {quests.content_for(q, "2026-07-18", level=lvl)[2][0] for lvl in range(6)}
+    assert len(floors) == 1
 
 
 def test_content_band_shifts_with_level():

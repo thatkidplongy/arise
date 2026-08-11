@@ -30,7 +30,8 @@ The pools are tuned to the hunter's real interests:
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
   INT  learn-how-to-learn first, then math from scratch, Japanese, and the wider
        world (politics, history, geography, science); reading is the daily floor
-       (a chapter, at a pace that climbs with level)
+       (at your own pace — the floor asks you to log what you read, not to hit a
+       chapter quota)
   WLT  making money: money psychology & fundamentals first, then managing, then
        earning — side income, monetising skills
   CFT  the engineering craft, toward Senior: fluency & fundamentals → patterns &
@@ -894,12 +895,10 @@ FLOORS: dict[str, list[list[str]]] = {
     ],
 }
 
-# Reading (INT) floor climbs by *pace*: how fast you finish a book. Higher level
-# → fewer days to finish → more per day. It's book-dependent — a longer book asks
-# more per day than a short one to keep pace. Days-to-finish per reading level:
+# Only used when a book's length is unknown, so there are no chapters to count
+# progress in: how many days of reading stands in for finishing it, per reading
+# level. Higher level → a faster reader → fewer days. Never a per-day quota.
 _READING_PACE_DAYS: list[int] = [14, 10, 8, 7, 6, 5]
-# Fallback when the book's length is unknown: chapters/day per reading level.
-_READING_CHAPTERS: list[int] = [1, 1, 1, 2, 2, 3]
 
 # Where a quest is about *learning* something, point at a popular, well-trusted
 # source. Keyed by the variant's title, so the pointer matches the day's focus.
@@ -1069,24 +1068,21 @@ def _pick(slot_id: str, period_key: str, n: int) -> int:
     return int(digest, 16) % n
 
 
-def reading_floor(book: str | None, level: int, chapters: int = 0) -> str:
-    """The reading non-negotiable — a chapter a day, but at a pace that climbs.
+def reading_floor(book: str | None) -> str:
+    """The reading non-negotiable — read at your own pace, then say what you read.
 
-    Higher reading level → fewer days to finish → more per day. When the book's
-    chapter count is known the target is book-dependent (a longer book asks more
-    to keep pace); otherwise it falls back to a chapters/day curve."""
-    where = f" of {book}" if book else " of your current book"
-    lvl = max(0, min(level, len(_READING_PACE_DAYS) - 1))
-    if chapters and chapters > 0:
-        per = max(1, round(chapters / _READING_PACE_DAYS[lvl]))
-    else:
-        per = _READING_CHAPTERS[lvl]
-    return f"Read {per} chapters{where}" if per > 1 else f"Read a chapter{where}"
+    Deliberately quota-free: a fixed "read 3 chapters today" is a target set by the
+    app rather than by the book or the day, and it turns a good sitting into a
+    failed one. The floor is showing up and recording the truth; the chapters you
+    log are what moves the book toward finished (Status → Reading)."""
+    what = book or "your current book"
+    return f"Read {what} at your pace, then log which chapters"
 
 
 def days_to_finish(level: int) -> int:
-    """How many days a book should take at this reading level — the denominator
-    the Status screen uses to show reading progress. Higher level → fewer days."""
+    """How many days of reading stands in for finishing a book whose length is
+    unknown — the fallback denominator for reading progress when there are no
+    chapters to count. Higher reading level → fewer days."""
     return _READING_PACE_DAYS[max(0, min(level, len(_READING_PACE_DAYS) - 1))]
 
 
@@ -1160,17 +1156,17 @@ def cap_steps(steps: list[str], floor_len: int) -> list[str]:
     return steps[: 3 if floor_len > 0 else 2]
 
 
-def floor_for(quest: QuestDef, book: str | None = None, level: int = 0, chapters: int = 0) -> list[str]:
+def floor_for(quest: QuestDef, book: str | None = None, level: int = 0) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
     an LLM wrote it. Leveled floors (STR/SPI/WLT) climb through FLOORS; Grow opens
-    with the reading floor (pace scales with level + book length). Empty for slots
+    with the reading floor, which is level-independent by design. Empty for slots
     with no floor (Creativity, Connection, and all non-daily slots)."""
     tiers = FLOORS.get(quest.id)
     if tiers is not None:
         return list(tiers[max(0, min(level, len(tiers) - 1))])
     if quest.id == "d-read":
-        return [reading_floor(book, level, chapters)]
+        return [reading_floor(book)]
     return []
 
 
@@ -1300,7 +1296,6 @@ def content_for(
     focus: list[str] | None = None,
     book: str | None = None,
     level: int = 0,
-    chapters: int = 0,
     interview: bool = False,
     jp_week: int = 0,
 ) -> tuple[str, str, list[str], str]:
@@ -1308,8 +1303,8 @@ def content_for(
     pool for the period containing `day`, with the mandatory floor prepended.
 
     `focus` is the attribute's set of focuses; a side quest rotates through them
-    day to day. `book`/`chapters` drive the reading floor. `level` is the stat's
-    progression level — it climbs the floor and picks the content band.
+    day to day. `book` names the current read in the reading floor. `level` is the
+    stat's progression level — it climbs the floor and picks the content band.
     `interview` (Craft only) swaps in the interview-prep pool. `jp_week` (Japanese
     only) drives the phased learning plan. `resource` points at a trusted place to
     learn (empty when there isn't one)."""
@@ -1321,5 +1316,5 @@ def content_for(
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
     title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
-    steps = floor_for(quest, book, level, chapters) + steps  # non-negotiables first, then variety
+    steps = floor_for(quest, book, level) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

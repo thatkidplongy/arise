@@ -26,10 +26,10 @@ install script fills in your paths. You provide:
 ```bash
 cd backend
 uv sync                     # once: creates the virtualenv
-bash deploy/install.sh      # loads com.arise.backend + com.arise.backup
+bash deploy/install.sh      # loads com.arise.backend + com.arise.backup + com.arise.digest
 ```
 
-`install.sh` writes `~/Library/LaunchAgents/com.arise.{backend,backup}.plist`
+`install.sh` writes `~/Library/LaunchAgents/com.arise.{backend,backup,digest}.plist`
 with your paths and starts them. The backend then runs at login, restarts on
 crash, and relaunches after a reboot (uvicorn on `0.0.0.0:8000`).
 
@@ -111,6 +111,36 @@ areas → "Where I'm at"** so it can prescribe your next step. Anything goes wro
 
 > Privacy: your focus/level/book/recent-activity are sent to the Gemini API under
 > your own key. Minimal, but yours to weigh. It's entirely optional.
+
+## Recall — the daily digest email (optional)
+
+What you read yesterday, distilled into a handful of lines and mailed to you the
+next morning — plus a few highlights from ~3, 7 and 30 days back, which is the
+part that actually makes things stick. Log what you read under **You → Learn**;
+the reading daily and your quest reflections are folded in automatically.
+
+1. Get a free [Resend](https://resend.com) key (100 emails/day, no card — you
+   need one a day). **Sign up with the address you want the digest sent to.**
+   Until you verify a domain of your own, the shared `onboarding@resend.dev`
+   sender may only send to the account's own signup address; anything else comes
+   back 403.
+2. Add to `backend/.env`:
+   ```bash
+   ARISE_RESEND_API_KEY=re_your-key
+   ARISE_DIGEST_TO=you@example.com
+   ```
+   Distilling uses the same Gemini key as everything else, so `ARISE_LLM_API_KEY`
+   has to be set too. Leave either blank and nothing is ever sent.
+3. Reload: `bash deploy/install.sh`, then
+   `launchctl kickstart -k gui/$(id -u)/com.arise.backend`.
+
+`com.arise.digest` then runs at 07:00 daily (log: `backend/logs/digest.log`).
+Send one by hand any time: `.venv/bin/python scripts/send_digest.py 2026-08-07`.
+Sending is once-per-day, so an extra run can't double-mail you.
+
+Emails come from Resend's shared `onboarding@resend.dev` unless you set
+`ARISE_DIGEST_FROM` to a domain you've verified — check spam on the first one.
+Preview without sending (and tune the wording) at `/digest/preview?day=…`.
 
 ## Backups
 

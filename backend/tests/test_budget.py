@@ -20,7 +20,7 @@ def test_starts_empty_and_income_stamps_the_start_month(client):
         "start_month": "",
         "month": "2026-08",
         "commitments": [],
-        "actual": {"needs": 0, "wants": 0, "untagged": 0},
+        "actual": {"income": 0, "needs": 0, "wants": 0, "untagged": 0},
     }
 
     b = client.put(f"/budget/income?day={DAY}", json={"monthly_income": 45000}).json()["budget"]
@@ -35,6 +35,28 @@ def test_starts_empty_and_income_stamps_the_start_month(client):
 def test_income_of_zero_leaves_the_budget_unstarted(client):
     b = client.put(f"/budget/income?day={DAY}", json={"monthly_income": 0}).json()["budget"]
     assert b["monthly_income"] == 0 and b["start_month"] == ""
+
+
+def test_setting_pay_is_only_a_setting_money_moves_when_paydays_land(client):
+    # The pay amount is a plan; it never moves money on its own. The app follows the
+    # money: only logged paydays count as income.
+    client.put(f"/budget/income?day={DAY}", json={"monthly_income": 40750})
+    s = client.get(f"/state?day={DAY}").json()
+    assert s["money"]["balance"] == 0
+    assert s["budget"]["actual"]["income"] == 0
+    assert client.get(f"/money/history?scope=month&day={DAY}").json()["entries"] == []
+
+    # First payday lands and is logged — income and balance follow it.
+    client.post(f"/money?day={DAY}", json={"amount": 40750, "direction": "in", "note": "Payday"})
+    s = client.get(f"/state?day={DAY}").json()
+    assert s["money"]["balance"] == 40750
+    assert s["budget"]["actual"]["income"] == 40750
+
+    # Second payday later in the month stacks on top: two entries, doubled income.
+    client.post("/money?day=2026-08-20", json={"amount": 40750, "direction": "in", "note": "Payday"})
+    s = client.get("/state?day=2026-08-20").json()
+    assert s["money"]["balance"] == 81500
+    assert s["budget"]["actual"]["income"] == 81500
 
 
 def test_commitments_are_the_worksheet_line_items(client):
@@ -88,7 +110,7 @@ def test_paying_a_commitment_writes_the_money_entry(client):
     assert hist[0]["note"] == "Rent" and hist[0]["bucket"] == "needs" and hist[0]["commitment_id"] == cid
     # And it's off the due list, with the spend counted against needs.
     assert body["budget"]["commitments"][0]["paid_this_month"] is True
-    assert body["budget"]["actual"] == {"needs": 12000, "wants": 0, "untagged": 0}
+    assert body["budget"]["actual"] == {"income": 0, "needs": 12000, "wants": 0, "untagged": 0}
 
 
 def test_a_commitment_cannot_be_paid_twice_in_one_month(client):
@@ -126,7 +148,7 @@ def test_ad_hoc_spending_can_be_tagged_and_income_never_is(client):
     client.post(f"/money?day={DAY}", json={"amount": 45000, "direction": "in", "bucket": "needs"})
 
     b = client.get(f"/state?day={DAY}").json()["budget"]
-    assert b["actual"] == {"needs": 0, "wants": 620, "untagged": 300}
+    assert b["actual"] == {"income": 45000, "needs": 0, "wants": 620, "untagged": 300}
     entries = {e["note"]: e["bucket"] for e in client.get(f"/money/history?scope=month&day={DAY}").json()["entries"]}
     assert entries == {"milk tea": "wants", "jeep": None, "": None}
 

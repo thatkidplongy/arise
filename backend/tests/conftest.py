@@ -18,6 +18,10 @@ os.environ.pop("ARISE_LLM_API_KEY", None)
 os.environ.pop("GEMINI_API_KEY", None)
 # Same for the transcript service — tests stub it explicitly where needed.
 os.environ.pop("ARISE_SUPADATA_API_KEY", None)
+# And the digest mailer, so no test can ever send a real email.
+os.environ.pop("ARISE_RESEND_API_KEY", None)
+os.environ.pop("ARISE_DIGEST_TO", None)
+os.environ.pop("ARISE_DIGEST_FROM", None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app import models  # noqa: E402,F401  (registers tables on Base)
