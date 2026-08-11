@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { CurrentBookCard } from '@/components/CurrentBookCard';
 import type { ApiReading } from '@/lib/api';
 import { RankBadge } from '@/components/RankBadge';
@@ -261,6 +262,9 @@ export default function StatusScreen() {
 
       {/* Set / change the book you're reading — grouped with its progress above. */}
       <CurrentBookCard />
+
+      {/* The system-design plan, paced the same way: by what you've read. */}
+      <CraftPhaseCard />
 
       {next_rank ? (
         <SystemPanel title="Next rank">

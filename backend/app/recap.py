@@ -102,6 +102,8 @@ def empty(day: str) -> dict:
         "skincare": {"done": 0, "total": 0},
         "journal": 0,
         "learnings": 0,
+        "notion": [],
+        "studied": [],
         "captures": [],
     }
 
@@ -177,6 +179,21 @@ def of(db: Session, player: Player, day: str) -> dict:
         "skincare": {"done": skincare_done, "total": skincare_total},
         "journal": db.query(JournalEntry).filter_by(player_id=player.id, day=day).count(),
         "learnings": db.query(Learning).filter_by(player_id=player.id, day=day).count(),
+        # What was read outside the current book, named. Notion first, since the
+        # system-design plan runs on it; everything else logged in Learn follows.
+        "notion": [
+            (r.source or "a Notion page").strip()
+            for r in db.query(Learning)
+            .filter_by(player_id=player.id, day=day, kind="notion")
+            .order_by(Learning.created_at)
+        ],
+        "studied": [
+            f"{(r.source or r.kind).strip()}"
+            for r in db.query(Learning)
+            .filter_by(player_id=player.id, day=day)
+            .order_by(Learning.created_at)
+            if r.kind not in ("notion", "book")
+        ],
         "captures": [
             (i.title or i.kind).strip()
             for i in db.query(Insight).filter_by(player_id=player.id)
@@ -241,6 +258,20 @@ def lines(recap: dict) -> list[dict]:
         chapters = _join(reading["chapters"], cap=6)
         label = f"Read ch {chapters}" if chapters else f"Read {reading['count']} {_plural(reading['count'], 'chapter')}"
         out.append({"label": label, "detail": reading["book"]})
+
+    notion = recap["notion"]
+    if notion:
+        out.append({
+            "label": f"Read in Notion · {len(notion)} {_plural(len(notion), 'page')}",
+            "detail": _join(notion, cap=3),
+        })
+
+    studied = recap["studied"]
+    if studied:
+        out.append({
+            "label": f"Also learned from {len(studied)} {_plural(len(studied), 'source')}",
+            "detail": _join(studied, cap=3),
+        })
 
     money = recap["money"]
     if money["lines"]:

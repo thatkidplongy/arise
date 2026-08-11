@@ -130,6 +130,7 @@ export interface ApiState {
     resting: boolean;
   };
   book_review: { pending: boolean; book: string };
+  craft: ApiCraft; // where the system-design plan is, advanced by reading not dates
   reading: ApiReading | null; // progress on the current book, or null when none set
   week_review: ApiWeekReview; // a gentle recap of the current ISO week
   next_rank: { rank: Rank; level: number; streak: number } | null;
@@ -265,6 +266,19 @@ export interface ApiWeekReview {
   days_cleared: number;
   by_stat: Partial<Record<StatKey, number>>;
   top_stat: StatKey | null;
+}
+
+/** Where you are in the system-design plan. Advanced by reading, never by a date. */
+export interface ApiCraft {
+  phase: number;
+  phases: number;
+  label: string;
+  detail: string;
+  studied: number; // Notion pages logged since this phase began
+  pieces: number; // what the phase is made of — a denominator, never a deadline
+  progress: number; // 0..1
+  is_last: boolean;
+  pending: boolean; // the phase check-in is due
 }
 
 /** One logged sitting of reading — what you read, in your own units. */
@@ -561,6 +575,12 @@ export const api = {
     request<ApiState>(base, `/book?day=${day}`, token, {
       method: 'PUT',
       body: JSON.stringify({ current_book: currentBook, chapters }),
+    }),
+
+  reviewCraftPhase: (base: string, token: string, done: boolean, day: string) =>
+    request<ApiState>(base, `/craft/phase?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ done }),
     }),
 
   reviewBook: (

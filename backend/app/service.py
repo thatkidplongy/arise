@@ -302,6 +302,20 @@ def set_book(db: Session, player: Player, current_book: str, day: str, chapters:
     db.commit()
 
 
+def review_craft_phase(db: Session, player: Player, done: bool, day: str) -> None:
+    """Answer the system-design phase check-in. Done → move to the next phase and
+    start counting its study from today; not yet → hold where you are, and don't ask
+    again this week. Nothing here is on a clock: a phase you're still reading simply
+    stays, for as long as it takes."""
+    week = game.week_key(day)
+    if done and player.craft_phase < quests.LAST_CRAFT_PHASE:
+        player.craft_phase += 1
+        player.craft_phase_day = day
+        _clear_generated(db, player)  # a new phase should re-personalise the slot
+    player.craft_review_week = week
+    db.commit()
+
+
 def set_interview_mode(db: Session, player: Player, enabled: bool) -> None:
     """Turn Craft's interview-prep mode on or off. Clears the LLM cache so the
     next generation reflects the new mode (the pools switch immediately regardless)."""

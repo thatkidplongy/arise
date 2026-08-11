@@ -139,6 +139,36 @@ def test_the_rest_of_the_surfaces_are_gathered(db):
     assert r["captures"] == ["@someone"]
 
 
+def test_notion_reading_is_named_in_the_recap(db):
+    """The system-design plan runs on Notion, so what was read there has to reach the
+    email by name — counting it as an anonymous 'learning' loses the point."""
+    player = state.get_or_create_player(db)
+    db.add_all([
+        Learning(player_id=player.id, day=DAY, kind="notion", source="Ch 6 — Design a Key-Value Store"),
+        Learning(player_id=player.id, day=DAY, kind="notion", source="DDIA book map"),
+        Learning(player_id=player.id, day=DAY, kind="article", source="A paper on rate limiting"),
+    ])
+    db.commit()
+
+    r = recap.of(db, player, DAY)
+    assert r["notion"] == ["Ch 6 — Design a Key-Value Store", "DDIA book map"]
+    assert r["studied"] == ["A paper on rate limiting"]  # other sources, kept separate
+
+    rows = {row["label"]: row["detail"] for row in recap.lines(r)}
+    notion_row = next(k for k in rows if k.startswith("Read in Notion"))
+    assert "2 pages" in notion_row
+    assert "Ch 6 — Design a Key-Value Store" in rows[notion_row]
+    assert any(k.startswith("Also learned from") for k in rows)
+
+
+def test_a_book_logged_in_learn_is_not_double_counted_as_a_source(db):
+    """Book reading already has its own row from the reading log."""
+    player = state.get_or_create_player(db)
+    db.add(Learning(player_id=player.id, day=DAY, kind="book", source="Thinking, Fast and Slow"))
+    db.commit()
+    assert recap.of(db, player, DAY)["studied"] == []
+
+
 def test_an_empty_day_gathers_nothing(db):
     player = state.get_or_create_player(db)
     r = recap.of(db, player, DAY)

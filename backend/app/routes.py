@@ -7,7 +7,7 @@ from . import (body, books, digest, insights, llm, mailer, nutrition, service, s
                state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
-                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn,
                       CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
@@ -193,6 +193,17 @@ def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session =
     player = state.get_or_create_player(db)
     service.review_book(db, player, body.finished, body.next_book, _valid_day(day))
     return state.build_state(db, player, _valid_day(day))
+
+
+@router.post("/craft/phase", response_model=StateOut)
+def review_craft_phase(body: CraftPhaseIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Answer the system-design phase check-in: done → the next phase begins; not yet
+    → this one carries on. The only thing that moves the plan — there is no date at
+    which it advances on its own."""
+    player = state.get_or_create_player(db)
+    d = _valid_day(day)
+    service.review_craft_phase(db, player, body.done, d)
+    return state.build_state(db, player, d)
 
 
 @router.put("/interview", response_model=StateOut)

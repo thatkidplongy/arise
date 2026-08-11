@@ -1374,15 +1374,24 @@ _CRAFT_P5: list[tuple[str, str, list[str], str]] = [
         "Pull the fix out as one atomic Evergreen note, so the next rep has it to hand",
     ], "📓 Notion · Evergreen Notes (one idea per note)"),]
 
-# Which phase a given week of the plan sits in: weeks 1–2 foundations, 3–5
-# distributing data, 6–8 distributed truths, 9–10 derived data, 11+ design reps.
-# Past week 12 it stays on reps — that's the exit criteria, not a graduation.
-_CRAFT_PHASES: list[tuple[int, list[tuple[str, str, list[str], str]]]] = [
-    (2, _CRAFT_P1),
-    (5, _CRAFT_P2),
-    (8, _CRAFT_P3),
-    (10, _CRAFT_P4),
+# The phases in order. You sit in one until you've read its material and say so —
+# there is no week at which the app moves you on. The original plan pencilled in
+# 12 weeks; that was a forecast, not a rule, and treating it as one would be the
+# same mistake as a chapters-per-day quota.
+#
+# `pieces` is how many things the phase is made of (its DDIA chapters plus its Xu
+# reps), so 'how far into this phase' can be counted from what's actually logged
+# rather than from the calendar. It's a denominator for a progress bar, never a
+# deadline: nothing expires, and nothing is late.
+CRAFT_PHASES: list[dict] = [
+    {"label": "Foundations", "detail": "DDIA ch 1–4 · Xu vol 1 ch 1–3", "pieces": 7, "pool": _CRAFT_P1},
+    {"label": "Distributing data", "detail": "DDIA ch 5–7 · consistent hashing, KV store", "pieces": 6, "pool": _CRAFT_P2},
+    {"label": "Distributed truths", "detail": "DDIA ch 8–9 · unique ID, rate limiter", "pieces": 4, "pool": _CRAFT_P3},
+    {"label": "Derived data", "detail": "DDIA ch 10–12 · queue, metrics, aggregation", "pieces": 6, "pool": _CRAFT_P4},
+    {"label": "Design reps", "detail": "one design a sitting, closed book then diff", "pieces": 6, "pool": _CRAFT_P5},
 ]
+
+LAST_CRAFT_PHASE = len(CRAFT_PHASES)
 
 
 # Systems thinking as its own discipline, not software architecture — from the
@@ -1423,27 +1432,32 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
 _SYSTEMS_STRIDE = 9
 
 
-def craft_phase(week_num: int) -> list[tuple[str, str, list[str], str]]:
-    """The plan phase a given week sits in. Past the last phase it stays on design
-    reps — week 12 is the exit criteria, not a graduation."""
-    for last_week, phase in _CRAFT_PHASES:
-        if week_num <= last_week:
-            return phase
-    return _CRAFT_P5
+def craft_phase_info(phase: int) -> dict:
+    """The phase you're currently in (1-based, clamped). The last phase — design reps
+    — has no phase after it: that's the exit criteria, not a graduation, so it simply
+    continues for as long as you want it to."""
+    index = max(1, min(phase or 1, LAST_CRAFT_PHASE)) - 1
+    return CRAFT_PHASES[index]
 
 
-def craft_content(week_num: int, day: str) -> tuple[str, str, list[str], str]:
-    """Today's Craft task for someone `week_num` weeks into the system-design plan.
+def craft_phase(phase: int) -> list[tuple[str, str, list[str], str]]:
+    """The variant pool for the phase you're in."""
+    return craft_phase_info(phase)["pool"]
 
-    The phase is fixed by the week so the theory arrives before the reps that need
-    it; which of that phase's moves you get rotates day to day (read the theory,
-    design it closed-book, study an anchor, write the note up). Once a week the slot
-    steps out of the books entirely for a systems-thinking rep — architecture is only
-    half of what 'system thinking' means, and the other half needs a real system
-    rather than a chapter."""
+
+def craft_content(phase: int, day: str) -> tuple[str, str, list[str], str]:
+    """Today's Craft task for whoever is sitting in `phase` of the system-design plan.
+
+    The phase holds until the hunter says its material is read — the theory still
+    arrives before the reps that need it, but nothing moves them on by date. Which of
+    the phase's moves you get rotates day to day (read the theory, design it
+    closed-book, study an anchor, consolidate the notes). Regularly the slot steps out
+    of the books entirely for a systems-thinking rep — architecture is only half of
+    what 'system thinking' means, and the other half needs a real system rather than
+    a chapter."""
     if date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == 0:
         return _CRAFT_SYSTEMS[_pick("d-craft", f"systems:{day}", len(_CRAFT_SYSTEMS))]
-    pool = craft_phase(week_num)
+    pool = craft_phase(phase)
     return pool[_pick("d-craft", f"craft:{day}", len(pool))]
 
 
@@ -1455,7 +1469,7 @@ def content_for(
     level: int = 0,
     interview: bool = False,
     jp_week: int = 0,
-    craft_week: int = 0,
+    craft_phase_num: int = 0,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1463,15 +1477,16 @@ def content_for(
     `focus` is the attribute's set of focuses; a side quest rotates through them
     day to day. `book` names the current read in the reading floor. `level` is the
     stat's progression level — it climbs the floor and picks the content band.
-    `interview` (Craft only) swaps in the interview-prep pool. `jp_week` (Japanese)
-    and `craft_week` (Craft) drive their phased plans. `resource` points at a trusted
-    place to learn (empty when there isn't one)."""
+    `interview` (Craft only) swaps in the interview-prep pool. `jp_week` drives the
+    Japanese plan; `craft_phase_num` is the Craft phase currently held. `resource`
+    points at a trusted place to learn (empty when there isn't one)."""
     if quest.id == "d-jp":
         return japanese_content(jp_week or 1, day)  # follows the kana→grammar→kanji plan
     if quest.id == "d-craft" and not interview:
-        # Follows the 12-week system-design plan. Interview mode opts out — it has its
-        # own pool, and the plan's phases aren't what a next-week interview needs.
-        title, desc, steps, resource = craft_content(craft_week or 1, day)
+        # Follows the system-design plan at whatever phase the hunter is holding.
+        # Interview mode opts out — it has its own pool, and a next-week interview
+        # isn't served by wherever the plan happens to be.
+        title, desc, steps, resource = craft_content(craft_phase_num or 1, day)
         return title, desc, cap_steps(floor_for(quest, book, level) + steps, 1), resource
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)

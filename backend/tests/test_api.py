@@ -105,6 +105,44 @@ def test_reading_review_flow(client):
     assert body["book_review"]["pending"] is False
 
 
+def test_craft_phase_waits_for_reading_not_for_a_date(client):
+    """The plan advances on what you've studied, and only when you say so. A month
+    passing changes nothing — that's the whole correction."""
+    s = _state(client)
+    craft = s["craft"]
+    assert craft["phase"] == 1 and craft["label"] == "Foundations"
+    assert craft["studied"] == 0 and craft["pending"] is False
+
+    # A month later, with nothing logged: still phase 1, still not asking.
+    later = client.get("/state?day=2026-08-18").json()["craft"]
+    assert later["phase"] == 1 and later["pending"] is False
+
+    # Log the phase's material in Notion — now the bar fills and it checks in.
+    for i in range(craft["pieces"]):
+        client.post("/learnings", json={"kind": "notion", "source": f"DDIA ch {i + 1}",
+                                       "text": "", "day": DAY})
+    ready = client.get(f"/state?day={DAY}").json()["craft"]
+    assert ready["studied"] == ready["pieces"] and ready["progress"] == 1.0
+    assert ready["pending"] is True
+
+    # "Not yet" holds the phase and stops asking this week — no penalty either way.
+    held = client.post(f"/craft/phase?day={DAY}", json={"done": False}).json()["craft"]
+    assert held["phase"] == 1 and held["pending"] is False
+
+    # Saying it's done is the only thing that moves it, and the next phase starts at 0.
+    moved = client.post(f"/craft/phase?day={DAY}", json={"done": True}).json()["craft"]
+    assert moved["phase"] == 2 and moved["label"] == "Distributing data"
+    assert moved["studied"] == 0 and moved["pending"] is False
+
+
+def test_the_last_craft_phase_never_asks_to_move_on(client):
+    for _ in range(10):  # further than there are phases
+        client.post(f"/craft/phase?day={DAY}", json={"done": True})
+    craft = _state(client)["craft"]
+    assert craft["phase"] == craft["phases"] and craft["is_last"] is True
+    assert craft["pending"] is False
+
+
 def test_interview_mode_toggles_craft_quests(client):
     s = _state(client)
     assert s["player"]["interview_mode"] is False

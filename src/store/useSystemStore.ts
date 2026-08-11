@@ -162,6 +162,7 @@ export interface SystemStore {
   logReading: (chapters: number, label: string) => Promise<void>;
   removeReadingLog: (id: string) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
+  reviewCraftPhase: (done: boolean) => Promise<void>;
   setInterviewMode: (enabled: boolean) => Promise<void>;
   searchBooks: (q: string) => Promise<ApiBook[]>;
   suggestBooks: () => Promise<ApiBookShelf[]>;
@@ -356,6 +357,7 @@ export const useSystemStore = create<SystemStore>()(
       logReading: (chapters, label) =>
         mutate((b, t, d) => api.logReading(b, t, chapters, label, d)),
       removeReadingLog: (id) => mutate((b, t, d) => api.removeReadingLog(b, t, id, d)),
+      reviewCraftPhase: (done) => mutate((b, t, d) => api.reviewCraftPhase(b, t, done, d)),
       reviewBook: (finished, nextBook) =>
         mutate((b, t, d) => api.reviewBook(b, t, finished, nextBook, d)),
       setInterviewMode: (enabled) => mutate((b, t, d) => api.setInterviewMode(b, t, enabled, d)),

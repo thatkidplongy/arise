@@ -88,6 +88,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("highlights", "box", "INTEGER DEFAULT 0"),
     ("highlights", "due", "VARCHAR DEFAULT ''"),
     ("players", "craft_started_week", "VARCHAR DEFAULT ''"),
+    ("players", "craft_phase", "INTEGER DEFAULT 1"),
+    ("players", "craft_phase_day", "VARCHAR DEFAULT ''"),
+    ("players", "craft_review_week", "VARCHAR DEFAULT ''"),
 ]
 
 

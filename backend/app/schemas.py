@@ -42,6 +42,24 @@ class BookReviewIn(BaseModel):
     next_book: str = ""  # only used when finished is true
 
 
+class CraftPhaseIn(BaseModel):
+    """Answer to the system-design phase check-in."""
+    done: bool  # True → advance to the next phase; False → hold this one
+
+
+class CraftOut(BaseModel):
+    """Where the hunter is in the system-design plan, measured in study logged."""
+    phase: int
+    phases: int
+    label: str
+    detail: str
+    studied: int   # Notion pages logged since this phase began
+    pieces: int    # what the phase is made of — a denominator, never a deadline
+    progress: float
+    is_last: bool
+    pending: bool  # the check-in is due
+
+
 class InterviewModeIn(BaseModel):
     enabled: bool  # Craft (CFT): shift quests to interview prep when true
 
@@ -674,6 +692,7 @@ class StateOut(BaseModel):
     streak: StreakOut
     today: TodayOut
     book_review: BookReviewOut
+    craft: CraftOut
     reading: ReadingOut | None  # progress on the current book, or null when none set
     week_review: WeekReviewOut  # a gentle recap of the current ISO week
     next_rank: RankGateOut | None
