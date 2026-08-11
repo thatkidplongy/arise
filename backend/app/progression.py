@@ -47,7 +47,7 @@ FLOOR_LEN: dict[str, int] = {
     "d-meditate": 1,
     "d-wealth": 1,
     "d-read": 1,    # read your chapter(s)
-    "d-craft": 1,   # show up to the code — the deliberate-practice minimum
+    "d-craft": 1,   # read the one source you're studying, and log it
     "d-sketch": 0,
     "d-connect": 0,
 }

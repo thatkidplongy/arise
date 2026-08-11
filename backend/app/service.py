@@ -302,6 +302,14 @@ def set_book(db: Session, player: Player, current_book: str, day: str, chapters:
     db.commit()
 
 
+def set_craft_source(db: Session, player: Player, source: str) -> None:
+    """Set the one thing Craft is studying — a chapter, a Notion page. The quest names
+    it and nothing else, so a sitting has one place to be rather than three."""
+    player.craft_source = (source or "").strip()
+    _clear_generated(db, player)
+    db.commit()
+
+
 def review_craft_phase(db: Session, player: Player, done: bool, day: str) -> None:
     """Answer the system-design phase check-in. Done → move to the next phase and
     start counting its study from today; not yet → hold where you are, and don't ask

@@ -61,10 +61,10 @@ def test_state_shape(client):
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
-    # Craft opens by studying the system-design notes, and a new player starts at
-    # week 1 of the plan — foundations, not a coding drill.
-    assert "Notion" in _quest(s, "d-craft")["steps"][0]
-    assert _quest(s, "d-craft")["title"] in {v[0] for v in quests.craft_phase(1)}
+    # Craft names the one thing you're studying. Nothing set yet → it asks you to
+    # pick rather than picking for you, and it's never a coding drill.
+    assert _quest(s, "d-craft")["steps"][0].startswith("Pick what you're studying")
+    assert s["craft"]["source"] == ""
     assert s["player"]["interview_mode"] is False
     assert s["player"]["total_xp"] == 0
     # Progression starts everyone at Lv0 with a permanent peak of 0.
@@ -113,7 +113,7 @@ def test_craft_phase_waits_for_reading_not_for_a_date(client):
     s = _state(client)
     craft = s["craft"]
     assert craft["phase"] == 1 and craft["label"] == "Foundations"
-    assert craft["studied"] == 0 and craft["pending"] is False
+    assert craft["studied"] == 0 and craft["pending"] is False and craft["source"] == ""
 
     # A month later, with nothing logged: still phase 1, still not asking.
     later = client.get("/state?day=2026-08-18").json()["craft"]
@@ -155,8 +155,8 @@ def test_interview_mode_toggles_craft_quests(client):
     assert body["player"]["interview_mode"] is True
     assert _quest(body, "w-craft")["title"] in interview_titles
     # The daily still opens with its floor, then an interview drill — and interview
-    # mode opts out of the 12-week plan, which isn't what next week's interview needs.
-    assert "Notion" in _quest(body, "d-craft")["steps"][0]
+    # mode opts out of the plan, which isn't what next week's interview needs.
+    assert _quest(body, "d-craft")["steps"][0].startswith("Pick what you're studying")
     assert _quest(body, "d-craft")["title"] in {v[0] for v in quests.INTERVIEW_POOLS["d-craft"]}
     # Turning it off restores steady craft growth.
     off = client.put(f"/interview?day={DAY}", json={"enabled": False}).json()

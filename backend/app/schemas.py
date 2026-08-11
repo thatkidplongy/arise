@@ -42,6 +42,11 @@ class BookReviewIn(BaseModel):
     next_book: str = ""  # only used when finished is true
 
 
+class CraftSourceIn(BaseModel):
+    """The one thing Craft is studying. "" clears it."""
+    source: str = Field("", max_length=160)
+
+
 class CraftPhaseIn(BaseModel):
     """Answer to the system-design phase check-in."""
     done: bool  # True → advance to the next phase; False → hold this one
@@ -51,6 +56,7 @@ class CraftOut(BaseModel):
     """Where the hunter is in the system-design plan, measured in study logged."""
     phase: int
     phases: int
+    source: str  # the one thing currently being studied ('' = not set)
     label: str
     detail: str
     studied: int   # Notion pages logged since this phase began

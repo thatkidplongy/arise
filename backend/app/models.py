@@ -52,6 +52,11 @@ class Player(Base):
     craft_phase_day: Mapped[str] = mapped_column(String, default="")
     # The ISO week the phase check-in last fired, so it asks at most once a week.
     craft_review_week: Mapped[str] = mapped_column(String, default="")
+    # The one thing currently being studied — "DDIA ch 5 — Replication", a Notion
+    # page, a chapter. Craft's equivalent of current_book, and for the same reason: a
+    # quest that names three sources at once is a scavenger hunt, not a sitting. The
+    # phase says what this stretch is about; this says what's open in front of you.
+    craft_source: Mapped[str] = mapped_column(String, default="")
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)

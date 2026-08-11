@@ -874,19 +874,6 @@ FLOORS: dict[str, list[list[str]]] = {
         ["Log today's money in the tracker; nudge toward this week's saving target"],
         ["Money check-in in the tracker (You): today's in/out, the week's gap, and no new debt"],  # cap
     ],
-    # CFT — the non-negotiable is studying the system-design notes, and it climbs by
-    # how much you have to produce from memory rather than by minutes. Recognising a
-    # design when you read it is not the same as being able to draw it cold, which is
-    # the whole thing the plan's exit criteria asks for. The top rung lands in the
-    # hunter's own L7 shape: one atomic idea per note, linked back to its source.
-    "d-craft": [
-        ["Open your Notion system-design notes — read one section, then log the takeaway (Learn)"],
-        ["One section of your notes; log what you took away in your own words, never copy-pasted"],
-        ["One concept from your notes — say it back with the page closed, then check"],
-        ["One concept cold: explain it from memory, then diff against your notes and log the gap"],
-        ["Sketch the mechanism on paper before opening the notes, then diff and log the gap"],
-        ["Design it cold with real numbers, then pull one atomic idea into an Evergreen note (🌱, linked to its source)"],  # cap
-    ],
 }
 
 
@@ -1138,7 +1125,8 @@ def cap_steps(steps: list[str], floor_len: int) -> list[str]:
     return steps[: 3 if floor_len > 0 else 2]
 
 
-def floor_for(quest: QuestDef, book: str | None = None, level: int = 0) -> list[str]:
+def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
+              craft_source: str | None = None) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
     an LLM wrote it. Leveled floors (STR/SPI/WLT) climb through FLOORS; Grow opens
@@ -1149,6 +1137,8 @@ def floor_for(quest: QuestDef, book: str | None = None, level: int = 0) -> list[
         return list(tiers[max(0, min(level, len(tiers) - 1))])
     if quest.id == "d-read":
         return [reading_floor(book)]
+    if quest.id == "d-craft":
+        return [craft_floor(craft_source, level)]
     return []
 
 
@@ -1290,142 +1280,36 @@ def japanese_content(week_num: int, day: str) -> tuple[str, str, list[str], str]
 # 📓 marks the hunter's own Notion notes (the other emoji: 📖 book · 🎥 YouTube ·
 # 🎧 audio/app · 🌐 site).
 
-_CRAFT_P1: list[tuple[str, str, list[str], str]] = [
-    ("Foundations · Theory", "DDIA ch 1–4, from your notes", [
-        "Read one of ch 1–4: reliability/scalability, data models, storage engines, encoding",
-        "Write down the one idea you'd struggle to explain cold",
-    ], "📓 Notion · DDIA book map (ch 1–4)"),
-    ("Foundations · Rep", "Xu vol 1 ch 1–3, closed book first", [
-        "Take the chapter's question and design it on paper — before reading his answer",
-        "Diff yours against his, and write down what you missed",
-    ], "📓 Notion · SDI vol 1 book map (ch 1–3)"),
-    ("Capacity Math", "Back-of-envelope, in real numbers", [
-        "Re-read the Spotify anchor and redo its capacity math yourself",
-        "Write down the number you'd defend in an interview, and how you got there",
-    ], "📓 Notion · master doc — Spotify"),
-    ("Right-Sized Design", "Complexity matched to real traffic", [
-        "Re-read the Airbnb anchor: where did they deliberately not scale?",
-        "Note down which DDIA concept from ch 1–2 that decision is applying",
-    ], "📓 Notion · master doc — Airbnb"),
-    ("Foundations · Notes", "Turn the phase into notes that last", [
-        "Re-read your ch 1–4 notes and rephrase the idea that resonated most — your words, never copy-pasted",
-        "Pull it out as one atomic Evergreen note (🌱 Seedling, linked back to DDIA via Source books)",
-    ], "📓 Notion · Evergreen Notes (one idea per note)"),]
-
-_CRAFT_P2: list[tuple[str, str, list[str], str]] = [
-    ("Distributing Data · Theory", "DDIA ch 5–7, from your notes", [
-        "Read one of ch 5–7: replication, partitioning, transactions",
-        "Write down the failure mode that concept exists to prevent",
-    ], "📓 Notion · DDIA book map (ch 5–7)"),
-    ("Distributing Data · Rep", "Consistent hashing / key-value store", [
-        "Design the key-value store on paper, closed book — replication and partitioning included",
-        "Diff against Xu's solution and write down the gap",
-    ], "📓 Notion · Ch 6 — Design a Key-Value Store"),
-    ("Replication Anchors", "How real systems copy data", [
-        "Re-read Cloudflare Postgres + Instagram, and name the replication model each chose",
-        "Write down when the opposite choice would have won",
-    ], "📓 Notion · master doc — replication"),
-    ("Idempotency Study", "Money can't be paid twice", [
-        "Re-read Stripe + Airbnb on transactions and idempotency keys",
-        "Note down how you'd make one of your own endpoints safe to retry",
-    ], "📓 Notion · master doc — Stripe, Airbnb"),
-    ("Distributing Data · Notes", "Replication, partitioning, transactions", [
-        "Re-read your ch 5–7 notes and rephrase the trade-off you find hardest to hold — your words, never copy-pasted",
-        "Pull it out as one atomic Evergreen note (🌱 Seedling, linked back to DDIA via Source books)",
-    ], "📓 Notion · Evergreen Notes (one idea per note)"),]
-
-_CRAFT_P3: list[tuple[str, str, list[str], str]] = [
-    ("Distributed Truths · Theory", "DDIA ch 8–9, from your notes", [
-        "Read from ch 8–9: faults, unreliable clocks, consistency models, consensus",
-        "Write down which guarantee you'd actually need, and which you'd pay too much for",
-    ], "📓 Notion · DDIA book map (ch 8–9)"),
-    ("Distributed Truths · Rep", "Unique IDs / rate limiter, closed book", [
-        "Design one cold: unique ID generator or rate limiter",
-        "Diff against Xu, and write down the clock or coordination assumption you made",
-    ], "📓 Notion · SDI vol 1 — unique ID, rate limiter"),
-    ("Coordination Anchors", "Locks, heartbeats, convergence", [
-        "Re-read Reddit's Zookeeper locking and Google Docs' convergence without locks",
-        "Note down why one needs a lock and the other doesn't",
-    ], "📓 Notion · master doc — Reddit, Google Docs"),
-    ("Consensus, Seen Moving", "Raft, one visualisation", [
-        "Step through a leader election and a log replication on the Raft visualiser",
-        "Write down what happens to an uncommitted entry when the leader dies",
-    ], "🌐 thesecretlivesofdata.com — Raft"),
-    ("Distributed Truths · Notes", "Faults, clocks, consensus", [
-        "Re-read your ch 8–9 notes and rephrase the guarantee you'd struggle to explain cold — your words, never copy-pasted",
-        "Pull it out as one atomic Evergreen note (🌱 Seedling, linked back to DDIA via Source books)",
-    ], "📓 Notion · Evergreen Notes (one idea per note)"),]
-
-_CRAFT_P4: list[tuple[str, str, list[str], str]] = [
-    ("Derived Data · Theory", "DDIA ch 10–12, from your notes", [
-        "Read from ch 10–12: batch processing, stream processing, the future of data systems",
-        "Write down the difference a stream makes to what the system can promise",
-    ], "📓 Notion · DDIA book map (ch 10–12)"),
-    ("Derived Data · Rep", "Queue / metrics / click aggregation", [
-        "Design one cold from Xu vol 2: message queue, metrics monitoring, or ad-click aggregation",
-        "Diff against his, and write down how yours handles a slow consumer",
-    ], "📓 Notion · SDI vol 2 — queues, metrics"),
-    ("Decoupling Anchors", "Writes now, delivery later", [
-        "Re-read WhatsApp: what did the queue let them stop promising synchronously?",
-        "Note down one write path of your own that a queue would free",
-    ], "📓 Notion · master doc — WhatsApp"),
-    ("Backpressure Study", "What to do when you can't keep up", [
-        "Re-read Meta XFaaS — backpressure modelled on TCP",
-        "Write down what your system currently does under overload, honestly",
-    ], "📓 Notion · master doc — Meta XFaaS"),
-    ("Derived Data · Notes", "Batch, stream, and what they promise", [
-        "Re-read your ch 10–12 notes and rephrase the distinction you keep blurring — your words, never copy-pasted",
-        "Pull it out as one atomic Evergreen note (🌱 Seedling, linked back to DDIA via Source books)",
-    ], "📓 Notion · Evergreen Notes (one idea per note)"),]
-
-_CRAFT_P5: list[tuple[str, str, list[str], str]] = [
-    ("Design Rep · News Feed", "Cold, then diff", [
-        "Design a news feed in 45 min, closed book, with real capacity numbers",
-        "Diff against Xu + the Instagram/Twitter anchors and write down what you missed",
-    ], "📓 Notion · Ch 11 — Design a News Feed System"),
-    ("Design Rep · Chat", "Cold, then diff", [
-        "Design a chat system in 45 min, closed book — presence and delivery included",
-        "Diff against the WhatsApp/Slack anchors and write down what you missed",
-    ], "📓 Notion · Ch 12 — Design a Chat System"),
-    ("Design Rep · Payments", "Cold, then diff", [
-        "Design a payment system in 45 min, closed book — exactly-once as the hard part",
-        "Diff against Xu vol 2 + Stripe, and write down what you missed",
-    ], "📓 Notion · master doc — payment system"),
-    ("Design Rep · Proximity", "Cold, then diff", [
-        "Design a proximity service in 45 min, closed book — geospatial indexing included",
-        "Diff against Xu vol 2 + Uber H3, and write down what you missed",
-    ], "📓 Notion · master doc — Uber H3"),
-    ("Design Rep · Object Store", "Cold, then diff", [
-        "Design S3-like object storage in 45 min, closed book — durability as the hard part",
-        "Diff against Xu vol 2 and write down what you missed",
-    ], "📓 Notion · SDI vol 2 — object storage"),
-    ("Your Own Architecture", "The system you actually own", [
-        "Re-read your BYB platform architecture with one DDIA concept in hand",
-        "Write down one decision you'd now argue differently, and what it would cost",
-    ], "📓 Notion · BYB Platform Architecture"),
-    ("Reps · What You Keep Missing", "The gap, written down once", [
-        "Look back over your last few design reps and name the omission that shows up in more than one",
-        "Pull the fix out as one atomic Evergreen note, so the next rep has it to hand",
-    ], "📓 Notion · Evergreen Notes (one idea per note)"),]
-
-# The phases in order. You sit in one until you've read its material and say so —
-# there is no week at which the app moves you on. The original plan pencilled in
-# 12 weeks; that was a forecast, not a rule, and treating it as one would be the
-# same mistake as a chapters-per-day quota.
+# What a Craft sitting *does* with whatever is currently open. Deliberately one
+# source at a time: the material is `Player.craft_source`, and these vary the method
+# rather than the reading. A quest that named a DDIA chapter, a case study and an Xu
+# rep in the same three steps is a scavenger hunt, not a sitting — the reading loop
+# names one book and lets you get on with it, and this is the same shape.
 #
-# `pieces` is how many things the phase is made of (its DDIA chapters plus its Xu
-# reps), so 'how far into this phase' can be counted from what's actually logged
-# rather than from the calendar. It's a denominator for a progress bar, never a
-# deadline: nothing expires, and nothing is late.
-CRAFT_PHASES: list[dict] = [
-    {"label": "Foundations", "detail": "DDIA ch 1–4 · Xu vol 1 ch 1–3", "pieces": 7, "pool": _CRAFT_P1},
-    {"label": "Distributing data", "detail": "DDIA ch 5–7 · consistent hashing, KV store", "pieces": 6, "pool": _CRAFT_P2},
-    {"label": "Distributed truths", "detail": "DDIA ch 8–9 · unique ID, rate limiter", "pieces": 4, "pool": _CRAFT_P3},
-    {"label": "Derived data", "detail": "DDIA ch 10–12 · queue, metrics, aggregation", "pieces": 6, "pool": _CRAFT_P4},
-    {"label": "Design reps", "detail": "one design a sitting, closed book then diff", "pieces": 6, "pool": _CRAFT_P5},
+# So no step here may name a source. They all say "it": whatever you're holding.
+_CRAFT_METHODS: list[tuple[str, str, list[str], str]] = [
+    ("Read It Through", "Straight reading, then the takeaway", [
+        "Write down the one idea from it you'd struggle to explain cold",
+    ], ""),
+    ("Closed Book", "Produce it before you check", [
+        "Say the core mechanism out loud from memory, then read and find what you missed",
+    ], ""),
+    ("Draw The Mechanism", "A picture beats a paragraph", [
+        "Sketch how it actually works on paper, then correct the sketch against the page",
+    ], ""),
+    ("Name The Trade-off", "The decision, and its price", [
+        "Write down the trade-off it makes, and when the opposite choice would win",
+    ], ""),
+    ("What Breaks First", "Push it until it fails", [
+        "Write down what breaks first at 10× and which part gives way",
+    ], ""),
+    ("Connect It", "Onto something you own", [
+        "Write down where this applies in a system you actually run, and what you'd change",
+    ], ""),
+    ("Evergreen It", "One atomic idea, kept", [
+        "Rephrase the idea in your own words — never copy-pasted — as one atomic Evergreen note (🌱, linked to its source)",
+    ], "📓 Notion · Evergreen Notes (one idea per note)"),
 ]
-
-LAST_CRAFT_PHASE = len(CRAFT_PHASES)
 
 
 # Systems thinking as its own discipline, not software architecture — from the
@@ -1457,13 +1341,28 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
     ], "🎥 Systems thinking — your Inspire capture (Tips)"),
 ]
 
-# How often the slot leaves the books for a systems rep. Counted in days rather than
-# weekdays because Craft isn't a daily: the rotation in `state.active_daily_ids` shows
-# it every 3rd day, so a "every Sunday" rule would land about monthly. A stride of 9
-# is a multiple of that 3, which makes this every 3rd Craft day — roughly weekly.
-# `test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown` checks that
-# against the real rotation, so if the rotation changes this fails instead of drifting.
+# How often the slot leaves the reading for a systems rep. Counted in days rather
+# than weekdays because Craft isn't a daily: the rotation in `state.active_daily_ids`
+# shows it every 3rd day, so an "every Sunday" rule would land about monthly. A stride
+# of 9 is a multiple of that 3, making this every 3rd Craft day — roughly weekly.
+# `test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown` checks it
+# against the real rotation, so a rotation change fails loudly instead of drifting.
 _SYSTEMS_STRIDE = 9
+
+
+# The stretches of the plan, in order — guidance for what to pick as your next
+# source, not a schedule and not the quest's content. You hold one until you say its
+# material is read. `pieces` is how many things the stretch is made of, so the card
+# can show how far in you are; it is a denominator for a bar, never a deadline.
+CRAFT_PHASES: list[dict] = [
+    {"label": "Foundations", "detail": "DDIA ch 1–4 · Xu vol 1 ch 1–3", "pieces": 7},
+    {"label": "Distributing data", "detail": "DDIA ch 5–7 · consistent hashing, KV store", "pieces": 6},
+    {"label": "Distributed truths", "detail": "DDIA ch 8–9 · unique ID, rate limiter", "pieces": 4},
+    {"label": "Derived data", "detail": "DDIA ch 10–12 · queue, metrics, aggregation", "pieces": 6},
+    {"label": "Design reps", "detail": "one design a sitting, closed book then diff", "pieces": 6},
+]
+
+LAST_CRAFT_PHASE = len(CRAFT_PHASES)
 
 
 def craft_phase_info(phase: int) -> dict:
@@ -1474,25 +1373,44 @@ def craft_phase_info(phase: int) -> dict:
     return CRAFT_PHASES[index]
 
 
-def craft_phase(phase: int) -> list[tuple[str, str, list[str], str]]:
-    """The variant pool for the phase you're in."""
-    return craft_phase_info(phase)["pool"]
+def craft_floor(source: str | None, level: int) -> str:
+    """The Craft non-negotiable: read the one thing you're holding, then record it.
+
+    Same shape as the reading floor — it names a single source and sets no quota. What
+    climbs with level is how much you produce from memory, not how much you must get
+    through."""
+    what = source.strip() if source and source.strip() else ""
+    if not what:
+        return "Pick what you're studying (Status → System design), then read it at your pace"
+    tiers = [
+        f"Read {what} at your pace, then log what you took away (Learn)",
+        f"Read {what} at your pace; log it in your own words, never copy-pasted",
+        f"Read {what}, then say its key idea back with the page closed",
+        f"{what} — explain it from memory first, then read and log the gap",
+        f"{what} — sketch the mechanism before you open it, then diff",
+        f"{what} — explain or design it cold, then pull one atomic idea into an Evergreen note",
+    ]
+    return tiers[max(0, min(level, len(tiers) - 1))]
 
 
-def craft_content(phase: int, day: str) -> tuple[str, str, list[str], str]:
-    """Today's Craft task for whoever is sitting in `phase` of the system-design plan.
+def is_systems_day(day: str) -> bool:
+    """Whether today's Craft slot is a systems-thinking rep rather than reading."""
+    return date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == 0
 
-    The phase holds until the hunter says its material is read — the theory still
-    arrives before the reps that need it, but nothing moves them on by date. Which of
-    the phase's moves you get rotates day to day (read the theory, design it
-    closed-book, study an anchor, consolidate the notes). Regularly the slot steps out
-    of the books entirely for a systems-thinking rep — architecture is only half of
-    what 'system thinking' means, and the other half needs a real system rather than
-    a chapter."""
-    if date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == 0:
+
+def craft_content(day: str) -> tuple[str, str, list[str], str]:
+    """What today's Craft sitting does with whatever source is currently open.
+
+    Never *which* source — that's the hunter's, held in `Player.craft_source`, and the
+    floor names it. Only the method rotates: read it through, do it closed-book, draw
+    the mechanism, name the trade-off, and so on.
+
+    Regularly the slot steps out of reading altogether for a systems-thinking rep —
+    architecture is only half of what 'system thinking' means, and the other half
+    needs a real system rather than a page."""
+    if is_systems_day(day):
         return _CRAFT_SYSTEMS[_pick("d-craft", f"systems:{day}", len(_CRAFT_SYSTEMS))]
-    pool = craft_phase(phase)
-    return pool[_pick("d-craft", f"craft:{day}", len(pool))]
+    return _CRAFT_METHODS[_pick("d-craft", f"craft:{day}", len(_CRAFT_METHODS))]
 
 
 def content_for(
@@ -1503,7 +1421,7 @@ def content_for(
     level: int = 0,
     interview: bool = False,
     jp_week: int = 0,
-    craft_phase_num: int = 0,
+    craft_source: str | None = None,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1512,7 +1430,7 @@ def content_for(
     day to day. `book` names the current read in the reading floor. `level` is the
     stat's progression level — it climbs the floor and picks the content band.
     `interview` (Craft only) swaps in the interview-prep pool. `jp_week` drives the
-    Japanese plan; `craft_phase_num` is the Craft phase currently held. `resource`
+    Japanese plan; `craft_source` is the one thing Craft is studying. `resource`
     points at a trusted place to learn (empty when there isn't one)."""
     if quest.id == "d-jp":
         return japanese_content(jp_week or 1, day)  # follows the kana→grammar→kanji plan
@@ -1520,13 +1438,16 @@ def content_for(
         # Follows the system-design plan at whatever phase the hunter is holding.
         # Interview mode opts out — it has its own pool, and a next-week interview
         # isn't served by wherever the plan happens to be.
-        title, desc, steps, resource = craft_content(craft_phase_num or 1, day)
-        return title, desc, cap_steps(floor_for(quest, book, level) + steps, 1), resource
+        title, desc, steps, resource = craft_content(day)
+        # On a systems day the rep *is* the sitting: bolting "read your source" onto a
+        # whiteboard exercise would split one sitting across two places again.
+        floor = [] if is_systems_day(day) else floor_for(quest, book, level, craft_source)
+        return title, desc, cap_steps(floor + steps, len(floor)), resource
     if quest.cadence == "side" and focus:
         pk = _period_key(quest.cadence, day)
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
     title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
-    steps = floor_for(quest, book, level) + steps  # non-negotiables first, then variety
+    steps = floor_for(quest, book, level, craft_source) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

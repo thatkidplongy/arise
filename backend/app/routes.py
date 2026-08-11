@@ -7,7 +7,7 @@ from . import (body, books, digest, insights, llm, mailer, nutrition, service, s
                state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
-                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn, CraftSourceIn,
                       CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
@@ -192,6 +192,15 @@ def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session =
     next_book; not yet → keeps the current book. Asked once per new week."""
     player = state.get_or_create_player(db)
     service.review_book(db, player, body.finished, body.next_book, _valid_day(day))
+    return state.build_state(db, player, _valid_day(day))
+
+
+@router.put("/craft/source", response_model=StateOut)
+def set_craft_source(body: CraftSourceIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Set the one thing you're studying for Craft — the chapter or Notion page open in
+    front of you. The daily names this and nothing else; send "" to clear it."""
+    player = state.get_or_create_player(db)
+    service.set_craft_source(db, player, body.source)
     return state.build_state(db, player, _valid_day(day))
 
 

@@ -272,6 +272,7 @@ export interface ApiWeekReview {
 export interface ApiCraft {
   phase: number;
   phases: number;
+  source: string; // the one thing being studied ('' = not picked yet)
   label: string;
   detail: string;
   studied: number; // Notion pages logged since this phase began
@@ -574,6 +575,12 @@ export const api = {
     request<ApiState>(base, `/book?day=${day}`, token, {
       method: 'PUT',
       body: JSON.stringify({ current_book: currentBook, chapters }),
+    }),
+
+  setCraftSource: (base: string, token: string, source: string, day: string) =>
+    request<ApiState>(base, `/craft/source?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify({ source }),
     }),
 
   reviewCraftPhase: (base: string, token: string, done: boolean, day: string) =>

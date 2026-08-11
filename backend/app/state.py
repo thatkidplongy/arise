@@ -214,7 +214,7 @@ def resolve_content(
     book: str,
     interview: bool,
     jp_week: int,
-    craft_phase_num: int,
+    craft_source: str,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a quest shows today: LLM-generated
     content if present (with the mandatory leveled floor re-applied), else the
@@ -229,7 +229,7 @@ def resolve_content(
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
-        interview=interview, jp_week=jp_week, craft_phase_num=craft_phase_num,
+        interview=interview, jp_week=jp_week, craft_source=craft_source,
     )
     return title, desc, quests.cap_steps(steps, len(floor)), resource
 
@@ -246,7 +246,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     gen_by = generated_by(db, player)
     levels = progression_levels(db, player, day)
     jp_week = _jp_week(player, day)
-    craft_phase_num = _craft_phase_num(player)
+    craft_source = player.craft_source
     titles: dict[str, str] = {}
     for quest in quest_defs(db):
         title, _, _, _ = resolve_content(
@@ -257,7 +257,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             book=player.current_book,
             interview=player.interview_mode,
             jp_week=jp_week,
-            craft_phase_num=craft_phase_num,
+            craft_source=craft_source,
         )
         titles[quest.id] = title
     return titles
@@ -275,7 +275,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         book=player.current_book,
         interview=player.interview_mode,
         jp_week=_jp_week(player, day),
-        craft_phase_num=_craft_phase_num(player),
+        craft_source=player.craft_source,
     )
     return steps
 
@@ -390,7 +390,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, interview=False, jp_week=0, craft_phase_num=0, notes_by=None) -> dict:
+               levels=None, interview=False, jp_week=0, craft_source="", notes_by=None) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -400,7 +400,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         book=book,
         interview=interview,
         jp_week=jp_week,
-        craft_phase_num=craft_phase_num,
+        craft_source=craft_source,
     )
     checked = checks_by.get((q.id, pk), set())
     return {
@@ -537,6 +537,7 @@ def craft_of(db: Session, player: Player, day: str) -> dict:
     return {
         "phase": phase_num,
         "phases": quests.LAST_CRAFT_PHASE,
+        "source": player.craft_source,
         "label": info["label"],
         "detail": info["detail"],
         "studied": studied,
@@ -949,7 +950,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.interview_mode, _jp_week(player, day),
-                       _craft_phase_num(player), notes_by)
+                       player.craft_source, notes_by)
             for q in defs
             if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],

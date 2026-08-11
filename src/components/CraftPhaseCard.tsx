@@ -1,7 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
+import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiCraft } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, feedback, onAccent, surface, text, withAlpha } from '@/theme';
@@ -66,10 +69,62 @@ function PhaseProgress({ craft }: { craft: ApiCraft }) {
   );
 }
 
+/** What's open in front of you. The daily names this and nothing else — the same way
+ * the reading daily names one book — so a sitting has one place to be. */
+function CurrentSource({ source }: { source: string }) {
+  const setCraftSource = useSystem((s) => s.setCraftSource);
+  const save = useSaveState();
+  const [draft, setDraft] = useState('');
+
+  const submit = async () => {
+    const next = draft.trim();
+    if (!next || save.state === 'saving') return;
+    const landed = await save.run(() => setCraftSource(next));
+    if (landed) setDraft('');
+  };
+
+  return (
+    <View style={styles.sourceWrap}>
+      {source ? (
+        <View style={styles.nowStudying}>
+          <Ionicons name="document-text" size={15} color={HUE} />
+          <View style={styles.nowBody}>
+            <Text style={styles.nowLabel}>NOW STUDYING</Text>
+            <Text style={styles.nowTitle}>{source}</Text>
+          </View>
+        </View>
+      ) : null}
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        style={styles.input}
+        placeholder={source ? 'Move on to…' : 'e.g. DDIA ch 5 — Replication'}
+        placeholderTextColor={text.faint}
+        maxLength={160}
+        onSubmitEditing={submit}
+      />
+      <Pressable
+        disabled={!draft.trim() || save.state === 'saving'}
+        onPress={submit}
+        style={({ pressed }) => [
+          styles.btn,
+          styles.primary,
+          (!draft.trim() || pressed) && { opacity: 0.6 },
+        ]}
+      >
+        <Text style={styles.primaryText}>
+          {saveLabel(save.state, source ? 'Change what I’m studying' : 'Start studying it')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 /**
  * Where you are in the system-design plan — the Craft equivalent of the reading
  * panel. Progress is the Notion pages you've logged, not weeks elapsed: a plan that
- * advanced by date would march you past material you hadn't opened.
+ * advanced by date would march you past material you hadn't opened. The phase says
+ * what this stretch covers; you pick which piece of it you're on.
  */
 export function CraftPhaseCard() {
   const craft = useSystem((s) => s.state?.craft);
@@ -80,6 +135,7 @@ export function CraftPhaseCard() {
       <Text style={styles.phase}>{craft.label}</Text>
       <Text style={styles.detail}>{craft.detail}</Text>
       <PhaseProgress craft={craft} />
+      <CurrentSource source={craft.source} />
       {craft.pending ? <PhaseReview label={craft.label} /> : null}
     </SystemPanel>
   );
@@ -92,6 +148,30 @@ const styles = StyleSheet.create({
   tallyLabel: { color: text.secondary, fontSize: 12 },
   tallyValue: { color: text.primary, fontSize: 12, fontWeight: '700' },
   meta: { color: text.faint, fontSize: 12, lineHeight: 17, marginTop: 8 },
+  sourceWrap: { marginTop: 14, gap: 10 },
+  nowStudying: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: withAlpha(HUE, 0.08),
+    borderWidth: 1,
+    borderColor: withAlpha(HUE, 0.25),
+    borderRadius: 10,
+    padding: 11,
+  },
+  nowBody: { flex: 1, gap: 2 },
+  nowLabel: { color: HUE, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  nowTitle: { color: text.primary, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  input: {
+    borderWidth: 1,
+    borderColor: surface.hairline,
+    borderRadius: 9,
+    color: text.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: surface.base,
+  },
   review: {
     marginTop: 14,
     borderWidth: 1,

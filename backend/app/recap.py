@@ -71,16 +71,16 @@ def _quest_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     """Slot id → the title that slot showed on `day`, as the card showed it.
 
     `state` is imported here rather than at the top because it imports the digest,
-    which imports this module — a module-level import would close that loop. The
-    slot's own name is the fallback if resolving ever fails, since a recap that
-    names a quest slightly wrong still beats an email that doesn't arrive."""
+    which imports this module — a module-level import would close that loop.
+
+    Not wrapped in a try/except: this is the same resolver every /state call runs, so
+    if it can raise here the app is already broken, and swallowing the error only
+    turns a loud bug into an email that quietly names the wrong thing. (It did
+    exactly that once — a missing local, hidden for a whole test run.)"""
     from . import state
 
     titles = {d.id: d.title for d in db.query(QuestDef).all()}
-    try:
-        titles.update(state.displayed_titles(db, player, day))
-    except Exception:
-        pass
+    titles.update(state.displayed_titles(db, player, day))
     return titles
 
 
