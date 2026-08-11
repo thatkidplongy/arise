@@ -12,6 +12,8 @@ import {
   type ApiEvent,
   type ApiQuest,
   type ApiState,
+  type LearningKind,
+  type RecallGrade,
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import type { Notice, StatKey, Toast } from '@/types';
@@ -151,9 +153,14 @@ export interface SystemStore {
   addJournalEntry: (text: string) => Promise<void>;
   updateJournalEntry: (id: string, text: string) => Promise<void>;
   removeJournalEntry: (id: string) => Promise<void>;
+  addLearning: (entry: { kind: LearningKind; source: string; text: string }) => Promise<void>;
+  removeLearning: (id: string) => Promise<void>;
+  gradeRecall: (id: string, grade: RecallGrade) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
+  logReading: (chapters: number, label: string) => Promise<void>;
+  removeReadingLog: (id: string) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
   setInterviewMode: (enabled: boolean) => Promise<void>;
   searchBooks: (q: string) => Promise<ApiBook[]>;
@@ -212,7 +219,20 @@ export const useSystemStore = create<SystemStore>()(
         if (quest.done >= quest.target) return;
         try {
           const { events, state } = await api.complete(serverUrl, apiToken, quest.id, dateKey());
-          set({ state, status: 'online', notices: [...notices, ...noticesFrom(events)] });
+          // Tapping the check circle deserves the same floating confirmation as
+          // ticking the last step did — without it a save that worked looks like
+          // nothing happened. Only once it's actually at target, so a quest that
+          // takes several reps isn't told it's complete on the first one.
+          const fresh = state.quests.find((q) => q.id === quest.id);
+          const isDone = !!fresh && fresh.done >= fresh.target;
+          set({
+            state,
+            status: 'online',
+            notices: [...notices, ...noticesFrom(events)],
+            toast: isDone
+              ? { id: toastId(), title: quest.title, xp: quest.xp, undo: { kind: 'completion', questId: quest.id } }
+              : null,
+          });
         } catch (e) {
           const { status, notice } = errorOutcome(e);
           set({ status, notices: [...notices, notice] });
@@ -252,7 +272,7 @@ export const useSystemStore = create<SystemStore>()(
                   id: toastId(),
                   title: quest.title,
                   xp: quest.xp,
-                  undo: { questId: quest.id, stepIndex },
+                  undo: { kind: 'step', questId: quest.id, stepIndex },
                 }
               : null,
           });
@@ -265,17 +285,21 @@ export const useSystemStore = create<SystemStore>()(
       undoToast: async () => {
         const t = get().toast;
         if (!t) return;
-        const { serverUrl, apiToken } = get();
+        const { serverUrl, apiToken, state } = get();
         set({ toast: null });
+        // Undo the way it was done: un-tick the step that finished it, or reverse the
+        // completion itself (its id comes from the state the completion returned).
+        const undoableId =
+          t.undo.kind === 'completion'
+            ? state?.quests.find((q) => q.id === t.undo.questId)?.undoable_id
+            : undefined;
+        if (t.undo.kind === 'completion' && !undoableId) return;
         try {
-          const { state } = await api.toggleStep(
-            serverUrl,
-            apiToken,
-            t.undo.questId,
-            t.undo.stepIndex,
-            dateKey(),
-          );
-          set({ state, status: 'online' });
+          const fresh =
+            t.undo.kind === 'step'
+              ? await api.toggleStep(serverUrl, apiToken, t.undo.questId, t.undo.stepIndex, dateKey())
+              : await api.undo(serverUrl, apiToken, undoableId as string, dateKey());
+          set({ state: fresh.state, status: 'online' });
         } catch (e) {
           set({ status: errorOutcome(e).status });
         }
@@ -313,6 +337,9 @@ export const useSystemStore = create<SystemStore>()(
       addJournalEntry: (text) => mutate((b, t, d) => api.addJournalEntry(b, t, text, d)),
       updateJournalEntry: (id, text) => mutate((b, t, d) => api.updateJournalEntry(b, t, id, text, d)),
       removeJournalEntry: (id) => mutate((b, t, d) => api.removeJournalEntry(b, t, id, d)),
+      addLearning: (entry) => mutate((b, t, d) => api.addLearning(b, t, entry, d)),
+      removeLearning: (id) => mutate((b, t, d) => api.removeLearning(b, t, id, d)),
+      gradeRecall: (id, grade) => mutate((b, t, d) => api.gradeRecall(b, t, id, grade, d)),
 
       generate: async () => {
         const { serverUrl, apiToken } = get();
@@ -326,6 +353,9 @@ export const useSystemStore = create<SystemStore>()(
 
       saveBook: (currentBook, chapters = 0) =>
         mutate((b, t, d) => api.setBook(b, t, currentBook, chapters, d)),
+      logReading: (chapters, label) =>
+        mutate((b, t, d) => api.logReading(b, t, chapters, label, d)),
+      removeReadingLog: (id) => mutate((b, t, d) => api.removeReadingLog(b, t, id, d)),
       reviewBook: (finished, nextBook) =>
         mutate((b, t, d) => api.reviewBook(b, t, finished, nextBook, d)),
       setInterviewMode: (enabled) => mutate((b, t, d) => api.setInterviewMode(b, t, enabled, d)),

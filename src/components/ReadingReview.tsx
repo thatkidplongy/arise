@@ -7,8 +7,8 @@ import { accent, surface, text, withAlpha } from '@/theme';
 /**
  * The reading check-in. A book is never reset by a week ending — it carries on
  * with its progress intact. This shows only when the server flags a review as due
- * (you've put in the reading days to finish at your pace): "Did you finish it?" →
- * yes rolls to the next book, not yet carries it over — no penalty either way.
+ * (the chapters you've logged cover the book): "Did you finish it?" → yes rolls to
+ * the next book, not yet carries it over — no penalty either way.
  */
 export function ReadingReview() {
   const review = useSystem((s) => s.state?.book_review);

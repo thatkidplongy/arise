@@ -73,10 +73,14 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   undo), and the completion circle fills as you go.
 - **Focus areas** — an optional set of focuses per attribute (Settings → Focus
   areas); a saved focus rotates that attribute's side quest through your set.
-- **Reading loop** — a chapter a day is the mandatory Grow floor; each new week
-  Arise asks if you finished your book and what to read next (a book a week). Set
-  the book by **searching Open Library** (free, no key) or browsing themed shelves
-  (Grow / Money / Craft / Calm); picking one fills the title and estimates chapters.
+- **Reading loop** — the Grow floor is to read at your own pace and then log what
+  you got through (Status → **Today's reading**): type the chapters however you say
+  them (“5–7”, “12”, “the intro”) and the count follows along. There's no
+  chapters-a-day target — those logged chapters are what carry the book toward
+  finished, and once they cover it Arise asks whether you finished and what's next.
+  Set the book by **searching Open Library** (free, no key) or browsing themed
+  shelves (Grow / Money / Craft / Calm); picking one fills the title and estimates
+  the total chapters, which is just the finish line and can be left blank.
 - **Craft — the engineering ladder** — a dedicated attribute for coding, aimed
   at going mid → Senior. It climbs fundamentals-first: fluency & fundamentals →
   patterns & problem-solving → system design & architecture, with a small
@@ -105,6 +109,35 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   your North Star — and any quote can *become* your North Star in a tap.
   Standalone: it never touches XP or streaks, and it hides unless a Supadata key
   is set. (Videos with no speech — music- or text-only — have nothing to transcribe.)
+- **Recall — remembering what you read** — reading a lot and keeping little is the
+  usual problem, so Arise asks it back. Log what you read under **You → Learn** (a
+  book and its chapters, a Notion page, something that landed at work); each night
+  the LLM distils the day into lines worth keeping, and at 07:00 the next morning
+  they arrive in your inbox — **as questions, with the answers further down**. Being
+  asked and briefly failing is what fixes a memory; re-reading a line you recognise
+  mostly produces the feeling of knowing it. Alongside:
+  - **An expanding ladder** — 1, 3, 7, 16 then 35 days. Forgetting is steepest early,
+    so the rungs start close and stretch.
+  - **Write it before you look** — each question has a box for your answer, and the
+    real one only appears once you tap Reveal. Recognising an answer feels exactly
+    like knowing it, which is how you can review for weeks and still come up blank;
+    producing it cold is the only thing that tells the two apart.
+  - **Leitner grading (optional)** — with your attempt sitting next to the real
+    answer, tap *Knew it* / *Sort of* / *No clue*: knew it goes further out, no clue
+    comes back tomorrow. Skip it entirely and each showing still climbs one rung on
+    its own, so the plain ladder keeps working whether or not you ever grade.
+  - **Memory hooks** — a vivid image, but only for arbitrary material (names, lists,
+    coined terms). For anything you could re-derive, a mnemonic just competes with
+    the understanding.
+  - **The book so far** — one running sentence per book, rewritten every sitting
+    rather than added to. Condensing a growing pile back into one line is what turns
+    notes into something you hold.
+  - **The 24-hour window** — yesterday is asked first and every email invites you to
+    add what else surfaced, because that detail is gone by tomorrow.
+
+  Your reading daily and quest reflections are folded in automatically. Optional:
+  needs a free [Resend](https://resend.com) key, and it hides without one. See
+  [DEPLOY.md](./DEPLOY.md).
 - **Your North Star** — a line you write about the life you’re reaching for,
   pinned to the top of the Status screen.
 - **Rest days & forgiveness** — mark a rest day and your streak stays safe;
@@ -245,8 +278,10 @@ backend/
     books.py      book search + themed shelves via Open Library
     transcript.py video transcripts via Supadata (TikTok/Reels/Shorts)
     insights.py   Inspire: capture → distil → store; the daily pull-quote
+    digest.py     Recall: learnings → highlights → the daily email
+    mailer.py     one email out, via Resend
     achievements.py, models.py, schemas.py, seed.py, db.py, security.py
-  scripts/        backup_db.py
+  scripts/        backup_db.py, send_digest.py
   tests/          pytest: unit + integration + migration
-  deploy/         launchd plists (backend + backup)
+  deploy/         launchd plists (backend + backup + digest)
 ```

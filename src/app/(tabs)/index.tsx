@@ -7,6 +7,8 @@ import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CurrentBookCard } from '@/components/CurrentBookCard';
 import type { ApiReading } from '@/lib/api';
 import { RankBadge } from '@/components/RankBadge';
+import { ReadingLogCard } from '@/components/ReadingLogCard';
+import { RecallCard } from '@/components/RecallCard';
 import { Screen } from '@/components/Screen';
 import { StatRow } from '@/components/StatRow';
 import { DailyQuote, Reminders } from '@/components/StatusCards';
@@ -68,13 +70,24 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
-/** Read-only reading progress — how far toward finishing the current book, paced
- * by how many reading dailies you've actually done. Setting/changing the book
- * lives just below in the Current book card. */
+/** How the progress bar is counted: the chapters you've logged when the book's
+ * length is known, otherwise days of reading — there's nothing to count against a
+ * book of unknown length. Never a per-day quota either way. */
+function readingTally(reading: ApiReading): { label: string; value: number; max: number } {
+  if (reading.measure === 'chapters') {
+    const read = reading.chapters_read ?? 0; // absent until the backend service restarts
+    return { label: `${read} / ${reading.chapters} chapters`, value: read, max: reading.chapters };
+  }
+  return { label: `${reading.days_read} / ${reading.days_to_finish} days`, value: reading.days_read, max: reading.days_to_finish };
+}
+
+/** Read-only reading progress — how far toward finishing the current book, built
+ * from the chapters you logged. Logging lives just below in Today's reading, and
+ * setting/changing the book below that. */
 function Reading({ reading }: { reading: ApiReading }) {
   const pct = Math.round(reading.progress * 100);
   const done = pct >= 100;
-  const perDay = reading.per_day.replace(/ of .*/, ''); // book name shown above already
+  const tally = readingTally(reading);
   return (
     <SystemPanel
       title="Reading"
@@ -85,20 +98,18 @@ function Reading({ reading }: { reading: ApiReading }) {
       </Text>
       <View style={styles.xpRow}>
         <Text style={styles.xpLabel}>Toward finishing</Text>
-        <Text style={styles.xpValue}>
-          {reading.days_read} / {reading.days_to_finish} days
-        </Text>
+        <Text style={styles.xpValue}>{tally.label}</Text>
       </View>
       <XpBar
-        value={Math.min(reading.days_read, reading.days_to_finish)}
-        max={reading.days_to_finish}
+        value={Math.min(tally.value, tally.max)}
+        max={tally.max}
         color={done ? feedback.success : accent}
         height={8}
       />
       <Text style={styles.readingMeta}>
         {done
-          ? 'On pace to finish — the weekly check-in will ask when you’re done.'
-          : `About ${pct}% of the way at your pace · ${perDay} a day`}
+          ? 'That’s the whole book by your count — the check-in will ask if you’re done.'
+          : `About ${pct}% of the way, at whatever pace suits you`}
       </Text>
       <Text style={[styles.readingToday, { color: reading.done_today ? feedback.success : text.faint }]}>
         {reading.done_today ? '✓ Read today' : 'Not read yet today'}
@@ -139,6 +150,8 @@ export default function StatusScreen() {
       <NorthStar value={player.north_star} />
 
       {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
+
+      <RecallCard items={state.recall} />
 
       <SystemPanel>
         <View style={styles.identityRow}>
@@ -242,6 +255,9 @@ export default function StatusScreen() {
       </Pressable>
 
       {state.reading ? <Reading reading={state.reading} /> : null}
+
+      {/* What you read today — the only thing that moves the progress above. */}
+      <ReadingLogCard />
 
       {/* Set / change the book you're reading — grouped with its progress above. */}
       <CurrentBookCard />

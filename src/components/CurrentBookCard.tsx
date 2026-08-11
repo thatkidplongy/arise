@@ -52,10 +52,10 @@ export function CurrentBookCard() {
         </View>
       ) : null}
       <Text style={styles.help}>
-        Your Grow daily is to read at your own pace — which quietly speeds up as your Intelligence
-        level climbs. {current ? 'To change it, search' : 'Search'} a title (or browse a shelf), or
-        type your own; the chapter count paces you and can be left blank. A book carries on for as
-        long as it takes — it only checks in once you’ve read enough to finish.
+        Your Grow daily is to read at your own pace and log what you got through — no chapters-a-day
+        target. {current ? 'To change the book, search' : 'Search'} a title (or browse a shelf), or
+        type your own; the total chapter count is just the finish line, and can be left blank. A book
+        carries on for as long as it takes — it only checks in once your logged chapters cover it.
       </Text>
       <BookPicker
         onPick={(title, chapters) => {
@@ -76,7 +76,7 @@ export function CurrentBookCard() {
         onChangeText={(v) => setChaptersDraft(v.replace(/[^0-9]/g, ''))}
         style={styles.input}
         keyboardType="number-pad"
-        placeholder="Total chapters (optional) · e.g. 20"
+        placeholder="Total chapters in the book (optional) · e.g. 20"
         placeholderTextColor={text.faint}
         maxLength={4}
       />

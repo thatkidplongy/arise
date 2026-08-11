@@ -72,6 +72,43 @@ export interface ApiJournalEntry {
   updated_at: string; // last edit (or created_at) — the Journal sorts by this
 }
 
+/** One thing you logged reading or learning — the raw capture, before distilling. */
+export interface ApiLearning {
+  id: string;
+  day: string;
+  kind: LearningKind;
+  source: string; // what it was — title + chapters, a page, a URL
+  text: string; // your own notes, optional
+  created_at: string;
+}
+
+export type LearningKind = 'book' | 'notion' | 'article' | 'work' | 'video' | 'other';
+
+/** An older highlight resurfacing — the spaced half of the Recall digest. */
+/**
+ * How a recall went, straight from the index-card method: one you knew goes to the
+ * back of the pile, one you half-knew to the middle, one you had no clue about near
+ * the front. Grading is optional — an ungraded highlight still climbs on its own.
+ */
+export type RecallGrade = 'got' | 'shaky' | 'missed';
+
+/** The running one-sentence summary of the book you're reading, recondensed each sitting. */
+export interface ApiThread {
+  title: string;
+  summary: string;
+  days: number; // sittings folded in so far
+}
+
+export interface ApiRecall {
+  id: string;
+  text: string;
+  cue: string; // the question `text` answers — empty on highlights distilled before cues
+  hook: string; // a memory aid, only for arbitrary facts
+  day: string; // the day it was learned
+  source_label: string;
+  days_ago: number;
+}
+
 export interface ApiAchievement {
   id: string;
   name: string;
@@ -101,6 +138,7 @@ export interface ApiState {
   progression: Record<StatKey, ApiProgression>;
   llm_enabled: boolean;
   transcript_enabled: boolean; // true when a Supadata key is set (Inspire capture on)
+  digest_enabled: boolean; // true when Resend is configured (the Recall email can send)
   daily_quote: ApiDailyQuote | null; // a rotating pull-quote from captured videos
   quests: ApiQuest[];
   priorities: ApiPriority[]; // self-set focuses pinned on top of the plan, one per attribute
@@ -120,6 +158,9 @@ export interface ApiState {
   budget: ApiBudget; // take-home pay + standing commitments, for the 50/30/20 worksheet
   journal: ApiJournalEntry[]; // free-form daily entries, newest first
   reflections: ApiReflection[]; // quest-linked takeaways, newest first
+  learnings: ApiLearning[]; // what you logged reading/learning today
+  recall: ApiRecall[]; // older highlights coming back around, on an expanding ladder
+  thread: ApiThread | null; // the running summary of the book you're reading
 }
 
 /** A self-set priority for one attribute, pinned on top of that category's plan. */
@@ -193,10 +234,12 @@ export interface ApiCommitment {
   paid_this_month: boolean; // already logged this month, so it's off the due list
 }
 
-/** What actually left the wallet this month, per bucket. `untagged` is spending
+/** What actually moved this month. `income` is everything that came in (take-home
+ * plus any extra) — the figure the 50/30/20 lines divide. `untagged` is spending
  * from before the budget existed — reported as itself, never folded into a bucket
  * it was never assigned to. */
 export interface ApiBudgetActual {
+  income: number;
   needs: number;
   wants: number;
   untagged: number;
@@ -224,16 +267,25 @@ export interface ApiWeekReview {
   top_stat: StatKey | null;
 }
 
+/** One logged sitting of reading — what you read, in your own units. */
+export interface ApiReadingLog {
+  id: string;
+  label: string; // which chapters, verbatim ('' when only a count was given)
+  chapters: number;
+}
+
 /** Read-only progress on the current book, for the Status screen. */
 export interface ApiReading {
   book: string;
-  chapters: number; // 0 = unknown
+  chapters: number; // the book's length; 0 = unknown
   books_finished: number;
+  chapters_read: number; // chapters logged since this book began
   days_read: number; // days the reading daily was done since this book began
-  days_to_finish: number; // target days at the current reading pace
-  progress: number; // 0..1 — days_read / days_to_finish (capped)
-  per_day: string; // today's reading target, e.g. "Read a chapter of …"
-  done_today: boolean; // reading daily already ticked today
+  days_to_finish: number; // days of reading that stands in for an unknown-length book
+  progress: number; // 0..1 — chapters_read / chapters, or days_read / days_to_finish
+  measure: 'chapters' | 'days'; // 'chapters' when the book's length is known
+  logged_today: ApiReadingLog[];
+  done_today: boolean; // something logged today (or the reading daily ticked)
 }
 
 // ── Body (standalone wellness tools) ─────────────────────────────────────────
@@ -523,6 +575,15 @@ export const api = {
       body: JSON.stringify({ finished, next_book: nextBook }),
     }),
 
+  logReading: (base: string, token: string, chapters: number, label: string, day: string) =>
+    request<ApiState>(base, `/reading/log`, token, {
+      method: 'POST',
+      body: JSON.stringify({ chapters, label, day }),
+    }),
+
+  removeReadingLog: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/reading/log/${id}?day=${day}`, token, { method: 'DELETE' }),
+
   searchBooks: (base: string, token: string, q: string) =>
     request<ApiBook[]>(base, `/books/search?q=${encodeURIComponent(q)}`, token),
 
@@ -778,6 +839,27 @@ export const api = {
 
   removeJournalEntry: (base: string, token: string, id: string, day: string) =>
     request<ApiState>(base, `/journal/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  // ── Recall (what you read/learned → tomorrow's digest email) ──────────────
+  addLearning: (
+    base: string,
+    token: string,
+    entry: { kind: LearningKind; source: string; text: string },
+    day: string,
+  ) =>
+    request<ApiState>(base, `/learnings`, token, {
+      method: 'POST',
+      body: JSON.stringify({ ...entry, day }),
+    }),
+
+  removeLearning: (base: string, token: string, id: string, day: string) =>
+    request<ApiState>(base, `/learnings/${id}?day=${day}`, token, { method: 'DELETE' }),
+
+  gradeRecall: (base: string, token: string, id: string, grade: RecallGrade, day: string) =>
+    request<ApiState>(base, `/recall/${id}/grade?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ grade }),
+    }),
 };
 
 /** The API surface with the server base + token bound in, so callers pass only
