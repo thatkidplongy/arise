@@ -432,7 +432,7 @@ def test_send_daily_still_sends_a_day_with_no_learnings_but_a_record(db, monkeyp
     player = state.get_or_create_player(db)
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
     sent = {}
-    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t: sent.update(subject=s, text=t))
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.update(subject=s, text=t))
     db.add(Completion(player_id=player.id, quest_id="d-train", xp=10, day=DAY))
     db.commit()
 
@@ -446,7 +446,7 @@ def test_send_daily_sends_once_and_then_skips(db, monkeypatch):
     _highlight(db, player, DAY, "Depth beats speed.")
     sent = []
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
-    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t: sent.append(s) or {"id": "1"})
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.append(s) or {"id": "1"})
 
     first = digest.send_daily(db, player, DAY)
     assert first["status"] == "sent" and first["highlight_count"] == 1
@@ -461,7 +461,7 @@ def test_send_daily_force_resends(db, monkeypatch):
     _highlight(db, player, DAY, "Depth beats speed.")
     sent = []
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
-    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t: sent.append(s) or {"id": "1"})
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.append(s) or {"id": "1"})
 
     digest.send_daily(db, player, DAY)
     digest.send_daily(db, player, DAY, force=True)
@@ -473,7 +473,7 @@ def test_send_daily_records_a_failure_and_reraises(db, monkeypatch):
     _highlight(db, player, DAY, "Depth beats speed.")
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
 
-    def _fail(*_a):
+    def _fail(*_a, **_k):
         raise TimeoutError("no route to host")
 
     monkeypatch.setattr(digest.mailer, "send", _fail)
@@ -515,7 +515,7 @@ def test_a_failed_run_can_be_retried_without_force(db, monkeypatch):
     _highlight(db, player, DAY, "Depth beats speed.")
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
 
-    def _fail(*_a):
+    def _fail(*_a, **_k):
         raise TimeoutError("no route to host")
 
     monkeypatch.setattr(digest.mailer, "send", _fail)
@@ -525,7 +525,7 @@ def test_a_failed_run_can_be_retried_without_force(db, monkeypatch):
         pass
 
     sent = []
-    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t: sent.append(s) or {"id": "1"})
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.append(s) or {"id": "1"})
     assert digest.send_daily(db, player, DAY)["status"] == "sent"
     assert len(sent) == 1
 
@@ -736,7 +736,7 @@ def test_a_failed_send_does_not_burn_a_rung(db, monkeypatch):
     db.commit()
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
 
-    def _fail(*_a):
+    def _fail(*_a, **_k):
         raise TimeoutError("no route")
 
     monkeypatch.setattr(digest.mailer, "send", _fail)
@@ -747,6 +747,78 @@ def test_a_failed_send_does_not_burn_a_rung(db, monkeypatch):
 
     db.refresh(row)
     assert row.box == 0 and row.due == DAY  # asked again tomorrow, same rung
+
+
+# ── The profile picture in the header ─────────────────────────────────────────
+
+PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
+
+
+def test_avatar_part_splits_the_stored_data_uri():
+    part = digest.avatar_part(PNG)
+    assert part["content"] == "iVBORw0KGgoAAAANSUhEUg=="  # base64 only, no data: prefix
+    assert part["content_type"] == "image/png"
+    assert part["filename"] == "avatar.png"
+    assert part["content_id"] == digest.AVATAR_CID  # what src="cid:…" points at
+
+
+def test_avatar_part_names_a_jpeg_sensibly():
+    assert digest.avatar_part("data:image/jpeg;base64,AAAA")["filename"] == "avatar.jpg"
+
+
+def test_avatar_part_ignores_anything_unusable():
+    """A picture is the least important thing in the email — a malformed one is
+    dropped rather than risking the send."""
+    for bad in ("", "   ", "https://example.com/me.png", "data:image/png;base64,",
+                "data:text/plain;base64,AAAA", "not a uri"):
+        assert digest.avatar_part(bad) is None
+
+
+def test_the_header_shows_the_picture_by_content_id_when_sending():
+    ctx = {**_ctx(["Depth beats speed."]), "avatar": PNG}
+    html = digest.render_html(ctx, avatar_src=digest.AVATAR_SRC)
+    assert 'src="cid:arise-avatar"' in html
+    assert "base64" not in html  # the bytes travel as a part, never in the markup
+
+
+def test_the_preview_shows_the_picture_inline_instead():
+    """The in-app preview is a browser, not a mail client: cid: resolves to nothing
+    there, so with no src passed the stored data URI is used directly."""
+    ctx = {**_ctx(["Depth beats speed."]), "avatar": PNG}
+    assert PNG in digest.render_html(ctx)
+
+
+def test_the_header_is_unchanged_when_no_picture_is_set():
+    html = digest.render_html(_ctx(["Depth beats speed."]))
+    assert "<img" not in html
+    assert "Recall" in html and "Saturday, 18 July" in html
+
+
+def test_send_attaches_the_picture_and_points_the_html_at_it(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    player.avatar = PNG
+    db.commit()
+    _highlight(db, player, DAY, "Depth beats speed.")
+    seen = {}
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send",
+                        lambda s, h, t, attachments=None: seen.update(html=h, parts=attachments))
+
+    digest.send_daily(db, player, DAY)
+    assert seen["parts"][0]["content_id"] == digest.AVATAR_CID
+    assert 'src="cid:arise-avatar"' in seen["html"]
+
+
+def test_send_carries_no_attachment_without_a_picture(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _highlight(db, player, DAY, "Depth beats speed.")
+    seen = {}
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send",
+                        lambda s, h, t, attachments=None: seen.update(parts=attachments))
+
+    digest.send_daily(db, player, DAY)
+    assert seen["parts"] is None
 
 
 def test_the_email_warns_against_recognising_instead_of_recalling():

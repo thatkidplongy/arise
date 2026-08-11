@@ -425,6 +425,7 @@ def build_context(db: Session, player: Player, day: str) -> dict:
         "recall": recall_set(db, player, day),
         "thread": thread_for(db, player, day),
         "recap": recap.of(db, player, day),
+        "avatar": player.avatar or "",  # data URI; "" when no picture is set
     }
 
 
@@ -443,6 +444,38 @@ _HAIRLINE = "#E4D9C2"
 _TEXT = "#2C2720"
 _MUTED = "#7E7361"
 _ACCENT = "#B0603A"
+
+
+# The profile picture travels as an inline attachment the HTML points at by content
+# id. It can't just be the stored data URI: Gmail and Outlook strip `src="data:…"`
+# images outright, so an embedded one would arrive as a broken box every morning.
+AVATAR_CID = "arise-avatar"
+AVATAR_SRC = f"cid:{AVATAR_CID}"
+AVATAR_PX = 44
+
+_DATA_URI = re.compile(r"^data:(image/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$", re.I)
+
+
+def avatar_part(avatar: str) -> dict | None:
+    """The stored avatar as a Resend attachment, or None when there's nothing usable.
+
+    The app already keeps it as a base64 data URI (that's what an <img> in the client
+    needs), so this only splits it back into a part. Anything that isn't an inline
+    base64 image is ignored rather than repaired: a picture is the least important
+    thing in the email, and guessing at a malformed one would cost the whole send."""
+    match = _DATA_URI.match((avatar or "").strip())
+    if match is None:
+        return None
+    mime = match.group(1).lower()
+    data = "".join(match.group(2).split())  # base64 can arrive wrapped
+    if not data:
+        return None
+    return {
+        "filename": f"avatar.{mime.split('/')[-1].replace('jpeg', 'jpg')}",
+        "content": data,
+        "content_type": mime,
+        "content_id": AVATAR_CID,
+    }
 
 
 def _pretty_day(day: str) -> str:
@@ -660,7 +693,37 @@ def _recap_html(ctx: dict, rows: list[dict], divider: bool = True) -> str:
     )
 
 
-def render_html(ctx: dict) -> str:
+def _masthead(ctx: dict, avatar_src: str | None) -> str:
+    """Recall, the day, and the hunter's own face beside them when there is one.
+
+    `avatar_src` is what the <img> points at: `cid:…` for a real send, and the stored
+    data URI when it's left out — that's the in-app preview, which is a browser and
+    renders one happily."""
+    label = (
+        f'<div style="color:{_MUTED};font-size:12px;letter-spacing:.08em;'
+        f'text-transform:uppercase">Recall</div>'
+        f'<h1 style="color:{_TEXT};font-size:20px;margin:6px 0 4px;font-weight:700">'
+        f'{_pretty_day(ctx["day"])}</h1>'
+    )
+    src = avatar_src or ctx.get("avatar") or ""
+    if not src:
+        return label
+    # A table, not flexbox: Outlook ignores flex, and a two-cell row is the one layout
+    # every client agrees on. alt is empty on purpose — with images blocked, a caption
+    # where the face should be is noise, and the header reads fine without it.
+    return (
+        f'<table style="border-collapse:collapse;width:100%"><tr>'
+        f'<td style="width:{AVATAR_PX}px;padding:0 14px 0 0;vertical-align:middle">'
+        f'<img src="{src}" width="{AVATAR_PX}" height="{AVATAR_PX}" alt="" '
+        f'style="display:block;width:{AVATAR_PX}px;height:{AVATAR_PX}px;'
+        f'border-radius:{AVATAR_PX // 2}px;border:1px solid {_HAIRLINE};'
+        f'object-fit:cover"></td>'
+        f'<td style="vertical-align:middle">{label}</td>'
+        f'</tr></table>'
+    )
+
+
+def render_html(ctx: dict, avatar_src: str | None = None) -> str:
     """Inline-styled HTML in Arise's sandy palette. No template engine, no external
     CSS — mail clients strip stylesheets, so every rule has to travel inline.
 
@@ -716,10 +779,7 @@ def render_html(ctx: dict) -> str:
         f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif">'
         f'<div style="max-width:560px;margin:0 auto;background:{_CARD};'
         f'border:1px solid {_HAIRLINE};border-radius:14px;padding:28px">'
-        f'<div style="color:{_MUTED};font-size:12px;letter-spacing:.08em;'
-        f'text-transform:uppercase">Recall</div>'
-        f'<h1 style="color:{_TEXT};font-size:20px;margin:6px 0 4px;font-weight:700">'
-        f'{_pretty_day(ctx["day"])}</h1>'
+        f'{_masthead(ctx, avatar_src)}'
         f'{body}'
         f'<div style="border-top:1px solid {_HAIRLINE};margin-top:28px;padding-top:14px;'
         f'color:{_MUTED};font-size:12px">Showing up is the win. — Arise</div>'
@@ -782,8 +842,13 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
     if not ctx["highlights"] and not ctx["recall"] and not recap.had_anything(ctx["recap"]):
         return _record(db, player, day, "skipped", "nothing logged", 0)
 
+    # The picture rides along as a part, and the HTML points at it by content id —
+    # with no avatar set, both fall away and the email is what it always was.
+    part = avatar_part(ctx.get("avatar", ""))
+    html = render_html(ctx, avatar_src=AVATAR_SRC if part else None)
     try:
-        mailer.send(subject_for(ctx), render_html(ctx), render_text(ctx))
+        mailer.send(subject_for(ctx), html, render_text(ctx),
+                    attachments=[part] if part else None)
     except Exception as err:
         _record(db, player, day, "failed", _why(err), len(ctx["highlights"]))
         raise

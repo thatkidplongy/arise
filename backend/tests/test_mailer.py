@@ -43,6 +43,33 @@ def test_send_posts_the_expected_body(monkeypatch):
     assert seen["retries"] == 2  # the nightly job can ride out a rate limit
 
 
+def test_an_inline_attachment_travels_with_the_request(monkeypatch):
+    """The profile picture is a part the HTML points at by content id — it has to
+    reach Resend under `attachments` or the header renders a broken box."""
+    monkeypatch.setenv("ARISE_RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("ARISE_DIGEST_TO", "me@example.com")
+    seen = {}
+    monkeypatch.setattr(net, "post_json",
+                        lambda url, body, **k: seen.update(body) or {"id": "x"})
+
+    part = {"filename": "avatar.png", "content": "AAAA", "content_type": "image/png",
+            "content_id": "arise-avatar"}
+    mailer.send("Recall", '<img src="cid:arise-avatar">', "hi", attachments=[part])
+    assert seen["attachments"] == [part]
+
+
+def test_no_attachments_key_when_there_are_none(monkeypatch):
+    """An ordinary send keeps exactly the body it always had."""
+    monkeypatch.setenv("ARISE_RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("ARISE_DIGEST_TO", "me@example.com")
+    seen = {}
+    monkeypatch.setattr(net, "post_json",
+                        lambda url, body, **k: seen.update(body) or {"id": "x"})
+
+    mailer.send("Recall", "<p>hi</p>", "hi")
+    assert "attachments" not in seen
+
+
 def test_send_names_itself_in_the_user_agent(monkeypatch):
     """Resend is behind Cloudflare, which 403s urllib's default agent (error 1010)
     before the API ever sees the request. Dropping this header breaks every send."""

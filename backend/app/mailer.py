@@ -42,8 +42,14 @@ def enabled() -> bool:
     return bool(_api_key() and _to_address())
 
 
-def send(subject: str, html: str, text: str, timeout: float = 20.0) -> dict:
+def send(subject: str, html: str, text: str, attachments: list[dict] | None = None,
+         timeout: float = 20.0) -> dict:
     """Send one email. Returns Resend's response ({"id": ...}).
+
+    `attachments` is passed through to Resend as-is: each is a dict of `filename`,
+    base64 `content`, `content_type`, and — for an image the HTML shows inline via
+    `src="cid:…"` — a `content_id`. Omitted from the request entirely when there are
+    none, so the ordinary send keeps the body it always had.
 
     Raises ValueError when unconfigured, and lets any transport error propagate so
     the caller can record why a digest didn't go out."""
@@ -56,6 +62,8 @@ def send(subject: str, html: str, text: str, timeout: float = 20.0) -> dict:
         "html": html,
         "text": text,  # a plain-text part keeps it out of spam and readable anywhere
     }
+    if attachments:
+        body["attachments"] = attachments
     return net.post_json(
         _ENDPOINT,
         body,

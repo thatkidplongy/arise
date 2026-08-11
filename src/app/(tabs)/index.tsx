@@ -5,10 +5,8 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CraftPhaseCard } from '@/components/CraftPhaseCard';
-import { CurrentBookCard } from '@/components/CurrentBookCard';
-import type { ApiReading } from '@/lib/api';
 import { RankBadge } from '@/components/RankBadge';
-import { ReadingLogCard } from '@/components/ReadingLogCard';
+import { ReadingCard } from '@/components/ReadingCard';
 import { RecallCard } from '@/components/RecallCard';
 import { Screen } from '@/components/Screen';
 import { StatRow } from '@/components/StatRow';
@@ -68,76 +66,6 @@ function NorthStar({ value }: { value: string }) {
         </Text>
       )}
     </Pressable>
-  );
-}
-
-/** A book whose length you never set: there's nothing to be a fraction of, so it
- * shows the count and no bar rather than inventing a denominator. */
-function ReadingCount({ reading }: { reading: ApiReading }) {
-  const read = reading.chapters_read ?? 0;
-  return (
-    <>
-      <View style={styles.xpRow}>
-        <Text style={styles.xpLabel}>Chapters logged</Text>
-        <Text style={styles.xpValue}>{read}</Text>
-      </View>
-      <Text style={styles.readingMeta}>
-        No length set, so there’s no bar — add the total chapters below if you want one.
-        You decide when it’s finished.
-      </Text>
-    </>
-  );
-}
-
-/** A book whose length is known: the bar is the chapters you logged against it. */
-function ReadingBar({ reading }: { reading: ApiReading }) {
-  const read = reading.chapters_read ?? 0; // absent until the backend service restarts
-  const pct = Math.round(reading.progress * 100);
-  const done = pct >= 100;
-  return (
-    <>
-      <View style={styles.xpRow}>
-        <Text style={styles.xpLabel}>Toward finishing</Text>
-        <Text style={styles.xpValue}>
-          {read} / {reading.chapters} chapters
-        </Text>
-      </View>
-      <XpBar
-        value={Math.min(read, reading.chapters)}
-        max={reading.chapters}
-        color={done ? feedback.success : accent}
-        height={8}
-      />
-      <Text style={styles.readingMeta}>
-        {done
-          ? 'That’s the whole book by your count — the check-in will ask if you’re done.'
-          : `About ${pct}% of the way, at whatever pace suits you`}
-      </Text>
-    </>
-  );
-}
-
-/** Read-only reading progress — how far toward finishing the current book, built
- * from the chapters you logged. Logging lives just below in Today's reading, and
- * setting/changing the book below that. */
-function Reading({ reading }: { reading: ApiReading }) {
-  return (
-    <SystemPanel
-      title="Reading"
-      sub={reading.books_finished ? `${reading.books_finished} finished` : undefined}
-    >
-      <Text style={styles.readingBook} numberOfLines={2}>
-        {reading.book}
-      </Text>
-      {reading.measure === 'chapters' ? (
-        <ReadingBar reading={reading} />
-      ) : (
-        <ReadingCount reading={reading} />
-      )}
-      <Text style={[styles.readingToday, { color: reading.done_today ? feedback.success : text.faint }]}>
-        {reading.done_today ? '✓ Read today' : 'Not read yet today'}
-      </Text>
-    </SystemPanel>
   );
 }
 
@@ -277,13 +205,8 @@ export default function StatusScreen() {
         )}
       </Pressable>
 
-      {state.reading ? <Reading reading={state.reading} /> : null}
-
-      {/* What you read today — the only thing that moves the progress above. */}
-      <ReadingLogCard />
-
-      {/* Set / change the book you're reading — grouped with its progress above. */}
-      <CurrentBookCard />
+      {/* Progress, today's log and the book itself — one loop, one card. */}
+      <ReadingCard />
 
       {/* The system-design plan, paced the same way: by what you've read. */}
       <CraftPhaseCard />
@@ -395,9 +318,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  readingBook: { color: text.primary, fontSize: 15, fontWeight: '700', marginBottom: 12, lineHeight: 21 },
-  readingMeta: { color: text.secondary, fontSize: 12, lineHeight: 17, marginTop: 10 },
-  readingToday: { fontSize: 12, fontWeight: '700', marginTop: 6 },
   reminder: {
     color: text.faint,
     fontSize: 12,
