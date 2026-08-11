@@ -1,5 +1,7 @@
 """Integration tests: the HTTP API end to end, against a throwaway database."""
 
+from app import quests
+
 DAY = "2026-07-18"
 DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
 
@@ -59,8 +61,10 @@ def test_state_shape(client):
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
-    # Craft opens with its deep-work floor and defaults to steady growth (not interview).
-    assert "minutes" in _quest(s, "d-craft")["steps"][0]
+    # Craft opens by studying the system-design notes, and a new player starts at
+    # week 1 of the plan — foundations, not a coding drill.
+    assert "Notion" in _quest(s, "d-craft")["steps"][0]
+    assert _quest(s, "d-craft")["title"] in {v[0] for v in quests.craft_phase(1)}
     assert s["player"]["interview_mode"] is False
     assert s["player"]["total_xp"] == 0
     # Progression starts everyone at Lv0 with a permanent peak of 0.
@@ -110,8 +114,13 @@ def test_interview_mode_toggles_craft_quests(client):
     body = client.put(f"/interview?day={DAY}", json={"enabled": True}).json()
     assert body["player"]["interview_mode"] is True
     assert _quest(body, "w-craft")["title"] in interview_titles
-    # The daily still opens with its deep-work floor, then an interview drill.
-    assert "minutes" in _quest(body, "d-craft")["steps"][0]
+    # The daily still opens with its floor, then an interview drill — and interview
+    # mode opts out of the 12-week plan, which isn't what next week's interview needs.
+    assert "Notion" in _quest(body, "d-craft")["steps"][0]
+    assert _quest(body, "d-craft")["title"] in {
+        "Daily DSA", "Explain Your Solution", "Pattern of the Day", "Behavioural Prep",
+        "Mock Interview", "Mock System Design", "Flashcard Fundamentals", "Timed Set",
+    }
     # Turning it off restores steady craft growth.
     off = client.put(f"/interview?day={DAY}", json={"enabled": False}).json()
     assert off["player"]["interview_mode"] is False

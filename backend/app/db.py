@@ -87,6 +87,7 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # rather than all coming due at once.
     ("highlights", "box", "INTEGER DEFAULT 0"),
     ("highlights", "due", "VARCHAR DEFAULT ''"),
+    ("players", "craft_started_week", "VARCHAR DEFAULT ''"),
 ]
 
 

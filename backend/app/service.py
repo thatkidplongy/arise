@@ -376,6 +376,12 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
     for q in defs:
         if q.id == "d-jp":
             continue  # Japanese follows a fixed phased plan, not the LLM
+        if q.id == "d-craft" and not player.interview_mode:
+            # Craft's daily follows the 12-week system-design plan and points at the
+            # hunter's own Notion pages, which the LLM has never seen — anything it
+            # invented here would send them somewhere that doesn't exist. Interview
+            # mode isn't phase-bound, so it keeps its generated variety.
+            continue
         pk = quests.period_key(q.cadence, day)
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue

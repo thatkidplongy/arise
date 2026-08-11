@@ -32,7 +32,7 @@ SEED_QUESTS = [
     # Craft (CFT) — deliberate engineering practice toward Senior: fluency →
     # patterns → system design. The daily is a small deep-work floor; interview
     # mode (a Player toggle) shifts the weekly/side/daily toward interview prep.
-    dict(id="d-craft", title="The Forge", desc="Deliberate coding practice", stat="CFT", xp=10, cadence="daily", target=1),
+    dict(id="d-craft", title="The Architect", desc="System design, from your own notes", stat="CFT", xp=10, cadence="daily", target=1),
     dict(id="w-craft", title="Master Work", desc="One real step toward Senior this week", stat="CFT", xp=40, cadence="weekly", target=1),
     dict(id="s-craft", title="Sharpen the Axe", desc="A focused craft rep", stat="CFT", xp=15, cadence="side", target=1),
 ]

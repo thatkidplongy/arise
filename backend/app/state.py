@@ -50,6 +50,10 @@ def get_or_create_player(db: Session) -> Player:
         # Start the Japanese plan (kana → grammar → kanji) from this week.
         player.japanese_started_week = game.week_key(date.today().isoformat())
         db.commit()
+    if not player.craft_started_week:
+        # Start the 12-week system-design plan (foundations → … → design reps) now.
+        player.craft_started_week = game.week_key(date.today().isoformat())
+        db.commit()
     return player
 
 
@@ -181,7 +185,19 @@ def generated_by(db: Session, player: Player) -> dict[tuple[str, str], dict]:
 def _jp_week(player: Player, day: str) -> int:
     """Which week of the Japanese plan the player is in (1-indexed; week 1 = the
     anchor week). 0 when the anchor isn't set yet."""
-    anchor = player.japanese_started_week
+    return _weeks_since(player.japanese_started_week, day)
+
+
+def _craft_week(player: Player, day: str) -> int:
+    """Which week of the system-design plan the player is in (1-indexed). The phase
+    follows from it: 1–2 foundations, 3–5 distributing data, 6–8 distributed truths,
+    9–10 derived data, 11+ design reps."""
+    return _weeks_since(player.craft_started_week, day)
+
+
+def _weeks_since(anchor: str, day: str) -> int:
+    """Weeks from an ISO-week anchor to `day`, 1-indexed (week 1 = the anchor week).
+    0 when the anchor isn't set yet."""
     if not anchor:
         return 0
     elapsed = (date.fromisoformat(day) - progression.week_start(anchor)).days
@@ -198,6 +214,7 @@ def resolve_content(
     book: str,
     interview: bool,
     jp_week: int,
+    craft_week: int,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a quest shows today: LLM-generated
     content if present (with the mandatory leveled floor re-applied), else the
@@ -212,7 +229,7 @@ def resolve_content(
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
-        interview=interview, jp_week=jp_week,
+        interview=interview, jp_week=jp_week, craft_week=craft_week,
     )
     return title, desc, quests.cap_steps(steps, len(floor)), resource
 
@@ -229,6 +246,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     gen_by = generated_by(db, player)
     levels = progression_levels(db, player, day)
     jp_week = _jp_week(player, day)
+    craft_week = _craft_week(player, day)
     titles: dict[str, str] = {}
     for quest in quest_defs(db):
         title, _, _, _ = resolve_content(
@@ -239,6 +257,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             book=player.current_book,
             interview=player.interview_mode,
             jp_week=jp_week,
+            craft_week=craft_week,
         )
         titles[quest.id] = title
     return titles
@@ -256,6 +275,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         book=player.current_book,
         interview=player.interview_mode,
         jp_week=_jp_week(player, day),
+        craft_week=_craft_week(player, day),
     )
     return steps
 
@@ -370,7 +390,7 @@ def snapshot(agg: dict) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, interview=False, jp_week=0, notes_by=None) -> dict:
+               levels=None, interview=False, jp_week=0, craft_week=0, notes_by=None) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -380,6 +400,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         book=book,
         interview=interview,
         jp_week=jp_week,
+        craft_week=craft_week,
     )
     checked = checks_by.get((q.id, pk), set())
     return {
@@ -880,7 +901,8 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "daily_quote": insights.daily_quote(db, player.id, day),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
-                       prog_levels, player.interview_mode, _jp_week(player, day), notes_by)
+                       prog_levels, player.interview_mode, _jp_week(player, day),
+                       _craft_week(player, day), notes_by)
             for q in defs
             if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],

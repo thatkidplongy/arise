@@ -39,6 +39,9 @@ class Player(Base):
     # The ISO week Japanese study began — anchors the phased learning plan
     # (kana → grammar → kanji). Set the first time we see the player.
     japanese_started_week: Mapped[str] = mapped_column(String, default="")
+    # The ISO week the system-design plan began — anchors Craft's 12-week phases
+    # (foundations → distributing data → distributed truths → derived data → reps).
+    craft_started_week: Mapped[str] = mapped_column(String, default="")
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)

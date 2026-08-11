@@ -101,23 +101,119 @@ def test_all_resource_keys_exist_as_variant_titles():
     assert not missing, missing  # every citation maps to a real variant
 
 
-def test_craft_daily_floor_is_deep_work_minutes():
-    # Craft's floor is a deep-work minimum that climbs with level (gentle at Lv0).
+def test_craft_daily_floor_is_studying_the_notes():
+    """Craft's floor is no longer minutes at a keyboard — it's studying the
+    system-design notes, climbing by how much you produce from memory."""
     q = _q("d-craft", "CFT", "daily")
-    lv0 = quests.content_for(q, "2026-07-18", level=0)[2]
-    lv5 = quests.content_for(q, "2026-07-18", level=5)[2]
+    lv0 = quests.content_for(q, "2026-07-18", level=0, craft_week=1)[2]
+    lv5 = quests.content_for(q, "2026-07-18", level=5, craft_week=1)[2]
     assert lv0[0] == quests.FLOORS["d-craft"][0][0]
-    assert "15 focused minutes" in lv0[0] and "45 minutes" in lv5[0]
+    assert "Notion" in lv0[0]
+    assert "cold" in lv5[0]  # the top rung asks you to produce it, not recognise it
+    assert not any("minutes" in step for step in lv0 + lv5)
 
 
-def test_craft_band_climbs_from_fluency_to_system_design():
-    # Low levels favour fundamentals/fluency; high levels reach system design.
+def test_craft_daily_follows_the_twelve_week_plan_not_the_level():
+    """The phase comes from the plan week, so theory lands before the reps that need
+    it — a high level doesn't skip you ahead, and a low one doesn't hold you back."""
     q = _q("d-craft", "CFT", "daily")
-    low = {quests.content_for(q, f"2026-07-{d:02d}", level=0)[0] for d in range(1, 28)}
-    high = {quests.content_for(q, f"2026-07-{d:02d}", level=5)[0] for d in range(1, 28)}
-    depth = {"Systems Thinking", "Architecture Read", "Tradeoff Study"}
-    assert not (low & depth)  # beginners never see the depth band
-    assert high & depth  # advanced work reaches system design
+    day = "2026-07-18"
+    week1 = {quests.content_for(q, day, level=lvl, craft_week=1)[0] for lvl in range(6)}
+    assert len(week1) == 1  # level changes the floor, never the phase
+
+    # Each week draws from its own phase — the theory phases before the rep phases.
+    phases = {wk: {v[0] for v in quests.craft_phase(wk)} for wk in (1, 4, 7, 9, 12)}
+    assert "Foundations · Theory" in phases[1]
+    assert "Distributing Data · Theory" in phases[4]
+    assert "Distributed Truths · Theory" in phases[7]
+    assert "Derived Data · Theory" in phases[9]
+    assert "Design Rep · News Feed" in phases[12]
+    for wk, titles in phases.items():
+        assert quests.content_for(q, day, craft_week=wk)[0] in titles
+
+
+def test_craft_stays_on_design_reps_past_the_plan():
+    """Week 12 is the exit criteria, not a graduation — reps continue after it."""
+    for week in (13, 30, 200):
+        assert quests.craft_phase(week) is quests.craft_phase(12)
+
+
+def test_craft_points_at_notes_that_exist_rather_than_a_coding_kata():
+    """Every phase variant cites where to read it, and none of it is code-writing."""
+    q = _q("d-craft", "CFT", "daily")
+    banned = ("solve", "leetcode", "kata", "refactor", "write a test", "repo")
+    for week in (1, 3, 6, 9, 11):
+        title, _, steps, resource = quests.content_for(q, "2026-07-18", craft_week=week)
+        assert resource, title  # always names the page or chapter to read
+        joined = " ".join(steps).lower()
+        assert not any(word in joined for word in banned), (title, steps)
+
+
+def test_craft_rotates_within_a_phase_day_to_day():
+    q = _q("d-craft", "CFT", "daily")
+    seen = {quests.content_for(q, f"2026-07-{d:02d}", craft_week=1)[0] for d in range(1, 29)}
+    assert len(seen) > 1  # the same phase, but not the same task every day
+
+
+def test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown():
+    """Architecture is only half of 'system thinking'. The other half needs a real
+    system rather than a chapter, so the slot leaves the books regularly.
+
+    Craft is not a daily — `active_daily_ids` rotates it in every 3rd day — so this
+    counts only the days it's actually on the board. If that rotation ever changes,
+    this is the test that notices."""
+    from datetime import date, timedelta
+
+    from app import state
+
+    q = _q("d-craft", "CFT", "daily")
+    systems = {v[0] for v in quests._CRAFT_SYSTEMS}
+    start = date(2026, 8, 1)
+    shown = systems_days = 0
+    for offset in range(84):  # 12 weeks
+        day = (start + timedelta(days=offset)).isoformat()
+        if "d-craft" not in state.active_daily_ids(day):
+            continue
+        shown += 1
+        if quests.content_for(q, day, craft_week=1)[0] in systems:
+            systems_days += 1
+
+    assert shown > 20, shown  # Craft really is on the board regularly
+    assert systems_days == shown // 3  # exactly every third Craft day
+    assert 8 <= systems_days <= 12  # ≈ once a week across 12 weeks
+
+
+def test_systems_reps_work_on_a_real_system_not_a_chapter():
+    """The whole point of this strand: it can't be satisfied by more reading."""
+    for title, desc, steps, resource in quests._CRAFT_SYSTEMS:
+        joined = " ".join(steps).lower()
+        assert "ddia" not in joined and "chapter" not in joined, title
+        assert resource  # points back at the capture the framework came from
+
+
+def test_every_phase_can_land_a_note_in_the_evergreen_shape():
+    """Their L7 rule is one atomic idea per note, self-contained and linked back to
+    its source — so the note step has to say that, not just 'write a note'."""
+    for week in (1, 4, 7, 9, 12):
+        notes = [v for v in quests.craft_phase(week) if "Notes" in v[0] or "Missing" in v[0]]
+        assert notes, week
+        steps = " ".join(notes[0][2]).lower()
+        assert "atomic" in steps and "evergreen note" in steps
+
+
+def test_the_top_floor_rung_asks_for_the_evergreen_note_not_just_a_scribble():
+    top = quests.FLOORS["d-craft"][-1][0]
+    assert "atomic" in top.lower() and "evergreen" in top.lower()
+
+
+def test_notes_are_rephrased_never_copy_pasted():
+    """L6's rule, and the same principle the Learn tab already asks for."""
+    rephrase = [
+        v for week in (1, 4, 7, 9) for v in quests.craft_phase(week)
+        if "rephrase" in " ".join(v[2]).lower()
+    ]
+    assert rephrase
+    assert all("never copy-pasted" in " ".join(v[2]) for v in rephrase)
 
 
 def test_interview_mode_swaps_craft_pool():

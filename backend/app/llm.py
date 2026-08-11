@@ -92,6 +92,11 @@ def _build_prompt(slots: list[dict], profile: dict) -> str:
         lines.append(f"  North Star (their reason): {profile['north_star']}")
     if profile.get("current_book"):
         lines.append(f"  Currently reading: {profile['current_book']}")
+    lines.append(
+        "  Craft (CFT) is system thinking, design and architecture — not writing code."
+        " Code generation is cheap now; the judgment isn't. If you write a Craft"
+        " quest, make it reading/designing/critiquing systems, never a coding kata."
+    )
     if profile.get("interview_mode"):
         lines.append(
             "  Interview prep mode is ON — for Craft (CFT) slots, favour interview"
