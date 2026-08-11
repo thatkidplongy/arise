@@ -423,7 +423,22 @@ def test_send_daily_skips_an_empty_day(db, monkeypatch):
     player = state.get_or_create_player(db)
     monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
     out = digest.send_daily(db, player, DAY)
-    assert out["status"] == "skipped" and out["detail"] == "nothing to recall"
+    assert out["status"] == "skipped" and out["detail"] == "nothing logged"
+
+
+def test_send_daily_still_sends_a_day_with_no_learnings_but_a_record(db, monkeypatch):
+    """A day of quests and spending is worth an email even with nothing to recall —
+    the recap is the record of it."""
+    player = state.get_or_create_player(db)
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    sent = {}
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t: sent.update(subject=s, text=t))
+    db.add(Completion(player_id=player.id, quest_id="d-train", xp=10, day=DAY))
+    db.commit()
+
+    out = digest.send_daily(db, player, DAY)
+    assert out["status"] == "sent"
+    assert "THE DAY ITSELF" in sent["text"] and "1 quest finished" in sent["text"]
 
 
 def test_send_daily_sends_once_and_then_skips(db, monkeypatch):

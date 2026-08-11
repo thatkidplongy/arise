@@ -217,6 +217,33 @@ def resolve_content(
     return title, desc, quests.cap_steps(steps, len(floor)), resource
 
 
+def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
+    """Slot id → the title that slot showed on `day`, resolved exactly the way the
+    quest card resolved it (LLM content if it was cached, else the handcrafted pool
+    variant for that period and level).
+
+    The recap in the morning email names the quests you finished, and naming a slot
+    something you never saw on screen ("Grimoire Study" for what the card called
+    "Mind Map") reads as a different app. One resolver, so they can't drift."""
+    prefs = preferences_of(db, player)
+    gen_by = generated_by(db, player)
+    levels = progression_levels(db, player, day)
+    jp_week = _jp_week(player, day)
+    titles: dict[str, str] = {}
+    for quest in quest_defs(db):
+        title, _, _, _ = resolve_content(
+            quest, day,
+            prefs=prefs,
+            gen_by=gen_by,
+            level=levels.get(quest.stat, 0),
+            book=player.current_book,
+            interview=player.interview_mode,
+            jp_week=jp_week,
+        )
+        titles[quest.id] = title
+    return titles
+
+
 def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> list[str]:
     """The step list a quest shows today, for the step-toggle write path — the same
     content the read model renders (see `resolve_content`), so a tick lands on the

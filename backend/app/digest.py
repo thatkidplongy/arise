@@ -28,7 +28,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import llm, mailer
+from . import llm, mailer, recap
 from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
                      ReadingLog, Thread)
 
@@ -424,6 +424,7 @@ def build_context(db: Session, player: Player, day: str) -> dict:
         ],
         "recall": recall_set(db, player, day),
         "thread": thread_for(db, player, day),
+        "recap": recap.of(db, player, day),
     }
 
 
@@ -536,12 +537,18 @@ def _uncued(ctx: dict) -> list[dict]:
     return [h for h in ctx["highlights"] if not h.get("cue")]
 
 
+def _recap_rows(ctx: dict) -> list[dict]:
+    """The day's record, tolerating a context built before the recap existed."""
+    return recap.lines(ctx.get("recap") or recap.empty(ctx["day"]))
+
+
 def render_text(ctx: dict) -> str:
     """The plain-text part — also the readable fallback if the HTML is stripped."""
     items = quiz_items(ctx)
+    rows = _recap_rows(ctx)
     out = [f"Recall · {_pretty_day(ctx['day'])}", ""]
 
-    if not items and not _uncued(ctx):
+    if not items and not _uncued(ctx) and not rows:
         out += ["Nothing logged. A quiet day is still a day — rest counts.", "", "— Arise"]
         return "\n".join(out)
 
@@ -562,6 +569,17 @@ def render_text(ctx: dict) -> str:
         out += ["", "Also from yesterday", ""]
         for h in extra:
             out.append(f"  - {h['text']}")
+
+    if rows:
+        xp = (ctx.get("recap") or {}).get("xp", 0)
+        heading = "THE DAY ITSELF" + (f" — {xp} XP" if xp else "")
+        # The rule only separates this from something above it.
+        out += ["", "─" * 40, ""] if (items or extra) else [""]
+        out += [heading, ""]
+        for row in rows:
+            out.append(f"  • {row['label']}")
+            if row["detail"]:
+                out.append(f"    {row['detail']}")
 
     thread = ctx.get("thread")
     if thread:
@@ -613,6 +631,35 @@ def _numbered(items: list[dict], answers: bool) -> str:
     return f'<table style="border-collapse:collapse;width:100%">{"".join(rows)}</table>'
 
 
+def _recap_html(ctx: dict, rows: list[dict], divider: bool = True) -> str:
+    """The day's record as a quiet table — a bold line per thing done, its detail
+    under it. A table rather than a list because Outlook indents `ul` unpredictably,
+    and this section is the one people scan rather than read."""
+    xp = (ctx.get("recap") or {}).get("xp", 0)
+    cells = []
+    for row in rows:
+        detail = (
+            f'<div style="color:{_MUTED};font-size:12px;margin-top:3px">{row["detail"]}</div>'
+            if row["detail"] else ""
+        )
+        cells.append(
+            f'<tr><td style="padding:0 0 12px;line-height:1.45">'
+            f'<span style="color:{_TEXT};font-size:15px">{row["label"]}</span>'
+            f'{detail}</td></tr>'
+        )
+    earned = (
+        f'<div style="color:{_MUTED};font-size:12px;margin:-6px 0 14px">{xp} XP earned</div>'
+        if xp else ""
+    )
+    rule = f'<div style="border-top:1px solid {_HAIRLINE};margin:30px 0 0"></div>' if divider else ""
+    return (
+        rule
+        + _h2("The day itself")
+        + earned
+        + f'<table style="border-collapse:collapse;width:100%">{"".join(cells)}</table>'
+    )
+
+
 def render_html(ctx: dict) -> str:
     """Inline-styled HTML in Arise's sandy palette. No template engine, no external
     CSS — mail clients strip stylesheets, so every rule has to travel inline.
@@ -622,8 +669,9 @@ def render_html(ctx: dict) -> str:
     beside its question removes that entirely."""
     items = quiz_items(ctx)
     extra = _uncued(ctx)
+    rows = _recap_rows(ctx)
 
-    if not items and not extra:
+    if not items and not extra and not rows:
         body = (
             f'<ul style="margin:0;padding-left:18px">'
             f'{_li("Nothing logged. A quiet day is still a day — rest counts.")}</ul>'
@@ -645,6 +693,8 @@ def render_html(ctx: dict) -> str:
             body += f'<ul style="margin:0;padding-left:18px">' + "".join(
                 _li(h["text"]) for h in extra
             ) + "</ul>"
+        if rows:
+            body += _recap_html(ctx, rows, divider=bool(items or extra))
         thread = ctx.get("thread")
         if thread:
             body += (
@@ -727,8 +777,10 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
         return _record(db, player, day, "skipped", "mailer not configured", 0)
 
     ctx = build_context(db, player, day)
-    if not ctx["highlights"] and not ctx["recall"]:
-        return _record(db, player, day, "skipped", "nothing to recall", 0)
+    # A day with nothing to recall can still be a day worth a record — quests, money,
+    # to-dos. Only a genuinely empty day is skipped.
+    if not ctx["highlights"] and not ctx["recall"] and not recap.had_anything(ctx["recap"]):
+        return _record(db, player, day, "skipped", "nothing logged", 0)
 
     try:
         mailer.send(subject_for(ctx), render_html(ctx), render_text(ctx))
