@@ -147,3 +147,56 @@ def test_parse_subject_reads_works():
     assert len(items) == 1
     assert items[0]["title"] == "Deep Work" and items[0]["author"] == "Cal Newport"
     assert items[0]["cover_url"] == "https://covers.openlibrary.org/b/id/123-M.jpg"
+
+
+# ── Curated shelves ───────────────────────────────────────────────────────────
+
+
+def test_every_curated_book_is_complete_enough_to_pick():
+    """The picker estimates chapters from `pages` and shows a cover, so a shelf entry
+    missing either arrives as a blank card that sets a book with no finish line."""
+    for shelf in books.CURATED:
+        assert shelf["label"] and shelf["books"], shelf["label"]
+        for b in shelf["books"]:
+            assert b["title"] and b["author"], b
+            assert b["pages"] > 0, b["title"]
+            assert b["cover_url"].startswith("https://covers.openlibrary.org/"), b["title"]
+            assert 1900 < b["year"] <= 2030, b["title"]
+
+
+def test_no_book_is_shelved_twice():
+    """A duplicate across shelves reads as a bug while browsing, and quietly says two
+    different topics have the same single answer."""
+    titles = [b["title"] for shelf in books.CURATED for b in shelf["books"]]
+    assert len(titles) == len(set(titles))
+
+
+def test_suggestions_stand_alone_when_open_library_is_down(monkeypatch):
+    """The curated shelves need no network — a browse must never come back empty just
+    because Open Library is having a day."""
+    def _down(*_a, **_k):
+        raise TimeoutError("openlibrary unreachable")
+
+    monkeypatch.setattr(books.net, "get_json", _down)
+    shelves = books.suggestions()
+    assert [s["label"] for s in shelves] == [s["label"] for s in books.CURATED]
+    assert all(s["books"] for s in shelves)
+
+
+def test_the_curated_shelves_come_before_the_subject_shelves(monkeypatch):
+    monkeypatch.setattr(books, "SHELVES", [("Grow", "self_help")])
+    monkeypatch.setattr(books.net, "get_json", lambda *a, **k: {"works": [
+        {"title": "Something Tagged", "authors": [{"name": "Someone"}]},
+    ]})
+    labels = [s["label"] for s in books.suggestions()]
+    assert labels[0] == books.CURATED[0]["label"]
+    assert labels[-1] == "Grow"
+
+
+def test_a_caller_cannot_mutate_the_curated_shelves(monkeypatch):
+    """suggestions() hands out its own lists; the module's data is the source of
+    truth for every later browse in the process."""
+    monkeypatch.setattr(books, "SHELVES", [])
+    before = len(books.CURATED[0]["books"])
+    books.suggestions()[0]["books"].clear()
+    assert len(books.CURATED[0]["books"]) == before
