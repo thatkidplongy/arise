@@ -174,9 +174,16 @@ def source_label(entries: list[dict]) -> str:
     return ""
 
 
-def build_highlights(db: Session, player: Player, day: str) -> list[Highlight]:
+def build_highlights(db: Session, player: Player, day: str,
+                     problems: list[str] | None = None) -> list[Highlight]:
     """Distil `day` into keepable lines, once. Idempotent: a day that already has
-    highlights returns them untouched rather than paying for a second LLM call."""
+    highlights returns them untouched rather than paying for a second LLM call.
+
+    A distillation that fails is not fatal: the reason is appended to `problems` and
+    no highlights are returned. The rest of the email — the spaced recall and the
+    day's record — needs no model at all, and losing the whole 7am email because a
+    free-tier quota ran out is the worst possible trade. Nothing is written either,
+    so the day distils properly the next time it's asked for."""
     existing = (
         db.query(Highlight)
         .filter_by(player_id=player.id, day=day)
@@ -190,7 +197,14 @@ def build_highlights(db: Session, player: Player, day: str) -> list[Highlight]:
     if not entries or not llm.enabled():
         return []
 
-    items = llm.distill_learning(entries)["highlights"]
+    try:
+        items = llm.distill_learning(entries)["highlights"]
+    except Exception as err:
+        reason = f"not distilled ({_why(err)})"
+        print(f"[arise.digest] {reason}; sending the rest of the email.", file=sys.stderr)
+        if problems is not None:
+            problems.append(reason)
+        return []
     if not items:
         return []
 
@@ -410,9 +424,14 @@ def _interleave(picks: list[dict]) -> list[dict]:
 
 
 def build_context(db: Session, player: Player, day: str) -> dict:
-    """Everything the email needs for `day`, built once and shared by preview and send."""
-    highlights = build_highlights(db, player, day)
+    """Everything the email needs for `day`, built once and shared by preview and send.
+
+    `problems` collects anything that degraded the build (a distillation that
+    couldn't run) so the send can record it. It never stops the email."""
+    problems: list[str] = []
+    highlights = build_highlights(db, player, day, problems)
     return {
+        "problems": problems,
         "day": day,
         "name": player.name,
         "highlights": [
@@ -837,10 +856,11 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
         return _record(db, player, day, "skipped", "mailer not configured", 0)
 
     ctx = build_context(db, player, day)
+    notes = "; ".join(ctx.get("problems") or [])
     # A day with nothing to recall can still be a day worth a record — quests, money,
     # to-dos. Only a genuinely empty day is skipped.
     if not ctx["highlights"] and not ctx["recall"] and not recap.had_anything(ctx["recap"]):
-        return _record(db, player, day, "skipped", "nothing logged", 0)
+        return _record(db, player, day, "skipped", notes or "nothing logged", 0)
 
     # The picture rides along as a part, and the HTML points at it by content id —
     # with no avatar set, both fall away and the email is what it always was.
@@ -856,4 +876,6 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
     # Only after it actually left: a send that failed asks the same questions again
     # tomorrow rather than silently burning a rung.
     advance_shown(db, player, day, quiz_items(ctx))
-    return _record(db, player, day, "sent", "", len(ctx["highlights"]))
+    # 'sent' with a note: the email went out, and the note says what it went out
+    # without — otherwise a quota-shaped hole in a morning leaves no trace anywhere.
+    return _record(db, player, day, "sent", notes, len(ctx["highlights"]))

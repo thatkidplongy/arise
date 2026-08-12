@@ -235,6 +235,55 @@ def test_build_highlights_persists_distilled_lines(db, monkeypatch):
     assert len(stored) == 1
 
 
+class _Exhausted(Exception):
+    """Gemini's free-tier daily cap, as urllib raises it."""
+    code = 429
+
+    def read(self):
+        return b"Quota exceeded for metric: generate_content_free_tier_requests"
+
+
+def test_a_failed_distillation_is_reported_not_raised(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _learn(db, player, DAY, source="Deep Work, ch 2")
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "distill_learning", lambda _e: (_ for _ in ()).throw(_Exhausted()))
+
+    problems: list[str] = []
+    assert digest.build_highlights(db, player, DAY, problems) == []
+    assert problems and problems[0].startswith("not distilled (_Exhausted 429")
+    # Nothing written, so the day distils properly once there's quota again.
+    assert db.query(Highlight).filter_by(player_id=player.id, day=DAY).count() == 0
+
+
+def test_the_email_still_goes_out_when_distilling_fails(db, monkeypatch):
+    """A free-tier quota running out must not cost the whole morning: the day's
+    record and the spaced recall need no model at all."""
+    player = state.get_or_create_player(db)
+    _learn(db, player, DAY, source="Deep Work, ch 2")
+    db.add(Completion(player_id=player.id, quest_id="d-train", xp=10, day=DAY))
+    db.commit()
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "distill_learning", lambda _e: (_ for _ in ()).throw(_Exhausted()))
+    sent = {}
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send",
+                        lambda s, h, t, **_k: sent.update(subject=s, text=t) or {"id": "1"})
+
+    out = digest.send_daily(db, player, DAY)
+    assert out["status"] == "sent"
+    assert "1 quest finished" in sent["text"]  # the recap made it
+    assert "429" in out["detail"]  # and the hole in it is on the record
+
+
+def test_a_clean_send_records_no_note(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _highlight(db, player, DAY, "Depth beats speed.")
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: {"id": "1"})
+    assert digest.send_daily(db, player, DAY)["detail"] == ""
+
+
 # ── recall_set — the spaced part ──────────────────────────────────────────────
 
 
