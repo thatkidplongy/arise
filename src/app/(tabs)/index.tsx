@@ -4,10 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { RankBadge } from '@/components/RankBadge';
-import { ReadingCard } from '@/components/ReadingCard';
-import { RecallCard } from '@/components/RecallCard';
 import { Screen } from '@/components/Screen';
 import { StatRow } from '@/components/StatRow';
 import { DailyQuote, Reminders } from '@/components/StatusCards';
@@ -101,8 +98,6 @@ export default function StatusScreen() {
       <NorthStar value={player.north_star} />
 
       {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
-
-      <RecallCard items={state.recall} />
 
       <SystemPanel>
         <View style={styles.identityRow}>
@@ -204,12 +199,6 @@ export default function StatusScreen() {
           </>
         )}
       </Pressable>
-
-      {/* Progress, today's log and the book itself — one loop, one card. */}
-      <ReadingCard />
-
-      {/* The system-design plan, paced the same way: by what you've read. */}
-      <CraftPhaseCard />
 
       {next_rank ? (
         <SystemPanel title="Next rank">

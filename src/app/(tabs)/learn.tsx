@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { CraftPhaseCard } from '@/components/CraftPhaseCard';
+import { ReadingCard } from '@/components/ReadingCard';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
@@ -279,16 +280,21 @@ export default function LearnScreen() {
 
   return (
     <Screen>
-      <BackLink />
       <View style={styles.head}>
         <Text style={styles.h1}>Learn</Text>
-        <Text style={styles.sub}>Log what you read. Get it back when it counts.</Text>
+        <Text style={styles.sub}>What you’re reading, and what comes back.</Text>
       </View>
 
       {!state ? (
         <ConnectionPanel />
       ) : (
         <>
+          {/* The two things being worked through, then everything else you read.
+              Both are paced by what you log, never by a schedule. */}
+          <ReadingCard />
+
+          <CraftPhaseCard />
+
           <Capture />
 
           <SystemPanel title="Today" sub={learnings.length ? `${learnings.length}` : undefined}>

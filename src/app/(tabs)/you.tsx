@@ -12,7 +12,7 @@ import { accent, feedback, STAT_META, surface, text } from '@/theme';
 // The occasional screens live here rather than crowding the tab bar. Adding more
 // later? Drop another row in — the bar stays at five.
 const ITEMS = [
-  { icon: 'bulb-outline', label: 'Learn', sub: 'What you read · tomorrow’s recall', route: '/learn' },
+  { icon: 'nutrition-outline', label: 'Food', sub: 'Meals & macros · groceries', route: '/body' },
   { icon: 'book-outline', label: 'Journal', sub: 'Write freely · quest reflections', route: '/journal' },
   { icon: 'wallet-outline', label: 'Money', sub: 'Spending & income · weekly totals', route: '/money' },
   { icon: 'trophy-outline', label: 'Achievements', sub: 'Titles & milestones', route: '/achievements' },

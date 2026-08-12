@@ -14,9 +14,11 @@ type IconName = ComponentProps<typeof Ionicons>["name"];
 const ICONS: Record<string, { on: IconName; off: IconName }> = {
   index: { on: "person", off: "person-outline" },
   quests: { on: "flash", off: "flash-outline" },
-  body: { on: "nutrition", off: "nutrition-outline" },
+  learn: { on: "bulb", off: "bulb-outline" },
   inspire: { on: "flame", off: "flame-outline" },
   you: { on: "person-circle", off: "person-circle-outline" },
+  // Off the bar for now, but a glyph costs nothing and the route still works.
+  body: { on: "nutrition", off: "nutrition-outline" },
 };
 const FALLBACK_GLYPH = { on: "ellipse", off: "ellipse-outline" } as const;
 
