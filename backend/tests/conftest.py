@@ -37,6 +37,17 @@ def _reset_schema() -> None:
     Base.metadata.create_all(engine)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_llm_budget():
+    """The model budget is module state, so one test's spending would otherwise be
+    another's ceiling."""
+    from app import llm
+
+    llm.reset_budget()
+    yield
+    llm.reset_budget()
+
+
 @pytest.fixture
 def client():
     """A TestClient on a freshly-seeded database (lifespan seeds the quests)."""

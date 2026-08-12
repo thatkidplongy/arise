@@ -436,7 +436,9 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
     the result. No key, nothing to generate, or any failure → state is unchanged
     (the handcrafted pools). The mandatory floor is re-applied on read, so this
     can never drop a non-negotiable."""
-    if not llm.enabled():
+    if not llm.enabled() or not llm.can_generate():
+        # Out of budget → the pools, silently. This runs on every refresh, so
+        # without the check a refusal is re-asked on every tab you open.
         return build_state(db, player, day)
     defs = quest_defs(db)
     prog = progression_of(db, player, day)

@@ -200,6 +200,7 @@ def build_highlights(db: Session, player: Player, day: str,
     try:
         items = llm.distill_learning(entries)["highlights"]
     except Exception as err:
+        llm.note_refusal(err)  # a per-day refusal closes the window for everyone
         reason = f"not distilled ({_why(err)})"
         print(f"[arise.digest] {reason}; sending the rest of the email.", file=sys.stderr)
         if problems is not None:

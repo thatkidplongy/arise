@@ -18,10 +18,101 @@ without extra deps.
 import json
 import os
 import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from . import net
 
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+# ── The free tier's daily budget ─────────────────────────────────────────────
+#
+# Two things share one small allowance, and they are not equally important.
+# Quest generation runs on every refresh — every tab you open — and degrades
+# invisibly to the handcrafted pools when it can't run. The nightly distillation
+# runs once and has no fallback at all: a day it misses is recall material that
+# never comes to exist.
+#
+# So generation is capped short of the limit and the digest keeps a reserve, and
+# a refusal that names a per-day quota stops both until the window rolls. Without
+# that last part the failure is self-sustaining: nothing caches a failure, so
+# every subsequent refresh asks again and is refused again, all day.
+
+DAILY_LIMIT = int(os.environ.get("ARISE_LLM_DAILY_LIMIT", "20"))
+DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "4"))
+# The free tier's window rolls at midnight Pacific, wherever the hunter is.
+_QUOTA_TZ = ZoneInfo("America/Los_Angeles")
+
+_spent: dict[str, int] = {}
+_exhausted_day: str = ""
+
+
+def quota_day() -> str:
+    """Which allowance today's requests come out of."""
+    return datetime.now(_QUOTA_TZ).date().isoformat()
+
+
+def budget_left(reserve: int = 0) -> int:
+    """Requests still safe to make, holding `reserve` back for something else."""
+    day = quota_day()
+    if _exhausted_day == day:
+        return 0
+    return max(0, DAILY_LIMIT - reserve - _spent.get(day, 0))
+
+
+def can_generate() -> bool:
+    """Whether quest generation may run — false once it would eat the digest's
+    share, so the one call with no fallback still has room."""
+    return budget_left(DIGEST_RESERVE) > 0
+
+
+def note_spend(n: int = 1) -> None:
+    """Record requests made. Yesterday's tally is dropped, not accumulated."""
+    day = quota_day()
+    for stale in [k for k in _spent if k != day]:
+        del _spent[stale]
+    _spent[day] = _spent.get(day, 0) + n
+
+
+def reset_budget() -> None:
+    """Forget the tally — for tests, and for a manual reset after topping up."""
+    global _exhausted_day
+    _spent.clear()
+    _exhausted_day = ""
+
+
+def _error_body(err: Exception) -> str:
+    """The provider's error text, read once and remembered: an HTTPError body is a
+    stream, so a second reader would find it empty."""
+    cached = getattr(err, "_arise_body", None)
+    if cached is not None:
+        return cached
+    body = ""
+    try:  # HTTPError is response-like; Google's error JSON carries no key
+        raw = err.read()  # type: ignore[attr-defined]
+        if raw:
+            body = raw.decode("utf-8", "replace")
+    except Exception:
+        pass
+    try:
+        err._arise_body = body  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    return body
+
+
+def note_refusal(err: Exception) -> None:
+    """Learn from a 429 so it isn't walked into again.
+
+    Only a per-day quota closes the window: a burst limit clears in seconds and
+    must not be allowed to switch the model off for the rest of the day."""
+    if getattr(err, "code", None) != 429:
+        return
+    body = _error_body(err)
+    if "PerDay" in body or "per day" in body.lower():
+        global _exhausted_day
+        _exhausted_day = quota_day()
 
 # Gemini structured-output schema (OpenAPI subset): one object per slot.
 _RESPONSE_SCHEMA = {
@@ -146,6 +237,7 @@ def generate(slots: list[dict], profile: dict, timeout: float = 20.0) -> dict[st
         },
     }
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    note_spend()
     payload = net.post_json(url, body, timeout=timeout)
 
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
@@ -518,8 +610,13 @@ def distill_learning(entries: list[dict], timeout: float = 30.0) -> dict:
             "responseSchema": _LEARNING_SCHEMA,
         },
     }
+    if budget_left() <= 0:
+        # Asking anyway would spend three requests (it retries) learning what we
+        # already know, and the digest logs the reason and sends the rest.
+        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
     # Runs from the nightly digest job, so a free-tier burst limit is worth waiting out.
+    note_spend(3)  # one attempt plus its two retries
     payload = net.post_json(url, body, timeout=timeout, retries=2)
     return _parse_learning(payload)
 
@@ -529,15 +626,12 @@ def log_failure(err: Exception) -> None:
 
     Only the exception type (and HTTP status, if any) is logged — never the
     request URL, since it carries the API key as a query parameter."""
+    note_refusal(err)
     detail = type(err).__name__
     code = getattr(err, "code", None)
     if code is not None:
         detail += f" {code}"
-    body = ""
-    try:  # HTTPError is response-like; Google's error JSON carries no key
-        raw = err.read()  # type: ignore[attr-defined]
-        if raw:
-            body = " " + raw.decode("utf-8", "replace")[:1500]
-    except Exception:
-        pass
-    print(f"[arise.llm] generation failed ({detail}); using pools.{body}", file=sys.stderr)
+    raw = _error_body(err)[:1500]
+    body = f" {raw}" if raw else ""
+    shut = " Quota closed until it rolls; not asking again today." if _exhausted_day == quota_day() else ""
+    print(f"[arise.llm] generation failed ({detail}); using pools.{shut}{body}", file=sys.stderr)
