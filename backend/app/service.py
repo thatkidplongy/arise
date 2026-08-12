@@ -306,7 +306,7 @@ def set_craft_source(db: Session, player: Player, source: str) -> None:
     """Set the one thing Craft is studying — a chapter, a Notion page. The quest names
     it and nothing else, so a sitting has one place to be rather than three."""
     player.craft_source = (source or "").strip()
-    _clear_generated(db, player)
+    _clear_generated_for_craft(db, player)
     db.commit()
 
 
@@ -325,7 +325,7 @@ def finish_craft_piece(db: Session, player: Player, done: bool) -> None:
     nxt = quests.craft_piece_at(player.craft_phase or 1, player.craft_piece)
     if nxt:
         player.craft_source = nxt
-    _clear_generated(db, player)  # the slot names the source, so re-personalise it
+    _clear_generated_for_craft(db, player)  # only interview mode generates this slot
     db.commit()
 
 
@@ -353,7 +353,7 @@ def review_craft_phase(db: Session, player: Player, done: bool, day: str) -> Non
         player.craft_phase_day = day
         player.craft_piece = 0
         player.craft_source = quests.craft_piece_at(player.craft_phase, 0)
-        _clear_generated(db, player)  # a new phase should re-personalise the slot
+        _clear_generated_for_craft(db, player)  # only interview mode generates this slot
     player.craft_review_week = week
     db.commit()
 
@@ -384,6 +384,18 @@ def review_book(db: Session, player: Player, finished: bool, next_book: str, day
 def _clear_generated(db: Session, player: Player) -> None:
     """Drop cached LLM content so the next generation reflects a changed profile."""
     db.query(GeneratedQuest).filter_by(player_id=player.id).delete()
+
+
+def _clear_generated_for_craft(db: Session, player: Player) -> None:
+    """Same, but only when the craft slot is actually generated.
+
+    Outside interview mode `generate_quests` skips d-craft entirely — the source is
+    named by the floor, which is applied on read — so wiping the cache because the
+    source moved re-makes every *other* slot and changes nothing about craft. That
+    costs a whole generation call, and the daily free tier is small enough that the
+    digest can be left with nothing to distil."""
+    if player.interview_mode:
+        _clear_generated(db, player)
 
 
 def _profile(db: Session, player: Player, day: str) -> dict:
