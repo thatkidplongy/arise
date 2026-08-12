@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useSystem } from '@/store/useSystem';
 import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
@@ -28,29 +28,42 @@ export function ToastHost() {
 /**
  * One toast, alive for TOAST_MS.
  *
- * Deliberately un-animated. An Animated.Value bound to `opacity` here never reached
- * the DOM node on this RN Web build — the toast mounted at opacity 0 and sat there
- * invisible, so a completion that saved perfectly looked like it had done nothing.
- * A confirmation must not depend on an animation landing, so the countdown is plain
- * state and the card itself is plain style. (Animated stays fine for decoration:
- * XpBar's width does drive.)
+ * The card itself carries no animation on purpose. An Animated.Value bound to its
+ * `opacity` never reached the DOM node on this RN Web build: the toast mounted at 0
+ * and sat there invisible, so a completion that saved perfectly looked like it had
+ * done nothing. A confirmation must never depend on an animation landing.
+ *
+ * The countdown bar is the exception, and it does have to animate — driving it from
+ * interval state meant fifty visible steps across five seconds. It uses XpBar's
+ * shape (an Animated width, no native driver), which is the one Animated usage on
+ * this build known to drive. If it ever stops driving, the bar sits full while the
+ * toast still shows and still undoes.
  */
 function ToastView({ toast }: { toast: ToastData }) {
   const undoToast = useSystem((s) => s.undoToast);
   const dismiss = useSystem((s) => s.dismissToast);
-  const [left, setLeft] = useState(1); // share of the toast's life remaining, 1 → 0
+  // Share of the toast's life remaining, 1 → 0. State, not a ref: the width style is
+  // built during render, which a ref forbids.
+  const [left] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    const startedAt = Date.now();
-    const tick = setInterval(() => {
-      setLeft(Math.max(0, 1 - (Date.now() - startedAt) / TOAST_MS));
-    }, 100);
+    const drain = Animated.timing(left, {
+      toValue: 0,
+      duration: TOAST_MS,
+      // Linear, not the default ease: a countdown that slowed down at the end would
+      // misreport how long is left to hit Undo.
+      easing: Easing.linear,
+      useNativeDriver: false,
+    });
+    drain.start();
     const timer = setTimeout(() => dismiss(), TOAST_MS);
     return () => {
-      clearInterval(tick);
+      drain.stop(); // an Undo mid-drain shouldn't leave it animating
       clearTimeout(timer);
     };
-  }, [dismiss]);
+  }, [left, dismiss]);
+
+  const width = left.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
@@ -71,7 +84,7 @@ function ToastView({ toast }: { toast: ToastData }) {
         >
           <Text style={styles.undoText}>Undo</Text>
         </Pressable>
-        <View pointerEvents="none" style={[styles.countdown, { width: `${left * 100}%` }]} />
+        <Animated.View pointerEvents="none" style={[styles.countdown, { width }]} />
       </View>
     </View>
   );
