@@ -4,7 +4,11 @@ import { useSystem } from '@/store/useSystem';
 /** A plain grocery list — only what's still to buy. Ticking an item moves it to the
  * You tab's Completed record (where it can be undone), so it leaves this list. */
 export function GroceryPanel() {
-  const items = useSystem((s) => s.state?.grocery ?? []);
+  // The `?? []` has to sit outside the selector: inside, it hands useSyncExternalStore
+  // a brand-new array on every read whenever `state` is null, which reads as "the
+  // store changed" forever and loops the render (React error #185). Only bites when
+  // this screen is opened before /state has landed.
+  const items = useSystem((s) => s.state?.grocery) ?? [];
   const addGrocery = useSystem((s) => s.addGrocery);
   const toggleGrocery = useSystem((s) => s.toggleGrocery);
   const removeGrocery = useSystem((s) => s.removeGrocery);
