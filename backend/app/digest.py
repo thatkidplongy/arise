@@ -427,8 +427,9 @@ def _interleave(picks: list[dict]) -> list[dict]:
 # How far back a repair run will reach. Beyond a week the recall value has mostly
 # gone, and a long backlog would spend the allowance on history instead of today.
 CATCH_UP_DAYS = 7
-# Left for the day being sent: one distillation costs an attempt and its two retries.
-_TODAY_RESERVE = 3
+# Left for the day being sent — a whole morning is two calls (distil, then rewrite
+# the book's running sentence), each an attempt plus its two retries.
+_TODAY_RESERVE = llm.DIGEST_RESERVE
 
 
 def catch_up(db: Session, player: Player, day: str) -> list[str]:

@@ -40,7 +40,9 @@ _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gen
 # every subsequent refresh asks again and is refused again, all day.
 
 DAILY_LIMIT = int(os.environ.get("ARISE_LLM_DAILY_LIMIT", "20"))
-DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "4"))
+# A digest is two calls — distil the day, then rewrite the book's running sentence
+# — and each retries twice against a burst limit. Six is one whole morning.
+DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "6"))
 # The free tier's window rolls at midnight Pacific, wherever the hunter is.
 _QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 
@@ -570,7 +572,11 @@ def thread_summary(title: str, previous: str, new_lines: list[str], timeout: flo
             "responseSchema": _THREAD_SCHEMA,
         },
     }
+    if budget_left() <= 0:
+        # The caller keeps the previous sentence, which is the right failure here.
+        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
     url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    note_spend(3)  # one attempt plus its two retries
     payload = net.post_json(url, body, timeout=timeout, retries=2)
     return _parse_thread(payload)
 
