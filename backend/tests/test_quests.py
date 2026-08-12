@@ -219,9 +219,21 @@ def test_systems_reps_work_on_a_real_system_not_a_page():
 
 def test_every_phase_names_what_it_is_made_of():
     """The phases are guidance for what to pick next, so each needs a label, what it
-    covers, and a count the card can show progress against."""
+    covers, and the pieces themselves — the card hands you the next one by name, so an
+    empty or unnamed piece would leave it with nothing to offer."""
     for info in quests.CRAFT_PHASES:
-        assert info["label"] and info["detail"] and info["pieces"] > 0
+        assert info["label"] and info["detail"]
+        assert info["plan"] and all(piece.strip() for piece in info["plan"])
+
+
+def test_a_phase_hands_over_its_pieces_in_order_then_stops():
+    """Walking off the end returns "" rather than raising: that state is how the card
+    knows the phase is covered and the check-in is due."""
+    plan = quests.craft_phase_info(1)["plan"]
+    assert quests.craft_piece_at(1, 0) == plan[0]
+    assert quests.craft_piece_at(1, len(plan) - 1) == plan[-1]
+    assert quests.craft_piece_at(1, len(plan)) == ""
+    assert quests.craft_piece_at(1, -1) == ""
 
 
 def test_the_last_phase_has_nothing_after_it():

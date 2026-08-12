@@ -85,6 +85,23 @@ function useEditorStyles() {
   }, []);
 }
 
+/**
+ * Normalise what the serialiser hands back into what we actually store.
+ *
+ * `getMarkdown()` aims at a markdown-to-HTML pipeline: it encodes HTML entities
+ * (`->` becomes `-&gt;`) and backslash-escapes markdown punctuation. Both are wrong
+ * here — notes are rendered by our own Markdown component, which prints text
+ * literally, and the native editor stores exactly what was typed. Undoing both keeps
+ * one storage format across platforms and stops entities surfacing in the app.
+ */
+function toStoredMarkdown(md: string): string {
+  // A detached textarea decodes entities without parsing tags: its content is
+  // RCDATA, so nothing in `md` can become an element.
+  const decoder = document.createElement("textarea");
+  decoder.innerHTML = md;
+  return (decoder.value || "").replace(/\\([\\`*_[\]~])/g, "$1");
+}
+
 /** A compact toolbar button; `on` lights it when that mark/block is active. */
 function Btn({ on, onPress, children }: { on?: boolean; onPress: () => void; children: React.ReactNode }) {
   return (
@@ -111,7 +128,10 @@ export function NoteEditorModal({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // Autolink off: these notes carry pasted code, and it reads `urls.map` or
+      // `i.name` as a domain and rewrites it to [urls.map](http://urls.map). A link
+      // you type yourself is still a link — only the guessing is off.
+      StarterKit.configure({ link: { autolink: false } }),
       Markdown,
       Placeholder.configure({ placeholder: "Write it here…" }),
     ],
@@ -144,7 +164,7 @@ export function NoteEditorModal({
 
   const save = () => {
     if (!editor || editor.isEmpty) return;
-    const md = editor.getMarkdown().trim();
+    const md = toStoredMarkdown(editor.getMarkdown()).trim();
     if (!md) return;
     onSave(md);
   };

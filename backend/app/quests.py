@@ -1352,14 +1352,71 @@ _SYSTEMS_STRIDE = 9
 
 # The stretches of the plan, in order — guidance for what to pick as your next
 # source, not a schedule and not the quest's content. You hold one until you say its
-# material is read. `pieces` is how many things the stretch is made of, so the card
-# can show how far in you are; it is a denominator for a bar, never a deadline.
+# material is read.
+#
+# `plan` names the pieces the stretch is made of, in the order you'd take them, so
+# the card can hand you the next one rather than asking you to retype it. Its length
+# is the denominator for the bar — a count of things to cover, never a deadline. Go
+# off-plan whenever you like: the source is still yours to set by hand.
 CRAFT_PHASES: list[dict] = [
-    {"label": "Foundations", "detail": "DDIA ch 1–4 · Xu vol 1 ch 1–3", "pieces": 7},
-    {"label": "Distributing data", "detail": "DDIA ch 5–7 · consistent hashing, KV store", "pieces": 6},
-    {"label": "Distributed truths", "detail": "DDIA ch 8–9 · unique ID, rate limiter", "pieces": 4},
-    {"label": "Derived data", "detail": "DDIA ch 10–12 · queue, metrics, aggregation", "pieces": 6},
-    {"label": "Design reps", "detail": "one design a sitting, closed book then diff", "pieces": 6},
+    {
+        "label": "Foundations",
+        "detail": "DDIA ch 1–4 · Xu vol 1 ch 1–3",
+        "plan": [
+            "DDIA ch 1 — Reliable, Scalable and Maintainable Applications",
+            "DDIA ch 2 — Data Models and Query Languages",
+            "DDIA ch 3 — Storage and Retrieval",
+            "DDIA ch 4 — Encoding and Evolution",
+            "Xu vol 1 ch 1 — Scale from Zero to Millions of Users",
+            "Xu vol 1 ch 2 — Back-of-the-Envelope Estimation",
+            "Xu vol 1 ch 3 — A Framework for System Design Interviews",
+        ],
+    },
+    {
+        "label": "Distributing data",
+        "detail": "DDIA ch 5–7 · consistent hashing, KV store",
+        "plan": [
+            "DDIA ch 5 — Replication",
+            "DDIA ch 6 — Partitioning",
+            "DDIA ch 7 — Transactions",
+            "Xu vol 1 ch 5 — Design Consistent Hashing",
+            "Xu vol 1 ch 6 — Design a Key-Value Store",
+        ],
+    },
+    {
+        "label": "Distributed truths",
+        "detail": "DDIA ch 8–9 · unique ID, rate limiter",
+        "plan": [
+            "DDIA ch 8 — The Trouble with Distributed Systems",
+            "DDIA ch 9 — Consistency and Consensus",
+            "Xu vol 1 ch 4 — Design a Rate Limiter",
+            "Xu vol 1 ch 7 — Design a Unique ID Generator",
+        ],
+    },
+    {
+        "label": "Derived data",
+        "detail": "DDIA ch 10–12 · queue, metrics, aggregation",
+        "plan": [
+            "DDIA ch 10 — Batch Processing",
+            "DDIA ch 11 — Stream Processing",
+            "DDIA ch 12 — The Future of Data Systems",
+            "Xu vol 2 — Distributed Message Queue",
+            "Xu vol 2 — Metrics Monitoring and Alerting",
+            "Xu vol 2 — Ad Click Event Aggregation",
+        ],
+    },
+    {
+        "label": "Design reps",
+        "detail": "one design a sitting, closed book then diff",
+        "plan": [
+            "Xu vol 1 ch 8 — Design a URL Shortener",
+            "Xu vol 1 ch 9 — Design a Web Crawler",
+            "Xu vol 1 ch 10 — Design a Notification System",
+            "Xu vol 1 ch 11 — Design a News Feed System",
+            "Xu vol 1 ch 12 — Design a Chat System",
+            "Xu vol 1 ch 13 — Design a Search Autocomplete System",
+        ],
+    },
 ]
 
 LAST_CRAFT_PHASE = len(CRAFT_PHASES)
@@ -1371,6 +1428,15 @@ def craft_phase_info(phase: int) -> dict:
     continues for as long as you want it to."""
     index = max(1, min(phase or 1, LAST_CRAFT_PHASE)) - 1
     return CRAFT_PHASES[index]
+
+
+def craft_piece_at(phase: int, index: int) -> str:
+    """The plan's piece at `index`, or "" once the phase's pieces are all covered.
+    Running off the end isn't an error — it's the state that makes the check-in due."""
+    plan = craft_phase_info(phase)["plan"]
+    if index < 0 or index >= len(plan):
+        return ""
+    return plan[index]
 
 
 def craft_floor(source: str | None, level: int) -> str:

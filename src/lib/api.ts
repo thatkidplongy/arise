@@ -275,8 +275,11 @@ export interface ApiCraft {
   source: string; // the one thing being studied ('' = not picked yet)
   label: string;
   detail: string;
-  studied: number; // Notion pages logged since this phase began
-  pieces: number; // what the phase is made of — a denominator, never a deadline
+  plan: string[]; // the phase's pieces, in the order you'd take them
+  piece: string; // the next uncovered piece ('' once the phase is covered)
+  done: number; // pieces ticked off in this phase — what the bar is made of
+  studied: number; // notes logged since this phase began: sittings, not pieces
+  pieces: number; // how many the phase holds — a denominator, never a deadline
   progress: number; // 0..1
   is_last: boolean;
   pending: boolean; // the phase check-in is due
@@ -585,6 +588,12 @@ export const api = {
 
   reviewCraftPhase: (base: string, token: string, done: boolean, day: string) =>
     request<ApiState>(base, `/craft/phase?day=${day}`, token, {
+      method: 'POST',
+      body: JSON.stringify({ done }),
+    }),
+
+  finishCraftPiece: (base: string, token: string, done: boolean, day: string) =>
+    request<ApiState>(base, `/craft/piece?day=${day}`, token, {
       method: 'POST',
       body: JSON.stringify({ done }),
     }),

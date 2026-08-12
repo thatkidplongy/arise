@@ -52,15 +52,23 @@ class CraftPhaseIn(BaseModel):
     done: bool  # True → advance to the next phase; False → hold this one
 
 
+class CraftPieceIn(BaseModel):
+    """Tick the current piece of the phase off, or take the last tick back."""
+    done: bool  # True → this piece is covered, move to the next; False → undo one
+
+
 class CraftOut(BaseModel):
-    """Where the hunter is in the system-design plan, measured in study logged."""
+    """Where the hunter is in the system-design plan, measured in pieces covered."""
     phase: int
     phases: int
     source: str  # the one thing currently being studied ('' = not set)
     label: str
     detail: str
-    studied: int   # Notion pages logged since this phase began
-    pieces: int    # what the phase is made of — a denominator, never a deadline
+    plan: list[str]  # the phase's pieces, in the order you'd take them
+    piece: str       # the plan's next uncovered piece ('' once the phase is covered)
+    done: int        # pieces ticked off in this phase
+    studied: int     # notes logged since this phase began — sittings, not pieces
+    pieces: int      # how many the phase holds — a denominator, never a deadline
     progress: float
     is_last: bool
     pending: bool  # the check-in is due

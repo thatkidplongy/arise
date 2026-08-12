@@ -310,15 +310,49 @@ def set_craft_source(db: Session, player: Player, source: str) -> None:
     db.commit()
 
 
+def finish_craft_piece(db: Session, player: Player, done: bool) -> None:
+    """Tick the piece you're holding off the phase's plan, or take the last tick back.
+
+    Separate from logging a sitting on purpose: you can sit with one chapter as many
+    times as it takes, and only this says you're through it. Ticking hands you the
+    next piece as the source, so the daily quest names it without you retyping it —
+    and untick walks back to the one before, for the tap you didn't mean."""
+    plan = quests.craft_phase_info(player.craft_phase or 1)["plan"]
+    step = 1 if done else -1
+    player.craft_piece = max(0, min((player.craft_piece or 0) + step, len(plan)))
+    # Past the last piece there's nothing to hand over; the check-in takes it from
+    # here, so leave the source on what they just finished rather than blanking it.
+    nxt = quests.craft_piece_at(player.craft_phase or 1, player.craft_piece)
+    if nxt:
+        player.craft_source = nxt
+    _clear_generated(db, player)  # the slot names the source, so re-personalise it
+    db.commit()
+
+
+def advance_craft_on_log(db: Session, player: Player, kind: str, source: str) -> None:
+    """Logging a sitting against the piece you're holding moves you on to the next one
+    — writing up what you took away *is* the claim that you're through it.
+
+    Scoped to the source actually open: a Notion page logged from the Learn capture,
+    about something else entirely, has no business marching the plan forward. A
+    chapter that wants a second sitting is what 'Undo last' is for."""
+    open_source = (player.craft_source or "").strip()
+    if kind != "notion" or not open_source or source.strip() != open_source:
+        return
+    finish_craft_piece(db, player, True)
+
+
 def review_craft_phase(db: Session, player: Player, done: bool, day: str) -> None:
-    """Answer the system-design phase check-in. Done → move to the next phase and
-    start counting its study from today; not yet → hold where you are, and don't ask
-    again this week. Nothing here is on a clock: a phase you're still reading simply
-    stays, for as long as it takes."""
+    """Answer the system-design phase check-in. Done → move to the next phase, start
+    counting its study from today and open its first piece; not yet → hold where you
+    are, and don't ask again this week. Nothing here is on a clock: a phase you're
+    still reading simply stays, for as long as it takes."""
     week = game.week_key(day)
     if done and player.craft_phase < quests.LAST_CRAFT_PHASE:
         player.craft_phase += 1
         player.craft_phase_day = day
+        player.craft_piece = 0
+        player.craft_source = quests.craft_piece_at(player.craft_phase, 0)
         _clear_generated(db, player)  # a new phase should re-personalise the slot
     player.craft_review_week = week
     db.commit()

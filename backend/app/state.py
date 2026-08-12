@@ -525,21 +525,28 @@ def craft_of(db: Session, player: Player, day: str) -> dict:
     advanced on dates would march them past chapters they hadn't opened, which is the
     same failure as a chapters-per-day quota.
 
-    `studied` counts the Notion pages logged since this phase began and `pieces` is
-    what the phase is made of, so the bar answers 'how far in am I'. `pending` asks —
-    once, and at most weekly — whether the phase is done; answering is the only thing
-    that moves it."""
+    `done` counts the pieces ticked off and `pieces` is how many the phase holds, so
+    the bar answers 'how much of this stretch have I covered'. `studied` is a separate
+    count of the notes logged since the phase began — sittings, not chapters: one hard
+    chapter can take three of them, which is why the bar no longer reads them as three
+    pieces covered. `pending` asks — once, and at most weekly — whether the phase is
+    done; answering is the only thing that moves it."""
     phase_num = _craft_phase_num(player)
     info = quests.craft_phase_info(phase_num)
+    plan = info["plan"]
+    pieces = len(plan)
+    done = max(0, min(player.craft_piece or 0, pieces))
     studied = len(notion_study_of(db, player, player.craft_phase_day or None))
-    pieces = info["pieces"]
-    progress = min(1.0, studied / pieces) if pieces else 0.0
+    progress = min(1.0, done / pieces) if pieces else 0.0
     return {
         "phase": phase_num,
         "phases": quests.LAST_CRAFT_PHASE,
         "source": player.craft_source,
         "label": info["label"],
         "detail": info["detail"],
+        "plan": plan,
+        "piece": quests.craft_piece_at(phase_num, done),
+        "done": done,
         "studied": studied,
         "pieces": pieces,
         "progress": round(progress, 3),

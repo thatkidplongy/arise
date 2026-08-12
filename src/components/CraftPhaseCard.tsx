@@ -49,17 +49,17 @@ function PhaseReview({ label }: { label: string }) {
 }
 
 function PhaseProgress({ craft }: { craft: ApiCraft }) {
-  const covered = craft.studied >= craft.pieces;
+  const covered = craft.done >= craft.pieces;
   return (
     <>
       <View style={styles.tallyRow}>
-        <Text style={styles.tallyLabel}>Studied from Notion</Text>
+        <Text style={styles.tallyLabel}>Covered in this phase</Text>
         <Text style={styles.tallyValue}>
-          {craft.studied} / {craft.pieces}
+          {craft.done} / {craft.pieces}
         </Text>
       </View>
       <XpBar
-        value={Math.min(craft.studied, craft.pieces)}
+        value={Math.min(craft.done, craft.pieces)}
         max={craft.pieces}
         color={covered ? feedback.success : HUE}
         height={8}
@@ -73,15 +73,45 @@ function PhaseProgress({ craft }: { craft: ApiCraft }) {
   );
 }
 
+/** What's coming once you log this one — logging is what moves you on, so there's no
+ * separate button to press. */
+function UpNext({ next }: { next: string }) {
+  if (!next) return null;
+  return <Text style={styles.nowNext}>Log this one and you’re on to {next}</Text>;
+}
+
+/** Steps back to the piece before this one — for a chapter that wants a second
+ * sitting, or a log you didn't mean to move you on. */
+function UndoTick() {
+  const finishCraftPiece = useSystem((s) => s.finishCraftPiece);
+  return (
+    <Pressable
+      onPress={() => void finishCraftPiece(false)}
+      hitSlop={6}
+      style={({ pressed }) => [styles.undo, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name="arrow-undo-outline" size={12} color={text.secondary} />
+      <Text style={styles.undoText}>Back to the one before</Text>
+    </Pressable>
+  );
+}
+
+function PhaseCovered() {
+  return <Text style={styles.nowNext}>Every piece of this phase is ticked off.</Text>;
+}
+
 /** What's open in front of you. The daily names this and nothing else — the same way
  * the reading daily names one book — so a sitting has one place to be. */
-function NowStudying({ source }: { source: string }) {
+function NowStudying({ craft }: { craft: ApiCraft }) {
+  const covered = craft.done >= craft.pieces;
   return (
     <View style={styles.nowStudying}>
       <Ionicons name="document-text" size={15} color={HUE} />
       <View style={styles.nowBody}>
         <Text style={styles.nowLabel}>NOW STUDYING</Text>
-        <Text style={styles.nowTitle}>{source}</Text>
+        <Text style={styles.nowTitle}>{craft.source}</Text>
+        {covered ? <PhaseCovered /> : <UpNext next={craft.plan[craft.done + 1] ?? ''} />}
+        {craft.done > 0 ? <UndoTick /> : null}
       </View>
     </View>
   );
@@ -267,11 +297,12 @@ function PickSource() {
 
 /** Source, today's sitting, and moving on — the same three parts as the book, in the
  * same order, so both loops read the same way. */
-function StudySection({ source }: { source: string }) {
+function StudySection({ craft }: { craft: ApiCraft }) {
   const { open, toggle } = useCollapse(true, true);
+  const source = craft.source;
   return (
     <>
-      <NowStudying source={source} />
+      <NowStudying craft={craft} />
       <StudyLog source={source} />
 
       <Pressable
@@ -303,7 +334,7 @@ export function CraftPhaseCard() {
       <Text style={styles.phase}>{craft.label}</Text>
       <Text style={styles.detail}>{craft.detail}</Text>
       <PhaseProgress craft={craft} />
-      {craft.source ? <StudySection source={craft.source} /> : <PickSource />}
+      {craft.source ? <StudySection craft={craft} /> : <PickSource />}
       {craft.pending ? <PhaseReview label={craft.label} /> : null}
     </SystemPanel>
   );
@@ -328,9 +359,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 11,
   },
-  nowBody: { flex: 1, gap: 2 },
+  nowBody: { flex: 1, minWidth: 0, gap: 2 },
   nowLabel: { color: HUE, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   nowTitle: { color: text.primary, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  nowNext: { color: text.secondary, fontSize: 12, lineHeight: 17, marginTop: 8 },
+  undo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  undoText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
 
   section: { marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: surface.hairline },
   sectionLabel: {

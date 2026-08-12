@@ -92,6 +92,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("players", "craft_phase_day", "VARCHAR DEFAULT ''"),
     ("players", "craft_review_week", "VARCHAR DEFAULT ''"),
     ("players", "craft_source", "VARCHAR DEFAULT ''"),
+    # Pieces ticked off in the current phase. Existing rows start at 0: what was
+    # logged before this column existed was sittings, which is not the same claim.
+    ("players", "craft_piece", "INTEGER DEFAULT 0"),
 ]
 
 

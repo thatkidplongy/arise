@@ -7,7 +7,7 @@ from . import (body, books, digest, insights, llm, mailer, nutrition, service, s
                state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
-                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn, CraftSourceIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
                       CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
@@ -204,6 +204,16 @@ def set_craft_source(body: CraftSourceIn, day: str | None = Query(None), db: Ses
     return state.build_state(db, player, _valid_day(day))
 
 
+@router.post("/craft/piece", response_model=StateOut)
+def finish_craft_piece(body: CraftPieceIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Tick the current piece of the phase off (done → the next one becomes the
+    source), or send done=false to take the last tick back. Logging a sitting is a
+    different thing and doesn't move this."""
+    player = state.get_or_create_player(db)
+    service.finish_craft_piece(db, player, body.done)
+    return state.build_state(db, player, _valid_day(day))
+
+
 @router.post("/craft/phase", response_model=StateOut)
 def review_craft_phase(body: CraftPhaseIn, day: str | None = Query(None), db: Session = Depends(get_db)):
     """Answer the system-design phase check-in: done → the next phase begins; not yet
@@ -383,6 +393,7 @@ def add_learning(body_in: LearningIn, db: Session = Depends(get_db)):
     if not body_in.source.strip() and not body_in.text.strip():
         raise HTTPException(400, "Give it a source or a note — something to remember it by.")
     digest.add_learning(db, player.id, day, body_in.kind, body_in.source, body_in.text)
+    service.advance_craft_on_log(db, player, body_in.kind, body_in.source)
     return state.build_state(db, player, day)
 
 

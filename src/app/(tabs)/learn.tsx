@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CraftPhaseCard } from '@/components/CraftPhaseCard';
+import { Markdown } from '@/components/Markdown';
 import { ReadingCard } from '@/components/ReadingCard';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
@@ -43,11 +44,10 @@ function LoggedRow({ entry, onRemove }: { entry: ApiLearning; onRemove: () => vo
         <Text style={styles.rowSource} numberOfLines={2}>
           {entry.source || kind.label}
         </Text>
-        {entry.text ? (
-          <Text style={styles.rowNote} numberOfLines={3}>
-            {entry.text}
-          </Text>
-        ) : null}
+        {/* Notes are written in the editor now, so render the Markdown rather than
+            showing its markers. This row has the height for it; the compact rows on
+            the cards use snippet() instead. */}
+        {entry.text ? <Markdown value={entry.text} color={text.secondary} /> : null}
       </View>
       <Pressable onPress={onRemove} hitSlop={8} accessibilityLabel={`Remove ${entry.source}`}>
         <Text style={styles.remove}>×</Text>
@@ -375,7 +375,6 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 3 },
   rowSource: { color: text.primary, fontSize: 14, fontWeight: '600' },
-  rowNote: { color: text.secondary, fontSize: 12, lineHeight: 17 },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
   recallRow: { paddingVertical: 9, borderTopWidth: 1, borderTopColor: surface.hairline, gap: 3 },

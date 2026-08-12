@@ -57,6 +57,11 @@ class Player(Base):
     # quest that names three sources at once is a scavenger hunt, not a sitting. The
     # phase says what this stretch is about; this says what's open in front of you.
     craft_source: Mapped[str] = mapped_column(String, default="")
+    # How many of the current phase's pieces have been ticked off. Deliberately not
+    # derived from the notes logged: a hard chapter can take three sittings, and
+    # counting sittings would read those as three chapters covered. Saying a piece is
+    # finished is a separate act from saying you sat with it.
+    craft_piece: Mapped[int] = mapped_column(Integer, default=0)
     # Craft (CFT): when on, the coding attribute's quests shift to interview prep —
     # timed DSA, mock system design, behavioural stories. Off → steady craft growth.
     interview_mode: Mapped[bool] = mapped_column(Boolean, default=False)

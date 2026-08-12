@@ -108,33 +108,84 @@ def test_reading_review_flow(client):
 
 
 def test_craft_phase_waits_for_reading_not_for_a_date(client):
-    """The plan advances on what you've studied, and only when you say so. A month
+    """The plan advances on what you've covered, and only when you say so. A month
     passing changes nothing — that's the whole correction."""
     s = _state(client)
     craft = s["craft"]
     assert craft["phase"] == 1 and craft["label"] == "Foundations"
-    assert craft["studied"] == 0 and craft["pending"] is False and craft["source"] == ""
+    assert craft["done"] == 0 and craft["pending"] is False and craft["source"] == ""
 
-    # A month later, with nothing logged: still phase 1, still not asking.
+    # A month later, with nothing covered: still phase 1, still not asking.
     later = client.get("/state?day=2026-08-18").json()["craft"]
     assert later["phase"] == 1 and later["pending"] is False
 
-    # Log the phase's material in Notion — now the bar fills and it checks in.
-    for i in range(craft["pieces"]):
-        client.post("/learnings", json={"kind": "notion", "source": f"DDIA ch {i + 1}",
-                                       "text": "", "day": DAY})
+    # Tick the phase's pieces off — now the bar fills and it checks in.
+    for _ in range(craft["pieces"]):
+        client.post(f"/craft/piece?day={DAY}", json={"done": True})
     ready = client.get(f"/state?day={DAY}").json()["craft"]
-    assert ready["studied"] == ready["pieces"] and ready["progress"] == 1.0
+    assert ready["done"] == ready["pieces"] and ready["progress"] == 1.0
     assert ready["pending"] is True
 
     # "Not yet" holds the phase and stops asking this week — no penalty either way.
     held = client.post(f"/craft/phase?day={DAY}", json={"done": False}).json()["craft"]
     assert held["phase"] == 1 and held["pending"] is False
 
-    # Saying it's done is the only thing that moves it, and the next phase starts at 0.
+    # Saying it's done is the only thing that moves it, and the next phase starts at 0
+    # with its first piece already open.
     moved = client.post(f"/craft/phase?day={DAY}", json={"done": True}).json()["craft"]
     assert moved["phase"] == 2 and moved["label"] == "Distributing data"
-    assert moved["studied"] == 0 and moved["pending"] is False
+    assert moved["done"] == 0 and moved["pending"] is False
+    assert moved["source"] == moved["plan"][0]
+
+
+def test_logging_the_open_source_moves_you_on(client):
+    """Writing up what you took away is the claim that you're through the piece, so
+    the log itself advances the plan and opens the next chapter."""
+    plan = _state(client)["craft"]["plan"]
+    client.put(f"/craft/source?day={DAY}", json={"source": plan[0]})
+
+    client.post("/learnings", json={"kind": "notion", "source": plan[0],
+                                    "text": "what I took away", "day": DAY})
+    craft = client.get(f"/state?day={DAY}").json()["craft"]
+    assert craft["done"] == 1 and craft["source"] == plan[1]
+    assert craft["studied"] == 1  # the sitting is still in the log
+
+    # A chapter that wants a second sitting: step back, log again.
+    client.post(f"/craft/piece?day={DAY}", json={"done": False})
+    client.post("/learnings", json={"kind": "notion", "source": plan[0],
+                                    "text": "second pass", "day": DAY})
+    again = client.get(f"/state?day={DAY}").json()["craft"]
+    assert again["done"] == 1 and again["studied"] == 2
+
+
+def test_logging_something_else_leaves_the_plan_where_it_is(client):
+    """A Notion page logged from the Learn capture, about something unrelated, has no
+    business marching the system-design plan forward."""
+    plan = _state(client)["craft"]["plan"]
+    client.put(f"/craft/source?day={DAY}", json={"source": plan[0]})
+
+    client.post("/learnings", json={"kind": "notion", "source": "Some other page",
+                                    "text": "unrelated", "day": DAY})
+    craft = client.get(f"/state?day={DAY}").json()["craft"]
+    assert craft["done"] == 0 and craft["source"] == plan[0]
+    assert craft["studied"] == 1
+
+
+def test_ticking_a_piece_hands_over_the_next_one_and_undoes_cleanly(client):
+    """The source follows the plan so the daily quest names it without retyping, and a
+    tap you didn't mean walks back to where you were."""
+    craft = _state(client)["craft"]
+    plan = craft["plan"]
+
+    first = client.post(f"/craft/piece?day={DAY}", json={"done": True}).json()["craft"]
+    assert first["done"] == 1 and first["source"] == plan[1] and first["piece"] == plan[1]
+
+    back = client.post(f"/craft/piece?day={DAY}", json={"done": False}).json()["craft"]
+    assert back["done"] == 0 and back["source"] == plan[0]
+
+    # Undo at zero has nothing to take back, and never goes negative.
+    floor = client.post(f"/craft/piece?day={DAY}", json={"done": False}).json()["craft"]
+    assert floor["done"] == 0 and floor["source"] == plan[0]
 
 
 def test_the_last_craft_phase_never_asks_to_move_on(client):
