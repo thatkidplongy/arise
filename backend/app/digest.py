@@ -424,6 +424,43 @@ def _interleave(picks: list[dict]) -> list[dict]:
     return out
 
 
+# How far back a repair run will reach. Beyond a week the recall value has mostly
+# gone, and a long backlog would spend the allowance on history instead of today.
+CATCH_UP_DAYS = 7
+# Left for the day being sent: one distillation costs an attempt and its two retries.
+_TODAY_RESERVE = 3
+
+
+def catch_up(db: Session, player: Player, day: str) -> list[str]:
+    """Distil recent days that were logged but never distilled, and return them.
+
+    A day is only asked for once, on the morning after it: if the model was
+    unreachable then — a spent quota, an outage — that day's reading was silently
+    never turned into anything, and nothing came back to ask again. This is that
+    second ask.
+
+    Oldest first, and deliberately before the day being sent: `update_thread` stamps
+    the thread with the day it folded in, so repairing an old day afterwards would
+    drag the running summary backwards. Stops while `_TODAY_RESERVE` is still on the
+    table, because today matters more than a week ago."""
+    repaired: list[str] = []
+    today = date.fromisoformat(day)
+    for back in range(CATCH_UP_DAYS, 0, -1):
+        if llm.budget_left() <= _TODAY_RESERVE:
+            break
+        past = (today - timedelta(days=back)).isoformat()
+        if db.query(Highlight).filter_by(player_id=player.id, day=past).first():
+            continue  # already distilled
+        if not gather(db, player, past):
+            continue  # nothing was logged; not a miss
+        if build_highlights(db, player, past):
+            repaired.append(past)
+    if repaired:
+        print(f"[arise.digest] distilled {len(repaired)} missed day(s): "
+              f"{', '.join(repaired)}", file=sys.stderr)
+    return repaired
+
+
 def build_context(db: Session, player: Player, day: str) -> dict:
     """Everything the email needs for `day`, built once and shared by preview and send.
 
@@ -855,6 +892,10 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
 
     if not mailer.enabled():
         return _record(db, player, day, "skipped", "mailer not configured", 0)
+
+    # Repair first: a day the model couldn't reach is never asked for again on its
+    # own, and this is the only thing that runs on a schedule.
+    catch_up(db, player, day)
 
     ctx = build_context(db, player, day)
     notes = "; ".join(ctx.get("problems") or [])
