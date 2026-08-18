@@ -15,8 +15,11 @@ the picks span an expanding ladder of past days. Three things drive that shape:
   last moment the surrounding detail can still be dredged up and written down —
   hence FLESH_NUDGE at the foot of every email.
 
-Mnemonic hooks are generated only for arbitrary material (see llm._LEARNING_PROMPT);
-for anything re-derivable they're clutter competing with the understanding.
+Every highlight carries a hook — the vivid third thing that holds a fact and its
+question together (see llm._LEARNING_PROMPT). Arbitrary material gets a mnemonic;
+an idea you could re-derive gets the picture it lives in instead, which is an aid
+to the understanding rather than a rival to it. Highlights distilled before that
+was true are hooked a morning at a time by `backfill_hooks`.
 
 Reads and the single write path both live here, like insights.py. `recall_set` is
 a pure derive-on-read — same day, same picks, rotating as the days pass.
@@ -427,8 +430,9 @@ def _interleave(picks: list[dict]) -> list[dict]:
 # How far back a repair run will reach. Beyond a week the recall value has mostly
 # gone, and a long backlog would spend the allowance on history instead of today.
 CATCH_UP_DAYS = 7
-# Left for the day being sent — a whole morning is two calls (distil, then rewrite
-# the book's running sentence), each an attempt plus its two retries.
+# Left for the day being sent — a whole morning is three calls (distil, rewrite the
+# book's running sentence, then hook the older answers), each an attempt plus its
+# two retries.
 _TODAY_RESERVE = llm.DIGEST_RESERVE
 
 
@@ -485,6 +489,61 @@ def build_context(db: Session, player: Player, day: str) -> dict:
         "recap": recap.of(db, player, day),
         "avatar": player.avatar or "",  # data URI; "" when no picture is set
     }
+
+
+# Two digests' worth in one call: the answers asked this morning, with a little room
+# for the ones a repeat pushed out, so the backlog drains in mornings rather than weeks.
+HOOKS_PER_CALL = PER_DIGEST * 2
+
+
+def backfill_hooks(db: Session, player: Player, ctx: dict,
+                   problems: list[str] | None = None) -> int:
+    """Give this email's older answers the hook the fresh ones now come with.
+
+    Every highlight distilled from here on carries one, but the ones already stored
+    predate that and go on being asked for weeks — so the lines this morning actually
+    quizzes are hooked in one call, and keep them for every later showing. Only the
+    missing ones are sent, so the backlog costs a call a morning until it is gone and
+    nothing at all after that.
+
+    Runs from the send, never from the preview: it writes, and it spends. It is also
+    last in line for the morning's allowance, after the distillation and the thread —
+    a hook on an old line is the one thing here that can wait for tomorrow.
+
+    A failure is not fatal: the reason is appended to `problems` and the answers go out
+    bare, as they did before hooks were on all of them."""
+    asked = {it["id"] for it in quiz_items(ctx) if it.get("id")}
+    pending = [
+        h for h in list(ctx["highlights"]) + list(ctx["recall"])
+        if h.get("id") in asked and h.get("cue") and not h.get("hook")
+    ][:HOOKS_PER_CALL]
+    if not pending or not llm.enabled() or llm.budget_left() <= 0:
+        return 0
+
+    try:
+        hooks = llm.hooks_for([{"text": h["text"], "cue": h["cue"]} for h in pending])
+    except Exception as err:
+        llm.note_refusal(err)
+        reason = f"hooks not written ({_why(err)})"
+        print(f"[arise.digest] {reason}; sending the answers without them.", file=sys.stderr)
+        if problems is not None:
+            problems.append(reason)
+        return 0
+
+    written = 0
+    for i, item in enumerate(pending, 1):
+        hook = hooks.get(i, "")
+        if not hook:
+            continue
+        row = db.get(Highlight, item["id"])
+        if row is None or row.player_id != player.id:
+            continue
+        row.hook = hook
+        item["hook"] = hook  # the email renders from the context, not a re-read
+        written += 1
+    if written:
+        db.commit()
+    return written
 
 
 def quizzable(recall: list[dict]) -> list[dict]:
@@ -899,11 +958,15 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
     catch_up(db, player, day)
 
     ctx = build_context(db, player, day)
-    notes = "; ".join(ctx.get("problems") or [])
     # A day with nothing to recall can still be a day worth a record — quests, money,
     # to-dos. Only a genuinely empty day is skipped.
     if not ctx["highlights"] and not ctx["recall"] and not recap.had_anything(ctx["recap"]):
+        notes = "; ".join(ctx.get("problems") or [])
         return _record(db, player, day, "skipped", notes or "nothing logged", 0)
+
+    # After the emptiness check, so a quiet morning never spends a call on it.
+    backfill_hooks(db, player, ctx, ctx.get("problems"))
+    notes = "; ".join(ctx.get("problems") or [])
 
     # The picture rides along as a part, and the HTML points at it by content id —
     # with no avatar set, both fall away and the email is what it always was.

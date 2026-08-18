@@ -58,21 +58,27 @@ def test_a_per_day_refusal_closes_the_window_for_everyone():
 
 
 def test_the_reserve_covers_a_whole_morning_not_half_of_one():
-    """A digest is two calls — distil the day, then rewrite the book's sentence —
-    and each retries twice. A reserve that only covered the first would leave the
-    thread stuck, which is exactly the symptom it exists to prevent."""
-    assert llm.DIGEST_RESERVE >= 6
+    """A digest is three calls — distil the day, rewrite the book's sentence, then hook
+    the older answers — and each retries twice. A reserve that only covered the first
+    would leave the thread stuck, which is exactly the symptom it exists to prevent."""
+    assert llm.DIGEST_RESERVE >= 9
 
     llm.note_spend(llm.DAILY_LIMIT - llm.DIGEST_RESERVE)
     assert llm.can_generate() is False
-    # Both of the digest's calls still fit in what's left.
-    assert llm.budget_left() >= 6
+    # All three of the digest's calls still fit in what's left.
+    assert llm.budget_left() >= 9
 
 
 def test_the_thread_rewrite_is_charged_for_too():
     llm.note_spend(llm.DAILY_LIMIT)
     with pytest.raises(RuntimeError, match="quota is spent"):
         llm.thread_summary("DDIA", "previous sentence", ["a new idea"])
+
+
+def test_the_hook_backfill_is_charged_for_too():
+    llm.note_spend(llm.DAILY_LIMIT)
+    with pytest.raises(RuntimeError, match="quota is spent"):
+        llm.hooks_for([{"text": "Depth beats speed.", "cue": "What beats speed?"}])
 
 
 def test_a_burst_refusal_does_not_close_the_day():

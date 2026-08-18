@@ -103,7 +103,7 @@ export interface ApiRecall {
   id: string;
   text: string;
   cue: string; // the question `text` answers — empty on highlights distilled before cues
-  hook: string; // a memory aid, only for arbitrary facts
+  hook: string; // a memory aid — empty only on highlights distilled before hooks were on all of them
   day: string; // the day it was learned
   source_label: string;
   days_ago: number;

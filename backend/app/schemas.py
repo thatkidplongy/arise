@@ -519,7 +519,7 @@ class RecallOut(BaseModel):
     id: str
     text: str
     cue: str = ""  # the question `text` answers; empty on rows distilled before cues
-    hook: str = ""  # a memory aid, only ever set for arbitrary facts
+    hook: str = ""  # a memory aid; empty only on rows distilled before every line had one
     box: int = 0  # Leitner rung — higher means it keeps being recalled
     day: str  # the day it was learned
     source_label: str
