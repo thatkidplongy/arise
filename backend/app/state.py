@@ -303,22 +303,35 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
     return _count(rows, quest.id, week=game.week_key(day))
 
 
-# Physical and Reading show every day; the other dailies rotate over a 3-day cycle,
-# so each day is a lighter set (the two mandatories + one group). Every area still
-# comes around within three days. Keyed on the date's ordinal so it advances daily.
+# Physical and Reading show every day; most of the other dailies rotate over a 3-day
+# cycle, so each day is a lighter set (the two mandatories + one group). Every area
+# still comes around within three days. Keyed on the date's ordinal so it advances
+# daily.
 _DAILY_ALWAYS = ("d-train", "d-read")
 _DAILY_ROTATION: list[list[str]] = [
     ["d-wealth", "d-craft"],       # build & money
-    ["d-sketch", "d-jp"],          # create & language
+    ["d-sketch"],                  # create
     ["d-meditate", "d-connect"],   # inner & social
 ]
+
+# Some dailies are better on named days than on a cycle that drifts through the week.
+# Japanese is one: a script and its grammar need a rhythm you can plan around, and
+# Monday/Wednesday/Friday is spaced closely enough that a sitting still has the last
+# one behind it, with a day off in between for it to settle. Weekday numbers are
+# date.weekday(), so Monday is 0.
+_DAILY_WEEKDAYS: dict[str, tuple[int, ...]] = {
+    "d-jp": (0, 2, 4),  # Mon / Wed / Fri
+}
 
 
 def active_daily_ids(day: str) -> set[str]:
     """The daily quests shown on `day`: Physical + Reading always, plus one rotating
-    group so the daily load stays light. Non-daily quests are unaffected."""
-    idx = date.fromisoformat(day).toordinal() % len(_DAILY_ROTATION)
-    return {*_DAILY_ALWAYS, *_DAILY_ROTATION[idx]}
+    group so the daily load stays light, plus anything pinned to this weekday.
+    Non-daily quests are unaffected."""
+    today = date.fromisoformat(day)
+    idx = today.toordinal() % len(_DAILY_ROTATION)
+    fixed = {qid for qid, days in _DAILY_WEEKDAYS.items() if today.weekday() in days}
+    return {*_DAILY_ALWAYS, *_DAILY_ROTATION[idx], *fixed}
 
 
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
@@ -886,7 +899,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    active_ids = active_daily_ids(day)  # Physical + today's rotating group
+    active_ids = active_daily_ids(day)  # Physical + today's rotating group + its fixed days
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
