@@ -126,9 +126,11 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
     answer, tap *Knew it* / *Sort of* / *No clue*: knew it goes further out, no clue
     comes back tomorrow. Skip it entirely and each showing still climbs one rung on
     its own, so the plain ladder keeps working whether or not you ever grade.
-  - **Memory hooks** — a vivid image, but only for arbitrary material (names, lists,
-    coined terms). For anything you could re-derive, a mnemonic just competes with
-    the understanding.
+  - **Memory hooks** — every answer comes with one: a vivid third thing that holds the
+    fact and its question together. Arbitrary material (names, lists, coined terms)
+    gets a mnemonic; anything you could re-derive gets the picture the idea lives in —
+    the scene or analogy that makes it obvious again — rather than a mnemonic
+    competing with the understanding.
   - **The book so far** — one running sentence per book, rewritten every sitting
     rather than added to. Condensing a growing pile back into one line is what turns
     notes into something you hold.

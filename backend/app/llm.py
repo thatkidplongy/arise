@@ -40,9 +40,10 @@ _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gen
 # every subsequent refresh asks again and is refused again, all day.
 
 DAILY_LIMIT = int(os.environ.get("ARISE_LLM_DAILY_LIMIT", "20"))
-# A digest is two calls — distil the day, then rewrite the book's running sentence
-# — and each retries twice against a burst limit. Six is one whole morning.
-DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "6"))
+# A digest is three calls — distil the day, rewrite the book's running sentence, then
+# hook whatever older highlights are still missing one — and each retries twice
+# against a burst limit. Nine is one whole morning.
+DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "9"))
 # The free tier's window rolls at midnight Pacific, wherever the hunter is.
 _QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 
@@ -448,7 +449,7 @@ _LEARNING_SCHEMA = {
                     "cue": {"type": "string"},
                     "hook": {"type": "string"},
                 },
-                "required": ["text", "cue"],
+                "required": ["text", "cue", "hook"],
             },
         },
     },
@@ -480,7 +481,7 @@ _LEARNING_PROMPT = (
     "numbering, no markdown.\n"
     "If the entries are empty or have no real substance, return an empty array.\n"
     "\n"
-    "Each highlight also carries a CUE and, sometimes, a HOOK.\n"
+    "Each highlight also carries a CUE and a HOOK.\n"
     "cue — the question this highlight is the answer to. It is asked days and weeks "
     "later, on its own, with the answer hidden: being asked and briefly failing is "
     "what fixes something in memory, so the cue must make the person actually "
@@ -492,16 +493,21 @@ _LEARNING_PROMPT = (
     "• No yes/no questions — they can be guessed with a coin.\n"
     "• Name enough context to be answerable cold months later. 'What are the four "
     "stages of a habit?' works; 'What were the four stages?' does not.\n"
-    "hook — a memory aid, ONLY when the fact is arbitrary: names, ordered lists, "
-    "coined terms, numbers, anything where there is nothing to reason from.\n"
-    "• A hook works by adding a THIRD thing that links the two you must connect — a "
-    "concrete image or tiny story, not a restatement. To tie a term to its meaning, "
-    "find something in the word itself that can be pictured, and picture it doing "
-    "what the term means.\n"
-    "• Make it vivid and physical. A picture you can see beats a clever phrase.\n"
-    "• For an idea the person could re-derive by understanding it, return an empty "
-    "string — a mnemonic competes with the understanding that would carry it anyway. "
-    "Most highlights should have no hook.\n"
+    "hook — a memory aid, on EVERY highlight. It is printed under the answer and never "
+    "beside the question, so it can be as explicit as it likes without giving anything "
+    "away.\n"
+    "• A hook adds a THIRD thing to hold the two you must connect — a concrete image or "
+    "tiny story. Never a restatement: if it could be swapped for the answer and read "
+    "the same, it is not a hook.\n"
+    "• When the fact is arbitrary — names, ordered lists, coined terms, numbers, "
+    "anything with nothing to reason from — make it a mnemonic: find something in the "
+    "word itself that can be pictured, and picture it doing what the term means.\n"
+    "• When the person could re-derive the idea, give the picture the idea lives in "
+    "instead: the smallest scene, everyday example or analogy that makes it obvious "
+    "again, or the one-line reason it has to be true. A mnemonic there would compete "
+    "with the understanding; an image the understanding hangs on does not.\n"
+    "• Make it vivid and physical, and keep it to a dozen words or so. A picture you "
+    "can see beats a clever phrase.\n"
     'Return JSON only: {highlights:[{text, cue, hook}]}.'
 )
 
@@ -526,6 +532,96 @@ def _parse_learning(payload: dict) -> dict:
             "hook": _clip(str(item.get("hook") or "").strip(), 160),
         })
     return {"highlights": out[:10]}
+
+
+_HOOKS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hooks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "n": {"type": "integer"},
+                    "hook": {"type": "string"},
+                },
+                "required": ["n", "hook"],
+            },
+        },
+    },
+    "required": ["hooks"],
+}
+
+_HOOKS_PROMPT = (
+    "You write memory hooks for lines someone already saved from their reading, for a "
+    "personal growth app. They are quizzed on these lines by email, days and weeks "
+    "apart, and the hook is printed under the answer — never beside the question — so "
+    "it can be as explicit as it likes without giving anything away.\n"
+    "You are given numbered FACTS: each an answer and the question it is asked as. "
+    "Return one hook for every number, and change nothing else.\n"
+    "• A hook adds a THIRD thing to hold the two you must connect — a concrete image or "
+    "tiny story. Never a restatement: if it could be swapped for the fact and read the "
+    "same, it is not a hook.\n"
+    "• When the fact is arbitrary — names, ordered lists, coined terms, numbers, "
+    "anything with nothing to reason from — make it a mnemonic: find something in the "
+    "word itself that can be pictured, and picture it doing what the term means.\n"
+    "• When the fact could be re-derived, give the picture the idea lives in instead: "
+    "the smallest scene, everyday example or analogy that makes it obvious again, or "
+    "the one-line reason it has to be true.\n"
+    "• Make it vivid and physical, and keep it to a dozen words or so. Plain words, no "
+    "markdown, no numbering inside the hook.\n"
+    'Return JSON only: {hooks:[{n, hook}]}.'
+)
+
+
+def _parse_hooks(payload: dict) -> dict[int, str]:
+    """Pure: Gemini response JSON → {number: hook}. Testable offline.
+
+    Keyed by the number sent rather than by position: a model that skips one or
+    reorders them would otherwise hang every hook on the wrong fact, which is worse
+    than a fact with no hook at all."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    out: dict[int, str] = {}
+    for item in json.loads(text).get("hooks") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            n = int(item.get("n"))
+        except (TypeError, ValueError):
+            continue
+        hook = _clip(str(item.get("hook") or "").strip(), 160)
+        if hook:
+            out[n] = hook
+    return out
+
+
+def hooks_for(facts: list[dict], timeout: float = 30.0) -> dict[int, str]:
+    """One Gemini call → a hook per fact, keyed by its position in `facts` (1-based).
+
+    For highlights distilled before every line carried a hook: they are asked for
+    years, so it is worth one call to give them the same thing the fresh ones get.
+    Raises on transport/parse failure; the caller sends the email without them."""
+    numbered = "\n\n".join(
+        f"{i}. FACT: {f.get('text') or ''}\n   ASKED AS: {f.get('cue') or ''}"
+        for i, f in enumerate(facts, 1)
+    )
+    body = {
+        "contents": [{"parts": [
+            {"text": _HOOKS_PROMPT},
+            {"text": "FACTS:\n" + numbered},
+        ]}],
+        "generationConfig": {
+            "temperature": 0.4,  # a hook is an invention; the distillation is not
+            "responseMimeType": "application/json",
+            "responseSchema": _HOOKS_SCHEMA,
+        },
+    }
+    if budget_left() <= 0:
+        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    note_spend(3)  # one attempt plus its two retries
+    payload = net.post_json(url, body, timeout=timeout, retries=2)
+    return _parse_hooks(payload)
 
 
 _THREAD_SCHEMA = {

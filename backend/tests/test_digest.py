@@ -2,6 +2,7 @@
 rendering, and the once-per-day send guard. No network, no email."""
 
 import json
+from datetime import date, timedelta
 
 import pytest
 
@@ -65,6 +66,13 @@ def test_parse_learning_caps_at_ten():
         "highlights": [{"text": f"h{i}", "cue": f"q{i}"} for i in range(20)],
     }))
     assert len(out["highlights"]) == 10
+
+
+def test_every_highlight_is_asked_for_a_hook():
+    """The schema is where 'sometimes' became 'always' — a line without one is now a
+    line the model failed to fill in, not a line that opted out."""
+    item = llm._LEARNING_SCHEMA["properties"]["highlights"]["items"]
+    assert "hook" in item["required"]
 
 
 def test_format_entries_omits_notes_when_empty():
@@ -577,6 +585,156 @@ def test_a_failed_run_can_be_retried_without_force(db, monkeypatch):
     monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.append(s) or {"id": "1"})
     assert digest.send_daily(db, player, DAY)["status"] == "sent"
     assert len(sent) == 1
+
+
+# ── hooks on every answer ─────────────────────────────────────────────────────
+
+
+def _older(db, player, text, cue, hook="", days_ago=7):
+    """A highlight from a past day, due this morning — what the recall half asks."""
+    day = (date.fromisoformat(DAY) - timedelta(days=days_ago)).isoformat()
+    row = Highlight(player_id=player.id, day=day, text=text, cue=cue, hook=hook,
+                    source_label="A book", box=0, due=DAY)
+    db.add(row)
+    db.commit()
+    return row
+
+
+def _hooker(monkeypatch, hooks: dict, asked: list | None = None):
+    def _hooks_for(facts, timeout=30.0):
+        if asked is not None:
+            asked.append(facts)
+        return hooks
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "hooks_for", _hooks_for)
+
+
+def test_parse_hooks_keys_by_the_number_sent():
+    """By number, not position: a model that skips one or reorders them would hang
+    every hook on the wrong fact, which is worse than a fact with no hook."""
+    out = llm._parse_hooks(_payload({"hooks": [
+        {"n": 2, "hook": "  a scale tipping  "},
+        {"n": 1, "hook": "a deep well"},
+    ]}))
+    assert out == {1: "a deep well", 2: "a scale tipping"}
+
+
+def test_parse_hooks_drops_what_it_cannot_place():
+    out = llm._parse_hooks(_payload({"hooks": [
+        "a bare string",
+        {"n": "second", "hook": "no usable number"},
+        {"n": 3, "hook": "   "},
+        {"n": 1, "hook": "kept"},
+    ]}))
+    assert out == {1: "kept"}
+
+
+def test_backfill_hooks_gives_older_answers_the_hook_fresh_ones_come_with(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Losses weigh about twice as much as equal gains.",
+           "How do losses weigh against equal gains?")
+    asked: list = []
+    _hooker(monkeypatch, {1: "a feather on one pan tipping the whole scale"}, asked)
+
+    ctx = digest.build_context(db, player, DAY)
+    assert digest.backfill_hooks(db, player, ctx) == 1
+
+    # The email renders from the context, and the row keeps it for every later showing.
+    assert "a feather on one pan" in digest.render_text(ctx)
+    assert db.query(Highlight).filter_by(player_id=player.id).one().hook.startswith("a feather")
+    assert asked[0] == [{
+        "text": "Losses weigh about twice as much as equal gains.",
+        "cue": "How do losses weigh against equal gains?",
+    }]
+
+
+def test_backfill_hooks_only_asks_about_the_ones_missing_one(db, monkeypatch):
+    """The backlog drains and then costs nothing: an answer already hooked is never
+    sent up again."""
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?", hook="a deep well",
+           days_ago=9)
+    _older(db, player, "Attention residue lingers after a switch.",
+           "What lingers after switching tasks?", days_ago=7)
+    asked: list = []
+    _hooker(monkeypatch, {1: "wet paint you keep touching"}, asked)
+
+    ctx = digest.build_context(db, player, DAY)
+    digest.backfill_hooks(db, player, ctx)
+    assert [f["text"] for f in asked[0]] == ["Attention residue lingers after a switch."]
+
+
+def test_backfill_hooks_asks_nothing_when_every_answer_has_one(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?", hook="a deep well")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("nothing was missing a hook")
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "hooks_for", _boom)
+    assert digest.backfill_hooks(db, player, digest.build_context(db, player, DAY)) == 0
+
+
+def test_backfill_hooks_leaves_the_answers_bare_when_it_fails(db, monkeypatch):
+    """One unwritten hook is not worth losing the 7am email over."""
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?")
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "hooks_for",
+                        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("no quota")))
+
+    ctx = digest.build_context(db, player, DAY)
+    problems: list[str] = []
+    assert digest.backfill_hooks(db, player, ctx, problems) == 0
+    assert problems and "hooks not written" in problems[0]
+    assert "What beats speed?" in digest.render_text(ctx)
+
+
+def test_backfill_hooks_stops_when_the_days_quota_is_gone(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?")
+    _hooker(monkeypatch, {1: "a deep well"})
+    llm.note_spend(llm.DAILY_LIMIT)
+    assert digest.backfill_hooks(db, player, digest.build_context(db, player, DAY)) == 0
+
+
+def test_a_preview_writes_no_hooks(db, monkeypatch):
+    """build_context is what the app and the preview read, as often as they like."""
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("a preview must not spend the allowance")
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "hooks_for", _boom)
+    ctx = digest.build_context(db, player, DAY)
+    assert ctx["recall"][0]["hook"] == ""
+
+
+def test_send_daily_hooks_the_answers_it_is_about_to_ask(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Losses weigh about twice as much as equal gains.",
+           "How do losses weigh against equal gains?")
+    _hooker(monkeypatch, {1: "a feather on one pan tipping the whole scale"})
+    sent = {}
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.update(text=t, html=h))
+
+    assert digest.send_daily(db, player, DAY)["status"] == "sent"
+    assert "hook: a feather on one pan tipping the whole scale" in sent["text"]
+    assert "a feather on one pan tipping the whole scale" in sent["html"]
+
+
+def test_a_quiet_morning_spends_nothing_on_hooks(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "hooks_for",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("nothing to send")))
+    assert digest.send_daily(db, player, DAY)["status"] == "skipped"
 
 
 # ── cross-day duplicates ──────────────────────────────────────────────────────
