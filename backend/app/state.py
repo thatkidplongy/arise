@@ -315,12 +315,13 @@ _DAILY_ROTATION: list[list[str]] = [
 ]
 
 # Some dailies are better on named days than on a cycle that drifts through the week.
-# Japanese is one: a script and its grammar need a rhythm you can plan around, and
-# Monday/Wednesday/Friday is spaced closely enough that a sitting still has the last
-# one behind it, with a day off in between for it to settle. Weekday numbers are
-# date.weekday(), so Monday is 0.
+# Japanese is one: a script and its grammar need a rhythm you can plan around. Weekday
+# evenings go Monday/Wednesday/Friday — close enough spacing that a sitting still has
+# the last one behind it, with a day between for it to settle — and both weekend days
+# join them, because that's when there is actually time to sit with it. Tuesday and
+# Thursday are the ones off. Weekday numbers are date.weekday(), so Monday is 0.
 _DAILY_WEEKDAYS: dict[str, tuple[int, ...]] = {
-    "d-jp": (0, 2, 4),  # Mon / Wed / Fri
+    "d-jp": (0, 2, 4, 5, 6),  # Mon / Wed / Fri + the whole weekend
 }
 
 

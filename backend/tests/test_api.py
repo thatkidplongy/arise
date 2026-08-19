@@ -311,21 +311,22 @@ def test_daily_rotation(client):
         assert "d-train" in shown and shown == active_daily_ids(d)
         seen.append(shown)
     assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
-    # Across the full cycle every daily comes around — Japanese on its own weekdays
-    # rather than the cycle, and 2026-07-20 is a Monday.
+    # Across the full cycle every daily comes around — Japanese on its own named days
+    # rather than the cycle (these three are a Saturday, a Sunday and a Monday).
     assert set().union(*seen) == {
         "d-train", "d-read", "d-wealth", "d-craft", "d-sketch", "d-jp", "d-meditate", "d-connect",
     }
 
 
-def test_japanese_lands_on_monday_wednesday_friday():
+def test_japanese_lands_on_mon_wed_fri_and_the_whole_weekend():
     """A script and its grammar need a rhythm you can plan around, so the Japanese
-    daily sits on named days instead of drifting through the week with the rotation."""
+    daily sits on named days instead of drifting through the week with the rotation:
+    the three weekday evenings, both weekend days, and Tuesday/Thursday off."""
     from app.state import active_daily_ids
 
     week = [f"2026-07-{20 + i}" for i in range(7)]  # Monday 20th → Sunday 26th
     assert [d for d in week if "d-jp" in active_daily_ids(d)] == [
-        "2026-07-20", "2026-07-22", "2026-07-24",
+        "2026-07-20", "2026-07-22", "2026-07-24", "2026-07-25", "2026-07-26",
     ]
 
 
@@ -346,7 +347,7 @@ def test_a_day_off_from_japanese_does_not_block_the_daily_clear():
     from app import state
     from app.models import Completion, QuestDef
 
-    tuesday = "2026-07-21"
+    tuesday = "2026-07-21"  # one of the two days Japanese is off
     active = state.active_daily_ids(tuesday)
     assert "d-jp" not in active
     defs = [QuestDef(id=qid, title=qid, desc="", stat="INT", xp=10, cadence="daily",
