@@ -311,10 +311,49 @@ def test_daily_rotation(client):
         assert "d-train" in shown and shown == active_daily_ids(d)
         seen.append(shown)
     assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
-    # Across the full cycle every daily comes around.
+    # Across the full cycle every daily comes around — Japanese on its own named days
+    # rather than the cycle (these three are a Saturday, a Sunday and a Monday).
     assert set().union(*seen) == {
         "d-train", "d-read", "d-wealth", "d-craft", "d-sketch", "d-jp", "d-meditate", "d-connect",
     }
+
+
+def test_japanese_lands_on_mon_wed_fri_and_the_whole_weekend():
+    """A script and its grammar need a rhythm you can plan around, so the Japanese
+    daily sits on named days instead of drifting through the week with the rotation:
+    the three weekday evenings, both weekend days, and Tuesday/Thursday off."""
+    from app.state import active_daily_ids
+
+    week = [f"2026-07-{20 + i}" for i in range(7)]  # Monday 20th → Sunday 26th
+    assert [d for d in week if "d-jp" in active_daily_ids(d)] == [
+        "2026-07-20", "2026-07-22", "2026-07-24", "2026-07-25", "2026-07-26",
+    ]
+
+
+def test_the_fixed_days_do_not_drift_with_the_rotation():
+    """The 3-day cycle advances by the date's ordinal, so it slides against the
+    weekday — a Monday must be a Japanese day whatever the cycle is doing that week."""
+    from datetime import date, timedelta
+
+    from app.state import active_daily_ids
+
+    monday = date.fromisoformat("2026-07-20")
+    for week in range(6):
+        assert "d-jp" in active_daily_ids((monday + timedelta(weeks=week)).isoformat())
+
+
+def test_a_day_off_from_japanese_does_not_block_the_daily_clear():
+    """Tuesday's clear can't be held up by a quest Tuesday never shows."""
+    from app import state
+    from app.models import Completion, QuestDef
+
+    tuesday = "2026-07-21"  # one of the two days Japanese is off
+    active = state.active_daily_ids(tuesday)
+    assert "d-jp" not in active
+    defs = [QuestDef(id=qid, title=qid, desc="", stat="INT", xp=10, cadence="daily",
+                     target=1) for qid in sorted(active | {"d-jp"})]
+    rows = [Completion(quest_id=qid, day=tuesday, xp=10) for qid in sorted(active)]
+    assert state.dailies_cleared(rows, defs, tuesday) is True
 
 
 def test_step_toggle_rejected_for_multi_target(client):
