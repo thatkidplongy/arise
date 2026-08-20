@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readMoneyDraft, type MoneyDraft } from '@/lib/moneyEntry';
+import { hasLoggedPayday, PAYDAY_NOTE, readMoneyDraft, type MoneyDraft } from '@/lib/moneyEntry';
 
 function draft(extra: Partial<MoneyDraft> = {}): MoneyDraft {
   return { amount: '', note: '', direction: 'out', bucket: null, ...extra };
@@ -41,5 +41,39 @@ describe('readMoneyDraft', () => {
   it('carries the direction through', () => {
     expect(readMoneyDraft(draft({ amount: '500', direction: 'in' }))?.direction).toBe('in');
     expect(readMoneyDraft(draft({ amount: '500', direction: 'out' }))?.direction).toBe('out');
+  });
+});
+
+describe('hasLoggedPayday', () => {
+  it('is false for a day with no entries', () => {
+    expect(hasLoggedPayday([])).toBe(false);
+  });
+
+  it('is true once the payday is in', () => {
+    expect(hasLoggedPayday([{ direction: 'in', note: PAYDAY_NOTE }])).toBe(true);
+  });
+
+  it('ignores other money in — side income must leave the button tappable', () => {
+    expect(
+      hasLoggedPayday([
+        { direction: 'in', note: 'Sold a book' },
+        { direction: 'in', note: 'Gift' },
+        { direction: 'out', note: 'Groceries' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('finds the payday among other entries the same day', () => {
+    expect(
+      hasLoggedPayday([
+        { direction: 'out', note: 'Rent' },
+        { direction: 'in', note: 'Refund' },
+        { direction: 'in', note: PAYDAY_NOTE },
+      ]),
+    ).toBe(true);
+  });
+
+  it('ignores money out that happens to carry the payday note', () => {
+    expect(hasLoggedPayday([{ direction: 'out', note: PAYDAY_NOTE }])).toBe(false);
   });
 });

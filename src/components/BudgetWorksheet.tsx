@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import type { ApiBudget, ApiCommitment } from '@/lib/api';
+import { dateKey } from '@/lib/dates';
 import {
   BUCKET_LABEL,
   BUDGET_SPLIT,
@@ -15,7 +16,9 @@ import {
   type BucketReading,
 } from '@/lib/budget';
 import { peso } from '@/lib/money';
+import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
+import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, feedback, surface, text, withAlpha } from '@/theme';
 
@@ -231,19 +234,24 @@ function IncomeField({ payday }: { payday: number }) {
  * follows from these entries: the balance, the graph, and the 50/30/20 lines. */
 function PaydayButton({ payday }: { payday: number }) {
   const addMoney = useSystem((s) => s.addMoney);
-  const todayIn = useSystem((s) => s.state?.money.today_in ?? 0);
   const qc = useQueryClient();
-  const logged = todayIn > 0; // guards a double-tap; tomorrow it's tappable again
+  // Today's entries, not today's total in: only a payday entry may block this
+  // button. Side income, a gift or a refund logged the same day is not the payday,
+  // and a total-in check would lock the button for the rest of the day.
+  const { history, loading } = useMoneyHistory('day', dateKey());
+  const logged = hasLoggedPayday(history?.entries ?? []); // guards a double-tap; tomorrow it's tappable again
 
   const log = async () => {
-    await addMoney(payday, 'in', 'Payday');
+    await addMoney(payday, 'in', PAYDAY_NOTE);
     void qc.invalidateQueries({ queryKey: ['money-history'] });
   };
 
   return (
     <Pressable
       onPress={logged ? undefined : () => void log()}
-      disabled={logged}
+      // Held until today's entries are in: tapping before they load can't tell
+      // whether the payday is already there, and would risk logging it twice.
+      disabled={logged || loading}
       style={({ pressed }) => [styles.paydayBtn, logged && styles.paydayBtnDone, pressed && { opacity: 0.85 }]}
       accessibilityLabel={logged ? 'Payday already logged today' : `Log payday, ${peso(payday)} in`}
     >

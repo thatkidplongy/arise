@@ -6,8 +6,27 @@
  * client agrees with the server instead of sending fields it will silently drop.
  */
 
+import type { ApiMoneyEntry } from '@/lib/api';
+
 export type MoneyDirection = 'in' | 'out';
 export type MoneyBucket = 'needs' | 'wants' | null;
+
+/** The note the payday button writes, and the only thing that marks an entry as
+ * *the* payday rather than any other money in. One constant so the button that
+ * writes it and the check that looks for it can't drift apart. */
+export const PAYDAY_NOTE = 'Payday';
+
+/**
+ * Whether the payday has already been logged among these entries — pass one day's
+ * worth to guard the payday button against a double-tap.
+ *
+ * Deliberately narrower than "any money in today": side income, a gift or a refund
+ * logged the same day must leave the payday button tappable, since they're not the
+ * payday. A plain total-in check can't tell those apart.
+ */
+export function hasLoggedPayday(entries: readonly Pick<ApiMoneyEntry, 'direction' | 'note'>[]): boolean {
+  return entries.some((e) => e.direction === 'in' && e.note === PAYDAY_NOTE);
+}
 
 /** What the form holds — amount and note as typed, so both can be mid-edit. */
 export interface MoneyDraft {
