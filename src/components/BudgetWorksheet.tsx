@@ -259,11 +259,14 @@ function PaydayButton({ payday }: { payday: number }) {
   );
 }
 
+/** Shown before take-home pay is set — which is also *why* the payday button isn't
+ * on screen yet, so this says so rather than pointing at a control that isn't there. */
 function EmptyState() {
   return (
     <Text style={styles.empty}>
-      Set what you take home each payday, then log each payday as it lands. The three lines split only money that has
-      actually come in — 50% needs, 30% wants, 20% kept.
+      Tap “Take-home per payday” above to set what you actually clear. The one-tap payday button appears once it’s set,
+      and the three lines split only money that has come in — 50% needs, 30% wants, 20% kept. Anything else you earn
+      goes in “Log money” below.
     </Text>
   );
 }
