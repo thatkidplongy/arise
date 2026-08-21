@@ -64,11 +64,15 @@ The backend serves `dist/` at `/`, so the app and its data share one origin (it
 auto-connects — no URL to type). `dist/` is **gitignored** — it's a build output —
 which is why a `git pull` on its own never updates what the phone sees.
 
-`install.sh` schedules **`com.arise.deploy`** to close that gap. Every 15 minutes
+`install.sh` schedules **`com.arise.deploy`** to close that gap. Every 2 minutes
 it fast-forwards `main`, rebuilds the web app *only* if the frontend actually
 changed, and restarts the backend *only* if something needs it. With no new commit
 it's one `git fetch` and out. So: push to `main`, and the phone catches up on its
-own within a quarter of an hour.
+own — the check costs milliseconds, and a full rebuild is about 20 seconds, so
+you're waiting well under three minutes.
+
+Don't want to wait at all? `launchctl kickstart -k gui/$(id -u)/com.arise.deploy`
+deploys immediately.
 
 It's deliberately timid — it refuses to act and says why, rather than guessing:
 
