@@ -84,6 +84,11 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
   const chartMax = Math.max(1, ...buckets.map((b) => Math.max(b.earned, b.spent)));
   const barH = (v: number) => (v > 0 ? Math.max(3, Math.round((v / chartMax) * CHART_HALF)) : 0);
   const showLabels = buckets.length <= 7;
+  // Whether anything was actually logged — not how many days the period spans. A day
+  // period is always exactly one bucket, so counting buckets told the Day view it had
+  // nothing to chart even with money logged, and told Week/Month it had something to
+  // chart on a period where nothing happened.
+  const charted = buckets.some((b) => b.earned > 0 || b.spent > 0);
 
   return (
     <SystemPanel title="Money">
@@ -139,14 +144,11 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
       <View style={styles.totals}>
         <Text style={[styles.total, { color: feedback.success }]}>{peso(history?.earned ?? 0)} in</Text>
         <Text style={[styles.total, { color: feedback.danger }]}>{peso(history?.spent ?? 0)} out</Text>
-        <Text style={[styles.total, styles.net]}>
-          net {history && history.net < 0 ? '−' : ''}
-          {peso(Math.abs(history?.net ?? 0))}
-        </Text>
+        <Text style={[styles.total, styles.net]}>net {peso(history?.net ?? 0)}</Text>
       </View>
 
       {/* Diverging chart: earned above the line, spent below */}
-      {buckets.length > 1 ? (
+      {charted ? (
         <View style={styles.chartWrap}>
           <View style={styles.baseline} />
           <View style={styles.chart}>

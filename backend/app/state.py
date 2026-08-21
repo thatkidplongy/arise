@@ -718,9 +718,10 @@ def _money_of(db: Session, player: Player, day: str) -> dict:
         "today_out": total("out", lambda r: r.day == day),
         "week_in": total("in", lambda r: game.week_key(r.day) == week),
         "week_out": total("out", lambda r: game.week_key(r.day) == week),
-        # One pool: the take-home pay is logged as a 'money in' (see set_monthly_income),
-        # so remaining is a plain everything-in minus everything-out. That in-entry is
-        # what makes this equal the budget salary at a fresh, unspent start.
+        # One pool: a plain everything-in minus everything-out. Take-home pay is only a
+        # setting and logs nothing (see set_monthly_income), so this stays at 0 — and goes
+        # negative once anything is spent — until a payday is actually logged in. Setting
+        # a salary does not fund the balance; landing one does.
         "balance": round(total("in", always) - total("out", always), 2),
     }
 
