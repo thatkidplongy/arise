@@ -5,16 +5,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Where the build lands. Defaults to dist/ — the directory the backend serves —
+# so running this by hand behaves exactly as it always has. scripts/deploy.sh
+# overrides it to build somewhere else and swap the finished build into place,
+# rather than overwriting dist/ file-by-file while the phone is being served it.
+OUT="${ARISE_WEB_OUT:-dist}"
+
 echo "▸ Exporting web build…"
-npx expo export --platform web
+npx expo export --platform web --output-dir "$OUT"
 
 echo "▸ Generating home-screen icon…"
 # 180x180 is the size iOS uses for apple-touch-icon.
-sips -z 180 180 assets/images/icon.png --out dist/apple-touch-icon.png >/dev/null
+sips -z 180 180 assets/images/icon.png --out "$OUT/apple-touch-icon.png" >/dev/null
 
 echo "▸ Injecting PWA meta tags…"
-python3 - <<'PY'
-import pathlib, re
+OUT="$OUT" python3 - <<'PY'
+import os, pathlib, re
 
 META = """
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -32,7 +38,7 @@ META = """
 VIEWPORT = ('<meta name="viewport" content="width=device-width, initial-scale=1, '
             'maximum-scale=1, user-scalable=no"/>')
 
-for html in pathlib.Path("dist").glob("**/*.html"):
+for html in pathlib.Path(os.environ["OUT"]).glob("**/*.html"):
     text = html.read_text()
     if re.search(r'<meta[^>]*name="viewport"[^>]*/?>', text):
         text = re.sub(r'<meta[^>]*name="viewport"[^>]*/?>', VIEWPORT, text, count=1)
@@ -43,4 +49,4 @@ for html in pathlib.Path("dist").glob("**/*.html"):
     html.write_text(text)
 PY
 
-echo "✔ Web app built to dist/ (installable). The always-on backend serves it."
+echo "✔ Web app built to $OUT/ (installable). The always-on backend serves it."

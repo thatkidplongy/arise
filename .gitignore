@@ -6,6 +6,9 @@ node_modules/
 # Expo
 .expo/
 dist/
+# scripts/deploy.sh builds beside the live bundle and swaps it in.
+dist.new/
+dist.old/
 web-build/
 expo-env.d.ts
 
@@ -58,3 +61,6 @@ backend/backups/
 
 # Runtime logs
 backend/logs/
+
+# scripts/deploy.sh single-run lock
+.deploy.lock/

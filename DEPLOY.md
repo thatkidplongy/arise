@@ -29,15 +29,17 @@ uv sync                     # once: creates the virtualenv
 bash deploy/install.sh      # loads com.arise.backend + com.arise.backup + com.arise.digest
 ```
 
-`install.sh` writes `~/Library/LaunchAgents/com.arise.{backend,backup,digest}.plist`
+`install.sh` writes `~/Library/LaunchAgents/com.arise.{backend,backup,digest,deploy}.plist`
 with your paths and starts them. The backend then runs at login, restarts on
-crash, and relaunches after a reboot (uvicorn on `0.0.0.0:8000`).
+crash, and relaunches after a reboot (uvicorn on `0.0.0.0:8000`), and
+`com.arise.deploy` keeps the app itself up to date (see step 3).
 
 Control it:
 
 ```bash
 launchctl print gui/$(id -u)/com.arise.backend | grep -E "state|pid"   # status
 launchctl kickstart -k gui/$(id -u)/com.arise.backend                  # restart
+launchctl kickstart -k gui/$(id -u)/com.arise.deploy                   # deploy now
 tail -f backend/logs/backend.log                                       # logs
 bash deploy/uninstall.sh                                               # remove (keeps data)
 ```
@@ -56,15 +58,43 @@ never on the public internet). To require a token anyway, uncomment the
 
 That address reaches your Mac from anywhere your phone has internet.
 
-## 3. Build the web app (served by the backend)
-
-```bash
-./scripts/build-web.sh      # exports dist/, makes the home-screen icon + PWA meta
-```
+## 3. The web app (built and deployed for you)
 
 The backend serves `dist/` at `/`, so the app and its data share one origin (it
-auto-connects — no URL to type). Rerun this (and `launchctl kickstart -k
-gui/$(id -u)/com.arise.backend`) whenever you change the app's code.
+auto-connects — no URL to type). `dist/` is **gitignored** — it's a build output —
+which is why a `git pull` on its own never updates what the phone sees.
+
+`install.sh` schedules **`com.arise.deploy`** to close that gap. Every 15 minutes
+it fast-forwards `main`, rebuilds the web app *only* if the frontend actually
+changed, and restarts the backend *only* if something needs it. With no new commit
+it's one `git fetch` and out. So: push to `main`, and the phone catches up on its
+own within a quarter of an hour.
+
+It's deliberately timid — it refuses to act and says why, rather than guessing:
+
+| Situation | What it does |
+|---|---|
+| Uncommitted changes in the tree | skips, touches nothing |
+| Checked out on a branch other than `main` | skips, touches nothing |
+| Local branch diverged from origin | skips (`--ff-only`, so it can never invent a merge) |
+| Build fails | keeps serving the previous build, logs the failure |
+| Backend-only commit | restarts, doesn't rebuild |
+
+The build runs beside the live one and is swapped in when it's finished, so the
+phone is never served a half-written app.
+
+Build or deploy by hand any time:
+
+```bash
+./scripts/build-web.sh                    # just build (into dist/)
+./scripts/deploy.sh                       # pull + build-if-needed + restart-if-needed
+tail -f backend/logs/deploy.log           # what it's been doing
+```
+
+> One prerequisite: `git fetch` has to work **non-interactively** in that repo —
+> the credential is stored in the macOS keychain, or the remote is SSH with a
+> loaded key. If it can't authenticate it logs the failure and changes nothing.
+> `ARISE_DEPLOY_BRANCH` overrides the branch it tracks (default `main`).
 
 ## 4. Keep the Mac awake
 

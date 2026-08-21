@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template — do not load directly. Run `bash backend/deploy/install.sh`, which
+  substitutes __BACKEND_DIR__ for your machine and loads it.
+
+  Checks origin/main every 15 minutes: fast-forwards, rebuilds the web app only
+  if the frontend moved, and restarts com.arise.backend only if something needs
+  it. With no new commit it is one `git fetch` and out, so the interval is cheap.
+
+  This is what stops a pushed change sitting invisible on the phone: dist/ is
+  gitignored, so a pull alone never updates the UI.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.arise.deploy</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__BACKEND_DIR__/../scripts/deploy.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__BACKEND_DIR__/..</string>
+
+    <!-- Every 15 minutes, and once when it loads (login / reboot). -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__BACKEND_DIR__/logs/deploy.log</string>
+    <key>StandardErrorPath</key>
+    <string>__BACKEND_DIR__/logs/deploy.log</string>
+</dict>
+</plist>
