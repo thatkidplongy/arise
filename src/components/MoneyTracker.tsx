@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
-import type { ApiMoney, MoneyScope } from '@/lib/api';
+import type { ApiMoney, ApiMoneyEntry, MoneyScope } from '@/lib/api';
 import { dateKey, shortDay } from '@/lib/dates';
+import { useShowMore } from '@/hooks/useShowMore';
 import { peso } from '@/lib/money';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
@@ -32,6 +34,72 @@ function monthDay(key: string): string {
 function weekdayNarrow(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'narrow' });
+}
+
+/** How many logged lines show before the rest fold away. A month holds dozens, and
+ * what this list is for is the recent handful you're checking. */
+const VISIBLE_ENTRIES = 8;
+
+/** One logged line: what it was, what it counted against, and how much. */
+function EntryRow({ entry, today, showDay }: { entry: ApiMoneyEntry; today: string; showDay: boolean }) {
+  const income = entry.direction === 'in';
+  const meta = [
+    showDay ? shortDay(entry.day, today) : null,
+    entry.bucket,
+    entry.commitment_id ? 'standing bill' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <View style={styles.entry}>
+      <View style={styles.entryText}>
+        <Text style={styles.entryNote} numberOfLines={1}>
+          {entry.note}
+        </Text>
+        {meta ? <Text style={styles.entryMeta}>{meta}</Text> : null}
+      </View>
+      {/* The sign is what says which way the money went; the colour only agrees with
+          it. All-red on a list that's mostly spending would just be noise. */}
+      <Text style={[styles.entryAmount, income && { color: feedback.success }]}>
+        {income ? '+' : '−'}
+        {peso(entry.amount)}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * What the period's totals are actually made of. The chart says how much and when;
+ * this is the only thing that says *what*, which is the question a day's spending
+ * raises first.
+ *
+ * Ordered by the day the money moved, not the day it was typed in — a back-dated
+ * spend belongs where it happened, otherwise catching up on a week would file
+ * everything under the sitting that recorded it.
+ */
+function EntryList({ entries, today, showDay }: { entries: ApiMoneyEntry[]; today: string; showDay: boolean }) {
+  const ordered = [...entries].sort(
+    (a, b) => b.day.localeCompare(a.day) || b.created_at.localeCompare(a.created_at),
+  );
+  const { shown, rest, folds, expanded, toggle } = useShowMore(ordered, VISIBLE_ENTRIES);
+
+  return (
+    <View style={styles.entries}>
+      {shown.map((e) => (
+        <EntryRow key={e.id} entry={e} today={today} showDay={showDay} />
+      ))}
+      {folds ? (
+        <FoldToggle
+          expanded={expanded}
+          label={expanded ? 'Show fewer' : `${rest.length} more`}
+          total={ordered.length}
+          color={accent}
+          onPress={toggle}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 /**
@@ -89,6 +157,7 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
   // nothing to chart even with money logged, and told Week/Month it had something to
   // chart on a period where nothing happened.
   const charted = buckets.some((b) => b.earned > 0 || b.spent > 0);
+  const entries = history?.entries ?? [];
 
   return (
     <SystemPanel title="Money">
@@ -172,6 +241,9 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
       ) : (
         <Text style={styles.empty}>Not enough logged this period to chart yet.</Text>
       )}
+
+      {/* The day is only worth repeating per row when the period spans more than one. */}
+      {entries.length > 0 ? <EntryList entries={entries} today={today} showDay={scope !== 'day'} /> : null}
     </SystemPanel>
   );
 }
@@ -226,4 +298,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   empty: { color: text.faint, fontSize: 13, textAlign: 'center', marginTop: 12 },
+
+  entries: { marginTop: 18, borderTopWidth: 1, borderTopColor: surface.hairline },
+  entry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 42,
+    borderBottomWidth: 1,
+    borderBottomColor: surface.hairline,
+  },
+  entryText: { flex: 1, minWidth: 0 },
+  entryNote: { color: text.primary, fontSize: 13 },
+  // text.secondary, not text.faint: faint taupe is 2.46:1 on an ivory card, and this
+  // line carries the day and the bucket.
+  entryMeta: { color: text.secondary, fontSize: 11, marginTop: 1 },
+  entryAmount: { color: text.primary, fontSize: 13, fontWeight: '700' },
+
 });

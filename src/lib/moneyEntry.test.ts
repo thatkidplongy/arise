@@ -77,3 +77,20 @@ describe('hasLoggedPayday', () => {
     expect(hasLoggedPayday([{ direction: 'out', note: PAYDAY_NOTE }])).toBe(false);
   });
 });
+
+describe('readMoneyDraft day', () => {
+  it('defaults to blank, so the server uses the day of the request', () => {
+    expect(readMoneyDraft(draft({ amount: '190' }))?.day).toBe('');
+    expect(readMoneyDraft(draft({ amount: '190', day: '' }))?.day).toBe('');
+  });
+
+  it('passes a well-formed day through, so a spend can be back-dated', () => {
+    expect(readMoneyDraft(draft({ amount: '190', day: '2026-08-20' }))?.day).toBe('2026-08-20');
+  });
+
+  it('drops a malformed day rather than losing the whole entry to a 422', () => {
+    expect(readMoneyDraft(draft({ amount: '190', day: '20-08-2026' }))?.day).toBe('');
+    expect(readMoneyDraft(draft({ amount: '190', day: 'thursday' }))?.day).toBe('');
+    expect(readMoneyDraft(draft({ amount: '190', day: '2026-8-20' }))?.day).toBe('');
+  });
+});

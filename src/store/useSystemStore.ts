@@ -12,6 +12,7 @@ import {
   type ApiEvent,
   type ApiQuest,
   type ApiState,
+  type ApiMoneyInput,
   type LearningKind,
   type RecallGrade,
 } from '@/lib/api';
@@ -116,12 +117,7 @@ export interface SystemStore {
   addGrocery: (name: string) => Promise<void>;
   toggleGrocery: (id: string, bought: boolean) => Promise<void>;
   removeGrocery: (id: string) => Promise<void>;
-  addMoney: (
-    amount: number,
-    direction: 'in' | 'out',
-    note: string,
-    bucket?: 'needs' | 'wants' | null,
-  ) => Promise<void>;
+  addMoney: (entry: ApiMoneyInput) => Promise<void>;
   payCommitment: (id: string, amount?: number) => Promise<void>;
   removeMoney: (id: string) => Promise<void>;
   resetMoney: () => Promise<void>;
@@ -322,8 +318,7 @@ export const useSystemStore = create<SystemStore>()(
       addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
       toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
       removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
-      addMoney: (amount, direction, note, bucket = null) =>
-        mutate((b, t, d) => api.addMoney(b, t, amount, direction, note, d, bucket)),
+      addMoney: (entry) => mutate((b, t, d) => api.addMoney(b, t, entry, d)),
       payCommitment: (id, amount) => mutate((b, t, d) => api.payCommitment(b, t, id, d, amount)),
       removeMoney: (id) => mutate((b, t, d) => api.removeMoney(b, t, id, d)),
       resetMoney: () => mutate((b, t, d) => api.resetMoney(b, t, d)),

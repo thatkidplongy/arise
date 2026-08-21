@@ -544,11 +544,21 @@ def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = De
 
 @router.post("/money", response_model=StateOut)
 def add_money(body_in: MoneyIn, day: str | None = Query(None), db: Session = Depends(get_db)):
-    """Log an amount in (income) or out (spending) for the day. `bucket` tags spending
-    against the 50/30/20 rule; it's ignored on money in."""
+    """Log an amount in (income) or out (spending). `bucket` tags spending against the
+    50/30/20 rule; it's ignored on money in.
+
+    `day` in the body back-dates the entry to the day the money actually moved; omit
+    it and the entry lands on the query day, as every existing caller expects. The
+    state that comes back is always for the query day — that's the screen the client
+    is looking at, not the day it just filed something under."""
     player = state.get_or_create_player(db)
     d = _valid_day(day)
-    service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, d, bucket=body_in.bucket)
+    on = _valid_day(body_in.day) if body_in.day else d
+    # A future entry sits outside every period the app can navigate to, so it would be
+    # accepted and then invisible. Refuse it rather than swallow it.
+    if on > d:
+        raise HTTPException(400, "day cannot be in the future")
+    service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, on, bucket=body_in.bucket)
     return state.build_state(db, player, d)
 
 

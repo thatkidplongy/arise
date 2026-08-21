@@ -83,3 +83,42 @@ def test_reset_clears_money_and_budget(client):
 def test_money_rejects_bad_input(client):
     assert client.post(f"/money?day={DAY}", json={"amount": 0, "direction": "in"}).status_code == 422
     assert client.post(f"/money?day={DAY}", json={"amount": 10, "direction": "sideways"}).status_code == 422
+
+
+def test_back_dated_spend_lands_on_the_day_it_happened(client):
+    """A spend remembered days later belongs on the day the money moved, not the day
+    it was typed in — otherwise a week of back-filling piles onto one day and the
+    weekday has to live in the note."""
+    client.post(f"/money?day={DAY}", json={"amount": 190, "direction": "out",
+                                           "note": "thu dinner", "day": LAST_WEEK})
+
+    # The entry is filed under LAST_WEEK, so this week's out is untouched...
+    m = client.get(f"/state?day={DAY}").json()["money"]
+    assert m["today_out"] == 0 and m["week_out"] == 0 and m["balance"] == -190
+
+    # ...and it shows up in that day's own history, note and all.
+    hist = _hist(client, "day", LAST_WEEK)
+    assert hist["spent"] == 190
+    assert [(e["note"], e["day"]) for e in hist["entries"]] == [("thu dinner", LAST_WEEK)]
+
+
+def test_blank_day_falls_back_to_the_query_day(client):
+    """Every caller that doesn't care about back-dating sends no day at all, and must
+    keep landing on the day it's looking at."""
+    client.post(f"/money?day={DAY}", json={"amount": 500, "direction": "in", "note": "gig", "day": ""})
+    assert [e["day"] for e in _hist(client, "day")["entries"]] == [DAY]
+
+
+def test_a_future_day_is_refused(client):
+    """Accepting it would file the entry outside every period the app can navigate
+    to — logged, then invisible. Better a 400 than a silent loss."""
+    r = client.post(f"/money?day={DAY}", json={"amount": 190, "direction": "out", "day": "2026-07-21"})
+    assert r.status_code == 400
+    assert _hist(client, "month")["spent"] == 0
+
+
+def test_a_malformed_day_is_refused(client):
+    for bad in ("20-07-2026", "2026-7-20", "2026-02-31", "yesterday"):
+        r = client.post(f"/money?day={DAY}", json={"amount": 10, "direction": "out", "day": bad})
+        assert r.status_code in (400, 422), bad
+    assert _hist(client, "month")["spent"] == 0

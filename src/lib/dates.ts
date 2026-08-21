@@ -28,3 +28,18 @@ export function shortDay(day: string, today: string): string {
   if (diff === 1) return 'Yesterday';
   return `${MONTHS[m - 1]} ${d}`;
 }
+
+/**
+ * The last `count` calendar days ending at `today` (a 'YYYY-MM-DD'), most recent
+ * first — the strip a form offers for back-dating an entry a few days.
+ *
+ * Walks a UTC epoch rather than mutating a local Date, so crossing a month or year
+ * boundary can't land on a day that doesn't exist (the classic `setDate(0)` bug),
+ * and DST can't make a step land twice on the same date.
+ */
+export function recentDays(today: string, count: number): string[] {
+  const [y, m, d] = today.split('-').map(Number);
+  if (!y || !m || !d || count < 1) return [];
+  const start = Date.UTC(y, m - 1, d);
+  return Array.from({ length: count }, (_, i) => new Date(start - i * 86_400_000).toISOString().slice(0, 10));
+}

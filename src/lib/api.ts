@@ -186,6 +186,18 @@ export interface ApiMoneyEntry {
   commitment_id: string | null; // set when logged by paying a standing commitment
 }
 
+/** The body POST /money takes. `day` is the day the money actually moved; '' means
+ * the day the request itself is for, which is what logging something as it happens
+ * wants. Lives here with the other wire types, so the client and the form can't hold
+ * two drifting ideas of the same payload. */
+export interface ApiMoneyInput {
+  amount: number;
+  direction: 'in' | 'out';
+  note: string;
+  bucket: 'needs' | 'wants' | null;
+  day: string;
+}
+
 /** The money summary in /state — headline figures only; entries come per-period
  * from getMoneyHistory so /state never carries the whole log. */
 export interface ApiMoney {
@@ -770,14 +782,13 @@ export const api = {
     request<ApiState>(base, `/grocery/${id}?day=${day}`, token, { method: 'DELETE' }),
 
   // ── Money log (in/out) ────────────────────────────────────────────────────
-  addMoney: (
-    base: string, token: string,
-    amount: number, direction: 'in' | 'out', note: string, day: string,
-    bucket: 'needs' | 'wants' | null = null,
-  ) =>
+  // Two days meet here and they mean different things: `entry.day` is when the money
+  // moved, `day` is the screen being looked at and decides which state comes back.
+  // Passing the entry whole keeps them from ever being swapped at a call site.
+  addMoney: (base: string, token: string, entry: ApiMoneyInput, day: string) =>
     request<ApiState>(base, `/money?day=${day}`, token, {
       method: 'POST',
-      body: JSON.stringify({ amount, direction, note, bucket }),
+      body: JSON.stringify(entry),
     }),
 
   removeMoney: (base: string, token: string, id: string, day: string) =>

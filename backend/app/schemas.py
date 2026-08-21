@@ -124,6 +124,11 @@ class MoneyIn(BaseModel):
     # Which 50/30/20 bucket this spending counts against. Only meaningful on money
     # out — income isn't divided, it's what the division is of.
     bucket: Literal["needs", "wants"] | None = None
+    # The day the money actually moved, when that isn't the day it was typed in. A
+    # spend recalled on Friday belongs on Tuesday, otherwise the weekday ends up in
+    # the note and every back-filled spend piles onto one day. Blank = the request's
+    # own day, which is what every caller that doesn't care sends.
+    day: str = Field("", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
 
 
 class PayCommitmentIn(BaseModel):

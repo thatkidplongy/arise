@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import type { ApiBudget, ApiCommitment } from '@/lib/api';
@@ -15,6 +16,7 @@ import {
   summariseBudget,
   type BucketReading,
 } from '@/lib/budget';
+import { useShowMore } from '@/hooks/useShowMore';
 import { peso } from '@/lib/money';
 import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
@@ -68,6 +70,12 @@ function BucketRow({ reading }: { reading: BucketReading }) {
   );
 }
 
+/** Live and unpaid — the only state in which a line still wants a tap. Shared so the
+ * row and the fold that hides it can't disagree about what's still owed. */
+function isPayable(item: ApiCommitment): boolean {
+  return item.active && !item.paid_this_month;
+}
+
 function CommitmentRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: () => void; onRemove: () => void }) {
   const meta = [
     item.due_day > 0 ? `${item.due_day}${ordinal(item.due_day)}` : null,
@@ -78,7 +86,7 @@ function CommitmentRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: 
     .join(' · ');
   // Unpaid → tapping the row logs the spend against this bucket (one tap, never
   // retyped). Paid ones aren't tappable — the month's obligation is already met.
-  const payable = item.active && !item.paid_this_month;
+  const payable = isPayable(item);
 
   return (
     <View style={styles.line}>
@@ -122,6 +130,14 @@ const VISIBLE_LINES = 5;
  * behind a control you have to operate, and the count is small enough that "show
  * the rest" is one tap instead of several.
  */
+/** What the fold says it's holding back. Hiding a bill that still needs paying is the
+ * one bad outcome here, so that gets named rather than folded into a row count. */
+function describeFold(expanded: boolean, hidden: number, unpaid: number): string {
+  if (expanded) return 'Show fewer';
+  if (unpaid > 0) return `${hidden} more · ${unpaid} still to pay`;
+  return `${hidden} more`;
+}
+
 function CommitmentList({
   items,
   onPay,
@@ -131,13 +147,7 @@ function CommitmentList({
   onPay: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const folds = items.length > VISIBLE_LINES + 1; // +1: folding a single row saves nothing
-  const shown = expanded || !folds ? items : items.slice(0, VISIBLE_LINES);
-  const hidden = items.length - shown.length;
-  // Hiding a bill that still needs paying is the one bad outcome here, so the
-  // button says when that's what it's doing rather than just counting rows.
-  const hiddenUnpaid = items.slice(shown.length).filter((c) => c.active && !c.paid_this_month).length;
+  const { shown, rest, folds, expanded, toggle } = useShowMore(items, VISIBLE_LINES);
 
   return (
     <>
@@ -145,21 +155,14 @@ function CommitmentList({
         <CommitmentRow key={item.id} item={item} onPay={() => onPay(item.id)} onRemove={() => onRemove(item.id)} />
       ))}
       {folds ? (
-        <Pressable
-          onPress={() => setExpanded((e) => !e)}
-          style={styles.foldBtn}
-          accessibilityRole="button"
-          accessibilityLabel={expanded ? 'Show fewer lines' : `Show all ${items.length} lines`}
-        >
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={TONE} />
-          <Text style={styles.foldText}>
-            {expanded
-              ? 'Show fewer'
-              : hiddenUnpaid > 0
-                ? `${hidden} more · ${hiddenUnpaid} still to pay`
-                : `${hidden} more`}
-          </Text>
-        </Pressable>
+        <FoldToggle
+          expanded={expanded}
+          label={describeFold(expanded, rest.length, rest.filter(isPayable).length)}
+          total={items.length}
+          color={TONE}
+          onPress={toggle}
+          style={styles.foldDivider}
+        />
       ) : null}
     </>
   );
@@ -298,7 +301,8 @@ function PaydayButton({ payday }: { payday: number }) {
   const logged = hasLoggedPayday(history?.entries ?? []); // guards a double-tap; tomorrow it's tappable again
 
   const log = async () => {
-    await addMoney(payday, 'in', PAYDAY_NOTE);
+    // day '': the payday is being logged as it lands, so it belongs on today.
+    await addMoney({ amount: payday, direction: 'in', note: PAYDAY_NOTE, bucket: null, day: '' });
     void qc.invalidateQueries({ queryKey: ['money-history'] });
   };
 
@@ -506,16 +510,8 @@ const styles = StyleSheet.create({
   remove: { color: text.secondary, fontSize: 18, fontWeight: '700' },
 
   // Reads as a continuation of the list it folds, so it carries the same hairline.
-  foldBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    minHeight: TAP,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  foldText: { color: TONE, fontSize: 12, fontWeight: '600' },
+  // The fold sits at the foot of a ruled list, so it keeps the rule going.
+  foldDivider: { borderTopWidth: 1, borderTopColor: surface.hairline },
 
   addRow: { flexDirection: 'row', gap: 6, marginTop: 12, alignItems: 'center' },
   input: {
