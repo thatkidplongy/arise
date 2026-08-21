@@ -288,17 +288,59 @@ def remove_reading_log(db: Session, player: Player, log_id: str) -> None:
         db.commit()
 
 
+def _same_book(title: str, other: str) -> bool:
+    """Whether two titles name the same book. Trimmed and case-insensitive, because
+    the same book retyped with different capitalisation is not a new book."""
+    return (title or "").strip().casefold() == (other or "").strip().casefold()
+
+
+def _retitle_reading_logs(db: Session, player: Player, title: str) -> None:
+    """Move the sittings logged against the current book onto a re-spelled title.
+
+    They're keyed on the title exactly as it stood when logged
+    (state.reading_logs_of), so a corrected capitalisation has to bring them along
+    or the same book reads back as one with nothing read."""
+    if title == player.current_book:
+        return
+    db.query(ReadingLog).filter_by(player_id=player.id, book=player.current_book).update(
+        {"book": title}, synchronize_session=False
+    )
+
+
+def _carry_book_on(db: Session, player: Player, title: str) -> None:
+    """Keep reading the book already open — a corrected spelling or length is not a
+    new book. The week it started, a check-in already answered and the generated
+    reading day all stand: none of them are a length's business."""
+    _retitle_reading_logs(db, player, title)
+    player.current_book = title
+
+
+def _open_new_book(db: Session, player: Player, title: str, day: str) -> None:
+    """Start a different book. Its progress window begins this week, the finish
+    check-in is free to fire again, and the reading day is re-personalised for it."""
+    player.current_book = title
+    player.book_started_week = game.week_key(day) if title else ""
+    player.book_review_week = ""
+    _clear_generated(db, player)
+
+
 def set_book(db: Session, player: Player, current_book: str, day: str, chapters: int = 0) -> None:
     """Set (or change) the book being read. The book then carries on for as many
     weeks as it takes — a week ending never resets it. `chapters` (optional) is the
     book's length — the finish line progress is measured against, never a per-day
     quota; 0 leaves it unknown and progress falls back to days read.
-    `book_review_week` is cleared so the finish check-in can fire again."""
-    player.current_book = (current_book or "").strip()
-    player.current_book_chapters = max(0, chapters) if player.current_book else 0
-    player.book_started_week = game.week_key(day) if player.current_book else ""
-    player.book_review_week = ""  # allow the next week's review to fire
-    _clear_generated(db, player)  # a new book should re-personalise the reading day
+
+    Only a *different* book starts over. The one UI path to a book's chapter total
+    is this same save, so re-saving the title you're already reading with a fixed
+    length has to leave its history alone: moving `book_started_week` to this week
+    drops every earlier sitting and read day out of the window state.py counts —
+    a 13-day book fixed from 35 to 38 chapters came back as 2 days read."""
+    title = (current_book or "").strip()
+    if _same_book(title, player.current_book):
+        _carry_book_on(db, player, title)
+    else:
+        _open_new_book(db, player, title, day)
+    player.current_book_chapters = max(0, chapters) if title else 0
     db.commit()
 
 

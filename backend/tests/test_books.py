@@ -112,6 +112,92 @@ def test_changing_books_does_not_inherit_the_last_ones_chapters(client):
     assert r["chapters_read"] == 0 and r["logged_today"] == []
 
 
+def _book_started_week(client) -> str:
+    from app.db import SessionLocal
+    from app.models import Player
+
+    session = SessionLocal()
+    try:
+        return session.query(Player).first().book_started_week
+    finally:
+        session.close()
+
+
+def test_fixing_a_books_chapter_count_keeps_the_history_it_already_has(client):
+    """Correcting a length is not starting over.
+
+    The only UI path to a book's chapter total is this same save, so re-saving the
+    title you're already reading has to leave `book_started_week` where it is —
+    moving it to this week drops every earlier sitting and read day out of the
+    window progress is counted in. Real data: "Thinking, fast and slow" fixed from
+    35 to 38 chapters came back as 2 days read instead of 13."""
+    start, later = "2026-07-14", "2026-07-27"  # W29, then W31 — the book runs on
+    client.put(f"/book?day={start}", json={"current_book": "Thinking, fast and slow", "chapters": 35})
+    for day in (start, "2026-07-16", later):
+        client.post("/reading/log", json={"chapters": 4, "label": "", "day": day})
+        client.post("/completions", json={"quest_id": "d-read", "day": day})
+
+    before = client.get(f"/state?day={later}").json()["reading"]
+    assert before["chapters_read"] == 12 and before["days_read"] == 3
+    assert _book_started_week(client) == "2026-W29"
+
+    # The fix: same book, right length. Everything but the total holds.
+    r = client.put(f"/book?day={later}", json={"current_book": "Thinking, fast and slow", "chapters": 38}).json()
+    assert r["reading"]["chapters"] == 38
+    assert r["reading"]["chapters_read"] == 12 and r["reading"]["days_read"] == 3
+    assert _book_started_week(client) == "2026-W29"
+
+
+def test_retyping_the_same_title_differently_is_not_a_new_book(client):
+    """Capitalisation isn't identity. The sittings are keyed on the title as it stood
+    when logged, so they come along with the corrected spelling rather than reading
+    as a book with no progress."""
+    start, later = "2026-07-14", "2026-07-27"
+    client.put(f"/book?day={start}", json={"current_book": "atomic habits", "chapters": 20})
+    client.post("/reading/log", json={"chapters": 5, "label": "1-5", "day": start})
+    client.post("/completions", json={"quest_id": "d-read", "day": start})
+
+    r = client.put(f"/book?day={later}", json={"current_book": "  Atomic Habits ", "chapters": 20}).json()
+    assert r["player"]["current_book"] == "Atomic Habits"  # what they typed, kept
+    assert r["reading"]["chapters_read"] == 5 and r["reading"]["days_read"] == 1
+    assert _book_started_week(client) == "2026-W29"
+
+
+def test_a_genuinely_new_book_still_starts_its_own_window(client):
+    """The reset has to survive the fix — a different book is a different book, and
+    the last one's read days are not this one's."""
+    start, later = "2026-07-14", "2026-07-27"
+    client.put(f"/book?day={start}", json={"current_book": "First Book", "chapters": 10})
+    client.post("/reading/log", json={"chapters": 6, "label": "1-6", "day": start})
+    client.post("/completions", json={"quest_id": "d-read", "day": start})
+    assert _book_started_week(client) == "2026-W29"
+
+    r = client.put(f"/book?day={later}", json={"current_book": "Second Book", "chapters": 12}).json()
+    assert r["reading"]["chapters_read"] == 0 and r["reading"]["days_read"] == 0
+    assert _book_started_week(client) == "2026-W31"
+
+
+def test_answering_the_check_in_this_week_survives_a_length_correction(client):
+    """"Not yet" holds for the week you said it in. Correcting the length afterwards
+    is not a new book, so it mustn't re-open the check-in you already answered."""
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Short Book", "chapters": 4})
+    client.post("/reading/log", json={"chapters": 4, "label": "1-4", "day": day})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is True
+
+    client.post(f"/book/review?day={day}", json={"finished": False, "next_book": ""})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is False
+
+    # 3 chapters, not 4 — still covered, so only the held answer keeps it quiet.
+    body = client.put(f"/book?day={day}", json={"current_book": "Short Book", "chapters": 3}).json()
+    assert body["reading"]["progress"] == 1.0 and body["book_review"]["pending"] is False
+
+    # A different book, though, is asked about on its own terms again.
+    client.put(f"/book?day={day}", json={"current_book": "Other Book", "chapters": 1})
+    client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is True
+
+
 def test_logging_reading_needs_a_book_first(client):
     r = client.post("/reading/log", json={"chapters": 2, "label": "1–2", "day": "2026-07-18"})
     assert r.status_code == 400
