@@ -109,6 +109,62 @@ function CommitmentRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: 
   );
 }
 
+/** How many commitment rows a bucket shows before it starts folding them away. */
+const VISIBLE_LINES = 5;
+
+/**
+ * One bucket's commitments, capped so a long list doesn't bury the rest of the
+ * screen. Order is left exactly as the server sorted it (dated bills in due order,
+ * then undated) — a collapsed list that reshuffles itself is harder to read than a
+ * long one.
+ *
+ * Pagination was the other option and is worse here: pages put the thing you want
+ * behind a control you have to operate, and the count is small enough that "show
+ * the rest" is one tap instead of several.
+ */
+function CommitmentList({
+  items,
+  onPay,
+  onRemove,
+}: {
+  items: ApiCommitment[];
+  onPay: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const folds = items.length > VISIBLE_LINES + 1; // +1: folding a single row saves nothing
+  const shown = expanded || !folds ? items : items.slice(0, VISIBLE_LINES);
+  const hidden = items.length - shown.length;
+  // Hiding a bill that still needs paying is the one bad outcome here, so the
+  // button says when that's what it's doing rather than just counting rows.
+  const hiddenUnpaid = items.slice(shown.length).filter((c) => c.active && !c.paid_this_month).length;
+
+  return (
+    <>
+      {shown.map((item) => (
+        <CommitmentRow key={item.id} item={item} onPay={() => onPay(item.id)} onRemove={() => onRemove(item.id)} />
+      ))}
+      {folds ? (
+        <Pressable
+          onPress={() => setExpanded((e) => !e)}
+          style={styles.foldBtn}
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Show fewer lines' : `Show all ${items.length} lines`}
+        >
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={TONE} />
+          <Text style={styles.foldText}>
+            {expanded
+              ? 'Show fewer'
+              : hiddenUnpaid > 0
+                ? `${hidden} more · ${hiddenUnpaid} still to pay`
+                : `${hidden} more`}
+          </Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+}
+
 function ordinal(day: number): string {
   if (day % 10 === 1 && day !== 11) return 'st';
   if (day % 10 === 2 && day !== 12) return 'nd';
@@ -345,14 +401,11 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
                   : 'The things you choose. Eating out, subscriptions, hobbies.'}
               </Text>
             ) : (
-              items.map((item) => (
-                <CommitmentRow
-                  key={item.id}
-                  item={item}
-                  onPay={() => void pay(item.id)}
-                  onRemove={() => void removeCommitment(item.id)}
-                />
-              ))
+              <CommitmentList
+                items={items}
+                onPay={(id) => void pay(id)}
+                onRemove={(id) => void removeCommitment(id)}
+              />
             )}
             <AddLine bucket={bucket} />
           </SystemPanel>
@@ -451,6 +504,18 @@ const styles = StyleSheet.create({
   lineAmount: { color: text.primary, fontSize: 13, fontWeight: '700' },
   lineRemove: { minWidth: 24, minHeight: TAP, alignItems: 'flex-end', justifyContent: 'center' },
   remove: { color: text.secondary, fontSize: 18, fontWeight: '700' },
+
+  // Reads as a continuation of the list it folds, so it carries the same hairline.
+  foldBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    minHeight: TAP,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  foldText: { color: TONE, fontSize: 12, fontWeight: '600' },
 
   addRow: { flexDirection: 'row', gap: 6, marginTop: 12, alignItems: 'center' },
   input: {
