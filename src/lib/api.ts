@@ -502,7 +502,10 @@ export interface ApiDailyQuote {
 
 export interface ApiEvent {
   type: 'daily_clear' | 'level_up' | 'rank_up' | 'achievement' | string;
-  data: Record<string, any>;
+  // `unknown`, not `any`: the shape differs per event type, and the store reads these
+  // fields by name. unknown still interpolates into a template, so the notice copy is
+  // unaffected, but it can no longer be silently used as a number or dereferenced.
+  data: Record<string, unknown>;
 }
 
 export interface ActionResult {

@@ -45,13 +45,17 @@ function useWebPullToRefresh(scrollRef: React.RefObject<ScrollView | null>, onRe
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    const node: any = (scrollRef.current as any)?.getScrollableNode?.();
+    // react-native-web's ScrollView exposes the underlying DOM node through this,
+    // and publishes no type for it. Narrowed through `unknown` to exactly what's used
+    // here rather than `any`, so a typo in the handler wiring below is still caught.
+    type Scrollable = { getScrollableNode?: () => HTMLElement | null };
+    const node = (scrollRef.current as unknown as Scrollable | null)?.getScrollableNode?.();
     if (!node?.addEventListener) return;
 
     let startY = 0;
     let active = false;
 
-    const start = (e: any) => {
+    const start = (e: TouchEvent) => {
       if (node.scrollTop > 0 || busy.current) {
         active = false;
         return;
@@ -59,7 +63,7 @@ function useWebPullToRefresh(scrollRef: React.RefObject<ScrollView | null>, onRe
       startY = e.touches[0].clientY;
       active = true;
     };
-    const move = (e: any) => {
+    const move = (e: TouchEvent) => {
       if (!active) return;
       const dy = e.touches[0].clientY - startY;
       if (dy <= 0 || node.scrollTop > 0) {

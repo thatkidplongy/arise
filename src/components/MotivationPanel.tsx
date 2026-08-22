@@ -350,7 +350,6 @@ export function MotivationPanel() {
         setUrl={setUrl}
         mode={mode}
         setMode={setMode}
-        ready={ready}
         transcriptOn={transcriptOn}
         llmOn={llmOn}
         canCapture={canCapture}
@@ -423,7 +422,6 @@ function CaptureCard({
   setUrl,
   mode,
   setMode,
-  ready,
   transcriptOn,
   llmOn,
   canCapture,
@@ -434,7 +432,6 @@ function CaptureCard({
   setUrl: (v: string) => void;
   mode: InsightKind;
   setMode: (m: InsightKind) => void;
-  ready: boolean;
   transcriptOn: boolean;
   llmOn: boolean;
   canCapture: boolean;

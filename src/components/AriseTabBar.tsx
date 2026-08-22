@@ -69,6 +69,14 @@ const GLASS_SHEEN = 'rgba(255, 255, 255, 0.65)'; // white, deliberately off-ramp
 /** Shared with the backdrop-filter rule in scripts/build-web.sh. */
 const GLASS_ID = 'arise-glass-bar';
 
+// KNOWN DEBT: this file is 369 lines of code against the ~250 ceiling in
+// ~/Develop/FRONTEND_STANDARDS.md, and eslint's max-lines warns about it on every
+// run. The seam is AriseRail — the desktop sidebar shares this file with the phone
+// bar by accident, not by design, and moving it out (plus the glyph map and nav
+// types into a third module, since the bar renders the rail) drops this under the
+// ceiling. Two attempts at scripting that split produced malformed files and were
+// reverted; it wants doing by hand, in its own change.
+
 // A snappy spring carries the pill; a looser, slower one carries the shadow, so it
 // lags behind mid-slide. The shadow then fades out over SHADOW_FADE_MS.
 const PILL_SPRING = {

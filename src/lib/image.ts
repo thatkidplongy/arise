@@ -36,17 +36,22 @@ export function splitDataUri(dataUri: string): { base64: string; mime: string } 
 
 function webDownscale(src: string, max: number, quality: number): Promise<string | null> {
   return new Promise((resolve) => {
-    const g: any = globalThis;
-    if (!g.document?.createElement) {
+    // The browser globals this needs, on a module that also loads under React Native
+    // where they don't exist. Narrowed through `unknown` to the real DOM types and
+    // then captured in locals, so everything below is properly typed rather than any.
+    const g = globalThis as unknown as { document?: Document; Image?: typeof Image };
+    const doc = g.document;
+    const ImageCtor = g.Image;
+    if (!doc?.createElement || !ImageCtor) {
       resolve(null);
       return;
     }
-    const img = new g.Image();
+    const img = new ImageCtor();
     img.onload = () => {
       const scale = Math.min(1, max / Math.max(img.width, img.height, 1));
       const w = Math.max(1, Math.round(img.width * scale));
       const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = g.document.createElement('canvas');
+      const canvas = doc.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
