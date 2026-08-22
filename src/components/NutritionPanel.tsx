@@ -1,9 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { SearchRow } from '@/components/SearchRow';
+import { Button } from '@/components/ui/Button';
+import { Tag } from '@/components/ui/Tag';
 import { Text, TextInput } from '@/components/ui/Text';
 import { useSearch } from '@/hooks/useSearch';
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion, FoodEntry } from '@/lib/api';
@@ -60,15 +61,31 @@ function MacroInputs({ macro, set }: { macro: MacroDraft; set: (m: MacroDraft) =
   );
 }
 
-/** Estimate a meal from a photo (or read a nutrition label), then adjust and log. */
+/**
+ * A meal from a photo: pick it, look at it, ask for a guess, then correct the guess
+ * before anything is logged.
+ *
+ * The estimate arrives editable on purpose — it is a guess from a picture, and
+ * nothing goes into your day behind your back. Every figure is a field.
+ */
 function PhotoEstimate() {
-  const { analyzePhoto, logFood } = useBody();
+  const { body, analyzePhoto, logFood } = useBody();
+  const [shot, setShot] = useState<string | null>(null); // the picked photo, as a data URI
   const [analyzing, setAnalyzing] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [estimate, setEstimate] = useState<ApiFoodEstimate | null>(null);
   const [macro, setMacro] = useState<MacroDraft>(EMPTY_MACRO);
+  const [logged, setLogged] = useState(false);
 
-  const pickAndAnalyze = async () => {
+  const reset = () => {
+    setShot(null);
+    setEstimate(null);
+    setMacro(EMPTY_MACRO);
+    setPhotoError('');
+    setLogged(false);
+  };
+
+  const pick = async () => {
     setPhotoError('');
     const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.4, base64: true, allowsEditing: true });
     if (res.canceled || !res.assets?.[0]) return;
@@ -79,7 +96,14 @@ function PhotoEstimate() {
       setPhotoError('Could not read that image — try another, or log by hand.');
       return;
     }
-    const { base64, mime } = splitDataUri(dataUri);
+    setLogged(false);
+    setEstimate(null);
+    setShot(dataUri);
+  };
+
+  const analyse = async () => {
+    if (!shot) return;
+    const { base64, mime } = splitDataUri(shot);
     setAnalyzing(true);
     try {
       const est = await analyzePhoto(base64, mime);
@@ -94,62 +118,124 @@ function PhotoEstimate() {
   const add = async () => {
     await logFood(macroEntry(macro, 'Meal'));
     setEstimate(null);
+    setShot(null);
+    setLogged(true);
   };
+
+  if (logged) {
+    return (
+      <View style={styles.photoBox}>
+        <View style={styles.loggedCard}>
+          <Text style={styles.loggedTitle}>
+            Logged — {(body?.food?.total_kcal ?? 0).toLocaleString()} kcal today
+          </Text>
+          <Text style={styles.loggedBody}>
+            No XP, no streak, no score — Food deliberately sits outside the game.
+          </Text>
+        </View>
+        <Button label="Snap another" tone="secondary" block onPress={pick} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.photoBox}>
+      {shot ? <Image source={{ uri: shot }} style={styles.shot} resizeMode="cover" /> : null}
+
+      {shot && !estimate && !analyzing ? (
+        <Button label="Estimate this" onPress={analyse} block large />
+      ) : null}
+
+      {analyzing ? (
+        <View style={styles.reading}>
+          <ActivityIndicator size="small" color={TONE} />
+          <Text style={styles.readingText}>Reading the photo…</Text>
+        </View>
+      ) : null}
+
       {estimate ? (
         <View style={styles.estimate}>
-          <Text style={styles.estimateTitle}>
-            {estimate.source === 'label'
-              ? 'Read from the label — check it looks right'
-              : 'Photo estimate — adjust anything that looks off'}
-          </Text>
+          <View style={styles.guessHead}>
+            <Text style={styles.guessKicker}>
+              {estimate.source === 'label' ? 'From the label' : 'Best guess'}
+            </Text>
+            <Tag label="Editable" />
+          </View>
+
           <TextInput
             value={macro.name}
             onChangeText={(v) => setMacro({ ...macro, name: v })}
-            style={styles.input}
+            style={styles.guessName}
             placeholder="What is it?"
-            placeholderTextColor={text.faint}
             maxLength={80}
           />
-          <MacroInputs macro={macro} set={setMacro} />
-          {estimate.note ? (
-            <Text style={styles.estimateNote}>
-              {estimate.source === 'label' ? '' : 'Assumed: '}{estimate.note}
-            </Text>
-          ) : null}
+
+          <View style={styles.figures}>
+            <Figure
+              value={macro.kcal}
+              unit="kcal"
+              max={5}
+              onChange={(v) => setMacro({ ...macro, kcal: v })}
+            />
+            <Figure
+              value={macro.protein}
+              unit="g protein"
+              max={3}
+              onChange={(v) => setMacro({ ...macro, protein: v })}
+            />
+            <Figure
+              value={macro.fibre}
+              unit="g fibre"
+              max={3}
+              onChange={(v) => setMacro({ ...macro, fibre: v })}
+            />
+          </View>
+
           <Text style={styles.estimateNote}>
-            {estimate.source === 'label'
-              ? 'These are per serving — adjust if you ate more or less.'
-              : 'Photo estimates are rough — tweak anything before saving.'}
+            {estimate.note ? `${estimate.source === 'label' ? '' : 'Assumed: '}${estimate.note} ` : ''}
+            Tap any figure to change it. If the guess is far off, search the food database instead —
+            it&apos;s exact.
           </Text>
-          <View style={styles.searchRow}>
-            <Pressable onPress={add} style={({ pressed }) => [styles.btn, styles.flex1, pressed && { opacity: 0.8 }]}>
-              <Text style={styles.btnText}>Add to log</Text>
-            </Pressable>
-            <Pressable onPress={() => setEstimate(null)} style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.7 }]}>
-              <Text style={[styles.searchBtnText, { color: text.secondary }]}>Discard</Text>
-            </Pressable>
+
+          <View style={styles.guessActions}>
+            <Button label="Discard" tone="quiet" onPress={reset} />
+            <Button label="Log it" onPress={add} style={styles.flex1} large />
           </View>
         </View>
-      ) : (
-        <>
-          <Pressable
-            onPress={pickAndAnalyze}
-            disabled={analyzing}
-            style={({ pressed }) => [styles.photoBtn, (pressed || analyzing) && { opacity: 0.85 }]}
-          >
-            {analyzing ? (
-              <ActivityIndicator size="small" color={TONE} />
-            ) : (
-              <Ionicons name="camera-outline" size={18} color={TONE} />
-            )}
-            <Text style={styles.photoBtnText}>{analyzing ? 'Reading your photo…' : 'Estimate from a photo'}</Text>
-          </Pressable>
-          {photoError ? <Text style={styles.searchNote}>{photoError}</Text> : null}
-        </>
-      )}
+      ) : null}
+
+      {!shot && !analyzing ? (
+        <Button label="Snap a meal" icon="camera-outline" tone="secondary" block onPress={pick} />
+      ) : null}
+
+      {photoError ? <Text style={styles.searchNote}>{photoError}</Text> : null}
+    </View>
+  );
+}
+
+/** One editable figure from the guess — a big number you can simply type over. */
+function Figure({
+  value,
+  unit,
+  max,
+  onChange,
+}: {
+  value: string;
+  unit: string;
+  max: number;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <View style={styles.figure}>
+      <TextInput
+        value={value}
+        onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ''))}
+        style={styles.figureValue}
+        keyboardType="number-pad"
+        maxLength={max}
+        accessibilityLabel={unit}
+      />
+      <Text style={styles.figureUnit}>{unit}</Text>
     </View>
   );
 }
@@ -477,21 +563,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   plusText: { color: TONE, fontSize: 20, fontWeight: '700', marginTop: -2 },
-  photoBox: { marginTop: 16 },
-  photoBtn: {
+  shot: { height: 230, borderRadius: 26, backgroundColor: neutral[200] },
+  reading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    paddingVertical: 11,
-    borderWidth: 1,
+    gap: 10,
+    paddingVertical: 26,
+    borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: withAlpha(TONE, 0.5),
-    backgroundColor: withAlpha(TONE, 0.06),
+    borderColor: surface.edge,
+    borderRadius: radius.lg,
   },
-  photoBtnText: { color: TONE, fontSize: 14, fontWeight: '700' },
+  readingText: { ...typography.label, color: text.secondary },
+  guessHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  guessKicker: { ...typography.kicker, flex: 1, color: clay[700] },
+  guessName: {
+    ...typography.label,
+    fontSize: 15,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    borderRadius: radius.pill,
+    backgroundColor: surface.muted,
+    color: neutral[900],
+  },
+  figures: { flexDirection: 'row', gap: 9 },
+  figure: { flex: 1, gap: 2, padding: 14, borderRadius: radius.md, backgroundColor: surface.muted },
+  figureValue: {
+    ...typography.numeral,
+    fontSize: 24,
+    color: neutral[900],
+    padding: 0,
+    includeFontPadding: false,
+  },
+  figureUnit: { ...typography.tiny, fontSize: 10, color: text.secondary },
+  guessActions: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  loggedCard: { backgroundColor: sage[100], borderRadius: radius.lg, padding: 22, gap: 9 },
+  loggedTitle: { ...typography.numeral, fontSize: 21, lineHeight: 26, color: neutral[900] },
+  loggedBody: { ...typography.body, color: sage[900] },
+  photoBox: { marginTop: 16 },
   estimate: {
     borderWidth: 1,
     borderColor: withAlpha(TONE, 0.4),

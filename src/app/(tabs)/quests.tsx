@@ -9,10 +9,13 @@ import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
-import { Disc } from '@/components/ui/StatChip';
+import { NorthStarCard } from '@/components/NorthStarCard';
+import { XpBar } from '@/components/XpBar';
+import { Disc, StatChip } from '@/components/ui/StatChip';
 import { Counter, SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
-import type { ApiQuest } from '@/lib/api';
+import { useWide } from '@/hooks/useWide';
+import type { ApiQuest, ApiState } from '@/lib/api';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, clay, neutral, radius, sage, surface, text, typography } from '@/theme';
@@ -51,8 +54,55 @@ function Gate({ quest }: { quest: ApiQuest }) {
   );
 }
 
+/**
+ * On a wide window the single column unstacks: the board keeps the left, and what
+ * was above it on a phone — where you're up to, the North Star, the attributes —
+ * moves beside it, where it can stay in view instead of being scrolled past.
+ * Nothing new is added; it's the same payload.
+ */
+function Aside({ state }: { state: ApiState }) {
+  const { player, today, stats, progression } = state;
+  return (
+    <View style={styles.aside}>
+      <View style={styles.asideCard}>
+        <View style={styles.asideHead}>
+          <Disc value={player.level} caption="level" size={62} />
+          <View style={styles.asideHeadCopy}>
+            <Text style={styles.asideToday}>
+              {today.dailies_done} of {today.dailies_total} today
+            </Text>
+            <Text style={styles.asideXp}>
+              {player.xp_into.toLocaleString()} / {player.xp_needed.toLocaleString()} XP
+            </Text>
+          </View>
+        </View>
+        <XpBar value={player.xp_into} max={player.xp_needed} height={10} track={clay[200]} />
+      </View>
+
+      <NorthStarCard northStar={player.north_star} quote={state.daily_quote} />
+
+      <View style={styles.asideCard}>
+        <Text style={styles.asideTitle}>Attributes</Text>
+        {stats.map((stat) => {
+          const meta = STAT_META[stat.key];
+          return (
+            <View key={stat.key} style={styles.asideStat}>
+              <StatChip statKey={stat.key} size={32} />
+              <Text style={styles.asideStatLabel}>{meta.label}</Text>
+              <Text style={[styles.asideStatLevel, { color: meta.color }]}>
+                Lv {progression?.[stat.key]?.level ?? 0}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function QuestsScreen() {
   const state = useSystem((s) => s.state);
+  const wide = useWide();
 
   // Bump on each visit to the tab so the time-block panels re-mount and re-apply
   // their collapsed default — a finished block folds itself away every time you
@@ -87,8 +137,8 @@ export default function QuestsScreen() {
     items: rest.filter((q) => blockOf(q.stat, q.title) === block.key),
   })).filter((g) => g.items.length > 0);
 
-  return (
-    <Screen>
+  const board = (
+    <>
       <View style={styles.headerRow}>
         <Text style={styles.h1}>Quest{'\n'}board</Text>
         <Disc
@@ -152,11 +202,34 @@ export default function QuestsScreen() {
           ))}
         </View>
       </SystemPanel>
+    </>
+  );
+
+  if (!wide) return <Screen>{board}</Screen>;
+
+  return (
+    <Screen>
+      <View style={styles.split}>
+        <View style={styles.boardColumn}>{board}</View>
+        <Aside state={state} />
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  split: { flexDirection: 'row', alignItems: 'flex-start', gap: 20 },
+  boardColumn: { flex: 1.35, minWidth: 0, gap: 16 },
+  aside: { flex: 1, minWidth: 0, gap: 16 },
+  asideCard: { backgroundColor: surface.card, borderRadius: radius.lg, padding: 20, gap: 12 },
+  asideHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  asideHeadCopy: { flex: 1, minWidth: 0, gap: 3 },
+  asideToday: { ...typography.numeral, fontSize: 20, color: neutral[900], includeFontPadding: false },
+  asideXp: { ...typography.small, color: text.secondary },
+  asideTitle: { ...typography.heading, color: neutral[900] },
+  asideStat: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 3 },
+  asideStatLabel: { ...typography.label, flex: 1, minWidth: 0, color: neutral[800] },
+  asideStatLevel: { ...typography.label, fontSize: 11.5 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
