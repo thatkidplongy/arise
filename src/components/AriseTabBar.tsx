@@ -8,7 +8,7 @@ import { CONTENT_MAX_WIDTH } from "@/components/Screen";
 import { Text } from "@/components/ui/Text";
 import { RAIL_WIDTH, useWide } from "@/hooks/useWide";
 import { useSystem } from "@/store/useSystem";
-import { clay, neutral, radius, sage, shadow, surface, text, typography } from "@/theme";
+import { clay, neutral, radius, sage, shadow, surface, text, typography, withAlpha } from "@/theme";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -44,8 +44,8 @@ const LIFT = 10; // gap between the bar and the safe-area inset below it
  * non-iOS GlassView is `<View {...props} />` and isLiquidGlassAvailable() returns
  * false — on the web build this ships as, it draws nothing at all.
  */
-const GLASS_SOLID = 'rgba(249, 244, 237, 0.86)';
-const GLASS_RIM = 'rgba(46, 43, 37, 0.12)';
+const GLASS_SOLID = withAlpha(surface.card, 0.86);
+const GLASS_RIM = withAlpha(neutral[900], 0.12);
 /**
  * The specular edge — a bright hairline along the top inside lip.
  *
@@ -54,7 +54,8 @@ const GLASS_RIM = 'rgba(46, 43, 37, 0.12)';
  * genuinely blurring and still looked like plain translucent plastic. A lit top edge
  * reads as thickness and catches the eye even over an empty background.
  */
-const GLASS_SHEEN = 'rgba(255, 255, 255, 0.65)';
+const GLASS_SHEEN = 'rgba(255, 255, 255, 0.65)'; // white, deliberately off-ramp: a
+// specular highlight is light itself rather than any surface in the palette.
 /** Shared with the backdrop-filter rule in scripts/build-web.sh. */
 const GLASS_ID = 'arise-glass-bar';
 
@@ -438,5 +439,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   mainTint: { backgroundColor: clay[200] },
-  shadowTint: { backgroundColor: "rgba(32, 30, 29, 0.12)" },
+  shadowTint: { backgroundColor: withAlpha(text.primary, 0.12) },
 });

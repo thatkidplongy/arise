@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   figure: { flex: 1, gap: 2 },
   figureValue: { ...typography.numeral, fontSize: 34, color: ink.text, includeFontPadding: false },
   figureLabel: { ...typography.tiny, color: ink.textDim },
-  line: { ...typography.body, lineHeight: 22, color: 'rgba(249, 244, 237, 0.82)' },
+  line: { ...typography.body, lineHeight: 22, color: ink.textSoft },
   barRow: { gap: 6, paddingVertical: 7 },
   barHead: { flexDirection: 'row', alignItems: 'baseline', gap: 9 },
   barKey: { ...typography.kicker, fontSize: 9.5, letterSpacing: 1 },

@@ -91,6 +91,9 @@ export const ink = {
   bracketSage: sage[400],
   bracketSageRule: 'rgba(174, 191, 146, 0.34)',
   text: neutral[100],
+  /** Between `text` and `textDim`. Two screens had spelled this exact value out by
+   * hand because the scale skipped it. */
+  textSoft: 'rgba(249, 244, 237, 0.82)',
   textDim: 'rgba(249, 244, 237, 0.72)',
   textFaint: 'rgba(249, 244, 237, 0.62)',
   accent: clay[300],

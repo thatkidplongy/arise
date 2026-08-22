@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { TAP_MIN, accent, clay, neutral, onAccent, radius, surface, text, typography } from '@/theme';
+import { TAP_MIN, accent, clay, feedback, neutral, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -141,9 +141,9 @@ const TONES: Record<ButtonTone, { rest: ViewStyle; pressed: ViewStyle; fg: strin
     fg: neutral[800],
   },
   danger: {
-    rest: { borderWidth: 1, borderColor: '#B0503F' },
-    pressed: { backgroundColor: 'rgba(176, 80, 63, 0.12)' },
-    fg: '#B0503F',
+    rest: { borderWidth: 1, borderColor: feedback.danger },
+    pressed: { backgroundColor: withAlpha(feedback.danger, 0.12) },
+    fg: feedback.danger,
   },
 };
 

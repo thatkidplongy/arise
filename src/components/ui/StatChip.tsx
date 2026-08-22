@@ -1,7 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { STAT_META, STAT_TINT, clay, font, neutral, radius, typography, withAlpha } from '@/theme';
+import { STAT_META, STAT_TINT, clay, font, neutral, radius, sage, typography, withAlpha } from '@/theme';
 import type { StatKey } from '@/types';
 
 /**
@@ -53,9 +53,9 @@ const DISC_CLAY = {
   sub: clay[700],
 };
 const DISC_SAGE = {
-  box: { backgroundColor: '#E1EECC' },
-  fg: '#3D472B',
-  sub: '#56633F',
+  box: { backgroundColor: sage[200] },
+  fg: sage[800],
+  sub: sage[700],
 };
 
 const styles = StyleSheet.create({

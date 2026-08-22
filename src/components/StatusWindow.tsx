@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   stats: { gap: 11 },
   statRow: { gap: 6 },
   statHead: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  statKey: { ...typography.kicker, fontSize: 10.5, letterSpacing: 1.4, color: 'rgba(249, 244, 237, 0.82)' },
+  statKey: { ...typography.kicker, fontSize: 10.5, letterSpacing: 1.4, color: ink.textSoft },
   statLabel: { ...typography.small, color: ink.textFaint },
   statLevel: { ...typography.numeral, fontSize: 15, marginLeft: 'auto', color: ink.accent, includeFontPadding: false },
   statTrack: { height: 3, borderRadius: radius.pill, backgroundColor: ink.track, overflow: 'hidden' },
