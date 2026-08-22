@@ -12,46 +12,19 @@ import { SystemPanel } from '@/components/SystemPanel';
 import { NorthStarCard } from '@/components/NorthStarCard';
 import { XpBar } from '@/components/XpBar';
 import { Disc, StatChip } from '@/components/ui/StatChip';
-import { Counter, SectionRule } from '@/components/ui/SystemWindow';
+import { SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { useWide } from '@/hooks/useWide';
 import type { ApiQuest, ApiState } from '@/lib/api';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, clay, neutral, radius, sage, surface, text, typography } from '@/theme';
+import { STAT_META, clay, neutral, radius, surface, text, typography } from '@/theme';
 
 /** The one the System is asking for now: the first open daily in this block, else
  * the first open daily anywhere, else the first — a cleared window still reads. */
 function pickFeatured(daily: ApiQuest[], nowKey: string): ApiQuest | undefined {
   const open = daily.filter((q) => q.done < q.target);
   return open.find((q) => blockOf(q.stat, q.title) === nowKey) ?? open[0] ?? daily[0];
-}
-
-/** A weekly quest, as a gate: a ringed attribute, its reward, and where you're up to. */
-function Gate({ quest }: { quest: ApiQuest }) {
-  const meta = STAT_META[quest.stat];
-  const cleared = quest.done >= quest.target;
-  return (
-    <View style={styles.gate}>
-      <View style={[styles.gateRing, { borderColor: meta.color }]}>
-        <Text style={[styles.gateKey, { color: meta.color }]}>{quest.stat}</Text>
-      </View>
-      <View style={styles.gateBody}>
-        <Text style={styles.gateTitle}>{quest.title}</Text>
-        <Text style={styles.gateSub}>
-          {meta.label} · the week&apos;s raid
-        </Text>
-      </View>
-      <View style={styles.gateRight}>
-        <Text style={styles.gateXp}>{quest.xp}</Text>
-        <Counter
-          done={Math.min(quest.done, quest.target)}
-          total={quest.target}
-          color={cleared ? sage[700] : text.secondary}
-        />
-      </View>
-    </View>
-  );
 }
 
 /**
@@ -189,9 +162,13 @@ export default function QuestsScreen() {
       {weekly.length ? (
         <>
           <SectionRule label="Gates open this week" trailing="New set each Monday" />
-          {weekly.map((q) => (
-            <Gate key={q.id} quest={q} />
-          ))}
+          {/* The same card the dailies use, not a summary row: a weekly quest is
+              something you tick, write on and undo, so it needs the whole card. */}
+          <View style={styles.list}>
+            {weekly.map((q) => (
+              <QuestCard key={q.id} quest={q} />
+            ))}
+          </View>
         </>
       ) : null}
 
@@ -256,27 +233,4 @@ const styles = StyleSheet.create({
   nowBlock: {
     backgroundColor: clay[100],
   },
-  gate: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-    padding: 18,
-    borderRadius: radius.lg,
-    backgroundColor: surface.card,
-  },
-  gateRing: {
-    width: 48,
-    height: 48,
-    flexShrink: 0,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gateKey: { ...typography.label, fontSize: 11 },
-  gateBody: { flex: 1, minWidth: 0, gap: 3 },
-  gateTitle: { ...typography.cardTitle, fontSize: 13.5, color: neutral[900] },
-  gateSub: { ...typography.small, color: text.secondary },
-  gateRight: { alignItems: 'flex-end', gap: 3 },
-  gateXp: { ...typography.numeral, fontSize: 17, color: clay[700], includeFontPadding: false },
 });
