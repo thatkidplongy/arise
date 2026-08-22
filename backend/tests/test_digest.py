@@ -814,6 +814,20 @@ def test_update_thread_is_once_a_day(db, monkeypatch):
     assert len(calls) == 1
 
 
+def test_update_thread_will_not_fold_a_day_older_than_the_last_one(db, monkeypatch):
+    """A repair reaching back must not rewrite the sentence with older reading."""
+    player = state.get_or_create_player(db)
+    entries = [{"kind": "book", "source": "Deep Work", "text": ""}]
+    calls = []
+    monkeypatch.setattr(llm, "thread_summary",
+                        lambda *a, **k: calls.append(1) or "The later sentence.")
+    digest.update_thread(db, player, "2026-07-20", entries, ["a"])
+
+    row = digest.update_thread(db, player, "2026-07-18", entries, ["older"])
+    assert len(calls) == 1  # the older day was never asked about
+    assert row.summary == "The later sentence." and row.day == "2026-07-20"
+
+
 def test_update_thread_keeps_the_old_sentence_when_the_llm_fails(db, monkeypatch):
     """Losing a morning is fine; losing the thread is not."""
     player = state.get_or_create_player(db)

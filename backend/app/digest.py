@@ -261,8 +261,10 @@ def update_thread(db: Session, player: Player, day: str, entries: list[dict],
         return None
 
     row = db.query(Thread).filter_by(player_id=player.id, key=key).first()
-    if row is not None and row.day == day:
-        return row  # already folded in today; don't pay for it twice
+    if row is not None and row.day >= day:
+        # Already folded in for this day — don't pay for it twice — or for a later
+        # one, in which case folding now would drag the sentence backwards.
+        return row
 
     try:
         summary = llm.thread_summary(book["source"], row.summary if row else "", lines)
@@ -442,7 +444,9 @@ def catch_up(db: Session, player: Player, day: str) -> list[str]:
     A day is only asked for once, on the morning after it: if the model was
     unreachable then — a spent quota, an outage — that day's reading was silently
     never turned into anything, and nothing came back to ask again. This is that
-    second ask.
+    second ask. A day that *was* distilled still gets its book thread folded if that
+    separate call was the one that failed — otherwise the running sentence sits on an
+    old sitting for good, since nothing revisits a day that already has highlights.
 
     Oldest first, and deliberately before the day being sent: `update_thread` stamps
     the thread with the day it folded in, so repairing an old day afterwards would
@@ -454,10 +458,22 @@ def catch_up(db: Session, player: Player, day: str) -> list[str]:
         if llm.budget_left() <= _TODAY_RESERVE:
             break
         past = (today - timedelta(days=back)).isoformat()
-        if db.query(Highlight).filter_by(player_id=player.id, day=past).first():
-            continue  # already distilled
-        if not gather(db, player, past):
+        entries = gather(db, player, past)
+        if not entries:
             continue  # nothing was logged; not a miss
+        kept = (
+            db.query(Highlight)
+            .filter_by(player_id=player.id, day=past)
+            .order_by(Highlight.created_at)
+            .all()
+        )
+        if kept:
+            # Distilled already, but folding the book's running sentence is a second
+            # call that fails on its own — and a day with highlights was never asked
+            # about again, so a sentence stuck on an old sitting stayed stuck. Retry
+            # that call alone, from the lines already kept: no second distillation.
+            update_thread(db, player, past, entries, [h.text for h in kept])
+            continue
         if build_highlights(db, player, past):
             repaired.append(past)
     if repaired:

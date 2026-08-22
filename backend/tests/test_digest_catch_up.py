@@ -4,7 +4,9 @@ The scheduled job runs for yesterday and never looks back, so a quota that ran
 out at 7am used to mean that day's reading was silently never distilled — no
 highlights, and nothing entering the recall rotation. These pin the repair, and
 the two things it must not do: spend the day's own allowance, or drag the
-running book thread backwards.
+running book thread backwards. A day that was distilled but whose book thread
+never folded is repaired too — that fold is its own call, and nothing else would
+ever ask again.
 """
 
 from datetime import date, timedelta
@@ -106,3 +108,26 @@ def test_repair_works_oldest_first(db, monkeypatch):
     _fake_distiller(monkeypatch, calls)
 
     assert digest.catch_up(db, player, DAY) == [older, newer]
+
+
+def test_a_distilled_day_whose_thread_never_folded_is_folded(db, monkeypatch):
+    """The fold is a second call: it can fail while the distillation succeeds, and
+    the day is then never revisited — so the running sentence stays on an old
+    sitting. The repair retries the fold alone, from the lines already kept."""
+    player = _player(db)
+    past = (date.fromisoformat(DAY) - timedelta(days=1)).isoformat()
+    _log(db, player, past, source="Deep Work, ch 4")
+    db.add(Learning(player_id=player.id, day=past, kind="book",
+                    source="Deep Work, ch 4", text="what I took away"))
+    db.add(Highlight(player_id=player.id, day=past, text="already kept", box=0, due=""))
+    db.commit()
+
+    calls: list = []
+    _fake_distiller(monkeypatch, calls)
+    folded: list = []
+    monkeypatch.setattr(digest, "update_thread",
+                        lambda _db, _p, d, _e, lines: folded.append((d, lines)))
+
+    assert digest.catch_up(db, player, DAY) == []  # nothing to re-distil
+    assert calls == []  # and nothing was asked of the distiller
+    assert folded == [(past, ["already kept"])]
