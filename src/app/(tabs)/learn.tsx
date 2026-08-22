@@ -14,7 +14,6 @@ import { Card, ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
 import { FoldToggle } from '@/components/FoldToggle';
-import { EdgeBlock } from '@/components/ui/EdgeBlock';
 import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
@@ -300,18 +299,23 @@ function BringBackBlock() {
     >
       {/* On a card rather than bare on the page, unlike the daily line: this one opens
           the screen, and the ivory is what makes it read as the thing to do first
-          rather than a caption above the reading card. */}
-      <Card>
-        <EdgeBlock edge={HUE} kicker={current.kind === 'tip' ? 'From your tips' : 'Try to recall'}>
-          {/* Keyed so the next question arrives with its answer folded shut, rather
-              than inheriting the last one's open fold. */}
-          {current.kind === 'tip' ? (
-            <TipItem key={current.id} tip={current} />
-          ) : (
-            <DueItem key={current.id} item={current.item} />
-          )}
-          <Text style={styles.bringHint}>tap for another</Text>
-        </EdgeBlock>
+          rather than a caption above the reading card.
+
+          No edge rule either, for the same reason. A coloured rule earns its place
+          when it's the only structure there is; on a card it's a second boundary
+          inside the first, saying what the card already said. */}
+      <Card style={styles.bringCard}>
+        <Text style={styles.bringKicker}>
+          {current.kind === 'tip' ? 'From your tips' : 'Try to recall'}
+        </Text>
+        {/* Keyed so the next question arrives with its answer folded shut, rather
+            than inheriting the last one's open fold. */}
+        {current.kind === 'tip' ? (
+          <TipItem key={current.id} tip={current} />
+        ) : (
+          <DueItem key={current.id} item={current.item} />
+        )}
+        <Text style={styles.bringHint}>tap for another</Text>
       </Card>
     </Pressable>
   );
@@ -421,6 +425,12 @@ const styles = StyleSheet.create({
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   empty: { ...typography.body, color: text.secondary },
   bringPressed: { opacity: 0.85 },
+  // gap 10, not the card's own 13: the spacing the edge block used to set, kept so
+  // dropping the rule changed the rule and nothing else.
+  bringCard: { gap: 10 },
+  // The kicker's own size and tracking, which the edge block was overriding — base
+  // typography.kicker is 10px at 1.6, a visibly different label.
+  bringKicker: { ...typography.kicker, fontSize: 11, letterSpacing: 1.5, color: HUE },
   bringText: { ...typography.body, fontSize: 17, lineHeight: 26, color: neutral[900] },
   bringHint: { ...typography.small, color: text.secondary },
   bringMeta: { ...typography.small, color: text.secondary },
