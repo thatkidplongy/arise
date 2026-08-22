@@ -717,6 +717,14 @@ def _budget_of(db: Session, player: Player, day: str) -> dict:
     def total(bucket: str | None) -> float:
         return round(sum(e.amount for e in spent if e.bucket == bucket), 2)
 
+    # The day-sized line: what was spent loose today, with standing bills left out.
+    # A bill was planned months ago; charging it to the day it happened to be paid
+    # would call an ordinary day a blowout.
+    def today_total(bucket: str) -> float:
+        return round(
+            sum(e.amount for e in spent if e.bucket == bucket and e.day == day and not e.commitment_id), 2
+        )
+
     # Everything that came in this month — take-home plus any extra. This is what the
     # 50/30/20 lines divide, so the rule follows real money in, not a stored setting.
     income_in = round(sum(e.amount for e in entries if e.direction == "in"), 2)
@@ -747,6 +755,7 @@ def _budget_of(db: Session, player: Player, day: str) -> dict:
             "wants": total("wants"),
             "untagged": total(None),
         },
+        "today": {"needs": today_total("needs"), "wants": today_total("wants")},
     }
 
 

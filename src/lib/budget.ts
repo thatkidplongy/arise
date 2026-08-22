@@ -50,6 +50,27 @@ export interface BudgetReading {
   /** Spending logged with no bucket — from before the budget, or left untagged.
    * Surfaced so the actuals can be read honestly rather than looking complete. */
   untagged: number;
+  /** The day-sized lines. Savings has none: it's a remainder, not a spend. */
+  daily: { needs: DailyLine; wants: DailyLine };
+}
+
+/**
+ * One bucket's line for a single day.
+ *
+ * The monthly line answers "am I within the rule this month", which stops being
+ * useful the moment you're past it — there's nothing to do about it for another
+ * three weeks. This one resets every morning, so a bad Tuesday costs Tuesday.
+ */
+export interface DailyLine {
+  bucket: BudgetBucket;
+  /** What one day gets, once the standing bills have taken their share. */
+  allowance: number;
+  /** Loose spending logged today against this bucket. Bills aren't in it. */
+  spent: number;
+  /** allowance − spent. Negative once the day is past its line. */
+  left: number;
+  /** The bills already claim the whole share, so a day gets nothing loose. */
+  committed: boolean;
 }
 
 /** Pesos never want fractional centavos on screen. */
@@ -70,7 +91,46 @@ const NO_BUDGET: ApiBudget = {
   month: '',
   commitments: [],
   actual: { income: 0, needs: 0, wants: 0, untagged: 0 },
+  today: { needs: 0, wants: 0 },
 };
+
+/** How many days a 'YYYY-MM' holds. Anything unparseable reads as 30 — a daily
+ * line that's a day or two out beats one that divides by zero. */
+export function daysInMonth(month: string): number {
+  const [year, mon] = month.split('-').map(Number);
+  if (!year || !mon || mon < 1 || mon > 12) return 30;
+  return new Date(year, mon, 0).getDate();
+}
+
+/**
+ * A bucket's day-sized line: its monthly share, less what the standing bills
+ * already claim, spread evenly across the month.
+ *
+ * The bills come out first because they aren't discretionary — rent is going to
+ * happen whatever today looks like — so what's left is the part a single day can
+ * actually decide. Over-committed buckets land on 0 rather than a negative
+ * allowance: there's no such thing as owing yourself spending money.
+ */
+export function readDailyLine(reading: BucketReading, spentToday: number, month: string): DailyLine {
+  const loose = Math.max(0, reading.target - reading.planned);
+  const allowance = round2(loose / daysInMonth(month));
+  const spent = round2(Math.max(0, spentToday));
+  return {
+    bucket: reading.bucket,
+    allowance,
+    spent,
+    left: round2(allowance - spent),
+    // Under a peso a day is nothing to spend, and reads better said outright.
+    committed: allowance < 1,
+  };
+}
+
+/** A day's standing, in words — the same report-the-arithmetic tone as the month. */
+export function describeDaily(line: DailyLine, peso: (n: number) => string): string {
+  if (line.committed) return 'the bills already claim this whole share';
+  if (line.left >= 0) return `${peso(line.left)} left today`;
+  return `${peso(Math.abs(line.left))} past today's line`;
+}
 
 function readBucket(bucket: BudgetBucket, planned: number, actual: number, income: number): BucketReading {
   const target = round2(income * BUDGET_SPLIT[bucket]);
@@ -117,6 +177,7 @@ export function readBudget(budget: ApiBudget | null | undefined): BudgetReading 
   const wants = sumBucket(commitments, 'wants');
   const savings = round2(income - needs - wants);
 
+  const todaySafe = safe.today ?? NO_BUDGET.today;
   const untagged = round2(spentSafe.untagged ?? 0);
   const actualNeeds = round2(spentSafe.needs ?? 0);
   const actualWants = round2(spentSafe.wants ?? 0);
@@ -124,16 +185,24 @@ export function readBudget(budget: ApiBudget | null | undefined): BudgetReading 
   // against it too: the money is gone regardless of whether it carried a tag.
   const actualSavings = round2(income - actualNeeds - actualWants - untagged);
 
+  const needsReading = readBucket('needs', needs, actualNeeds, income);
+  const wantsReading = readBucket('wants', wants, actualWants, income);
+  const month = safe.month || '';
+
   return {
     income,
     received,
     // Set once payday pay is stored or money has landed — gates the empty state.
     isSet: round2(Math.max(0, safe.monthly_income ?? 0)) > 0 || received > 0,
-    needs: readBucket('needs', needs, actualNeeds, income),
-    wants: readBucket('wants', wants, actualWants, income),
+    needs: needsReading,
+    wants: wantsReading,
     savings: readBucket('savings', savings, actualSavings, income),
     allocated: round2(needs + wants + savings),
     untagged,
+    daily: {
+      needs: readDailyLine(needsReading, todaySafe.needs ?? 0, month),
+      wants: readDailyLine(wantsReading, todaySafe.wants ?? 0, month),
+    },
   };
 }
 

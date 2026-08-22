@@ -13,9 +13,11 @@ import {
   BUCKET_LABEL,
   BUDGET_SPLIT,
   describeBucket,
+  describeDaily,
   readBudget,
   summariseBudget,
   type BucketReading,
+  type DailyLine,
 } from '@/lib/budget';
 import { useShowMore } from '@/hooks/useShowMore';
 import { peso } from '@/lib/money';
@@ -45,7 +47,32 @@ function colorFor(reading: BucketReading): string {
   return reading.standing === 'over' ? feedback.danger : TONE;
 }
 
-function BucketRow({ reading }: { reading: BucketReading }) {
+/**
+ * The day-sized line, under the month-sized one.
+ *
+ * The monthly bar answers "am I inside the rule this month", which stops being
+ * actionable the moment it's breached — nothing can be done about it for another
+ * three weeks. This one starts at zero every morning, so a heavy Tuesday costs
+ * Tuesday and nothing more.
+ */
+function DailyRow({ line }: { line: DailyLine }) {
+  const color = line.left < 0 ? feedback.danger : TONE;
+  return (
+    <View style={styles.daily}>
+      <View style={styles.bucketHead}>
+        <Text style={styles.dailyLabel}>Today</Text>
+        <Text style={styles.dailyAmount}>
+          <Text style={{ color }}>{peso(line.spent)}</Text>
+          <Text style={styles.bucketTarget}> / {peso(line.allowance)}</Text>
+        </Text>
+      </View>
+      <XpBar value={line.spent} max={Math.max(line.allowance, line.spent, 1)} color={color} height={4} />
+      <Text style={[styles.bucketActual, { color }]}>{describeDaily(line, peso)}</Text>
+    </View>
+  );
+}
+
+function BucketRow({ reading, daily }: { reading: BucketReading; daily?: DailyLine }) {
   const color = colorFor(reading);
   const spentLabel = reading.bucket === 'savings' ? 'kept so far' : 'spent so far';
   return (
@@ -67,6 +94,7 @@ function BucketRow({ reading }: { reading: BucketReading }) {
       <Text style={styles.bucketActual}>
         {peso(reading.actual)} {spentLabel}
       </Text>
+      {daily ? <DailyRow line={daily} /> : null}
     </View>
   );
 }
@@ -119,7 +147,7 @@ function CommitmentRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: 
 }
 
 /** How many commitment rows a bucket shows before it starts folding them away. */
-const VISIBLE_LINES = 5;
+const VISIBLE_LINES = 10;
 
 /**
  * One bucket's commitments, capped so a long list doesn't bury the rest of the
@@ -379,8 +407,10 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
           <Text style={styles.empty}>Nothing in yet this month. Log your payday when it lands and the lines follow.</Text>
         ) : (
           <>
-            <BucketRow reading={reading.needs} />
-            <BucketRow reading={reading.wants} />
+            <BucketRow reading={reading.needs} daily={reading.daily.needs} />
+            <BucketRow reading={reading.wants} daily={reading.daily.wants} />
+            {/* Savings gets no daily line: it's what the other two leave behind,
+                not something you spend a day's worth of. */}
             <BucketRow reading={reading.savings} />
             <Text style={styles.summary}>{summariseBudget(reading, peso)}</Text>
             {/* Say so rather than letting the buckets look complete when they aren't. */}
@@ -485,6 +515,14 @@ const styles = StyleSheet.create({
   bucketStanding: { color: text.secondary, fontSize: 12, fontWeight: '600', flexShrink: 1 },
   bucketShare: { color: text.secondary, fontSize: 12, fontWeight: '700' },
   bucketActual: { color: text.secondary, fontSize: 11, marginTop: 3 },
+  daily: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: surface.hairline,
+  },
+  dailyLabel: { color: text.secondary, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
+  dailyAmount: { fontSize: 12, fontWeight: '700' },
 
   summary: {
     color: text.primary,

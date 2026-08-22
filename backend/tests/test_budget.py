@@ -21,6 +21,7 @@ def test_starts_empty_and_income_stamps_the_start_month(client):
         "month": "2026-08",
         "commitments": [],
         "actual": {"income": 0, "needs": 0, "wants": 0, "untagged": 0},
+        "today": {"needs": 0, "wants": 0},
     }
 
     b = client.put(f"/budget/income?day={DAY}", json={"monthly_income": 45000}).json()["budget"]
@@ -151,6 +152,28 @@ def test_ad_hoc_spending_can_be_tagged_and_income_never_is(client):
     assert b["actual"] == {"income": 45000, "needs": 0, "wants": 620, "untagged": 300}
     entries = {e["note"]: e["bucket"] for e in client.get(f"/money/history?scope=month&day={DAY}").json()["entries"]}
     assert entries == {"milk tea": "wants", "jeep": None, "": None}
+
+
+def test_today_counts_only_loose_spending_from_today(client):
+    """The day-sized line the worksheet resets every morning.
+
+    It leaves standing bills out on purpose: rent was planned long before the day
+    it happened to be paid, so charging it to that day would call an ordinary
+    Tuesday a blowout."""
+    cid = _add(client, "Rent", 12000, "needs", due_day=5).json()["budget"]["commitments"][0]["id"]
+    client.post(f"/budget/commitments/{cid}/pay?day={DAY}")  # a bill, paid today
+    client.post(f"/money?day={DAY}", json={"amount": 250, "direction": "out", "note": "fare", "bucket": "needs"})
+    client.post(f"/money?day={DAY}", json={"amount": 620, "direction": "out", "note": "milk tea", "bucket": "wants"})
+    client.post("/money?day=2026-08-04", json={"amount": 400, "direction": "out", "note": "yesterday", "bucket": "needs"})
+
+    b = _budget(client)
+    assert b["today"] == {"needs": 250, "wants": 620}      # the bill and yesterday are both out of it
+    assert b["actual"]["needs"] == 12650                    # but the month still counts everything
+
+
+def test_today_is_empty_on_a_day_nothing_was_logged(client):
+    client.post("/money?day=2026-08-04", json={"amount": 400, "direction": "out", "note": "fare", "bucket": "needs"})
+    assert _budget(client)["today"] == {"needs": 0, "wants": 0}
 
 
 def test_actuals_are_scoped_to_the_month(client):

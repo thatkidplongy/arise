@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ApiBudget, ApiCommitment } from '@/lib/api';
-import { describeBucket, findBreaches, findDue, readBudget, sumDue, summariseBudget } from '@/lib/budget';
+import {
+  daysInMonth,
+  describeBucket,
+  describeDaily,
+  findBreaches,
+  findDue,
+  readBudget,
+  readDailyLine,
+  sumDue,
+  summariseBudget,
+} from '@/lib/budget';
 import { peso } from '@/lib/money';
 
 let seq = 0;
@@ -24,6 +34,7 @@ function budget(
   received: number,
   commitments: ApiCommitment[] = [],
   actual?: Partial<ApiBudget['actual']>,
+  today?: Partial<ApiBudget['today']>,
 ): ApiBudget {
   // The lines follow money actually in, so the helper's first argument IS the
   // month's received income; the stored payday setting is incidental here.
@@ -33,6 +44,7 @@ function budget(
     month: '2026-08',
     commitments,
     actual: { income: received, needs: 0, wants: 0, untagged: 0, ...actual },
+    today: { needs: 0, wants: 0, ...today },
   };
 }
 
@@ -263,5 +275,93 @@ describe('copy', () => {
 
   it('asks for pay before anything else', () => {
     expect(summariseBudget(readBudget(budget(0)), peso)).toBe('Set your take-home pay to see the lines.');
+  });
+});
+
+describe('daysInMonth', () => {
+  it('knows the long and short months', () => {
+    expect(daysInMonth('2026-08')).toBe(31);
+    expect(daysInMonth('2026-09')).toBe(30);
+  });
+
+  it('handles February, leap and otherwise', () => {
+    expect(daysInMonth('2026-02')).toBe(28);
+    expect(daysInMonth('2028-02')).toBe(29);
+  });
+
+  it('falls back to 30 rather than dividing by nothing', () => {
+    expect(daysInMonth('')).toBe(30);
+    expect(daysInMonth('2026-13')).toBe(30);
+    expect(daysInMonth('August')).toBe(30);
+  });
+});
+
+describe('readDailyLine', () => {
+  // ₱30,000 in → needs line ₱15,000, of which ₱12,000 is committed rent, leaving
+  // ₱3,000 loose across a 30-day month = ₱100 a day.
+  const reading = () => readBudget(budget(30000, [line('Rent', 12000, 'needs')])).needs;
+
+  it('spreads what the bills leave behind across the month', () => {
+    expect(readDailyLine(reading(), 0, '2026-09').allowance).toBe(100);
+  });
+
+  it("counts today's loose spending against it", () => {
+    const d = readDailyLine(reading(), 40, '2026-09');
+    expect(d.spent).toBe(40);
+    expect(d.left).toBe(60);
+  });
+
+  it('goes negative once the day is past its line', () => {
+    expect(readDailyLine(reading(), 250, '2026-09').left).toBe(-150);
+  });
+
+  it('gives a day nothing when the bills claim the whole share', () => {
+    const over = readBudget(budget(30000, [line('Rent', 20000, 'needs')])).needs;
+    const d = readDailyLine(over, 0, '2026-09');
+    expect(d.allowance).toBe(0);
+    expect(d.committed).toBe(true);
+  });
+
+  it('never reports a negative allowance', () => {
+    const over = readBudget(budget(1000, [line('Rent', 9000, 'needs')])).needs;
+    expect(readDailyLine(over, 0, '2026-09').allowance).toBe(0);
+  });
+});
+
+describe('describeDaily', () => {
+  const reading = () => readBudget(budget(30000, [line('Rent', 12000, 'needs')])).needs;
+
+  it('says what is left', () => {
+    expect(describeDaily(readDailyLine(reading(), 40, '2026-09'), peso)).toBe('₱60 left today');
+  });
+
+  it('says how far past, without scolding', () => {
+    expect(describeDaily(readDailyLine(reading(), 250, '2026-09'), peso)).toBe("₱150 past today's line");
+  });
+
+  it('names the committed case outright', () => {
+    const over = readBudget(budget(30000, [line('Rent', 20000, 'needs')])).needs;
+    expect(describeDaily(readDailyLine(over, 0, '2026-09'), peso)).toBe(
+      'the bills already claim this whole share',
+    );
+  });
+});
+
+describe('readBudget daily lines', () => {
+  it("reads both buckets from the day's own totals", () => {
+    const b = budget(30000, [line('Rent', 12000, 'needs')], undefined, { needs: 40, wants: 500 });
+    b.month = '2026-09';
+    const r = readBudget(b);
+    expect(r.daily.needs.spent).toBe(40);
+    expect(r.daily.wants.spent).toBe(500);
+    // Wants line is 30% of ₱30,000 = ₱9,000, uncommitted, over 30 days = ₱300.
+    expect(r.daily.wants.allowance).toBe(300);
+  });
+
+  it("survives a backend too old to send today's totals", () => {
+    const b = budget(30000);
+    // @ts-expect-error — deliberately modelling the older payload
+    delete b.today;
+    expect(readBudget(b).daily.needs.spent).toBe(0);
   });
 });

@@ -251,6 +251,13 @@ export interface ApiCommitment {
  * plus any extra) — the figure the 50/30/20 lines divide. `untagged` is spending
  * from before the budget existed — reported as itself, never folded into a bucket
  * it was never assigned to. */
+/** Loose spending logged today against each bucket — bills excluded, since a
+ * standing bill was planned long before the day it happened to be paid. */
+export interface ApiBudgetToday {
+  needs: number;
+  wants: number;
+}
+
 export interface ApiBudgetActual {
   income: number;
   needs: number;
@@ -267,6 +274,7 @@ export interface ApiBudget {
   month: string; // the 'YYYY-MM' the actuals below cover
   commitments: ApiCommitment[];
   actual: ApiBudgetActual;
+  today: ApiBudgetToday;
 }
 
 /** A recap of the current ISO week, for the "This week" summary. */

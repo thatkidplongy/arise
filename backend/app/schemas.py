@@ -641,6 +641,16 @@ class BudgetActualOut(BaseModel):
     untagged: float
 
 
+class BudgetTodayOut(BaseModel):
+    """Loose spending logged *today* against each bucket — the day-sized line.
+
+    Standing bills are excluded on purpose: rent is already planned in the
+    commitments, so counting the day it's paid against a daily allowance would
+    read as a blowout on a day nothing unusual happened."""
+    needs: float
+    wants: float
+
+
 class BudgetOut(BaseModel):
     """The budget as stored: take-home pay, the commitments it's divided across, and
     this month's actual spending. Deliberately *raw* — targets, totals and the
@@ -652,6 +662,7 @@ class BudgetOut(BaseModel):
     month: str              # the 'YYYY-MM' the actuals below cover
     commitments: list[CommitmentOut]
     actual: BudgetActualOut
+    today: BudgetTodayOut
 
 
 class MoneyBucketOut(BaseModel):
