@@ -1,5 +1,10 @@
-import { Caprasimo_400Regular } from '@expo-google-fonts/caprasimo';
-import { Figtree_400Regular, Figtree_600SemiBold, Figtree_700Bold } from '@expo-google-fonts/figtree';
+// Imported per cut, not from the package root: the root index requires every weight
+// and italic, and a static web export then ships all fourteen files for the three
+// the app actually loads.
+import { Caprasimo_400Regular } from '@expo-google-fonts/caprasimo/400Regular';
+import { Figtree_400Regular } from '@expo-google-fonts/figtree/400Regular';
+import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
+import { Figtree_700Bold } from '@expo-google-fonts/figtree/700Bold';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
