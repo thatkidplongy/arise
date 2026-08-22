@@ -1,22 +1,21 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
-import { StatRow } from '@/components/StatRow';
 import { DailyQuote, Reminders } from '@/components/StatusCards';
+import { StatusWindow } from '@/components/StatusWindow';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import { IconButton } from '@/components/ui/Button';
 import { Card, Kicker } from '@/components/ui/Card';
-import { Disc } from '@/components/ui/StatChip';
-import { Tag } from '@/components/ui/Tag';
+import { SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { dateKey } from '@/lib/dates';
 import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { accent, clay, feedback, neutral, radius, sage, text, typography } from '@/theme';
+import { accent, clay, feedback, neutral, radius, sage, surface, text, typography } from '@/theme';
 
 // Quiet reminders — that rest and living are part of the path, not a detour.
 const REMINDERS = [
@@ -37,22 +36,16 @@ function reminderForToday(): string {
   return REMINDERS[sum % REMINDERS.length];
 }
 
-/** The wordmark, a face, and the one way through to your titles. */
-function Masthead({ avatarUri, initial }: { avatarUri?: string | null; initial: string }) {
+/** The wordmark, and the one way through to your titles. Tracked and ruled, so the
+ * page opens the way the System windows below it do. */
+function Masthead() {
+  const weekday = new Date().toLocaleDateString(undefined, { weekday: 'long' });
   return (
     <View style={styles.masthead}>
-      {avatarUri ? (
-        <Image source={{ uri: avatarUri }} style={styles.avatarSmall} />
-      ) : (
-        <View style={styles.initialDisc}>
-          <Text style={styles.initial}>{initial}</Text>
-        </View>
-      )}
-      <View style={styles.mastheadCopy}>
-        <Text style={styles.wordmark}>Arise</Text>
-        <Text style={styles.tagline}>rise beyond your limits</Text>
-      </View>
-      <IconButton icon="sparkles-outline" label="Achievements" onPress={() => router.push('/achievements')} />
+      <Text style={styles.wordmark}>Arise</Text>
+      <View style={styles.mastheadRule} />
+      <Text style={styles.weekday}>{weekday}</Text>
+      <IconButton icon="sparkles-outline" label="Achievements" onPress={() => router.push('/achievements')} size={40} />
     </View>
   );
 }
@@ -87,13 +80,13 @@ export default function StatusScreen() {
   if (!state) {
     return (
       <Screen>
-        <Masthead initial="A" />
+        <Masthead />
         <ConnectionPanel />
       </Screen>
     );
   }
 
-  const { player, stats, streak, today, next_rank } = state;
+  const { player, streak, today, next_rank } = state;
 
   const onRest = async () => {
     if (restPending) return;
@@ -104,48 +97,15 @@ export default function StatusScreen() {
 
   return (
     <Screen>
-      <Masthead avatarUri={avatarUri} initial={player.name.slice(0, 1).toUpperCase() || 'A'} />
+      <Masthead />
 
       <NorthStar value={player.north_star} />
 
       {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
 
-      <SystemPanel style={styles.identityCard}>
-        <View style={styles.identityRow}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
-          ) : (
-            <Disc value={player.level} caption="level" size={86} />
-          )}
-          <View style={styles.identity}>
-            <Text style={styles.name}>{player.name}</Text>
-            {player.equipped_title ? <Tag label={player.equipped_title} tone="sage" /> : null}
-            <Text style={styles.meta}>
-              Hunter · {player.rank}-Rank · Level {player.level}
-            </Text>
-          </View>
-        </View>
+      <StatusWindow state={state} avatarUri={avatarUri} />
 
-        <View style={styles.xpRow}>
-          <Text style={styles.xpLabel}>Experience</Text>
-          <Text style={styles.xpValue}>
-            {player.xp_into.toLocaleString()} / {player.xp_needed.toLocaleString()}
-          </Text>
-        </View>
-        <XpBar value={player.xp_into} max={player.xp_needed} height={12} track={clay[200]} />
-
-        <View style={styles.chips}>
-          <Tag label={`${streak.current} day streak`} />
-          <Tag label={`best ${streak.best}`} />
-          <Tag label={`${today.xp} XP today`} tone="sage" />
-        </View>
-      </SystemPanel>
-
-      <SystemPanel title="Attributes">
-        {stats.map((stat) => (
-          <StatRow key={stat.key} stat={stat} prog={state.progression?.[stat.key]} />
-        ))}
-      </SystemPanel>
+      <SectionRule label="The rest of today" />
 
       <Reminders items={state.reminders} />
 
@@ -227,36 +187,15 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingHorizontal: 2,
   },
-  mastheadCopy: { flex: 1, gap: 1 },
   wordmark: {
-    ...typography.wordmark,
+    ...typography.numeral,
+    fontSize: 17,
+    letterSpacing: 5.5,
     color: clay[700],
     includeFontPadding: false,
   },
-  tagline: {
-    ...typography.small,
-    fontSize: 12,
-    color: text.secondary,
-  },
-  initialDisc: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.pill,
-    backgroundColor: sage[300],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initial: {
-    ...typography.numeral,
-    fontSize: 22,
-    color: sage[800],
-    includeFontPadding: false,
-  },
-  avatarSmall: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.pill,
-  },
+  mastheadRule: { flex: 1, height: 1, backgroundColor: surface.hairline },
+  weekday: { ...typography.kicker, fontSize: 9.5, letterSpacing: 2.1, color: text.secondary },
   northStar: { overflow: 'hidden', gap: 9 },
   northStarBlob: {
     position: 'absolute',

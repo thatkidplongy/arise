@@ -69,6 +69,37 @@ export const surface = {
   sageFill: sage[200],
 };
 
+/**
+ * The System's side of the palette. Nothing new is invented here — the same clay
+ * and sage, inverted onto espresso, where the accent reads as a screen rather than
+ * a page. Clay on ink does the job the manhwa's electric blue does, without neon.
+ *
+ * Ink is rationed: at most two windows per screen, so dark keeps meaning *the
+ * System is talking*.
+ */
+export const ink = {
+  bg: neutral[900],
+  /** A window lifted off the window behind it. */
+  raised: 'rgba(249, 244, 237, 0.09)',
+  fill: 'rgba(249, 244, 237, 0.11)',
+  track: 'rgba(249, 244, 237, 0.13)',
+  rule: 'rgba(249, 244, 237, 0.13)',
+  /** The corner brackets and the tracked label between the rules. */
+  bracket: clay[400],
+  bracketRule: 'rgba(246, 160, 107, 0.32)',
+  /** Sage says cleared, on ink as on sand. */
+  bracketSage: sage[400],
+  bracketSageRule: 'rgba(174, 191, 146, 0.34)',
+  text: neutral[100],
+  textDim: 'rgba(249, 244, 237, 0.72)',
+  textFaint: 'rgba(249, 244, 237, 0.62)',
+  accent: clay[300],
+  accentDim: clay[400],
+  sage: sage[300],
+  sageFill: 'rgba(174, 191, 146, 0.18)',
+  clayFill: 'rgba(246, 160, 107, 0.13)',
+};
+
 export const text = {
   primary: '#201E1D', // ink
   secondary: neutral[700],
