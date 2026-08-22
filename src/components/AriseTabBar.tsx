@@ -32,13 +32,23 @@ const SIDE_PAD = 16; // gap between the bar and the screen edges
 const LIFT = 10; // gap between the bar and the safe-area inset below it
 
 /**
- * The glass, in two parts.
+ * The glass, and why it isn't more transparent than this.
  *
- * `GLASS_SOLID` is what the bar is without a blur behind it — opaque enough to read
- * icons against whatever scrolls under it. The injected stylesheet in
- * scripts/build-web.sh drops it to `.62` and adds the blur, but only inside an
- * `@supports` check, so a browser that can't blur keeps the readable version rather
- * than a muddy translucent one.
+ * The bar floats over both the sand page and the near-black quest and status
+ * windows, and a translucent tint takes on whatever is behind it. At the .5 this
+ * started as, the idle icon measured 3.76:1 over sand and 1.35:1 over ink — legible
+ * in one place and gone in the other. Dark glass only mirrors the problem: ink at
+ * .55 gives 7.46:1 over ink and 2.61:1 over sand.
+ *
+ * There's no tint that works both ways while staying properly see-through, so the
+ * tint is opaque enough that the background stops deciding. At .8, with the idle
+ * icon a step darker, the worst case is 4.12:1 — comfortably past the 3:1 floor for
+ * a non-text control either way. Blur and the lit lip still do the work; this reads
+ * as frosted rather than clear, which is the honest ceiling for a bar that crosses
+ * both extremes.
+ *
+ * `GLASS_SOLID` is the no-blur fallback, kept a touch heavier again. The stylesheet
+ * in scripts/build-web.sh applies .8 plus the blur inside an `@supports` check.
  *
  * expo-glass-effect is in package.json and would be the native answer, but its
  * non-iOS GlassView is `<View {...props} />` and isLiquidGlassAvailable() returns
@@ -236,7 +246,7 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
         />
         {visible.map((route, i) => {
           const focused = i === activeIndex;
-          const color = focused ? clay[700] : neutral[600];
+          const color = focused ? clay[700] : neutral[700];
           const glyph = ICONS[route.name] ?? FALLBACK_GLYPH;
           const title = descriptors[route.key]?.options.title ?? route.name;
           return (

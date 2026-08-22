@@ -40,7 +40,7 @@ FOCUS_CSS = """
    with page content legible straight through it. !important beats the inline class
    react-native-web generates for the same property. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
-#arise-glass-bar{background-color:rgba(249,244,237,.5)!important;
+#arise-glass-bar{background-color:rgba(249,244,237,.8)!important;
 -webkit-backdrop-filter:blur(30px) saturate(1.9) brightness(1.04);
 backdrop-filter:blur(30px) saturate(1.9) brightness(1.04)}
 }

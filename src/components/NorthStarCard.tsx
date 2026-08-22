@@ -60,21 +60,28 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
-/** One carryable line: what a capture said, or what it was telling you to do. */
+/** One carryable line: what a capture said, or what it was telling you to do,
+ * plus which capture it came from. */
 interface Line {
   text: string;
   verbatim: boolean;
+  source: string;
 }
 
 /** Today's line, and a way to pull another from what you've captured. */
 function DailyLine({ quote }: { quote: ApiDailyQuote }) {
   // Reset to the server's daily pick whenever it changes, the "adjust state during
   // render" way (no effect); shuffle can still swap `line` in between.
-  const [line, setLine] = useState<Line>({ text: quote.text, verbatim: quote.verbatim });
+  const pick = (q: ApiDailyQuote): Line => ({
+    text: q.text,
+    verbatim: q.verbatim,
+    source: q.source_title,
+  });
+  const [line, setLine] = useState<Line>(() => pick(quote));
   const [seed, setSeed] = useState(quote.text);
   if (seed !== quote.text) {
     setSeed(quote.text);
-    setLine({ text: quote.text, verbatim: quote.verbatim });
+    setLine(pick(quote));
   }
 
   const shuffle = async () => {
@@ -83,9 +90,11 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
     // takeaway is as worth carrying as a quote, and there are more of them. Shuffling
     // only quotes would mean a takeaway could arrive as the daily pick and then never
     // be reachable by tapping.
+    // The title rides along, or a shuffled line would lose the attribution the
+    // server's own pick carries — the same half-wired shape the takeaways had.
     const pool: Line[] = insights.flatMap((i) => [
-      ...i.quotes.map((text) => ({ text, verbatim: true })),
-      ...i.takeaways.map((text) => ({ text, verbatim: false })),
+      ...i.quotes.map((text) => ({ text, verbatim: true, source: i.title })),
+      ...i.takeaways.map((text) => ({ text, verbatim: false, source: i.title })),
     ]);
     const others = pool.filter((l) => l.text !== line.text);
     if (others.length === 0) return;
@@ -107,6 +116,9 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
         {/* Quotation marks only around what was actually said. Wrapping a distilled
             takeaway in them would invent a speaker for the model's own words. */}
         <Text style={styles.quote}>{line.verbatim ? `“${line.text}”` : line.text}</Text>
+        {/* Its own line under the quote, not back on the hint row where it was before
+            — the attribution belongs to the line above it, not to the control. */}
+        {line.source ? <Text style={styles.source}>{line.source}</Text> : null}
         <Text style={styles.hint}>tap for another</Text>
       </EdgeBlock>
     </Pressable>
@@ -126,5 +138,6 @@ const styles = StyleSheet.create({
   // Lowercase and quiet: an instruction, not a control. The block's own size is the
   // tap target, so nothing here needs TAP_MIN. marginTop keeps the spacing the row
   // that used to hold it had.
-  hint: { ...typography.small, color: text.secondary, marginTop: 2 },
+  source: { ...typography.small, color: text.secondary, marginTop: 2 },
+  hint: { ...typography.small, color: text.faint },
 });
