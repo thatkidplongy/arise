@@ -31,9 +31,9 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import llm, mailer, recap
+from . import llm, mailer, reading, recap
 from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
-                     ReadingLog, Thread)
+                     Thread)
 
 READING_QUEST_ID = "d-read"
 
@@ -133,14 +133,8 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
 
 def _chapters_today(db: Session, player: Player, day: str) -> str:
     """Which chapters were logged today, as the hunter labelled them ('5–7, 8'), or
-    '' when nothing was logged. Sittings with only a count contribute nothing to
-    name, so they're left out of the label rather than guessed at."""
-    rows = (
-        db.query(ReadingLog)
-        .filter_by(player_id=player.id, book=player.current_book, day=day)
-        .order_by(ReadingLog.created_at)
-    )
-    return ", ".join(r.label.strip() for r in rows if r.label.strip())
+    '' when nothing was logged."""
+    return reading.chapter_labels(reading.on_day(reading.logs_of(db, player), day))
 
 
 def _read_today(db: Session, player: Player, day: str) -> bool:
@@ -229,20 +223,6 @@ def build_highlights(db: Session, player: Player, day: str,
 
 # ── Threads — the running summary per book ───────────────────────────────────
 
-# 'Deep Work, ch 2', 'Deep Work ch. 2-3', 'Deep Work pp 40-52' → all one thread.
-# The marker must follow a separator, or the 'ch' inside a title like 'Catch 22'
-# would be read as a chapter and the book would become 'Cat'.
-_CHAPTERS = re.compile(
-    r"(?:[,;:]\s*|\s+)(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*\d.*$", re.I
-)
-
-
-def thread_key(source: str) -> str:
-    """A source name without its chapter marker, lowercased — so each day's reading
-    of the same book lands on the same thread instead of starting a new one."""
-    return " ".join(_CHAPTERS.sub("", source).split()).strip(" ,;:-–").lower()
-
-
 def update_thread(db: Session, player: Player, day: str, entries: list[dict],
                   lines: list[str]) -> Thread | None:
     """Fold the day's ideas into the running summary of the book they came from.
@@ -256,9 +236,10 @@ def update_thread(db: Session, player: Player, day: str, entries: list[dict],
     if book is None or not lines:
         return None
 
-    key = thread_key(book["source"])
+    key = reading.book_key(book["source"])
     if not key:
         return None
+    title = reading.book_name(book["source"])
 
     row = db.query(Thread).filter_by(player_id=player.id, key=key).first()
     if row is not None and row.day >= day:
@@ -280,14 +261,27 @@ def update_thread(db: Session, player: Player, day: str, entries: list[dict],
     if row is None:
         # days=0 explicitly: the column default only lands at flush, and we increment
         # before then.
-        row = Thread(player_id=player.id, key=key, title=book["source"], days=0)
+        row = Thread(player_id=player.id, key=key, title=title, days=0)
         db.add(row)
-    row.title = book["source"]
+    row.title = title
     row.summary = summary
     row.days = (row.days or 0) + 1
     row.day = day
     db.commit()
     return row
+
+
+def sittings_behind(db: Session, player: Player, row: Thread, book: str) -> int:
+    """How many times this book has been sat with.
+
+    Taken from the reading log whenever it has anything on the book, so the panel
+    quotes the same sittings the reading card lists rather than its own count of
+    folds — those two drift apart on any day the reading daily was ticked without
+    chapters logged. The folds are the fallback for a book read entirely on the Learn
+    screen, which never touches the reading log; one fold is one day spent with it,
+    so it means the same kind of thing."""
+    logged = len(reading.logs_of_book(db, player.id, book))
+    return logged or (row.days or 0)
 
 
 def thread_for(db: Session, player: Player, day: str) -> dict | None:
@@ -301,7 +295,14 @@ def thread_for(db: Session, player: Player, day: str) -> dict | None:
     )
     if row is None:
         return None
-    return {"title": row.title, "summary": row.summary, "days": row.days}
+    # Stripped again on the way out: rows written before titles were normalised still
+    # carry the chapter marker of whichever day last folded in.
+    book = reading.book_name(row.title)
+    return {
+        "title": book,
+        "summary": row.summary,
+        "sittings": sittings_behind(db, player, row, book),
+    }
 
 
 # ── Recall — the spaced part ─────────────────────────────────────────────────
@@ -900,8 +901,8 @@ def render_html(ctx: dict, avatar_src: str | None = None) -> str:
                 + f'<div style="color:{_TEXT};font-size:15px;line-height:1.55">'
                 f'{thread["summary"]}</div>'
                 f'<div style="color:{_MUTED};font-size:12px;margin-top:6px">'
-                f'{thread["title"]} · {thread["days"]} '
-                f'sitting{"s" if thread["days"] != 1 else ""}</div>'
+                f'{thread["title"]} · {thread["sittings"]} '
+                f'sitting{"s" if thread["sittings"] != 1 else ""}</div>'
             )
         body += (
             f'<div style="background:{_BASE};border-radius:16px;padding:16px 18px;'

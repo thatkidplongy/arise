@@ -453,7 +453,7 @@ class Thread(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     key: Mapped[str] = mapped_column(String, index=True)  # normalised source name
-    title: Mapped[str] = mapped_column(String)  # as last written, for display
+    title: Mapped[str] = mapped_column(String)  # the book, chapter markers stripped
     summary: Mapped[str] = mapped_column(String, default="")
     days: Mapped[int] = mapped_column(Integer, default=0)  # days folded in so far
     day: Mapped[str] = mapped_column(String, default="")  # last day folded in

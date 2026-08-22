@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app import digest, llm, state
+from app import digest, llm, reading, state
 from app.models import Completion, Highlight, Learning, ReadingLog, Thread
 
 DAY = "2026-07-18"
@@ -769,17 +769,57 @@ def test_too_alike_ignores_shared_filler_words():
 # ── threads — the running summary (marginalia) ────────────────────────────────
 
 
-def test_thread_key_strips_chapter_markers():
-    """Every sitting on one book must land on the same thread, however it was typed."""
-    assert digest.thread_key("Deep Work, ch 2") == "deep work"
-    assert digest.thread_key("Deep Work ch. 2-3") == "deep work"
-    assert digest.thread_key("Deep Work pp 40-52") == "deep work"
-    assert digest.thread_key("Deep Work") == "deep work"
-    assert digest.thread_key("Thinking, Fast and Slow, chapter 4") == "thinking, fast and slow"
+def test_update_thread_stores_the_book_without_the_chapters(db, monkeypatch):
+    """The panel sits next to the reading card, which shows where you actually are —
+    so the sentence is labelled with the book, never one day's chapters."""
+    player = state.get_or_create_player(db)
+    monkeypatch.setattr(llm, "thread_summary", lambda *a, **k: "Focus compounds.")
+
+    digest.update_thread(
+        db, player, DAY, [{"kind": "book", "source": "Deep Work, ch 2-3", "text": ""}], ["a"]
+    )
+    assert db.query(Thread).one().title == "Deep Work"
 
 
-def test_thread_key_keeps_a_number_that_is_part_of_the_title():
-    assert digest.thread_key("Catch 22") == "catch 22"
+def test_thread_for_strips_chapters_off_a_title_written_before_this(db):
+    """Rows already in the database were stamped with a day's chapters, and the panel
+    has to stop contradicting the reading card for them too."""
+    player = state.get_or_create_player(db)
+    db.add(Thread(player_id=player.id, key="deep work", title="Deep Work, ch 2-3",
+                  summary="Focus compounds.", days=2, day=DAY))
+    db.commit()
+
+    assert digest.thread_for(db, player, DAY)["title"] == "Deep Work"
+
+
+def test_thread_counts_the_sittings_the_reading_card_lists(db, monkeypatch):
+    """The two panels have to agree. Folds drift from sittings on any day the reading
+    daily was ticked with no chapters logged, so the log wins."""
+    player = state.get_or_create_player(db)
+    player.current_book = "Deep Work"
+    db.add_all([
+        ReadingLog(player_id=player.id, day=DAY, book="Deep Work", chapters=2, label="1-2"),
+        ReadingLog(player_id=player.id, day=DAY, book="Deep Work", chapters=1, label="3"),
+        ReadingLog(player_id=player.id, day="2026-07-19", book="Deep Work", chapters=1, label="4"),
+    ])
+    db.add(Thread(player_id=player.id, key="deep work", title="Deep Work",
+                  summary="Focus compounds.", days=9, day=DAY))
+    db.commit()
+
+    assert digest.thread_for(db, player, "2026-07-19")["sittings"] == 3  # not the nine folds
+    # The same tally the reading card is made of, so the two panels can't disagree.
+    assert reading.tally(reading.logs_of(db, player)).sittings == 3
+
+
+def test_thread_falls_back_to_folds_for_a_book_with_no_reading_log(db):
+    """A book read on the Learn screen never touches the reading log, so the folds are
+    the only record of how many times it has been sat with."""
+    player = state.get_or_create_player(db)
+    db.add(Thread(player_id=player.id, key="how to read a book", title="How to Read a Book",
+                  summary="Reading is active.", days=2, day=DAY))
+    db.commit()
+
+    assert digest.thread_for(db, player, DAY)["sittings"] == 2
 
 
 def test_update_thread_recondenses_rather_than_appending(db, monkeypatch):
@@ -863,7 +903,7 @@ def test_thread_for_ignores_a_summary_from_the_future(db):
 
 def test_render_shows_the_running_summary():
     ctx = _ctx([("Depth beats speed.", "What beats speed?")])
-    ctx["thread"] = {"title": "Deep Work", "summary": "Focus compounds.", "days": 3}
+    ctx["thread"] = {"title": "Deep Work", "summary": "Focus compounds.", "sittings": 3}
     assert "Focus compounds." in digest.render_text(ctx)
     html = digest.render_html(ctx)
     assert "Focus compounds." in html and "3 sittings" in html

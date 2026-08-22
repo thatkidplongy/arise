@@ -298,7 +298,7 @@ def _retitle_reading_logs(db: Session, player: Player, title: str) -> None:
     """Move the sittings logged against the current book onto a re-spelled title.
 
     They're keyed on the title exactly as it stood when logged
-    (state.reading_logs_of), so a corrected capitalisation has to bring them along
+    (reading.logs_of), so a corrected capitalisation has to bring them along
     or the same book reads back as one with nothing read."""
     if title == player.current_book:
         return

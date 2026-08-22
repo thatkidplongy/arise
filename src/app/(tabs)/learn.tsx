@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
 import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/api';
+import { describeThreadBook } from '@/lib/reading';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
@@ -284,7 +285,9 @@ function ThreadPanel() {
   return (
     <SystemPanel title="The book so far">
       <Text style={styles.threadText}>{thread.summary}</Text>
-      <Tag label={`${thread.title} · ${thread.days} sitting${thread.days === 1 ? '' : 's'}`} tone="sage" />
+      {/* Sittings are absent until the backend service restarts, like the reading
+          card's chapter count — the book alone still reads correctly. */}
+      <Tag label={describeThreadBook(thread.title, thread.sittings ?? 0)} tone="sage" />
     </SystemPanel>
   );
 }

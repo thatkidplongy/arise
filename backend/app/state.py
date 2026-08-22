@@ -7,13 +7,12 @@ handful of rows; when it grows, they become SQL queries with the same contract.
 """
 
 import json
-import re
 
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import body, digest, game, insights, llm, mailer, progression, quests, transcript
+from . import body, digest, game, insights, llm, mailer, progression, quests, reading, transcript
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -28,7 +27,6 @@ from .models import (
     QuestDef,
     Learning,
     QuestNote,
-    ReadingLog,
     Reminder,
     StepCheck,
 )
@@ -422,46 +420,6 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
     }
 
 
-def reading_logs_of(db: Session, player: Player, since: str | None = None) -> list[ReadingLog]:
-    """Every sitting logged for the *current* book, oldest first. Keyed on the title
-    as well as the start day, so changing books never inherits the last one's
-    chapters and re-reading the same title later starts from zero."""
-    q = db.query(ReadingLog).filter_by(player_id=player.id, book=player.current_book)
-    if since is not None:
-        q = q.filter(ReadingLog.day >= since)
-    return q.order_by(ReadingLog.created_at).all()
-
-
-_CHAPTER_NUMBER = re.compile(r"\d+")
-
-
-def furthest_chapter(label: str, total: int = 0) -> int:
-    """The chapter a label says you reached — the highest number in it. "21–22" means
-    you're 22 chapters into the book, not 2, which is how anyone reading it would
-    describe where they are. 0 when the label names no chapter ("the intro").
-
-    Clamped to the book's length when known, so a stray number in a label can't
-    claim you're past the last chapter."""
-    numbers = [int(n) for n in _CHAPTER_NUMBER.findall(label)]
-    if not numbers:
-        return 0
-    reached = max(numbers)
-    return min(reached, total) if total > 0 else reached
-
-
-def chapters_covered(logs: list[ReadingLog], total: int = 0) -> int:
-    """How far into the book the logged sittings put you.
-
-    The furthest chapter named wins, because that's what "how far through are you"
-    means — someone who joins mid-book at ch 21–22 is 22 in, not 2. Sittings logged
-    as a bare count still move it, so the count is a floor the furthest chapter can
-    only raise: logging ten unlabelled chapters and then naming "ch 2" mustn't wind
-    progress back to 2."""
-    counted = sum(log.chapters for log in logs)
-    named = max((furthest_chapter(log.label, total) for log in logs), default=0)
-    return max(counted, named)
-
-
 def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) -> dict | None:
     """A read-only view of progress on the current book: how far in the logged
     chapters put you, from the hunter's own logging rather than a quota the app set.
@@ -477,9 +435,9 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) ->
     start = progression.week_start(player.book_started_week) if player.book_started_week else None
     floor = start.isoformat() if start is not None else None
 
-    logs = reading_logs_of(db, player, floor)
-    chapters_read = chapters_covered(logs, player.current_book_chapters)
-    today = [log for log in logs if log.day == day]
+    logs = reading.logs_of(db, player, floor)
+    counts = reading.tally(logs, player.current_book_chapters)
+    today = reading.on_day(logs, day)
 
     read_days = {r.day for r in rows if r.quest_id == "d-read"}
     if floor is not None:  # only count reading done since this book began
@@ -487,13 +445,13 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) ->
     days_read = len(read_days)
 
     total = player.current_book_chapters
-    progress = min(1.0, chapters_read / total) if total > 0 else 0.0
+    progress = min(1.0, counts.chapters / total) if total > 0 else 0.0
 
     return {
         "book": book,
         "chapters": total,
         "books_finished": player.books_finished,
-        "chapters_read": chapters_read,
+        "chapters_read": counts.chapters,
         "days_read": days_read,
         "progress": round(progress, 3),
         "measure": "chapters" if total > 0 else "count",
@@ -899,11 +857,11 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     # about at all — there's nothing to compare against, so finishing it is something
     # only you can say (Status → Current book).
     week = game.week_key(day)
-    reading = reading_of(db, player, day, rows)
+    reading_view = reading_of(db, player, day, rows)
     review_pending = bool(
         player.current_book
-        and reading
-        and reading["progress"] >= 1.0
+        and reading_view
+        and reading_view["progress"] >= 1.0
         and player.book_review_week != week
     )
 
@@ -933,7 +891,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "craft": craft_of(db, player, day),
-        "reading": reading,
+        "reading": reading_view,
         "week_review": week_review_of(rows, defs, day),
         "stats": [
             {"key": k, **game.stat_level_info(agg["by_stat"][k])} for k in game.STAT_KEYS

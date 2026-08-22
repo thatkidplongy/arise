@@ -533,9 +533,9 @@ class RecallOut(BaseModel):
 
 class ThreadOut(BaseModel):
     """The running one-sentence summary of a book, recondensed each sitting."""
-    title: str
+    title: str  # the book, without any one day's chapters
     summary: str
-    days: int  # sittings folded in so far
+    sittings: int  # times sat with it, from the reading log (see digest.sittings_behind)
 
 
 class DigestOut(BaseModel):

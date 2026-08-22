@@ -94,9 +94,9 @@ export type RecallGrade = 'got' | 'shaky' | 'missed';
 
 /** The running one-sentence summary of the book you're reading, recondensed each sitting. */
 export interface ApiThread {
-  title: string;
+  title: string; // the book, without any one day's chapters
   summary: string;
-  days: number; // sittings folded in so far
+  sittings: number; // times sat with it, counted from the reading log
 }
 
 export interface ApiRecall {

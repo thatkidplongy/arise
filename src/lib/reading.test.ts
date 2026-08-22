@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countChapters, describeChaptersRead } from '@/lib/reading';
+import { countChapters, describeChaptersRead, describeThreadBook } from '@/lib/reading';
 
 describe('countChapters', () => {
   it('counts a single chapter', () => {
@@ -44,5 +44,16 @@ describe('describeChaptersRead', () => {
   it('falls back to a running count, pluralised', () => {
     expect(describeChaptersRead(1, 0)).toBe('1 chapter so far');
     expect(describeChaptersRead(4, 0)).toBe('4 chapters so far');
+  });
+});
+
+describe('describeThreadBook', () => {
+  it('names the book and how many sittings are behind the sentence', () => {
+    expect(describeThreadBook('Deep Work', 8)).toBe('Deep Work · 8 sittings');
+    expect(describeThreadBook('Deep Work', 1)).toBe('Deep Work · 1 sitting');
+  });
+
+  it('lets the book stand alone rather than claiming no sittings', () => {
+    expect(describeThreadBook('Deep Work', 0)).toBe('Deep Work');
   });
 });

@@ -34,3 +34,16 @@ export function describeChaptersRead(chaptersRead: number, total: number): strin
   if (total > 0) return `${chaptersRead} of ${total} chapters`;
   return `${chaptersRead} chapter${chaptersRead === 1 ? '' : 's'} so far`;
 }
+
+/**
+ * How the book reads under its running sentence, e.g. "Deep Work · 8 sittings".
+ *
+ * The count is the reading log's own sittings, the same ones the reading card lists,
+ * so the two panels can't disagree about how much of the book is behind you. With no
+ * count the book stands on its own — a phone can be ahead of the backend service, and
+ * "0 sittings" under a summary of the book would be a plain contradiction.
+ */
+export function describeThreadBook(title: string, sittings: number): string {
+  if (sittings <= 0) return title;
+  return `${title} · ${sittings} sitting${sittings === 1 ? '' : 's'}`;
+}

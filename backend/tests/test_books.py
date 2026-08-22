@@ -1,6 +1,6 @@
 """Unit tests for the Open Library parsers (pure, no network)."""
 
-from app import books, state
+from app import books, reading
 
 
 def test_reading_progress_counts_the_chapters_you_logged(client):
@@ -52,16 +52,36 @@ def test_a_bare_count_still_moves_progress_and_is_never_wound_back(client):
     assert r["chapters_read"] == 7  # 6 counted + this one, not back to 2
 
 
+def test_book_key_strips_chapter_markers():
+    """Every sitting on one book must land on the same thread, however it was typed."""
+    assert reading.book_key("Deep Work, ch 2") == "deep work"
+    assert reading.book_key("Deep Work ch. 2-3") == "deep work"
+    assert reading.book_key("Deep Work pp 40-52") == "deep work"
+    assert reading.book_key("Deep Work") == "deep work"
+    assert reading.book_key("Thinking, Fast and Slow, chapter 4") == "thinking, fast and slow"
+
+
+def test_book_key_keeps_a_number_that_is_part_of_the_title():
+    assert reading.book_key("Catch 22") == "catch 22"
+
+
+def test_book_name_keeps_the_title_as_written():
+    """It is what the panel shows, so the casing has to survive the stripping."""
+    assert reading.book_name("Thinking, fast and slow, ch 31-32") == "Thinking, fast and slow"
+    assert reading.book_name("Deep Work pp 40-52") == "Deep Work"
+    assert reading.book_name("Catch 22") == "Catch 22"
+
+
 def test_furthest_chapter_reads_a_label_the_way_a_reader_would():
-    assert state.furthest_chapter("21-22") == 22
-    assert state.furthest_chapter("ch 5 – 7") == 7
-    assert state.furthest_chapter("3, 5, 8") == 8
-    assert state.furthest_chapter("12") == 12
-    assert state.furthest_chapter("the intro") == 0
-    assert state.furthest_chapter("") == 0
+    assert reading.furthest_chapter("21-22") == 22
+    assert reading.furthest_chapter("ch 5 – 7") == 7
+    assert reading.furthest_chapter("3, 5, 8") == 8
+    assert reading.furthest_chapter("12") == 12
+    assert reading.furthest_chapter("the intro") == 0
+    assert reading.furthest_chapter("") == 0
     # A stray number can't put you past the last chapter of a book we know.
-    assert state.furthest_chapter("published 2011", total=35) == 35
-    assert state.furthest_chapter("published 2011") == 2011  # nothing to clamp to
+    assert reading.furthest_chapter("published 2011", total=35) == 35
+    assert reading.furthest_chapter("published 2011") == 2011  # nothing to clamp to
 
 
 def test_a_book_with_no_length_gets_a_count_and_no_deadline(client):
