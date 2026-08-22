@@ -15,12 +15,17 @@ function insight(over: Partial<ApiInsight>): ApiInsight {
 }
 
 describe('buildBringBack', () => {
-  it('puts every due recall item before any tip', () => {
+  it('puts every due highlight before any tip, so tapping through meets the work first', () => {
     const out = buildBringBack(
       [recall('a'), recall('b')],
       [insight({ takeaways: ['idea'], steps: ['do it'] })],
     );
     expect(out.map((x) => x.kind)).toEqual(['recall', 'recall', 'tip', 'tip']);
+  });
+
+  it('keeps the schedule’s own ordering of the due items', () => {
+    const out = buildBringBack([recall('a'), recall('b'), recall('c')], []);
+    expect(out.map((x) => x.id)).toEqual(['a', 'b', 'c']);
   });
 
   it('takes both halves of a tips capture, flagging actions apart from ideas', () => {
@@ -31,7 +36,7 @@ describe('buildBringBack', () => {
     ]);
   });
 
-  it('ignores motivation captures — those feed the daily line, not this', () => {
+  it('ignores motivation captures — those feed the daily line, not this screen', () => {
     const out = buildBringBack([], [insight({ kind: 'motivation', takeaways: ['t'], quotes: ['q'] })]);
     expect(out).toEqual([]);
   });
@@ -49,7 +54,9 @@ describe('buildBringBack', () => {
     expect(ids).toEqual(['a', 'x-t0', 'x-t1', 'x-s0', 'y-t0']);
   });
 
-  it('is empty when nothing is due and nothing has been captured', () => {
+  it('works with only one side present, and is empty with neither', () => {
+    expect(buildBringBack([recall('a')], []).map((x) => x.kind)).toEqual(['recall']);
+    expect(buildBringBack([], [insight({ takeaways: ['idea'] })]).map((x) => x.kind)).toEqual(['tip']);
     expect(buildBringBack([], [])).toEqual([]);
   });
 });

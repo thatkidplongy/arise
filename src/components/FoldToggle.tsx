@@ -16,6 +16,10 @@ const TAP = 44;
  * that still needs paying has to say so, where a hidden ledger line only has to be
  * counted. `total` is separate from it so the spoken label can be uniform even when
  * the visible one isn't.
+ *
+ * Not every fold hides a list, though: pass `accessibilityLabel` when it hides one
+ * thing, since "show all 1 lines" is not what a screen reader should say about an
+ * answer.
  */
 export function FoldToggle({
   expanded,
@@ -24,20 +28,23 @@ export function FoldToggle({
   color,
   onPress,
   style,
+  accessibilityLabel,
 }: {
   expanded: boolean;
   label: string;
-  total: number;
+  total?: number;
   color: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }) {
+  const spoken = accessibilityLabel ?? (expanded ? 'Show fewer lines' : `Show all ${total} lines`);
   return (
     <Pressable
       onPress={onPress}
       style={[styles.btn, style]}
       accessibilityRole="button"
-      accessibilityLabel={expanded ? 'Show fewer lines' : `Show all ${total} lines`}
+      accessibilityLabel={spoken}
     >
       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={color} />
       <Text style={[styles.text, { color }]}>{label}</Text>

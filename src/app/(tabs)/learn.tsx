@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
+import { FoldToggle } from '@/components/FoldToggle';
 import { EdgeBlock } from '@/components/ui/EdgeBlock';
 import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
@@ -212,82 +213,89 @@ function describeWhen(item: ApiRecall): string {
   return item.source_label ? `${ago} · ${item.source_label}` : ago;
 }
 
-/** The question, before the answer is out. */
-function RecallAsk({ item }: { item: ApiRecall }) {
+/**
+ * One due highlight: the question, with its answer folded away underneath.
+ *
+ * The question stays put when the answer opens. Swapping one for the other meant you
+ * couldn't check what was actually asked while looking at the answer — and comparing
+ * the two is the whole reason to be here.
+ */
+function DueItem({ item }: { item: ApiRecall }) {
+  const [open, setOpen] = useState(false);
+  // Highlights distilled before cues existed have no question to ask, so there's
+  // nothing to fold — they just show.
+  const hasQuestion = Boolean(item.cue);
+
   return (
     <>
-      <Text style={styles.bringText}>{item.cue}</Text>
+      <Text style={styles.bringText}>{hasQuestion ? item.cue : item.text}</Text>
       <Text style={styles.bringMeta}>{describeWhen(item)}</Text>
-      <Text style={styles.bringHint}>tap to reveal</Text>
+      {!hasQuestion ? null : (
+        <>
+          <FoldToggle
+            expanded={open}
+            label={open ? 'hide answer' : 'show answer'}
+            color={HUE}
+            onPress={() => setOpen((o) => !o)}
+            accessibilityLabel={open ? 'Hide the answer' : 'Show the answer'}
+            style={styles.answerFold}
+          />
+          {open ? (
+            <>
+              <Text style={styles.answerText}>{item.text}</Text>
+              {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
+              <GradeRow id={item.id} />
+            </>
+          ) : null}
+        </>
+      )}
     </>
   );
 }
 
-/** The answer, and the grade that reschedules it. */
-function RecallAnswer({ item }: { item: ApiRecall }) {
-  return (
-    <>
-      <Text style={styles.bringText}>{item.text}</Text>
-      {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
-      <Text style={styles.bringMeta}>{describeWhen(item)}</Text>
-      <GradeRow id={item.id} />
-    </>
-  );
-}
-
-/** A line from a tips capture. Nothing to grade — it isn't on a schedule. */
-function TipLine({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
+/** One line from a tips capture. Nothing to fold and nothing to grade — it was never
+ * a question, and it was never on a schedule. */
+function TipItem({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
   return (
     <>
       <Text style={styles.bringText}>{tip.text}</Text>
       <Text style={styles.bringMeta}>
         {tip.action ? 'to do' : 'idea'} · {tip.source}
       </Text>
-      <Text style={styles.bringHint}>tap for another</Text>
     </>
   );
 }
 
 /**
- * One thing at a time, in the edge-marked block the daily line uses — tap it and the
- * next thing comes round.
+ * What's come back around, at the top of the screen: one thing at a time, tap the
+ * card for the next.
  *
- * A recall item reveals on the first tap and advances on the second, so the answer
- * is never on screen beside its own question. Note that this reveals directly rather
- * than asking you to write the answer first: quicker, at the cost of the step that
- * separates recognising something from actually recalling it. The grade you give
- * afterwards is a feeling now rather than evidence.
+ * The answer is a fold under the question rather than a second tap that replaces it.
+ * Two reasons: the pair stays comparable, and the card's own tap keeps one meaning —
+ * "next" — instead of meaning "reveal" or "next" depending on hidden state.
+ *
+ * Note this reveals rather than asking you to write your answer first. Quicker, at
+ * the cost of the step that separates recognising something from recalling it, which
+ * makes the grade afterwards a feeling rather than evidence.
+ *
+ * The whole card is gone on a day with nothing owed and nothing captured.
  */
 function BringBackBlock() {
   const recall = useSystem((s) => s.state?.recall) ?? [];
   const { insights } = useInsights();
   const items = buildBringBack(recall, insights);
   const [at, setAt] = useState(0);
-  const [shown, setShown] = useState(false);
 
   if (!items.length) return null;
-  // The pool shrinks as recall items are graded off, so clamp rather than index past
-  // the end and render a blank block.
+  // The list shrinks as items are graded off, so wrap rather than index past the end
+  // and render an empty card.
   const current = items[at % items.length];
-
-  const advance = () => {
-    setShown(false);
-    setAt((i) => (i + 1) % items.length);
-  };
-  // A recall item earns two taps: reveal, then move on. Everything else is one.
-  const onTap = () => {
-    if (current.kind === 'recall' && current.item.cue && !shown) {
-      setShown(true);
-      return;
-    }
-    advance();
-  };
 
   return (
     <Pressable
-      onPress={onTap}
+      onPress={() => setAt((i) => (i + 1) % items.length)}
       accessibilityRole="button"
-      accessibilityLabel={shown ? 'Next' : 'Reveal'}
+      accessibilityLabel="Show the next one"
       style={({ pressed }) => (pressed ? styles.bringPressed : null)}
     >
       {/* On a card rather than bare on the page, unlike the daily line: this one opens
@@ -295,13 +303,14 @@ function BringBackBlock() {
           rather than a caption above the reading card. */}
       <Card>
         <EdgeBlock edge={HUE} kicker={current.kind === 'tip' ? 'From your tips' : 'Try to recall'}>
+          {/* Keyed so the next question arrives with its answer folded shut, rather
+              than inheriting the last one's open fold. */}
           {current.kind === 'tip' ? (
-            <TipLine tip={current} />
-          ) : shown || !current.item.cue ? (
-            <RecallAnswer item={current.item} />
+            <TipItem key={current.id} tip={current} />
           ) : (
-            <RecallAsk item={current.item} />
+            <DueItem key={current.id} item={current.item} />
           )}
+          <Text style={styles.bringHint}>tap for another</Text>
         </EdgeBlock>
       </Card>
     </Pressable>
@@ -413,8 +422,14 @@ const styles = StyleSheet.create({
   empty: { ...typography.body, color: text.secondary },
   bringPressed: { opacity: 0.85 },
   bringText: { ...typography.body, fontSize: 17, lineHeight: 26, color: neutral[900] },
-  bringMeta: { ...typography.small, color: text.secondary },
   bringHint: { ...typography.small, color: text.secondary },
+  bringMeta: { ...typography.small, color: text.secondary },
+  // The answer reads back a step from the question so the pair is scannable.
+  answerText: { ...typography.body, fontSize: 15, lineHeight: 23, color: text.secondary, marginTop: 6 },
+  // Left-aligned, unlike the list folds this component shares — it belongs to the
+  // question above it rather than to a column of rows.
+  answerFold: { justifyContent: 'flex-start', minHeight: 34 },
+
   recallHook: { ...typography.small, color: text.secondary, fontStyle: 'italic' },
   gradeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
   gradeDone: { ...typography.small, color: text.faint, marginTop: 10 },

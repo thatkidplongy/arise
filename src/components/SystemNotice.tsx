@@ -4,7 +4,7 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { clay, neutral, radius, sage, shadow, surface, text, typography } from '@/theme';
+import { clay, neutral, shadow, surface, text, typography } from '@/theme';
 import type { Notice } from '@/types';
 
 /**
@@ -49,7 +49,6 @@ function NoticeCard({ notice }: { notice: Notice }) {
   return (
     <View style={styles.overlay}>
       <Animated.View style={[styles.box, { transform: [{ scale }] }]}>
-        <View pointerEvents="none" style={styles.blob} />
         <Text style={styles.kicker}>The System</Text>
         <Text style={[styles.title, { fontSize: sizeFor(notice.title) }]}>{notice.title}</Text>
         {notice.lines.map((line, i) => (
@@ -86,18 +85,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
     gap: 14,
-    overflow: 'hidden',
     ...shadow.lg,
-  },
-  // A soft sage shape behind the type — the one decorative mark in the app.
-  blob: {
-    position: 'absolute',
-    left: -50,
-    top: -60,
-    width: 180,
-    height: 180,
-    borderRadius: radius.pill,
-    backgroundColor: sage[200],
   },
   kicker: {
     ...typography.kicker,
