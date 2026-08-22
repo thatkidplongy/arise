@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CONTENT_MAX_WIDTH } from "@/components/Screen";
 import { Text } from "@/components/ui/Text";
-import { clay, neutral, radius, surface, typography } from "@/theme";
+import { RAIL_WIDTH, useWide } from "@/hooks/useWide";
+import { useSystem } from "@/store/useSystem";
+import { clay, neutral, radius, sage, surface, text, typography } from "@/theme";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -74,6 +76,7 @@ type TabBarProps = {
  */
 export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const wide = useWide();
   const [rowW, setRowW] = useState(0);
 
   // Expo Router hides `href: null` routes with a null tabBarButton + display:none;
@@ -159,6 +162,17 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
     if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
   };
 
+  if (wide) {
+    return (
+      <Rail
+        visible={visible}
+        activeIndex={activeIndex}
+        descriptors={descriptors}
+        onPress={onPress}
+      />
+    );
+  }
+
   return (
     <View style={styles.strip}>
       <View
@@ -221,7 +235,132 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
   );
 }
 
+/**
+ * The desktop shape of the bar. Nothing new is added — the same five destinations,
+ * unstacked into a column that never scrolls away, with the wordmark above them and
+ * who you are at the foot.
+ */
+function Rail({
+  visible,
+  activeIndex,
+  descriptors,
+  onPress,
+}: {
+  visible: Route[];
+  activeIndex: number;
+  descriptors: TabBarProps["descriptors"];
+  onPress: (route: Route, focused: boolean) => void;
+}) {
+  const player = useSystem((s) => s.state?.player);
+  return (
+    <View style={styles.rail}>
+      <View style={styles.railHead}>
+        <Text style={styles.railMark}>Arise</Text>
+        <Text style={styles.railTag}>rise beyond your limits</Text>
+      </View>
+
+      <View style={styles.railNav}>
+        {visible.map((route, i) => {
+          const focused = i === activeIndex;
+          const glyph = ICONS[route.name] ?? FALLBACK_GLYPH;
+          const title = descriptors[route.key]?.options.title ?? route.name;
+          return (
+            <Pressable
+              key={route.key}
+              onPress={() => onPress(route, focused)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: focused }}
+              style={({ pressed }) => [
+                styles.railItem,
+                focused ? styles.railItemOn : null,
+                pressed && !focused ? styles.railItemPressed : null,
+              ]}
+            >
+              <Ionicons
+                name={focused ? glyph.on : glyph.off}
+                size={20}
+                color={focused ? clay[700] : neutral[600]}
+              />
+              <Text style={[styles.railLabel, { color: focused ? clay[700] : neutral[700] }]}>
+                {title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {player ? (
+        <View style={styles.railFoot}>
+          <View style={styles.railWho}>
+            <View style={styles.railAvatar}>
+              <Text style={styles.railInitial}>{player.name.slice(0, 1).toUpperCase()}</Text>
+            </View>
+            <View style={styles.railWhoCopy}>
+              <Text style={styles.railName} numberOfLines={1}>
+                {player.name}
+              </Text>
+              <Text style={styles.railMeta}>
+                Lv {player.level} · {player.rank}-Rank
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  rail: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: RAIL_WIDTH,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    gap: 22,
+    borderRightWidth: 1,
+    borderRightColor: surface.hairline,
+    backgroundColor: surface.base,
+    zIndex: 5,
+  },
+  railHead: { paddingLeft: 8, gap: 3 },
+  railMark: { ...typography.numeral, fontSize: 26, color: clay[700], includeFontPadding: false },
+  railTag: { ...typography.small, fontSize: 11, color: text.secondary },
+  railNav: { gap: 4 },
+  railItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+  },
+  railItemOn: { backgroundColor: clay[200] },
+  railItemPressed: { backgroundColor: neutral[200] },
+  railLabel: { ...typography.label, fontSize: 13.5 },
+  railFoot: { marginTop: "auto", gap: 12 },
+  railWho: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 14,
+    borderRadius: radius.md,
+    backgroundColor: surface.card,
+  },
+  railAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    backgroundColor: sage[300],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  railInitial: { ...typography.numeral, fontSize: 15, color: sage[800], includeFontPadding: false },
+  railWhoCopy: { flex: 1, minWidth: 0, gap: 1 },
+  railName: { ...typography.cardTitle, fontSize: 12.5, color: neutral[900] },
+  railMeta: { ...typography.tiny, color: text.secondary },
   strip: {
     backgroundColor: surface.card,
     borderTopWidth: 1,

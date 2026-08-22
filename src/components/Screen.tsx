@@ -3,13 +3,17 @@ import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Vi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
+import { RAIL_WIDTH, useWide } from '@/hooks/useWide';
 import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
 import { accent, surface, text, typography } from '@/theme';
 
-/** The app is phone-shaped, so on a wide browser we cap the content to a single
+/** The app is phone-shaped, so on a narrow window we cap the content to a single
  * readable column and centre it — no edge-to-edge sprawl. */
 export const CONTENT_MAX_WIDTH = 620;
+
+/** Past the rail breakpoint there's room for the column to unstack. */
+export const WIDE_CONTENT_MAX_WIDTH = 900;
 
 const PULL_THRESHOLD = 72; // px of drag before releasing triggers a refresh
 
@@ -101,6 +105,7 @@ function useWebPullToRefresh(scrollRef: React.RefObject<ScrollView | null>, onRe
  * pull-to-refresh that re-fetches data in place (no page reload). */
 export function Screen({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
+  const wide = useWide();
   const [nativeRefreshing, setNativeRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { pull, refreshing } = useWebPullToRefresh(scrollRef, softRefresh);
@@ -115,7 +120,8 @@ export function Screen({ children }: PropsWithChildren) {
   return (
     <ScrollView
       ref={scrollRef}
-      style={styles.root}
+      // The rail is positioned over the navigator, so the page makes room for it.
+      style={[styles.root, wide ? { paddingLeft: RAIL_WIDTH } : null]}
       contentContainerStyle={styles.outer}
       refreshControl={
         isWeb ? undefined : <RefreshControl refreshing={nativeRefreshing} onRefresh={onNativeRefresh} tintColor={accent} />
@@ -133,7 +139,15 @@ export function Screen({ children }: PropsWithChildren) {
           )}
         </View>
       ) : null}
-      <View style={[styles.column, { paddingTop: insets.top + 20 }]}>{children}</View>
+      <View
+        style={[
+          styles.column,
+          wide ? { maxWidth: WIDE_CONTENT_MAX_WIDTH, paddingBottom: 40 } : null,
+          { paddingTop: insets.top + 20 },
+        ]}
+      >
+        {children}
+      </View>
     </ScrollView>
   );
 }

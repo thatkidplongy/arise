@@ -168,6 +168,9 @@ export interface SystemStore {
   setServerUrl: (url: string) => void;
   setApiToken: (token: string) => void;
   dismissNotice: () => void;
+  /** False until the first run has been walked (or skipped) once. */
+  onboarded: boolean;
+  setOnboarded: (done: boolean) => void;
 }
 
 export const useSystemStore = create<SystemStore>()(
@@ -383,6 +386,9 @@ export const useSystemStore = create<SystemStore>()(
       setServerUrl: (url) => set({ serverUrl: url.trim().replace(/\/+$/, '') }),
       setApiToken: (token) => set({ apiToken: token.trim() }),
 
+      onboarded: false,
+      setOnboarded: (done) => set({ onboarded: done }),
+
       dismissNotice: () => set({ notices: get().notices.slice(1) }),
       };
     },
@@ -394,6 +400,7 @@ export const useSystemStore = create<SystemStore>()(
       partialize: (s) => ({
         serverUrl: s.serverUrl,
         apiToken: s.apiToken,
+        onboarded: s.onboarded,
       }),
     },
   ),

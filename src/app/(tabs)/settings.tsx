@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -22,6 +23,7 @@ export default function SettingsScreen() {
   const saveName = useSystem((s) => s.saveName);
   const saveNorthStar = useSystem((s) => s.saveNorthStar);
   const resetAll = useSystem((s) => s.resetAll);
+  const setOnboarded = useSystem((s) => s.setOnboarded);
   const refresh = useSystem((s) => s.refresh);
 
   const [nameDraft, setNameDraft] = useState(state?.player.name ?? '');
@@ -163,6 +165,22 @@ export default function SettingsScreen() {
           <Text style={styles.recordLine}>Quests completed: {state.record.total_completions}</Text>
         </SystemPanel>
       ) : null}
+
+      <SystemPanel title="First run">
+        <Text style={styles.help}>
+          The five-step introduction, with everything it asks already filled in. Nothing is erased
+          by running it again.
+        </Text>
+        <Button
+          label="Walk through it again"
+          tone="quiet"
+          block
+          onPress={() => {
+            setOnboarded(false);
+            router.replace('/onboarding');
+          }}
+        />
+      </SystemPanel>
 
       <Card tone="dashed" style={styles.danger}>
         <Text style={styles.dangerTitle}>Starting over</Text>

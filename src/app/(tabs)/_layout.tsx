@@ -1,9 +1,16 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 
 import { AriseTabBar } from '@/components/AriseTabBar';
+import { useSystem } from '@/store/useSystem';
 import { surface } from '@/theme';
 
 export default function TabsLayout() {
+  const onboarded = useSystem((s) => s.onboarded);
+
+  // The first run happens once, before the board is ever shown. It writes the flag
+  // itself, so skipping it counts as having done it.
+  if (!onboarded) return <Redirect href="/onboarding" />;
+
   return (
     <Tabs
       tabBar={(props) => <AriseTabBar {...props} />}
