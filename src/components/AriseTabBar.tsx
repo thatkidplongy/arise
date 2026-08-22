@@ -8,7 +8,7 @@ import { CONTENT_MAX_WIDTH } from "@/components/Screen";
 import { Text } from "@/components/ui/Text";
 import { RAIL_WIDTH, useWide } from "@/hooks/useWide";
 import { useSystem } from "@/store/useSystem";
-import { clay, neutral, radius, sage, surface, text, typography } from "@/theme";
+import { clay, neutral, radius, sage, shadow, surface, text, typography } from "@/theme";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -25,11 +25,29 @@ const ICONS: Record<string, { on: IconName; off: IconName }> = {
 };
 const FALLBACK_GLYPH = { on: "ellipse", off: "ellipse-outline" } as const;
 
-const PILL_W = 56;
-const PILL_H = 36;
-const PILL_TOP = 2;
-const BAR_CONTENT_H = 74; // bar height above the safe-area inset
-const EDGE_PAD = 8;
+const PILL_W = 54;
+const PILL_H = 42;
+const BAR_H = 62; // the floating bar itself; the safe-area inset sits under it
+const SIDE_PAD = 16; // gap between the bar and the screen edges
+const LIFT = 10; // gap between the bar and the safe-area inset below it
+
+/**
+ * The glass, in two parts.
+ *
+ * `GLASS_SOLID` is what the bar is without a blur behind it — opaque enough to read
+ * icons against whatever scrolls under it. The injected stylesheet in
+ * scripts/build-web.sh drops it to `.62` and adds the blur, but only inside an
+ * `@supports` check, so a browser that can't blur keeps the readable version rather
+ * than a muddy translucent one.
+ *
+ * expo-glass-effect is in package.json and would be the native answer, but its
+ * non-iOS GlassView is `<View {...props} />` and isLiquidGlassAvailable() returns
+ * false — on the web build this ships as, it draws nothing at all.
+ */
+const GLASS_SOLID = 'rgba(249, 244, 237, 0.86)';
+const GLASS_RIM = 'rgba(46, 43, 37, 0.08)';
+/** Shared with the backdrop-filter rule in scripts/build-web.sh. */
+const GLASS_ID = 'arise-glass-bar';
 
 // A snappy spring carries the pill; a looser, slower one carries the shadow, so it
 // lags behind mid-slide. The shadow then fades out over SHADOW_FADE_MS.
@@ -174,15 +192,14 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
   }
 
   return (
-    <View style={styles.strip}>
+    // box-none: the dock spans the screen so the bar can be centred in it, but only
+    // the bar itself may take a touch — otherwise it would swallow taps on the page.
+    <View style={[styles.dock, { paddingBottom: insets.bottom + LIFT }]} pointerEvents="box-none">
       <View
-        style={[
-          styles.row,
-          {
-            paddingBottom: insets.bottom + EDGE_PAD,
-            height: BAR_CONTENT_H + insets.bottom,
-          },
-        ]}
+        style={styles.bar}
+        // react-native-web renders nativeID as the DOM id, which is how the injected
+        // stylesheet finds this one view to blur. Ignored on native.
+        nativeID={GLASS_ID}
         onLayout={(e) => setRowW(e.nativeEvent.layout.width)}
       >
         <Animated.View
@@ -221,12 +238,9 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
             >
               <Ionicons
                 name={focused ? glyph.on : glyph.off}
-                size={24}
+                size={25}
                 color={color}
               />
-              <Text style={[styles.label, { color }]} numberOfLines={1}>
-                {title}
-              </Text>
             </Pressable>
           );
         })}
@@ -361,35 +375,44 @@ const styles = StyleSheet.create({
   railWhoCopy: { flex: 1, minWidth: 0, gap: 1 },
   railName: { ...typography.cardTitle, fontSize: 12.5, color: neutral[900] },
   railMeta: { ...typography.tiny, color: text.secondary },
-  strip: {
-    backgroundColor: surface.card,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
+  // Floats over the page rather than sitting under it, so the blur has something to
+  // blur. Absolute, so it contributes no layout height — Screen's own paddingBottom
+  // is what keeps the last row of content clear of it.
+  dock: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: SIDE_PAD,
+    alignItems: "center",
   },
-  row: {
+  bar: {
     flexDirection: "row",
+    alignItems: "center",
     position: "relative",
     width: "100%",
     maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: "center",
-    paddingTop: EDGE_PAD,
+    height: BAR_H,
+    borderRadius: radius.pill,
+    backgroundColor: GLASS_SOLID,
+    borderWidth: 1,
+    borderColor: GLASS_RIM,
+    // Clips the sliding pill to the rounded ends at the extremes of its travel.
+    overflow: "hidden",
+    ...shadow.lg,
   },
   tab: {
     flex: 1,
     zIndex: 1,
+    alignSelf: "stretch",
     alignItems: "center",
-    gap: 5,
-  },
-  label: {
-    ...typography.button,
-    fontSize: 10.5,
-    lineHeight: 14,
+    justifyContent: "center",
   },
   pill: {
     position: "absolute",
     zIndex: 0,
     left: 0,
-    top: PILL_TOP,
+    top: (BAR_H - PILL_H) / 2,
     width: PILL_W,
     height: PILL_H,
     borderRadius: radius.pill,

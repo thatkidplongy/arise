@@ -33,6 +33,16 @@ import os, pathlib, re
 # ring outside it.
 FOCUS_CSS = """
 <style>
+/* The floating tab bar's glass. Progressive enhancement on purpose: the bar ships
+   opaque enough to read icons against scrolling content, and only becomes properly
+   translucent where the browser can actually blur what is behind it. Without the
+   @supports guard a browser lacking backdrop-filter would show a muddy 62% wash
+   with page content legible straight through it. !important beats the inline class
+   react-native-web generates for the same property. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+#arise-glass-bar{background-color:rgba(249,244,237,.62)!important;
+-webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5)}
+}
 input,textarea,select,[contenteditable]{outline:none}
 input:focus,textarea:focus,select:focus,[contenteditable]:focus,
 input:focus-visible,textarea:focus-visible,select:focus-visible,[contenteditable]:focus-visible{
