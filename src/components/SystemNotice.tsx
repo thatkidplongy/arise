@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
+import { Poppers } from '@/components/Poppers';
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
@@ -49,6 +50,8 @@ function NoticeCard({ notice }: { notice: Notice }) {
   return (
     <View style={styles.overlay}>
       <Animated.View style={[styles.box, { transform: [{ scale }] }]}>
+        {/* Only the wins. A lost connection arrives through this same window. */}
+        {notice.celebrate ? <Poppers /> : null}
         <Text style={styles.kicker}>The System</Text>
         <Text style={[styles.title, { fontSize: sizeFor(notice.title) }]}>{notice.title}</Text>
         {notice.lines.map((line, i) => (

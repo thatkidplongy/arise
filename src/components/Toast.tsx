@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Poppers } from '@/components/Poppers';
 import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
 import { TAP_MIN, accent, clay, motion, neutral, radius, shadow, surface, text, typography } from '@/theme';
@@ -72,6 +73,9 @@ function ToastView({ toast }: { toast: ToastData }) {
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
+      {/* Outside the toast, not in it: the card clips to its rounded corners so the
+          countdown bar stays inside them, and that clip would eat the burst. */}
+      <Poppers />
       <View style={styles.toast}>
         <View style={styles.msg}>
           <Text style={styles.title} numberOfLines={1}>

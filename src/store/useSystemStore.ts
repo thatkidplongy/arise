@@ -38,8 +38,8 @@ export const DEFAULT_SERVER_URL = computeDefaultServerUrl();
 export type LinkStatus = 'connecting' | 'online' | 'offline' | 'unauthorized';
 
 let noticeSeq = 0;
-function makeNotice(title: string, lines: string[]): Notice {
-  return { id: `n-${Date.now()}-${noticeSeq++}`, title, lines };
+function makeNotice(title: string, lines: string[], celebrate = false): Notice {
+  return { id: `n-${Date.now()}-${noticeSeq++}`, title, lines, celebrate };
 }
 
 /** Translate server events into System pop-ups. */
@@ -47,18 +47,19 @@ export function noticesFrom(events: ApiEvent[]): Notice[] {
   return events.map((e) => {
     switch (e.type) {
       case 'daily_clear':
-        return makeNotice('You showed up across the board today', [
-          'That’s a full day of showing up — no small thing.',
-          `A little bonus for it: +${e.data.bonus_xp} XP`,
-        ]);
+        return makeNotice(
+          'You showed up across the board today',
+          ['That’s a full day of showing up — no small thing.', `A little bonus for it: +${e.data.bonus_xp} XP`],
+          true,
+        );
       case 'level_up':
-        return makeNotice('Level up', [`You have reached Level ${e.data.level}.`]);
+        return makeNotice('Level up', [`You have reached Level ${e.data.level}.`], true);
       case 'rank_up':
-        return makeNotice('Rank up', [`Hunter rank increased: ${e.data.from} → ${e.data.to}.`]);
+        return makeNotice('Rank up', [`Hunter rank increased: ${e.data.from} → ${e.data.to}.`], true);
       case 'achievement': {
         const lines = [e.data.desc as string];
         if (e.data.title_reward) lines.push(`Title acquired: “${e.data.title_reward}”`);
-        return makeNotice(`Achievement · ${e.data.name}`, lines);
+        return makeNotice(`Achievement · ${e.data.name}`, lines, true);
       }
       default:
         return makeNotice('SYSTEM', [JSON.stringify(e.data)]);

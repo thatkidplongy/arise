@@ -294,6 +294,8 @@ export const motion = {
   toastIn: 280,
   /** How long an undo stays offered. */
   undoWindow: 4500,
+  /** A burst of poppers, start to gone. */
+  poppers: 1300,
   /** Bottom sheets and System notices. */
   sheet: 300,
   notice: 340,

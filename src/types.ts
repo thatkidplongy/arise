@@ -10,6 +10,10 @@ export interface Notice {
   id: string;
   title: string;
   lines: string[];
+  /** Worth a burst of poppers. False for the ones that are only news — a lost
+   * connection arrives through the same window as a rank up, and confetti over
+   * "Access denied" would be the app laughing at you. */
+  celebrate: boolean;
 }
 
 /**
