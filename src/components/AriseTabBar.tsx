@@ -45,7 +45,16 @@ const LIFT = 10; // gap between the bar and the safe-area inset below it
  * false — on the web build this ships as, it draws nothing at all.
  */
 const GLASS_SOLID = 'rgba(249, 244, 237, 0.86)';
-const GLASS_RIM = 'rgba(46, 43, 37, 0.08)';
+const GLASS_RIM = 'rgba(46, 43, 37, 0.12)';
+/**
+ * The specular edge — a bright hairline along the top inside lip.
+ *
+ * This, not the blur, is what makes a surface read as glass. A blur only shows where
+ * there's detail behind it to smear, and most of this app is flat sand: the bar was
+ * genuinely blurring and still looked like plain translucent plastic. A lit top edge
+ * reads as thickness and catches the eye even over an empty background.
+ */
+const GLASS_SHEEN = 'rgba(255, 255, 255, 0.65)';
 /** Shared with the backdrop-filter rule in scripts/build-web.sh. */
 const GLASS_ID = 'arise-glass-bar';
 
@@ -202,6 +211,8 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
         nativeID={GLASS_ID}
         onLayout={(e) => setRowW(e.nativeEvent.layout.width)}
       >
+        {/* Above the sliding pill so the lip stays lit as the pill passes under it. */}
+        <View pointerEvents="none" style={styles.sheen} />
         <Animated.View
           style={[
             styles.pill,
@@ -400,6 +411,15 @@ const styles = StyleSheet.create({
     // Clips the sliding pill to the rounded ends at the extremes of its travel.
     overflow: "hidden",
     ...shadow.lg,
+  },
+  sheen: {
+    position: "absolute",
+    zIndex: 2,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: GLASS_SHEEN,
   },
   tab: {
     flex: 1,
