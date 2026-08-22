@@ -4,7 +4,8 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
-import { DailyQuote, Reminders } from '@/components/StatusCards';
+import { NorthStarCard } from '@/components/NorthStarCard';
+import { Reminders } from '@/components/StatusCards';
 import { StatusWindow } from '@/components/StatusWindow';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
@@ -50,26 +51,6 @@ function Masthead() {
   );
 }
 
-/** The reason behind all of this, on the one clay patch that opens the screen. */
-function NorthStar({ value }: { value: string }) {
-  const has = value.trim().length > 0;
-  return (
-    <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => (pressed ? styles.pressed : null)}>
-      <Card tone="clay" style={styles.northStar}>
-        <View pointerEvents="none" style={styles.northStarBlob} />
-        <Kicker color={clay[700]}>Your north star</Kicker>
-        {has ? (
-          <Text style={styles.northStarText}>{value.trim()}</Text>
-        ) : (
-          <Text style={styles.northStarEmpty}>
-            Write the life you’re reaching for — the reason behind all of this. Tap to set it.
-          </Text>
-        )}
-      </Card>
-    </Pressable>
-  );
-}
-
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
   const toggleRest = useSystem((s) => s.toggleRest);
@@ -99,9 +80,7 @@ export default function StatusScreen() {
     <Screen>
       <Masthead />
 
-      <NorthStar value={player.north_star} />
-
-      {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
+      <NorthStarCard northStar={player.north_star} quote={state.daily_quote} />
 
       <StatusWindow state={state} avatarUri={avatarUri} />
 
@@ -196,26 +175,6 @@ const styles = StyleSheet.create({
   },
   mastheadRule: { flex: 1, height: 1, backgroundColor: surface.hairline },
   weekday: { ...typography.kicker, fontSize: 9.5, letterSpacing: 2.1, color: text.secondary },
-  northStar: { overflow: 'hidden', gap: 9 },
-  northStarBlob: {
-    position: 'absolute',
-    right: -38,
-    top: -38,
-    width: 120,
-    height: 120,
-    borderRadius: radius.pill,
-    backgroundColor: clay[200],
-  },
-  northStarText: {
-    ...typography.numeral,
-    fontSize: 20,
-    lineHeight: 27,
-    color: neutral[900],
-  },
-  northStarEmpty: {
-    ...typography.body,
-    color: text.onClay,
-  },
   identityCard: { gap: 18 },
   identityRow: {
     flexDirection: 'row',

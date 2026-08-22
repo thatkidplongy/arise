@@ -18,6 +18,8 @@ const ITEMS = [
   { icon: 'book-outline', label: 'Journal', sub: 'Write freely · quest reflections', route: '/journal' },
   { icon: 'wallet-outline', label: 'Money', sub: 'Spending & income · weekly totals', route: '/money' },
   { icon: 'trophy-outline', label: 'Achievements', sub: 'Titles & milestones', route: '/achievements' },
+  { icon: 'flame-outline', label: 'Boss fights', sub: 'Long milestones · never a penalty', route: '/bosses' },
+  { icon: 'calendar-outline', label: 'Weekly recap', sub: 'How the week actually went', route: '/recap' },
   { icon: 'time-outline', label: 'Quest history', sub: 'Every quest you’ve finished', route: '/history' },
   { icon: 'compass-outline', label: 'Focus areas', sub: 'Tailor your quests · interview mode', route: '/focus' },
   { icon: 'sparkles-outline', label: 'Skincare', sub: 'Your AM / PM routine', route: '/skincare' },

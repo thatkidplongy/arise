@@ -25,6 +25,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="body" options={{ href: null, title: 'Food' }} />
       <Tabs.Screen name="focus" options={{ href: null, title: 'Focus' }} />
       <Tabs.Screen name="achievements" options={{ href: null, title: 'Achievements' }} />
+      <Tabs.Screen name="bosses" options={{ href: null, title: 'Boss fights' }} />
+      <Tabs.Screen name="recap" options={{ href: null, title: 'Recap' }} />
       <Tabs.Screen name="history" options={{ href: null, title: 'History' }} />
       <Tabs.Screen name="journal" options={{ href: null, title: 'Journal' }} />
       <Tabs.Screen name="entry" options={{ href: null, title: 'Entry' }} />

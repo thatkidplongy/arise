@@ -172,16 +172,17 @@ export const shadow: Record<'sm' | 'md' | 'lg', ViewStyle> = {
 };
 
 /**
- * Font families. Caprasimo is the only display voice — headings and every number
- * that matters. Figtree carries everything else. Monospace is reserved for
- * counters, ranks and totals.
+ * Font families. Bricolage Grotesque is the only display voice — headings and every
+ * number that matters. It's a contemporary app voice that keeps some character in
+ * the letterforms without the slab weight. Figtree carries everything else, and
+ * monospace is reserved for counters, ranks and totals.
  *
  * These are the family names the loader in `_layout.tsx` registers; on native a
  * custom family and a `fontWeight` must not be combined (Android synthesises a
  * fake bold), so pick the family that already carries the weight.
  */
 export const font = {
-  display: 'Caprasimo_400Regular',
+  display: 'BricolageGrotesque_700Bold',
   regular: 'Figtree_400Regular',
   semibold: 'Figtree_600SemiBold',
   bold: 'Figtree_700Bold',
@@ -207,15 +208,15 @@ export const FIGTREE_BY_WEIGHT: Record<string, string> = {
 /** The type scale. Presets, so no screen invents its own size/weight pairing. */
 export const typography = {
   /** The wordmark on Status. */
-  wordmark: { fontFamily: font.display, fontSize: 34, lineHeight: 36 } as TextStyle,
+  wordmark: { fontFamily: font.display, fontSize: 34, lineHeight: 36, letterSpacing: -0.6 } as TextStyle,
   /** A screen's own name. */
-  screenTitle: { fontFamily: font.display, fontSize: 32, lineHeight: 33 } as TextStyle,
+  screenTitle: { fontFamily: font.display, fontSize: 32, lineHeight: 35, letterSpacing: -0.7 } as TextStyle,
   /** A heading inside a card. */
-  section: { fontFamily: font.display, fontSize: 21, lineHeight: 23 } as TextStyle,
+  section: { fontFamily: font.display, fontSize: 21, lineHeight: 25, letterSpacing: -0.35 } as TextStyle,
   /** A smaller heading, or a card that is itself the heading. */
-  heading: { fontFamily: font.display, fontSize: 18, lineHeight: 22 } as TextStyle,
+  heading: { fontFamily: font.display, fontSize: 18, lineHeight: 23, letterSpacing: -0.25 } as TextStyle,
   /** A number that matters — size it at the call site. */
-  numeral: { fontFamily: font.display } as TextStyle,
+  numeral: { fontFamily: font.display, letterSpacing: -0.4 } as TextStyle,
   /** Card titles and controls. */
   cardTitle: { fontFamily: font.semibold, fontSize: 14, lineHeight: 19 } as TextStyle,
   label: { fontFamily: font.semibold, fontSize: 12.5, lineHeight: 17 } as TextStyle,
@@ -254,8 +255,6 @@ export const RANK_FILL: Record<Rank, { bg: string; fg: string }> = {
   A: { bg: clay[200], fg: clay[800] },
   S: { bg: neutral[900], fg: clay[300] },
 };
-
-export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT', 'CFT'];
 
 export const STAT_META: Record<
   StatKey,

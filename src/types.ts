@@ -1,5 +1,8 @@
 export type StatKey = 'STR' | 'CRE' | 'SPI' | 'CHA' | 'INT' | 'WLT' | 'CFT';
 
+/** The seven, in the order they're always shown. */
+export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT', 'CFT'];
+
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 
 /** A queued System pop-up (level up, rank up, achievement...). */

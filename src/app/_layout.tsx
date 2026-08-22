@@ -1,7 +1,7 @@
 // Imported per cut, not from the package root: the root index requires every weight
-// and italic, and a static web export then ships all fourteen files for the three
-// the app actually loads.
-import { Caprasimo_400Regular } from '@expo-google-fonts/caprasimo/400Regular';
+// and italic, and a static web export then ships all of them for the four the app
+// actually loads.
+import { BricolageGrotesque_700Bold } from '@expo-google-fonts/bricolage-grotesque/700Bold';
 import { Figtree_400Regular } from '@expo-google-fonts/figtree/400Regular';
 import { Figtree_600SemiBold } from '@expo-google-fonts/figtree/600SemiBold';
 import { Figtree_700Bold } from '@expo-google-fonts/figtree/700Bold';
@@ -20,13 +20,13 @@ import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
 import { surface, text } from '@/theme';
 
-// Hold the splash until Caprasimo and Figtree are in memory — the whole type
-// system is those two faces, so a frame drawn without them is the wrong app.
+// Hold the splash until Bricolage Grotesque and Figtree are in memory — the whole
+// type system is those two faces, so a frame drawn without them is the wrong app.
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Caprasimo_400Regular,
+    BricolageGrotesque_700Bold,
     Figtree_400Regular,
     Figtree_600SemiBold,
     Figtree_700Bold,

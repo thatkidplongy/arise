@@ -5,8 +5,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiPriority } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import type { StatKey } from '@/types';
-import { STAT_KEYS, STAT_META, TAP_MIN, accent, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_KEYS, type StatKey } from '@/types';
+import { STAT_META, TAP_MIN, accent, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Scope = 'day' | 'week' | 'open';
 const SCOPES: { key: Scope; label: string }[] = [
