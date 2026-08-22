@@ -10,7 +10,7 @@ import { ReadingCard } from '@/components/ReadingCard';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
-import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { Card, ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
 import { EdgeBlock } from '@/components/ui/EdgeBlock';
@@ -290,15 +290,20 @@ function BringBackBlock() {
       accessibilityLabel={shown ? 'Next' : 'Reveal'}
       style={({ pressed }) => (pressed ? styles.bringPressed : null)}
     >
-      <EdgeBlock edge={HUE} kicker={current.kind === 'tip' ? 'From your tips' : 'Try to recall'}>
-        {current.kind === 'tip' ? (
-          <TipLine tip={current} />
-        ) : shown || !current.item.cue ? (
-          <RecallAnswer item={current.item} />
-        ) : (
-          <RecallAsk item={current.item} />
-        )}
-      </EdgeBlock>
+      {/* On a card rather than bare on the page, unlike the daily line: this one opens
+          the screen, and the ivory is what makes it read as the thing to do first
+          rather than a caption above the reading card. */}
+      <Card>
+        <EdgeBlock edge={HUE} kicker={current.kind === 'tip' ? 'From your tips' : 'Try to recall'}>
+          {current.kind === 'tip' ? (
+            <TipLine tip={current} />
+          ) : shown || !current.item.cue ? (
+            <RecallAnswer item={current.item} />
+          ) : (
+            <RecallAsk item={current.item} />
+          )}
+        </EdgeBlock>
+      </Card>
     </Pressable>
   );
 }
@@ -336,6 +341,10 @@ export default function LearnScreen() {
         <ConnectionPanel />
       ) : (
         <>
+          {/* First on the screen: what's due to come back beats what's new to read,
+              and it's gone once the last item is graded off. */}
+          <BringBackBlock />
+
           {/* The two things being worked through, then everything else you read.
               Both are paced by what you log, never by a schedule. */}
           <ReadingCard />
@@ -358,8 +367,6 @@ export default function LearnScreen() {
           </SystemPanel>
 
           <ThreadPanel />
-
-          <BringBackBlock />
 
           {!state.digest_enabled ? (
             <Text style={styles.footer}>
