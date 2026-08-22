@@ -113,7 +113,8 @@ export function daysInMonth(month: string): number {
  */
 export function readDailyLine(reading: BucketReading, spentToday: number, month: string): DailyLine {
   const loose = Math.max(0, reading.target - reading.planned);
-  const allowance = round2(loose / daysInMonth(month));
+  // Whole pesos: centavos-per-day is arithmetic nobody spends against.
+  const allowance = Math.round(loose / daysInMonth(month));
   const spent = round2(Math.max(0, spentToday));
   return {
     bucket: reading.bucket,

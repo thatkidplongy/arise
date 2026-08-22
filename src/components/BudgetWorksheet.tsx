@@ -57,6 +57,18 @@ function colorFor(reading: BucketReading): string {
  */
 function DailyRow({ line }: { line: DailyLine }) {
   const color = line.left < 0 ? feedback.danger : TONE;
+
+  // Nothing to spend means nothing to draw: a ₱0 of ₱0 row and an empty bar say
+  // less than the sentence does, and read as a bug rather than a fact.
+  if (line.committed) {
+    return (
+      <View style={styles.daily}>
+        <Text style={styles.dailyLabel}>Today</Text>
+        <Text style={styles.bucketActual}>{describeDaily(line, peso)}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.daily}>
       <View style={styles.bucketHead}>
