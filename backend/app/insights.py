@@ -112,9 +112,19 @@ def remove_insight(db: Session, player_id: str, insight_id: str) -> None:
         db.commit()
 
 
-def _all_quotes(db: Session, player_id: str) -> list[dict]:
-    """Every quote across motivational captures, tagged with where it came from.
-    Tips captures carry no quotes and never feed the Status nudge."""
+def _all_lines(db: Session, player_id: str) -> list[dict]:
+    """Every line worth carrying from the motivational captures, tagged with where it
+    came from. Tips captures feed nothing here — they distil to a playbook of steps,
+    which is a thing to work through rather than a thing to hold onto for a day.
+
+    Both halves of a distillation qualify. A quote is what the video actually said; a
+    takeaway is what it was telling you to do, which is just as carryable and there
+    are more of them. `verbatim` keeps them distinguishable downstream, because only
+    one of the two can honestly be shown inside quotation marks.
+
+    Quotes lead per capture, so the ordering stays stable as before: the same day
+    keeps picking the same line rather than shifting when this grew.
+    """
     out: list[dict] = []
     rows = (
         db.query(Insight)
@@ -123,15 +133,17 @@ def _all_quotes(db: Session, player_id: str) -> list[dict]:
     )
     for r in rows:
         for q in _loads(r.quotes):
-            out.append({"text": q, "source_title": r.title, "insight_id": r.id})
+            out.append({"text": q, "source_title": r.title, "insight_id": r.id, "verbatim": True})
+        for t in _loads(r.takeaways):
+            out.append({"text": t, "source_title": r.title, "insight_id": r.id, "verbatim": False})
     return out
 
 
 def daily_quote(db: Session, player_id: str, day: str) -> dict | None:
-    """One quote to surface on Status, chosen deterministically by the date — stable
+    """One line to surface on Status, chosen deterministically by the date — stable
     across a day, rotating as days pass. None when nothing's been captured yet."""
-    quotes = _all_quotes(db, player_id)
-    if not quotes:
+    lines = _all_lines(db, player_id)
+    if not lines:
         return None
     h = int(hashlib.md5(f"quote:{day}".encode()).hexdigest(), 16)
-    return quotes[h % len(quotes)]
+    return lines[h % len(lines)]

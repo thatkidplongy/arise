@@ -97,24 +97,51 @@ def test_add_insight_rejects_empty_transcript(db, monkeypatch):
         insights.add_insight(db, player.id, "https://www.tiktok.com/@x/video/1")
 
 
-def test_daily_quote_is_deterministic_and_rotates(db, monkeypatch):
+def _two_motivation_captures(db, monkeypatch):
+    """Two captures, each with one quote and one takeaway, all four texts distinct."""
     monkeypatch.setattr(transcript, "fetch",
                         lambda url, **kw: {"lang": "en", "text": "x" * 40, "source": "tiktok"})
     player = state.get_or_create_player(db)
     monkeypatch.setattr(llm, "distill_motivation",
-                        lambda t, **kw: {"summary": "s", "takeaways": ["t"], "quotes": ["Q-A"]})
+                        lambda t, **kw: {"summary": "s", "takeaways": ["T-A"], "quotes": ["Q-A"]})
     insights.add_insight(db, player.id, "https://www.tiktok.com/@a/video/1")
     monkeypatch.setattr(llm, "distill_motivation",
-                        lambda t, **kw: {"summary": "s", "takeaways": ["t"], "quotes": ["Q-B"]})
+                        lambda t, **kw: {"summary": "s", "takeaways": ["T-B"], "quotes": ["Q-B"]})
     insights.add_insight(db, player.id, "https://www.tiktok.com/@b/video/2")
+    return player
 
-    # Same day → same quote (stable across a day).
+
+def test_takeaways_carry_the_same_as_quotes(db, monkeypatch):
+    """A takeaway is what the video was telling you to do, which is as worth carrying
+    as anything it said — and there are more of them. Both feed the daily line.
+
+    Asserted on the pool rather than through daily_quote, so it's exact instead of
+    depending on which line a hash happens to land on."""
+    player = _two_motivation_captures(db, monkeypatch)
+    lines = insights._all_lines(db, player.id)
+    assert [l["text"] for l in lines] == ["Q-A", "T-A", "Q-B", "T-B"]
+    # Only what was actually said may later be shown in quotation marks.
+    assert [l["verbatim"] for l in lines] == [True, False, True, False]
+    # Each line still knows which capture it came from.
+    assert {l["source_title"] for l in lines} == {"@a", "@b"}
+
+
+def test_daily_quote_is_deterministic_and_rotates(db, monkeypatch):
+    player = _two_motivation_captures(db, monkeypatch)
+    pool = {l["text"] for l in insights._all_lines(db, player.id)}
+
+    # Same day → same line (stable across a day).
     q1 = insights.daily_quote(db, player.id, DAY)
     assert insights.daily_quote(db, player.id, DAY) == q1
-    assert q1["text"] in {"Q-A", "Q-B"}
-    # Across a month both quotes surface — the rotation covers the whole set.
-    seen = {insights.daily_quote(db, player.id, f"2026-07-{d:02d}")["text"] for d in range(1, 29)}
-    assert seen == {"Q-A", "Q-B"}
+    assert q1["text"] in pool
+
+    # Every pick comes from the pool, and across two months the rotation reaches all
+    # of it — quotes and takeaways alike, so a takeaway really does get its turn.
+    seen = {
+        insights.daily_quote(db, player.id, f"2026-{m:02d}-{d:02d}")["text"]
+        for m in (7, 8) for d in range(1, 29)
+    }
+    assert seen == pool
 
 
 def test_daily_quote_none_when_empty(db):
@@ -199,11 +226,15 @@ def test_tips_quotes_never_feed_the_daily_nudge(db, monkeypatch):
     insights.add_insight(db, player.id, "https://youtu.be/tips1", kind="tips")
     assert insights.daily_quote(db, player.id, DAY) is None
 
-    # A motivation capture's quote does surface.
+    # A motivation capture does surface — and the tips capture's lines never do, on
+    # any day. Checking the whole pool rather than one day's pick: with takeaways in
+    # there too, asserting a single date passed only because a hash happened to land.
     monkeypatch.setattr(llm, "distill_motivation",
-                        lambda t, **kw: {"summary": "s", "takeaways": ["t"], "quotes": ["REAL"]})
+                        lambda t, **kw: {"summary": "s", "takeaways": ["REAL-T"], "quotes": ["REAL-Q"]})
     insights.add_insight(db, player.id, "https://youtu.be/mot1", kind="motivation")
-    assert insights.daily_quote(db, player.id, DAY)["text"] == "REAL"
+    assert {l["text"] for l in insights._all_lines(db, player.id)} == {"REAL-Q", "REAL-T"}
+    assert "SNEAKY" not in {l["text"] for l in insights._all_lines(db, player.id)}
+    assert "do this" not in {l["text"] for l in insights._all_lines(db, player.id)}
 
 
 def test_same_url_can_be_both_motivation_and_tips(db, monkeypatch):

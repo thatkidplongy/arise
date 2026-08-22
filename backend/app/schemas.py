@@ -559,10 +559,14 @@ class DigestSendOut(BaseModel):
 
 
 class DailyQuoteOut(BaseModel):
-    """One pull-quote surfaced on Status today, rotating by the date."""
+    """One line surfaced on Status today, rotating by the date — either a pull-quote
+    from a capture or one of its takeaways."""
     text: str
     source_title: str
     insight_id: str
+    # True when the video said this; False when it's a distilled takeaway. Only the
+    # former may be shown in quotation marks — quoting a paraphrase invents a speaker.
+    verbatim: bool = True
 
 
 class AvatarOut(BaseModel):

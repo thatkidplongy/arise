@@ -71,21 +71,34 @@ function NorthStar({ value }: { value: string }) {
   );
 }
 
+/** One carryable line: what a capture said, or what it was telling you to do. */
+interface Line {
+  text: string;
+  verbatim: boolean;
+}
+
 /** Today's line, and a way to pull another from what you've captured. */
 function DailyLine({ quote }: { quote: ApiDailyQuote }) {
   // Reset to the server's daily pick whenever it changes, the "adjust state during
   // render" way (no effect); shuffle can still swap `line` in between.
-  const [line, setLine] = useState(quote.text);
+  const [line, setLine] = useState<Line>({ text: quote.text, verbatim: quote.verbatim });
   const [seed, setSeed] = useState(quote.text);
   if (seed !== quote.text) {
     setSeed(quote.text);
-    setLine(quote.text);
+    setLine({ text: quote.text, verbatim: quote.verbatim });
   }
 
   const shuffle = async () => {
     const insights = await fetchInsights(); // cached, or lazy-loaded on first tap
-    const quotes = insights.flatMap((i) => i.quotes);
-    const others = quotes.filter((q) => q !== line);
+    // The same pool the server draws today's line from (insights._all_lines): a
+    // takeaway is as worth carrying as a quote, and there are more of them. Shuffling
+    // only quotes would mean a takeaway could arrive as the daily pick and then never
+    // be reachable by tapping.
+    const pool: Line[] = insights.flatMap((i) => [
+      ...i.quotes.map((text) => ({ text, verbatim: true })),
+      ...i.takeaways.map((text) => ({ text, verbatim: false })),
+    ]);
+    const others = pool.filter((l) => l.text !== line.text);
     if (others.length === 0) return;
     setLine(others[Math.floor(Math.random() * others.length)]);
   };
@@ -103,7 +116,9 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
     >
       <Block edge={sage[400]}>
         <Text style={[styles.kicker, { color: sage[700] }]}>A line to carry today</Text>
-        <Text style={styles.quote}>“{line}”</Text>
+        {/* Quotation marks only around what was actually said. Wrapping a distilled
+            takeaway in them would invent a speaker for the model's own words. */}
+        <Text style={styles.quote}>{line.verbatim ? `“${line.text}”` : line.text}</Text>
         <Text style={styles.hint}>tap for another</Text>
       </Block>
     </Pressable>

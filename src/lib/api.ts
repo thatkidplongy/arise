@@ -495,6 +495,9 @@ export interface ApiDailyQuote {
   text: string;
   source_title: string;
   insight_id: string;
+  /** True when the capture actually said this; false for a distilled takeaway. Only
+   * the former may be shown in quotation marks. */
+  verbatim: boolean;
 }
 
 export interface ApiEvent {
