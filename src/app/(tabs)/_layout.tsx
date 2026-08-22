@@ -1,15 +1,31 @@
 import { Redirect, Tabs } from 'expo-router';
+import { useEffect, useState } from 'react';
 
 import { AriseTabBar } from '@/components/AriseTabBar';
 import { useSystem } from '@/store/useSystem';
 import { surface } from '@/theme';
 
+/**
+ * Whether the persisted settings have come back from storage yet.
+ *
+ * Everything that reads `onboarded` has to wait for this. Before it's true the
+ * flag is only the store's default — false — and acting on that sends someone
+ * who onboarded months ago back through the first run, or blanks the route
+ * during a static web export, where storage never answers at all.
+ */
+function useHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => useSystem.persist.hasHydrated());
+  useEffect(() => useSystem.persist.onFinishHydration(() => setHydrated(true)), []);
+  return hydrated;
+}
+
 export default function TabsLayout() {
   const onboarded = useSystem((s) => s.onboarded);
+  const hydrated = useHydrated();
 
   // The first run happens once, before the board is ever shown. It writes the flag
   // itself, so skipping it counts as having done it.
-  if (!onboarded) return <Redirect href="/onboarding" />;
+  if (hydrated && !onboarded) return <Redirect href="/onboarding" />;
 
   return (
     <Tabs

@@ -22,6 +22,7 @@ import { surface, text } from '@/theme';
 
 // Hold the splash until Bricolage Grotesque and Figtree are in memory — the whole
 // type system is those two faces, so a frame drawn without them is the wrong app.
+// Native only; the web build accepts a brief fallback face instead of a blank page.
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -53,7 +54,11 @@ export default function RootLayout() {
     if (fontsLoaded || fontError) void SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // Deliberately no `if (!fontsLoaded) return null` here. On native the splash is
+  // already held until the fonts land, so a gate would only duplicate it — and a
+  // static web export renders this tree at build time, where useFonts can never
+  // resolve, so returning null emits one empty shell for every route and a deep
+  // link stops booting on its own screen.
 
   return (
     <QueryClientProvider client={queryClient}>
