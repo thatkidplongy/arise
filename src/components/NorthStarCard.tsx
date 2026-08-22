@@ -15,7 +15,8 @@ import { TAP_MIN, clay, font, neutral, radius, sage, surface, text, typography }
  * Edge-marked: a coloured rule down the side of each block does the sorting that a
  * tinted patch used to, so two very different things — the reason behind all of
  * this, and one line for today — can sit together without the page turning into a
- * stack of coloured boxes.
+ * stack of coloured boxes. There is no card behind them either; the rules are load
+ * bearing, and the sand page shows through.
  */
 export function NorthStarCard({ northStar, quote }: { northStar: string; quote: ApiDailyQuote | null }) {
   return (
@@ -118,12 +119,9 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: surface.card,
-    borderRadius: radius.lg,
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-  },
+  // No fill at all: on the sand page the two coloured rules are the whole structure,
+  // so the block sits in the page gutter rather than on a card floated above it.
+  card: { paddingVertical: 6 },
   pressed: { opacity: 0.85 },
   block: { flexDirection: 'row', gap: 16 },
   // The rule that does the sorting. It runs the height of its block, not the card.
