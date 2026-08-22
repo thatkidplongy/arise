@@ -1,7 +1,9 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
+import { Button } from '@/components/ui/Button';
+import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, text } from '@/theme';
+import { accent, feedback, font, neutral, text, typography } from '@/theme';
 
 import { SystemPanel } from './SystemPanel';
 
@@ -34,12 +36,7 @@ export function ConnectionPanel() {
               </Text>
             </>
           )}
-          <Pressable
-            style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
-            onPress={refresh}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </Pressable>
+          <Button label="Retry" onPress={refresh} block style={styles.retry} />
         </>
       ) : (
         <>
@@ -52,37 +49,9 @@ export function ConnectionPanel() {
 }
 
 const styles = StyleSheet.create({
-  heading: {
-    color: feedback.danger,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  line: {
-    color: text.secondary,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  center: {
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  url: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: text.primary,
-    marginVertical: 4,
-  },
-  retry: {
-    marginTop: 16,
-    backgroundColor: accent,
-    borderRadius: 9,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  retryText: {
-    color: onAccent,
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  heading: { ...typography.heading, color: feedback.danger, marginBottom: 8 },
+  line: { ...typography.body, color: text.secondary },
+  center: { textAlign: 'center', marginTop: 10 },
+  url: { ...typography.mono, color: neutral[900], fontFamily: font.mono, marginVertical: 6 },
+  retry: { marginTop: 18 },
 });

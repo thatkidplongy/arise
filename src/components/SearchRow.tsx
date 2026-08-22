@@ -1,6 +1,7 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { accent, surface, text } from '@/theme';
+import { Text, TextInput } from '@/components/ui/Text';
+import { TAP_MIN, accent, radius, surface, text, typography } from '@/theme';
 
 /** The search input + button shared by the lookup panels. `tone` colours the
  * button/spinner (each panel has its own accent); everything else is standard. */
@@ -47,20 +48,20 @@ export function SearchRow({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: surface.base,
+    ...typography.body,
+    minHeight: 50,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: surface.muted,
   },
   grow: { flex: 1 },
   btn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 14,
     minWidth: 74,

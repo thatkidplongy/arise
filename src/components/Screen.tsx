@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/ui/Text';
 import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text } from '@/theme';
+import { accent, surface, text, typography } from '@/theme';
 
 /** The app is phone-shaped, so on a wide browser we cap the content to a single
  * readable column and centre it — no edge-to-edge sprawl. */
@@ -153,12 +154,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pullRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pullText: { color: text.faint, fontSize: 12, fontWeight: '600' },
+  pullText: { ...typography.label, fontSize: 12, color: text.secondary },
   column: {
     width: '100%',
     maxWidth: CONTENT_MAX_WIDTH,
     padding: 18,
-    paddingBottom: 100,
+    paddingBottom: 112,
     gap: 16,
   },
 });

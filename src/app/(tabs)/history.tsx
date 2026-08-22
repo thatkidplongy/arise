@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { Text } from '@/components/ui/Text';
 import type { ApiHistoryItem } from '@/lib/api';
 import { dateKey, shortDay } from '@/lib/dates';
 import { useHistory } from '@/query/useHistory';
 import type { StatKey } from '@/types';
-import { STAT_META, text, withAlpha } from '@/theme';
+import { STAT_META, STAT_TINT, neutral, radius, text, typography, withAlpha } from '@/theme';
 
 const CADENCE_LABEL: Record<string, string> = { daily: 'Daily', weekly: 'Weekly', side: 'Side' };
 const FALLBACK = { color: text.faint, icon: 'ellipse-outline' as const, label: 'Quest' };
@@ -21,11 +23,11 @@ export default function HistoryScreen() {
   const columns: Column<ApiHistoryItem>[] = [
     {
       key: 'cat',
-      width: 30,
+      width: 32,
       render: (it) => {
         const meta = STAT_META[it.stat as StatKey] ?? FALLBACK;
         return (
-          <View style={[styles.iconBox, { backgroundColor: withAlpha(meta.color, 0.12) }]}>
+          <View style={[styles.iconBox, { backgroundColor: withAlpha(meta.color, STAT_TINT) }]}>
             <Ionicons name={meta.icon} size={14} color={meta.color} />
           </View>
         );
@@ -57,7 +59,7 @@ export default function HistoryScreen() {
     {
       key: 'xp',
       header: 'XP',
-      width: 42,
+      width: 54,
       align: 'right',
       render: (it) => {
         const meta = STAT_META[it.stat as StatKey] ?? FALLBACK;
@@ -69,10 +71,8 @@ export default function HistoryScreen() {
   return (
     <Screen>
       <BackLink />
-      <View style={styles.head}>
-        <Text style={styles.h1}>Quest history</Text>
-        <Text style={styles.headSub}>Every quest you&apos;ve finished — most recent first.</Text>
-      </View>
+      <ScreenTitle>Quest history</ScreenTitle>
+      <ScreenBlurb>Every quest you&apos;ve finished — most recent first. Rest days are in here too; they count.</ScreenBlurb>
 
       {history.length === 0 ? (
         <SystemPanel>
@@ -95,13 +95,10 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { gap: 4, marginBottom: 2 },
-  h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
-  headSub: { color: text.secondary, fontSize: 13 },
-  empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  iconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  title: { color: text.primary, fontSize: 13, fontWeight: '600' },
-  sub: { color: text.faint, fontSize: 11, marginTop: 1 },
-  date: { color: text.secondary, fontSize: 12, fontWeight: '600' },
-  xp: { fontSize: 13, fontWeight: '700' },
+  empty: { ...typography.body, color: text.secondary },
+  iconBox: { width: 30, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  title: { ...typography.cardTitle, fontSize: 13, color: neutral[900] },
+  sub: { ...typography.tiny, color: text.faint, marginTop: 2 },
+  date: { ...typography.label, fontSize: 12, color: text.secondary },
+  xp: { ...typography.numeral, fontSize: 15, includeFontPadding: false },
 });

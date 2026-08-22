@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CONTENT_MAX_WIDTH } from "@/components/Screen";
-import { accent, surface, text, withAlpha } from "@/theme";
+import { Text } from "@/components/ui/Text";
+import { clay, neutral, radius, surface, typography } from "@/theme";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -192,7 +193,7 @@ export function AriseTabBar({ state, descriptors, navigation }: TabBarProps) {
         />
         {visible.map((route, i) => {
           const focused = i === activeIndex;
-          const color = focused ? accent : text.faint;
+          const color = focused ? clay[700] : neutral[600];
           const glyph = ICONS[route.name] ?? FALLBACK_GLYPH;
           const title = descriptors[route.key]?.options.title ?? route.name;
           return (
@@ -241,9 +242,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   label: {
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16,
+    ...typography.button,
+    fontSize: 10.5,
+    lineHeight: 14,
   },
   pill: {
     position: "absolute",
@@ -252,8 +253,8 @@ const styles = StyleSheet.create({
     top: PILL_TOP,
     width: PILL_W,
     height: PILL_H,
-    borderRadius: 999,
+    borderRadius: radius.pill,
   },
-  mainTint: { backgroundColor: withAlpha(accent, 0.15) },
-  shadowTint: { backgroundColor: withAlpha(text.primary, 0.16) },
+  mainTint: { backgroundColor: clay[200] },
+  shadowTint: { backgroundColor: "rgba(32, 30, 29, 0.12)" },
 });

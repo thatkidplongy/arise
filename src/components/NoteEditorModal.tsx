@@ -1,17 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { accent, onAccent, surface, text, withAlpha } from '@/theme';
+import { Text, TextInput } from '@/components/ui/Text';
+import { QUEST_NOTE_MAX } from '@/consts';
+import { TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Sel = { start: number; end: number };
 
@@ -58,12 +51,15 @@ export function NoteEditorModal({
   initial,
   onSave,
   onClose,
+  maxLength = QUEST_NOTE_MAX,
 }: {
   visible: boolean;
   prompt: string;
   initial: string;
   onSave: (text: string) => void;
   onClose: () => void;
+  /** The surface's own cap — see src/consts.ts. Defaults to the tightest one. */
+  maxLength?: number;
 }) {
   const [value, setValue] = useState(initial);
   const [sel, setSel] = useState<Sel>({ start: initial.length, end: initial.length });
@@ -147,7 +143,7 @@ export function NoteEditorModal({
               autoFocus
               scrollEnabled
               textAlignVertical="top"
-              maxLength={2000}
+              maxLength={maxLength}
             />
             <Text style={styles.hint}>
               Use <Text style={styles.b}>**bold**</Text>, <Text style={styles.i}>_italic_</Text>,{' '}
@@ -185,7 +181,7 @@ export function NoteEditorModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(30, 22, 14, 0.45)',
+    backgroundColor: surface.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -197,14 +193,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: '90%',
     minHeight: 400,
-    backgroundColor: surface.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    padding: 18,
+    backgroundColor: surface.base,
+    borderRadius: radius.lg,
+    padding: 22,
   },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginBottom: 14 },
-  prompt: { flex: 1, color: text.primary, fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  prompt: { ...typography.heading, flex: 1, color: neutral[900] },
   toolbar: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   tool: {
     minWidth: 40,
@@ -215,19 +209,19 @@ const styles = StyleSheet.create({
     gap: 5,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     backgroundColor: surface.base,
   },
   toolWide: { paddingHorizontal: 12 },
   toolOn: { backgroundColor: withAlpha(accent, 0.12), borderColor: accent },
-  toolText: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  toolText: { ...typography.button, color: text.secondary },
   // flex:1 → the input fills the space between the fixed toolbar and actions, and
   // scrolls inside itself when the text is long. It's the only scrollable region.
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 10,
+    borderRadius: radius.md,
     color: text.primary,
     padding: 12,
     fontSize: 14,
@@ -235,14 +229,16 @@ const styles = StyleSheet.create({
     minHeight: 120,
     backgroundColor: surface.base,
   },
-  hint: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 8 },
+  hint: { ...typography.small, fontSize: 11, color: text.faint, marginTop: 10 },
   b: { fontWeight: '700', color: text.secondary },
   i: { fontStyle: 'italic', color: text.secondary },
   mono: { color: text.secondary, fontWeight: '700' },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 14 },
-  btn: { borderRadius: 9, paddingVertical: 10, paddingHorizontal: 18 },
-  btnGhost: { color: text.secondary, fontSize: 14, fontWeight: '600' },
+  btn: { borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 18 },
+  btnGhost: { ...typography.button, color: text.secondary },
   btnSave: { backgroundColor: accent },
   btnDisabled: { opacity: 0.5 },
-  btnSaveText: { color: onAccent, fontSize: 14, fontWeight: '700' },
+  btnSaveText: { ...typography.button, color: onAccent },
 });

@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
+import { StatChip } from '@/components/ui/StatChip';
+import { Text } from '@/components/ui/Text';
+import { QUEST_NOTE_MAX } from '@/consts';
 import { useCollapse } from '@/hooks/useCollapse';
 import type { ApiQuest } from '@/lib/api';
 import { isWriteStep } from '@/lib/quests';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
-import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, clay, neutral, radius, sage, surface, text, typography, withAlpha } from '@/theme';
 
 /** One written reflection on a quest. Short notes show inline; long or multi-line
  * ones (the glossaries some log-steps produce) fold to a one-line preview so they
@@ -176,9 +179,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
 
   const inner = (
     <>
-      <View style={[styles.iconBox, { backgroundColor: withAlpha(meta.color, 0.12) }]}>
-        <Ionicons name={meta.icon} size={17} color={meta.color} />
-      </View>
+      <StatChip statKey={quest.stat} size={40} style={styles.disc} />
 
       <View style={styles.body}>
         <Text style={[styles.title, isDone && styles.titleDone]}>{quest.title}</Text>
@@ -207,7 +208,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
                     ]}
                   >
                     {quest.steps_done[i] ? (
-                      <Ionicons name="checkmark" size={12} color={surface.card} />
+                      <Ionicons name="checkmark" size={13} color={neutral[100]} />
                     ) : null}
                   </View>
                   <Text style={[styles.stepText, quest.steps_done[i] && styles.stepTextDone]}>
@@ -258,7 +259,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
         {isDone ? (
           <View style={styles.hintRow}>
             <Ionicons name="arrow-undo-outline" size={12} color={text.faint} />
-            <Text style={styles.hint}>{useChecklist ? 'Tap ✓ to undo' : 'Tap to undo'}</Text>
+            <Text style={styles.hint}>{useChecklist ? 'Tap the circle to undo' : 'Tap to undo'}</Text>
           </View>
         ) : null}
 
@@ -275,7 +276,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
       </View>
 
       <View style={styles.right}>
-        <Text style={[styles.xp, { color: meta.color }]}>+{quest.xp}</Text>
+        <Text style={[styles.xp, { color: meta.color }]}>{quest.xp}</Text>
         <Pressable onPress={completeOrUndo} hitSlop={8} style={styles.checkSlot}>
           <View
             style={[
@@ -286,10 +287,10 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
           >
             {!isDone && progress > 0 ? (
               <View
-                style={[styles.checkFill, { height: 26 * progress, backgroundColor: meta.color }]}
+                style={[styles.checkFill, { height: 32 * progress, backgroundColor: meta.color }]}
               />
             ) : null}
-            {isDone ? <Ionicons name="checkmark" size={15} color={surface.card} /> : null}
+            {isDone ? <Ionicons name="checkmark" size={17} color={neutral[100]} /> : null}
           </View>
         </Pressable>
       </View>
@@ -302,6 +303,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
         visible={noteOpen}
         prompt={notePrompt}
         initial={noteInitial}
+        maxLength={QUEST_NOTE_MAX}
         onSave={saveNote}
         onClose={() => setNoteOpen(false)}
       />
@@ -337,7 +339,7 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
         style={({ pressed }) => [
           styles.card,
           isDone && styles.cardDone,
-          pressed && { backgroundColor: withAlpha(meta.color, 0.06), borderColor: meta.color },
+          pressed && { backgroundColor: withAlpha(meta.color, 0.07), borderColor: meta.color },
         ]}
       >
         {inner}
@@ -350,143 +352,143 @@ export function QuestCard({ quest }: { quest: ApiQuest }) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    backgroundColor: surface.raised,
+    gap: 13,
+    alignItems: 'flex-start',
+    backgroundColor: surface.card,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 11,
-    padding: 12,
+    borderRadius: radius.md,
+    padding: 15,
   },
+  // Done is sage, never green-means-go: a finished quest is safe, not urgent.
   cardDone: {
-    backgroundColor: withAlpha(feedback.success, 0.06),
+    backgroundColor: 'rgba(143, 160, 115, 0.12)',
+    borderColor: 'rgba(114, 129, 87, 0.4)',
   },
-  iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
+  disc: { marginTop: 1 },
   body: {
     flex: 1,
     // On web, a flex child won't shrink below its content unless minWidth is 0 —
-    // without this, a wide note line spills over the +XP / check column.
+    // without this, a wide note line spills over the XP / check column.
     minWidth: 0,
-    gap: 2,
+    gap: 3,
   },
   title: {
-    color: text.primary,
-    fontWeight: '600',
-    fontSize: 14,
+    ...typography.cardTitle,
+    lineHeight: 19,
+    color: neutral[900],
   },
   titleDone: {
     textDecorationLine: 'line-through',
     color: text.secondary,
   },
   desc: {
-    color: text.faint,
+    ...typography.small,
     fontSize: 11,
+    lineHeight: 16,
+    color: text.secondary,
   },
   resource: {
+    ...typography.tiny,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: radius.pill,
+    backgroundColor: neutral[200],
     color: text.secondary,
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 3,
   },
   steps: {
-    marginTop: 7,
-    gap: 6,
+    marginTop: 8,
+    gap: 8,
   },
   stepRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     alignItems: 'flex-start',
-    paddingVertical: 1,
+    minHeight: 26,
   },
   stepDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 7,
-    marginLeft: 6,
+    width: 5,
+    height: 5,
+    borderRadius: radius.pill,
+    marginTop: 8,
+    marginLeft: 8,
   },
   checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
+    width: 21,
+    height: 21,
+    borderRadius: radius.pill,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 0,
   },
   stepText: {
-    color: text.secondary,
-    fontSize: 12,
-    lineHeight: 17,
+    ...typography.small,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: neutral[800],
     flex: 1,
   },
   stepTextDone: {
     color: text.faint,
     textDecorationLine: 'line-through',
   },
-  stepPen: { marginTop: 1 },
+  stepPen: { marginTop: 3 },
   progress: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 5,
+    ...typography.label,
+    fontSize: 11.5,
+    marginTop: 7,
   },
   hintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
+    gap: 5,
+    marginTop: 5,
   },
   hint: {
+    ...typography.tiny,
     color: text.faint,
-    fontSize: 11,
-    fontWeight: '600',
   },
   stepDown: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     alignSelf: 'flex-start',
-    marginTop: 6,
+    marginTop: 9,
+    minHeight: 36,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 9,
+    borderColor: surface.edge,
+    borderRadius: radius.pill,
   },
   stepDownText: {
-    color: text.secondary,
+    ...typography.label,
     fontSize: 12,
-    fontWeight: '600',
+    color: text.secondary,
   },
   notes: {
-    marginTop: 9,
-    paddingTop: 9,
+    marginTop: 11,
+    paddingTop: 11,
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
-    gap: 7,
+    gap: 8,
   },
   noteItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: withAlpha(feedback.gold, 0.07),
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    backgroundColor: clay[100],
+    borderRadius: radius.md,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
     overflow: 'hidden', // clip any stray horizontal spill from a long note line
   },
   noteItemCol: { flexDirection: 'column', gap: 6 },
   noteItemBody: { flex: 1, minWidth: 0 },
   noteBar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   noteBarTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  notePreview: { flex: 1, minWidth: 0, color: text.secondary, fontSize: 12 },
+  notePreview: { ...typography.small, fontSize: 12, flex: 1, minWidth: 0, color: text.secondary },
   noteX: {
     color: text.faint,
     fontSize: 18,
@@ -495,25 +497,26 @@ const styles = StyleSheet.create({
   },
   right: {
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     alignSelf: 'flex-start',
   },
   xp: {
-    fontWeight: '700',
-    fontSize: 14,
+    ...typography.numeral,
+    fontSize: 15,
+    includeFontPadding: false,
   },
   checkSlot: {
-    width: 26,
-    height: 26,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   check: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: text.faint,
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: surface.edge,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -525,7 +528,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   checkDone: {
-    backgroundColor: feedback.success,
-    borderColor: feedback.success,
+    backgroundColor: sage[600],
+    borderColor: sage[600],
   },
 });

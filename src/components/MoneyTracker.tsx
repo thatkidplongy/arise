@@ -1,18 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Segmented } from '@/components/ui/Segmented';
+import { Text } from '@/components/ui/Text';
 import type { ApiMoney, ApiMoneyEntry, MoneyScope } from '@/lib/api';
 import { dateKey, shortDay } from '@/lib/dates';
 import { useShowMore } from '@/hooks/useShowMore';
 import { peso } from '@/lib/money';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, feedback, surface, text, typography } from '@/theme';
 
 const CHART_HALF = 30; // px each side of the baseline (earned up, spent down)
 const SCOPES: MoneyScope[] = ['day', 'week', 'month'];
@@ -185,16 +187,11 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
       />
 
       {/* Period scope */}
-      <View style={styles.scopeRow}>
-        {SCOPES.map((s) => {
-          const on = scope === s;
-          return (
-            <Pressable key={s} onPress={() => chooseScope(s)} style={[styles.scopeBtn, on && styles.scopeOn]}>
-              <Text style={[styles.scopeText, on && styles.scopeTextOn]}>{SCOPE_LABEL[s]}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Segmented
+        value={scope}
+        onChange={chooseScope}
+        options={SCOPES.map((s) => ({ value: s, label: SCOPE_LABEL[s] }))}
+      />
 
       {/* Period navigator */}
       <View style={styles.nav}>
@@ -261,21 +258,9 @@ const styles = StyleSheet.create({
   balanceLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   balanceLabel: { color: text.secondary, fontSize: 13, fontWeight: '600' },
   resetLink: { color: text.faint, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
-  balance: { fontSize: 26, fontWeight: '800' },
-  scopeRow: { flexDirection: 'row', gap: 6 },
-  scopeBtn: {
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 7,
-  },
-  scopeOn: { borderColor: accent, backgroundColor: withAlpha(accent, 0.1) },
-  scopeText: { color: text.faint, fontSize: 12, fontWeight: '600' },
-  scopeTextOn: { color: accent },
+  balance: { ...typography.numeral, fontSize: 30, includeFontPadding: false },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 12 },
-  navLabel: { color: text.primary, fontSize: 14, fontWeight: '700', minWidth: 130, textAlign: 'center' },
+  navLabel: { ...typography.cardTitle, minWidth: 140, textAlign: 'center' },
   totals: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   total: { fontSize: 12, fontWeight: '700' },
   net: { color: text.secondary },

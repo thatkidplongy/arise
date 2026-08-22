@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { SearchRow } from '@/components/SearchRow';
+import { Text, TextInput } from '@/components/ui/Text';
 import { useSearch } from '@/hooks/useSearch';
 import type { ApiFoodEstimate, ApiFoodSearchItem, ApiSuggestion, FoodEntry } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { toBoundedDataUri, splitDataUri } from '@/lib/image';
 import { num } from '@/lib/num';
 import { useBody } from '@/query/useBody';
-import { accent, feedback, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, accent, clay, feedback, neutral, onAccent, radius, sage, surface, text, typography, withAlpha } from '@/theme';
 
 import { NutritionProfileForm } from './NutritionProfileForm';
 import { SystemPanel } from './SystemPanel';
@@ -321,7 +322,7 @@ export function NutritionPanel() {
               of {targets.target_low.toLocaleString()}–{targets.target_high.toLocaleString()} kcal
             </Text>
           </View>
-          <XpBar value={total} max={targets.target_high} color={barColor} height={8} />
+          <XpBar value={total} max={targets.target_high} color={barColor} track={clay[200]} height={12} />
 
           {/* protein + fibre progress */}
           <View style={styles.macros}>
@@ -329,13 +330,13 @@ export function NutritionPanel() {
               <Text style={styles.macroLabel}>
                 Protein <Text style={styles.macroVal}>{food?.total_protein ?? 0} / {targets.protein_g} g</Text>
               </Text>
-              <XpBar value={food?.total_protein ?? 0} max={targets.protein_g} color={TONE} height={5} />
+              <XpBar value={food?.total_protein ?? 0} max={targets.protein_g} color={sage[600]} track={sage[200]} height={7} />
             </View>
             <View style={styles.macro}>
               <Text style={styles.macroLabel}>
                 Fibre <Text style={styles.macroVal}>{food?.total_fibre ?? 0} / {targets.fibre_g} g</Text>
               </Text>
-              <XpBar value={food?.total_fibre ?? 0} max={targets.fibre_g} color={feedback.success} height={5} />
+              <XpBar value={food?.total_fibre ?? 0} max={targets.fibre_g} color={sage[600]} track={sage[200]} height={7} />
             </View>
           </View>
 
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     color: text.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -428,12 +429,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: surface.base,
   },
-  btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+  btn: { backgroundColor: accent, borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 11, alignItems: 'center' },
   btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   flex1: { flex: 1 },
-  targetRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 },
-  bigNum: { color: text.primary, fontSize: 26, fontWeight: '700' },
-  targetMeta: { color: text.secondary, fontSize: 13 },
+  targetRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 14 },
+  bigNum: { ...typography.numeral, fontSize: 44, lineHeight: 46, color: neutral[900], includeFontPadding: false },
+  targetMeta: { ...typography.small, fontSize: 12, color: text.secondary, paddingBottom: 6 },
   macros: { gap: 8, marginTop: 12 },
   macro: { gap: 4 },
   macroLabel: { color: text.secondary, fontSize: 12 },
@@ -455,11 +458,11 @@ const styles = StyleSheet.create({
   entryName: { color: text.primary, fontSize: 13 },
   entryMeta: { color: text.faint, fontSize: 11, marginTop: 1 },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
-  suggest: { marginTop: 16 },
-  suggestTitle: { color: text.primary, fontSize: 14, fontWeight: '700' },
-  suggestHint: { color: text.faint, fontSize: 11, marginTop: 2, marginBottom: 8 },
+  suggest: { marginTop: 22 },
+  suggestTitle: { ...typography.section, color: neutral[900] },
+  suggestHint: { ...typography.small, color: text.secondary, marginTop: 6, marginBottom: 10 },
   group: { marginTop: 6 },
-  groupLabel: { color: TONE, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, marginBottom: 2 },
+  groupLabel: { ...typography.kicker, color: text.secondary, marginBottom: 4 },
   sugRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   sugMain: { flex: 1 },
   sugName: { color: text.primary, fontSize: 13 },
@@ -467,7 +470,7 @@ const styles = StyleSheet.create({
   plus: {
     width: 30,
     height: 30,
-    borderRadius: 8,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: surface.hairline,
     alignItems: 'center',
@@ -480,7 +483,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
     paddingVertical: 11,
     borderWidth: 1,
     borderStyle: 'dashed',
@@ -491,7 +495,7 @@ const styles = StyleSheet.create({
   estimate: {
     borderWidth: 1,
     borderColor: withAlpha(TONE, 0.4),
-    borderRadius: 11,
+    borderRadius: radius.md,
     padding: 12,
     backgroundColor: withAlpha(TONE, 0.05),
   },
@@ -503,7 +507,9 @@ const styles = StyleSheet.create({
   searchBtn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 14,
     minWidth: 74,
@@ -526,7 +532,9 @@ const styles = StyleSheet.create({
   gramsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 8 },
   gramsInput: { width: 84, marginBottom: 0 },
   gramsPreview: { color: text.secondary, fontSize: 12, flex: 1 },
-  addBtn: { backgroundColor: TONE, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 16 },
+  addBtn: { backgroundColor: TONE, borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 16 },
   addBtnText: { color: onAccent, fontSize: 13, fontWeight: '700' },
   manualLink: { color: text.faint, fontSize: 12, marginTop: 10, textDecorationLine: 'underline' },
 });

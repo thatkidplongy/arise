@@ -1,5 +1,9 @@
+import { Caprasimo_400Regular } from '@expo-google-fonts/caprasimo';
+import { Figtree_400Regular, Figtree_600SemiBold, Figtree_700Bold } from '@expo-google-fonts/figtree';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
@@ -11,7 +15,18 @@ import { queryClient } from '@/query/client';
 import { useSystem } from '@/store/useSystem';
 import { surface, text } from '@/theme';
 
+// Hold the splash until Caprasimo and Figtree are in memory — the whole type
+// system is those two faces, so a frame drawn without them is the wrong app.
+void SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Caprasimo_400Regular,
+    Figtree_400Regular,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+  });
+
   // First contact with the System server, after the persisted settings
   // have been rehydrated from storage.
   useEffect(() => {
@@ -26,6 +41,14 @@ export default function RootLayout() {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    // A font that failed to fetch still lets the app through — the fallback stack
+    // is ugly, not broken, and being stuck on a splash screen is worse.
+    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

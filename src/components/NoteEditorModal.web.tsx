@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Placeholder } from "@tiptap/extensions";
+import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { useEffect } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
 
-import { accent, onAccent, surface, text, withAlpha } from "@/theme";
+import { Text } from "@/components/ui/Text";
+import { QUEST_NOTE_MAX } from "@/consts";
+import { TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from "@/theme";
 
 // Web build only: a true WYSIWYG note editor. Bold/italic/lists render as
 // styled text (not raw ** markers), and we serialise back to Markdown on save
@@ -117,12 +119,15 @@ export function NoteEditorModal({
   initial,
   onSave,
   onClose,
+  maxLength = QUEST_NOTE_MAX,
 }: {
   visible: boolean;
   prompt: string;
   initial: string;
   onSave: (text: string) => void;
   onClose: () => void;
+  /** The surface's own cap — see src/consts.ts. Defaults to the tightest one. */
+  maxLength?: number;
 }) {
   useEditorStyles();
 
@@ -134,6 +139,9 @@ export function NoteEditorModal({
       StarterKit.configure({ link: { autolink: false } }),
       Markdown,
       Placeholder.configure({ placeholder: "Write it here…" }),
+      // Counts the visible text, while the cap applies to the Markdown we send —
+      // so the room left for markers is why the limit here is a little under it.
+      CharacterCount.configure({ limit: Math.floor(maxLength * 0.9) }),
     ],
     content: initial,
     contentType: "markdown",
@@ -280,7 +288,7 @@ export function NoteEditorModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(30, 22, 14, 0.45)",
+    backgroundColor: surface.overlay,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -289,11 +297,9 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 460,
     maxHeight: "90%",
-    backgroundColor: surface.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    padding: 18,
+    backgroundColor: surface.base,
+    borderRadius: radius.lg,
+    padding: 22,
   },
   head: {
     flexDirection: "row",
@@ -303,10 +309,8 @@ const styles = StyleSheet.create({
   },
   prompt: {
     flex: 1,
-    color: text.primary,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 21,
+    ...typography.heading,
+    color: neutral[900],
   },
   toolbar: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   tool: {
@@ -319,21 +323,23 @@ const styles = StyleSheet.create({
     gap: 5,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
-    backgroundColor: surface.base,
+    borderRadius: radius.pill,
+    backgroundColor: surface.muted,
   },
   toolOn: { backgroundColor: withAlpha(accent, 0.12), borderColor: accent },
-  toolText: { color: text.secondary, fontSize: 14, fontWeight: "600" },
-  hint: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 8 },
+  toolText: { ...typography.button, color: text.secondary },
+  hint: { ...typography.small, fontSize: 11, color: text.faint, marginTop: 10 },
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 14,
   },
-  btn: { borderRadius: 9, paddingVertical: 10, paddingHorizontal: 18 },
-  btnGhost: { color: text.secondary, fontSize: 14, fontWeight: "600" },
+  btn: { borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 18 },
+  btnGhost: { ...typography.button, color: text.secondary },
   btnSave: { backgroundColor: accent },
   btnDisabled: { opacity: 0.5 },
-  btnSaveText: { color: onAccent, fontSize: 14, fontWeight: "700" },
+  btnSaveText: { ...typography.button, color: onAccent },
 });

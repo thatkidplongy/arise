@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
@@ -9,12 +9,18 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Button } from '@/components/ui/Button';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { Segmented } from '@/components/ui/Segmented';
+import { ChoiceChip } from '@/components/ui/Tag';
+import { Text } from '@/components/ui/Text';
+import { JOURNAL_NOTE_MAX } from '@/consts';
 import type { ApiJournalEntry, ApiReflection } from '@/lib/api';
 import { dateKey, shortDay } from '@/lib/dates';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
 import type { StatKey } from '@/types';
-import { accent, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, STAT_TINT, clay, neutral, radius, text, typography, withAlpha } from '@/theme';
 
 type Tab = 'journal' | 'reflections';
 type Filter = StatKey | 'all';
@@ -66,7 +72,7 @@ export default function JournalScreen() {
     {
       key: 'day',
       header: 'Date',
-      width: 62,
+      width: 70,
       align: 'right',
       render: (e) => <Text style={styles.date}>{shortDay(e.day, today)}</Text>,
     },
@@ -75,11 +81,11 @@ export default function JournalScreen() {
   const reflectionCols: Column<ApiReflection>[] = [
     {
       key: 'cat',
-      width: 30,
+      width: 32,
       render: (r) => {
         const meta = STAT_META[r.stat];
         return (
-          <View style={[styles.iconBox, { backgroundColor: withAlpha(meta?.color ?? text.faint, 0.13) }]}>
+          <View style={[styles.iconBox, { backgroundColor: withAlpha(meta?.color ?? text.faint, STAT_TINT) }]}>
             <Ionicons name={meta?.icon ?? 'bookmark'} size={14} color={meta?.color ?? text.faint} />
           </View>
         );
@@ -100,7 +106,7 @@ export default function JournalScreen() {
     {
       key: 'day',
       header: 'Date',
-      width: 56,
+      width: 70,
       align: 'right',
       render: (r) => <Text style={styles.date}>{shortDay(r.day, today)}</Text>,
     },
@@ -109,31 +115,28 @@ export default function JournalScreen() {
   return (
     <Screen>
       <BackLink />
-      <View style={styles.headerRow}>
-        <Text style={styles.h1}>Journal</Text>
-        <Text style={styles.count}>{tab === 'journal' ? journal.length : reflections.length}</Text>
-      </View>
+      <ScreenTitle>Journal</ScreenTitle>
+      <ScreenBlurb>Quest reflections land here on their own. The rest is yours.</ScreenBlurb>
 
-      <View style={styles.tabs}>
-        {(['journal', 'reflections'] as const).map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, tab === t && styles.tabOn]}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>
-              {t === 'journal' ? 'Journal' : 'Reflections'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Segmented
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'journal', label: `Journal · ${journal.length}` },
+          { value: 'reflections', label: `Reflections · ${reflections.length}` },
+        ]}
+      />
 
       {tab === 'journal' ? (
         <>
           <Text style={styles.intro}>A free space — write anything you want for the day.</Text>
-          <Pressable
+          <Button
+            label="Write something for today"
+            icon="create-outline"
             onPress={() => setComposerOpen(true)}
-            style={({ pressed }) => [styles.writeBtn, pressed && { opacity: 0.85 }]}
-          >
-            <Ionicons name="create-outline" size={16} color={onAccent} />
-            <Text style={styles.writeText}>Write something for today</Text>
-          </Pressable>
+            block
+            large
+          />
 
           {journal.length === 0 ? (
             <SystemPanel>
@@ -164,18 +167,15 @@ export default function JournalScreen() {
               contentContainerStyle={styles.chips}
             >
               {(['all', ...cats] as Filter[]).map((c) => {
-                const on = filter === c;
                 const meta = c === 'all' ? null : STAT_META[c];
-                const color = meta?.color ?? accent;
                 return (
-                  <Pressable
+                  <ChoiceChip
                     key={c}
+                    label={meta?.label ?? 'All'}
+                    color={meta?.color ?? clay[600]}
+                    selected={filter === c}
                     onPress={() => setFilter(c)}
-                    style={[styles.chip, on && { backgroundColor: withAlpha(color, 0.14), borderColor: color }]}
-                  >
-                    {meta ? <Ionicons name={meta.icon} size={12} color={on ? color : text.faint} /> : null}
-                    <Text style={[styles.chipText, on && { color }]}>{meta?.label ?? 'All'}</Text>
-                  </Pressable>
+                  />
                 );
               })}
             </ScrollView>
@@ -207,6 +207,7 @@ export default function JournalScreen() {
         visible={composerOpen}
         prompt="What's on your mind today?"
         initial=""
+        maxLength={JOURNAL_NOTE_MAX}
         onSave={(t) => {
           setComposerOpen(false);
           void addJournalEntry(t);
@@ -218,47 +219,11 @@ export default function JournalScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
-  count: { color: text.secondary, fontSize: 14, fontWeight: '600' },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 9,
-  },
-  tabOn: { borderColor: accent, backgroundColor: withAlpha(accent, 0.1) },
-  tabText: { color: text.faint, fontSize: 13, fontWeight: '600' },
-  tabTextOn: { color: accent },
-  intro: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  writeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    backgroundColor: accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-  },
-  writeText: { color: onAccent, fontSize: 14, fontWeight: '700' },
-  empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  chips: { gap: 7, paddingVertical: 1, paddingRight: 4 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-  },
-  chipText: { color: text.faint, fontSize: 12, fontWeight: '600' },
-  iconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  title: { color: text.primary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
-  sub: { color: text.faint, fontSize: 11, marginTop: 1 },
-  date: { color: text.secondary, fontSize: 12, fontWeight: '600' },
+  intro: { ...typography.body, color: text.secondary },
+  empty: { ...typography.body, color: text.secondary },
+  chips: { gap: 9, paddingVertical: 1, paddingRight: 4 },
+  iconBox: { width: 30, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  title: { ...typography.cardTitle, fontSize: 13, color: neutral[900] },
+  sub: { ...typography.tiny, color: text.faint, marginTop: 2 },
+  date: { ...typography.label, fontSize: 12, color: text.secondary },
 });

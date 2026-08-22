@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SearchRow } from '@/components/SearchRow';
+import { Text, TextInput } from '@/components/ui/Text';
 import { useSearch } from '@/hooks/useSearch';
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { useBody } from '@/query/useBody';
-import { feedback, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
+
+import { Box } from '@/components/ui/Check';
 
 import { SystemPanel } from './SystemPanel';
 
@@ -39,7 +42,7 @@ function Routine({
   return (
     <View style={styles.routine}>
       <View style={styles.routineHead}>
-        <Ionicons name={icon} size={15} color={TONE} />
+        <Ionicons name={icon} size={17} color={TONE} />
         <Text style={styles.routineTitle}>{title}</Text>
         <Text style={styles.routineCount}>
           {doneCount}/{steps.length}
@@ -47,16 +50,18 @@ function Routine({
       </View>
       {steps.map((s) => (
         <View key={s.id} style={styles.step}>
-          <Pressable onPress={() => toggleStep(s.id, !s.done)} style={styles.stepTap} hitSlop={4}>
-            <Ionicons
-              name={s.done ? 'checkmark-circle' : 'ellipse-outline'}
-              size={20}
-              color={s.done ? feedback.success : text.faint}
-            />
+          <Pressable
+            onPress={() => toggleStep(s.id, !s.done)}
+            style={styles.stepTap}
+            hitSlop={4}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: s.done }}
+          >
+            <Box done={s.done} size={26} />
             <Text style={[styles.stepText, s.done && styles.stepTextDone]}>{s.text}</Text>
           </Pressable>
-          <Pressable onPress={() => removeStep(s.id)} hitSlop={8}>
-            <Text style={styles.remove}>×</Text>
+          <Pressable onPress={() => removeStep(s.id)} hitSlop={10} accessibilityLabel={`Remove ${s.text}`}>
+            <Ionicons name="close" size={18} color={text.faint} />
           </Pressable>
         </View>
       ))}
@@ -205,7 +210,7 @@ export function SkincarePanel() {
   if (!body) return null;
 
   return (
-    <SystemPanel title="Skincare" sub="pigmentation & pores">
+    <SystemPanel title="Your routine" sub="pigmentation & pores">
       {body.skincare_streak > 0 || body.skincare_days > 0 ? (
         <View style={styles.streakRow}>
           <Ionicons name="flame" size={14} color={feedback.gold} />
@@ -243,47 +248,50 @@ const styles = StyleSheet.create({
   streakText: { color: text.primary, fontSize: 13, fontWeight: '700' },
   streakSub: { color: text.faint, fontSize: 12, fontWeight: '400' },
   streakHint: { color: text.faint, fontSize: 12, lineHeight: 17, marginBottom: 10 },
+  // An invitation, not a prescription — so it takes the dashed patch.
   note: {
+    ...typography.small,
     color: text.secondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 14,
-    backgroundColor: withAlpha(TONE, 0.07),
-    borderRadius: 9,
-    padding: 11,
+    marginBottom: 18,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: surface.edge,
+    borderRadius: radius.lg,
+    padding: 18,
   },
-  routine: { marginBottom: 16 },
-  routineHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
-  routineTitle: { color: text.primary, fontSize: 13, fontWeight: '700' },
-  routineCount: { color: text.faint, fontSize: 12, marginLeft: 'auto' },
+  routine: { marginBottom: 20 },
+  routineHead: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
+  routineTitle: { ...typography.heading, color: neutral[900] },
+  routineCount: { ...typography.small, color: text.faint, marginLeft: 'auto' },
   step: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 7,
+    gap: 10,
+    minHeight: TAP_MIN,
+    paddingVertical: 6,
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
   },
-  stepTap: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  stepText: { color: text.primary, fontSize: 13, flex: 1, lineHeight: 18 },
+  stepTap: { flexDirection: 'row', alignItems: 'center', gap: 13, flex: 1 },
+  stepText: { ...typography.body, fontSize: 13.5, flex: 1 },
   stepTextDone: { color: text.faint, textDecorationLine: 'line-through' },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   addInput: {
+    ...typography.body,
     flex: 1,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 13,
-    backgroundColor: surface.base,
+    minHeight: 48,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: surface.muted,
   },
   addBtn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 9,
     paddingHorizontal: 14,
   },
@@ -325,7 +333,7 @@ const styles = StyleSheet.create({
   productName: { color: text.primary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   productBrand: { color: text.faint, fontWeight: '400' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  chip: { borderRadius: 99, paddingVertical: 4, paddingHorizontal: 10 },
+  chip: { borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: 10 },
   chipGood: { backgroundColor: withAlpha(feedback.success, 0.14) },
   chipGoodText: { color: feedback.success, fontSize: 11, fontWeight: '700' },
   chipWatch: { backgroundColor: withAlpha(feedback.gold, 0.16) },
@@ -341,7 +349,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
     backgroundColor: surface.base,
-    borderRadius: 8,
+    borderRadius: radius.md,
     padding: 9,
   },
 

@@ -36,5 +36,5 @@ export function useSaveState(holdMs = 1600) {
 
 /** The label a Save button shows for the current state (idle label passed in). */
 export function saveLabel(state: SaveState, idle: string): string {
-  return state === 'saving' ? 'Saving…' : state === 'done' ? 'Saved ✓' : idle;
+  return state === 'saving' ? 'Saving…' : state === 'done' ? 'Saved' : idle;
 }

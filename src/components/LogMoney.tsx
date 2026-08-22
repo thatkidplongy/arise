@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
+import { Text, TextInput } from '@/components/ui/Text';
 import { dateKey, prettyDay, recentDays } from '@/lib/dates';
 import { readMoneyDraft, type MoneyBucket, type MoneyDirection } from '@/lib/moneyEntry';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, radius, surface, text, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color; // the wealth attribute's tone, as everywhere on this screen
 
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
   },
   chipOn: { borderColor: TONE, backgroundColor: withAlpha(TONE, 0.1) },
   chipText: { color: text.faint, fontSize: 12, fontWeight: '600' },
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 9,
     color: text.primary,
@@ -225,7 +226,8 @@ const styles = StyleSheet.create({
   addBtn: {
     width: TAP,
     height: TAP,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
     borderWidth: 1,
     borderColor: TONE,
     backgroundColor: withAlpha(TONE, 0.1),

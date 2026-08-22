@@ -1,13 +1,25 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Card, Kicker, ScreenTitle } from '@/components/ui/Card';
+import { Text } from '@/components/ui/Text';
+import type { ApiState } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, text, withAlpha } from '@/theme';
+import { TAP_MIN, clay, feedback, neutral, radius, sage, surface, text, typography } from '@/theme';
+
+type Achievement = ApiState['achievements'][number];
+
+/** Locked, earned, or worn right now — the one word on the right of each row. */
+function stateOf(a: Achievement, equipped: string | null): { label: string; color: string } {
+  if (a.unlocked_at == null) return { label: 'Locked', color: text.faint };
+  if (a.title_reward && equipped === a.title_reward) return { label: 'Equipped', color: sage[700] };
+  if (a.title_reward) return { label: 'Equip', color: clay[700] };
+  return { label: 'Earned', color: feedback.gold };
+}
 
 export default function AchievementsScreen() {
   const state = useSystem((s) => s.state);
@@ -24,6 +36,7 @@ export default function AchievementsScreen() {
   if (!state) {
     return (
       <Screen>
+        <BackLink />
         <ConnectionPanel />
       </Screen>
     );
@@ -31,140 +44,94 @@ export default function AchievementsScreen() {
 
   const unlockedCount = state.achievements.filter((a) => a.unlocked_at != null).length;
   const equipped = state.player.equipped_title;
+  const worn = equipped ? state.achievements.find((a) => a.title_reward === equipped) : undefined;
 
   return (
     <Screen>
       <BackLink />
-      <View style={styles.headerRow}>
-        <Text style={styles.h1}>Achievements</Text>
-        <Text style={styles.count}>
-          {unlockedCount} / {state.achievements.length}
-        </Text>
-      </View>
+      <ScreenTitle>Achievements</ScreenTitle>
 
-      {state.achievements.map((a) => {
-        const unlocked = a.unlocked_at != null;
-        const isEquipped = a.title_reward != null && equipped === a.title_reward;
-        return (
-          <SystemPanel key={a.id} style={unlocked ? undefined : styles.locked}>
-            <View style={styles.row}>
-              <View
-                style={[
-                  styles.iconBox,
-                  { backgroundColor: withAlpha(unlocked ? feedback.gold : text.faint, 0.14) },
-                ]}
-              >
-                <Ionicons
-                  name={unlocked ? 'trophy' : 'lock-closed'}
-                  size={18}
-                  color={unlocked ? feedback.gold : text.faint}
-                />
+      {equipped ? (
+        <Card tone="clay" style={styles.equipped}>
+          <View pointerEvents="none" style={styles.blob} />
+          <Kicker color={clay[700]}>Equipped title</Kicker>
+          <Text style={styles.equippedName}>{equipped}</Text>
+          {worn ? <Text style={styles.equippedWhy}>{worn.desc}</Text> : null}
+        </Card>
+      ) : null}
+
+      <SystemPanel title="Every milestone" sub={`${unlockedCount} of ${state.achievements.length}`}>
+        {state.achievements.map((a, i) => {
+          const unlocked = a.unlocked_at != null;
+          const isEquipped = a.title_reward != null && equipped === a.title_reward;
+          const badge = stateOf(a, equipped);
+          const canEquip = unlocked && a.title_reward != null;
+          return (
+            <Pressable
+              key={a.id}
+              disabled={!canEquip || pendingId === a.id}
+              onPress={() => toggleTitle(a.id, a.title_reward!, isEquipped)}
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowRule,
+                !unlocked && styles.locked,
+                pressed && canEquip && { opacity: 0.7 },
+              ]}
+            >
+              <View style={[styles.disc, unlocked ? styles.discOn : styles.discOff]}>
+                <Text style={[styles.initial, { color: unlocked ? clay[800] : text.faint }]}>
+                  {a.name.slice(0, 1).toUpperCase()}
+                </Text>
               </View>
               <View style={styles.body}>
                 <Text style={styles.name}>{a.name}</Text>
                 <Text style={styles.desc}>{a.desc}</Text>
-                {unlocked ? (
-                  <Text style={styles.date}>
-                    Unlocked {new Date(a.unlocked_at!).toLocaleDateString()}
-                  </Text>
-                ) : a.title_reward ? (
-                  <Text style={styles.date}>Title reward hidden</Text>
-                ) : null}
               </View>
-            </View>
-
-            {a.title_reward && unlocked ? (
-              <Pressable
-                disabled={pendingId === a.id}
-                style={({ pressed }) => [
-                  styles.equipBtn,
-                  isEquipped && styles.equipBtnOn,
-                  (pressed || pendingId === a.id) && { opacity: 0.75 },
-                ]}
-                onPress={() => toggleTitle(a.id, a.title_reward!, isEquipped)}
-              >
-                <Text style={[styles.equipText, isEquipped && styles.equipTextOn]}>
-                  {pendingId === a.id
-                    ? 'Saving…'
-                    : isEquipped
-                      ? `Equipped · ${a.title_reward}`
-                      : `Equip title · ${a.title_reward}`}
-                </Text>
-              </Pressable>
-            ) : null}
-          </SystemPanel>
-        );
-      })}
+              <Text style={[styles.state, { color: badge.color }]}>
+                {pendingId === a.id ? 'Saving' : badge.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </SystemPanel>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
+  equipped: { overflow: 'hidden', gap: 8 },
+  blob: {
+    position: 'absolute',
+    right: -34,
+    bottom: -44,
+    width: 120,
+    height: 120,
+    borderRadius: radius.pill,
+    backgroundColor: clay[200],
   },
-  h1: {
-    color: text.primary,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  count: {
-    color: text.secondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  locked: {
-    opacity: 0.6,
-  },
+  equippedName: { ...typography.numeral, fontSize: 28, lineHeight: 31, color: neutral[900] },
+  equippedWhy: { ...typography.body, fontSize: 12.5, color: text.onClay },
   row: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
+    gap: 14,
+    minHeight: TAP_MIN + 20,
+    paddingVertical: 16,
   },
-  iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+  rowRule: { borderTopWidth: 1, borderTopColor: surface.hairline },
+  locked: { opacity: 0.55 },
+  disc: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    color: text.primary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  desc: {
-    color: text.secondary,
-    fontSize: 12,
-  },
-  date: {
-    color: feedback.gold,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  equipBtn: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: accent,
-    borderRadius: 9,
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  equipBtnOn: {
-    backgroundColor: withAlpha(accent, 0.12),
-  },
-  equipText: {
-    color: accent,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  equipTextOn: {
-    color: accent,
-  },
+  discOn: { backgroundColor: clay[200] },
+  discOff: { backgroundColor: neutral[200] },
+  initial: { ...typography.numeral, fontSize: 16, includeFontPadding: false },
+  body: { flex: 1, gap: 3 },
+  name: { ...typography.cardTitle, fontSize: 13.5, color: neutral[900] },
+  desc: { ...typography.small, color: text.secondary },
+  state: { ...typography.kicker, fontSize: 10.5, letterSpacing: 0.9 },
 });

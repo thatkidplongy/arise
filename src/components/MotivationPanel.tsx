@@ -1,13 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import { Segmented } from '@/components/ui/Segmented';
+import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiInsight, InsightKind } from '@/lib/api';
 import { useInsights } from '@/query/useInsights';
 import { useCaptures, type PendingCapture } from '@/store/useCaptures';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import { TAP_MIN, accent, clay, feedback, radius, surface, text, typography } from '@/theme';
 
 // Normalise a link so we can spot the same video pasted twice — mirrors the
 // server's clean_url enough to guard against re-hitting the API for a dupe.
@@ -439,27 +443,16 @@ function CaptureCard({
 }) {
   const tips = mode === 'tips';
   return (
-    <SystemPanel title="Capture a video" sub="TikTok · Reels · YouTube">
+    <SystemPanel title="Capture" sub="TikTok · Reels · YouTube">
       <View style={styles.modeRow}>
-        {(['motivation', 'tips'] as const).map((m) => {
-          const on = mode === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => setMode(m)}
-              style={[styles.modeBtn, on && styles.modeBtnOn]}
-            >
-              <Ionicons
-                name={m === 'tips' ? 'bulb-outline' : 'sparkles-outline'}
-                size={14}
-                color={on ? accent : text.faint}
-              />
-              <Text style={[styles.modeText, on && styles.modeTextOn]}>
-                {m === 'tips' ? 'Tips' : 'Motivation'}
-              </Text>
-            </Pressable>
-          );
-        })}
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'motivation', label: 'Motivation' },
+            { value: 'tips', label: 'Tips' },
+          ]}
+        />
       </View>
       <Text style={styles.help}>
         {tips
@@ -467,7 +460,7 @@ function CaptureCard({
           : 'For something that moved you. Arise distils it into a few takeaways and quotes worth keeping — one resurfaces on your Status now and then.'}
         {' '}It runs in the background (~8s), so you can paste another or leave this tab.
       </Text>
-      <TextInput
+      <Field
         value={url}
         onChangeText={setUrl}
         onSubmitEditing={onCapture}
@@ -477,15 +470,14 @@ function CaptureCard({
         keyboardType="url"
         returnKeyType="go"
         placeholder="Paste a TikTok, Reel or YouTube link"
-        placeholderTextColor={text.faint}
       />
-      <Pressable
-        disabled={!canCapture}
-        style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }, !canCapture && styles.btnDisabled]}
+      <Button
+        label={tips ? 'Capture tips' : 'Capture'}
         onPress={onCapture}
-      >
-        <Text style={styles.btnText}>{tips ? 'Capture tips' : 'Capture'}</Text>
-      </Pressable>
+        disabled={!canCapture}
+        block
+        large
+      />
       {!transcriptOn ? (
         <Text style={styles.gate}>
           Add a free Supadata key (ARISE_SUPADATA_API_KEY) on the server to enable this.
@@ -499,23 +491,9 @@ function CaptureCard({
 }
 
 const styles = StyleSheet.create({
-  help: { color: text.secondary, fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  help: { ...typography.small, color: text.secondary, marginBottom: 14 },
 
-  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  modeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 9,
-  },
-  modeBtnOn: { borderColor: accent, backgroundColor: withAlpha(accent, 0.1) },
-  modeText: { color: text.faint, fontSize: 13, fontWeight: '600' },
-  modeTextOn: { color: accent },
+  modeRow: { marginBottom: 14 },
 
 
   tips: { gap: 8 },
@@ -523,27 +501,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: surface.base,
-    borderRadius: 9,
-    padding: 10,
+    backgroundColor: surface.muted,
+    borderRadius: radius.md,
+    padding: 13,
   },
-  tipText: { flex: 1, color: text.primary, fontSize: 13, lineHeight: 19 },
+  tipText: { ...typography.body, flex: 1 },
   todoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   todoText: { color: accent, fontSize: 12, fontWeight: '700' },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 10,
-    backgroundColor: surface.base,
-  },
-  btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
+  input: { marginBottom: 12 },
   gate: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 10, textAlign: 'center' },
   hint: { color: text.faint, fontSize: 12, lineHeight: 17, marginTop: 10 },
   error: { color: feedback.danger, fontSize: 12, lineHeight: 17 },
@@ -552,30 +517,34 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingHorizontal: 12,
-    backgroundColor: surface.base,
+    gap: 10,
+    minHeight: 50,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    backgroundColor: surface.muted,
   },
-  searchInput: { flex: 1, color: text.primary, paddingVertical: 10, fontSize: 14 },
+  searchInput: { ...typography.body, flex: 1, paddingVertical: 12 },
 
   card: {
     backgroundColor: surface.card,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 11,
-    padding: 14,
-    gap: 10,
+    borderRadius: radius.lg,
+    padding: 20,
+    gap: 12,
   },
-  pendingCard: { borderStyle: 'dashed', borderColor: withAlpha(accent, 0.5) },
-  pendingTitle: { color: text.primary, fontSize: 14, fontWeight: '700', flex: 1 },
-  pendingUrl: { color: text.faint, fontSize: 12 },
+  pendingCard: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: surface.edge,
+  },
+  pendingTitle: { ...typography.cardTitle, flex: 1 },
+  pendingUrl: { ...typography.small, color: text.faint },
   retryBtn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 9,
     alignItems: 'center',
   },
@@ -585,22 +554,20 @@ const styles = StyleSheet.create({
   remove: { color: text.faint, fontSize: 22, fontWeight: '700', marginTop: -4 },
 
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowSummary: { flex: 1, color: text.primary, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  rowSummary: { ...typography.numeral, flex: 1, fontSize: 17, lineHeight: 23 },
 
   takeaways: { gap: 6 },
-  sectionLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  sectionLabel: { ...typography.kicker, color: text.secondary },
   bulletRow: { flexDirection: 'row', gap: 8 },
   bulletDot: { color: accent, fontSize: 14, lineHeight: 20 },
-  bulletText: { color: text.primary, fontSize: 13, lineHeight: 20, flex: 1 },
+  bulletText: { ...typography.body, lineHeight: 21, flex: 1 },
   quote: {
-    backgroundColor: withAlpha(feedback.gold, 0.09),
-    borderLeftWidth: 3,
-    borderLeftColor: feedback.gold,
-    borderRadius: 9,
-    padding: 11,
-    gap: 8,
+    backgroundColor: clay[100],
+    borderRadius: radius.md,
+    padding: 16,
+    gap: 10,
   },
-  quoteText: { color: text.primary, fontSize: 14, lineHeight: 21, fontWeight: '600' },
+  quoteText: { ...typography.numeral, fontSize: 18, lineHeight: 26, color: clay[800] },
   starBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   starText: { color: accent, fontSize: 12, fontWeight: '600' },
 

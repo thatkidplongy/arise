@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BookPicker } from '@/components/BookPicker';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
+import { Text, TextInput } from '@/components/ui/Text';
 import { useCollapse } from '@/hooks/useCollapse';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiReading, ApiReadingLog } from '@/lib/api';
 import { countChapters, describeChaptersRead } from '@/lib/reading';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import { TAP_MIN, accent, clay, feedback, onAccent, radius, sage, surface, text, typography, withAlpha } from '@/theme';
 
 /** The book, and whether today has anything on it yet. */
 function BookHead({ reading }: { reading: ApiReading }) {
@@ -21,7 +22,7 @@ function BookHead({ reading }: { reading: ApiReading }) {
         {reading.book}
       </Text>
       <Text style={[styles.today, { color: read ? feedback.success : text.faint }]}>
-        {read ? '✓ Read today' : 'Not yet today'}
+        {read ? 'Read today' : 'Not yet today'}
       </Text>
     </View>
   );
@@ -38,7 +39,8 @@ function ProgressBar({ reading }: { reading: ApiReading }) {
         value={Math.min(read, reading.chapters)}
         max={reading.chapters}
         color={done ? feedback.success : accent}
-        height={8}
+        track={done ? sage[200] : clay[200]}
+        height={12}
       />
       <Text style={styles.meta}>
         {done
@@ -301,7 +303,7 @@ export function ReadingCard() {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  book: { flex: 1, color: text.primary, fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  book: { ...typography.numeral, flex: 1, fontSize: 22, lineHeight: 27, includeFontPadding: false },
   today: { fontSize: 11, fontWeight: '700', marginTop: 3 },
   meta: { color: text.secondary, fontSize: 12, lineHeight: 17, marginTop: 8 },
 
@@ -319,7 +321,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     color: text.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -333,7 +335,8 @@ const styles = StyleSheet.create({
   stack: { marginBottom: 8 },
   btn: {
     backgroundColor: accent,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
     paddingVertical: 11,
     paddingHorizontal: 12,
     minWidth: 78,

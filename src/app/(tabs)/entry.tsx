@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
@@ -9,10 +9,13 @@ import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Button, ButtonRow } from '@/components/ui/Button';
+import { Text } from '@/components/ui/Text';
+import { JOURNAL_NOTE_MAX } from '@/consts';
 import { prettyDay } from '@/lib/dates';
 import { useSystem } from '@/store/useSystem';
 import type { StatKey } from '@/types';
-import { accent, feedback, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, STAT_TINT, TAP_MIN, clay, radius, text, typography, withAlpha } from '@/theme';
 
 type Kind = 'journal' | 'reflection';
 
@@ -81,14 +84,14 @@ export default function EntryScreen() {
 
       <View style={styles.head}>
         {meta ? (
-          <View style={[styles.chip, { backgroundColor: withAlpha(meta.color, 0.14) }]}>
+          <View style={[styles.chip, { backgroundColor: withAlpha(meta.color, STAT_TINT) }]}>
             <Ionicons name={meta.icon} size={13} color={meta.color} />
             <Text style={[styles.chipText, { color: meta.color }]}>{meta.label}</Text>
           </View>
         ) : (
-          <View style={[styles.chip, { backgroundColor: withAlpha(accent, 0.12) }]}>
-            <Ionicons name="book-outline" size={13} color={accent} />
-            <Text style={[styles.chipText, { color: accent }]}>Journal</Text>
+          <View style={[styles.chip, { backgroundColor: clay[200] }]}>
+            <Ionicons name="book-outline" size={13} color={clay[800]} />
+            <Text style={[styles.chipText, { color: clay[800] }]}>Journal</Text>
           </View>
         )}
         <Text style={styles.date}>{prettyDay(item.day)}</Text>
@@ -101,48 +104,37 @@ export default function EntryScreen() {
         <Markdown value={item.text} />
       </SystemPanel>
 
-      <View style={styles.actions}>
+      <ButtonRow>
         {kind === 'journal' ? (
-          <Pressable
-            onPress={() => setEditing(true)}
-            style={({ pressed }) => [styles.action, pressed && { opacity: 0.85 }]}
-          >
-            <Ionicons name="create-outline" size={15} color={onAccent} />
-            <Text style={styles.actionText}>Edit</Text>
-          </Pressable>
+          <Button label="Edit" icon="create-outline" onPress={() => setEditing(true)} style={styles.grow} />
         ) : null}
-        <Pressable
-          onPress={remove}
-          style={({ pressed }) => [styles.action, styles.danger, pressed && { opacity: 0.85 }]}
-        >
-          <Ionicons name="trash-outline" size={15} color={feedback.danger} />
-          <Text style={[styles.actionText, { color: feedback.danger }]}>Delete</Text>
-        </Pressable>
-      </View>
+        <Button label="Delete" icon="trash-outline" tone="danger" onPress={remove} style={styles.grow} />
+      </ButtonRow>
 
-      <View style={styles.pager}>
-        <Pressable
+      <ButtonRow>
+        <Button
+          label="Newer"
+          icon="chevron-up"
+          tone="quiet"
           disabled={!newer}
           onPress={() => go(newer)}
-          style={({ pressed }) => [styles.pageBtn, !newer && styles.pageOff, pressed && { opacity: 0.6 }]}
-        >
-          <Ionicons name="chevron-up" size={15} color={newer ? accent : text.faint} />
-          <Text style={[styles.pageText, !newer && styles.pageTextOff]}>Newer</Text>
-        </Pressable>
-        <Pressable
+          style={styles.grow}
+        />
+        <Button
+          label="Older"
+          icon="chevron-down"
+          tone="quiet"
           disabled={!older}
           onPress={() => go(older)}
-          style={({ pressed }) => [styles.pageBtn, !older && styles.pageOff, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={[styles.pageText, !older && styles.pageTextOff]}>Older</Text>
-          <Ionicons name="chevron-down" size={15} color={older ? accent : text.faint} />
-        </Pressable>
-      </View>
+          style={styles.grow}
+        />
+      </ButtonRow>
 
       <NoteEditorModal
         visible={editing}
         prompt="Edit your entry"
         initial={item.text}
+        maxLength={JOURNAL_NOTE_MAX}
         onSave={(t) => {
           setEditing(false);
           void updateJournalEntry(item.id, t);
@@ -154,39 +146,19 @@ export default function EntryScreen() {
 }
 
 const styles = StyleSheet.create({
-  gone: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
-  chipText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
-  date: { color: text.secondary, fontSize: 13, fontWeight: '600' },
-  prompt: { color: text.secondary, fontSize: 14, lineHeight: 20, fontStyle: 'italic' },
-  source: { color: text.faint, fontSize: 12, fontWeight: '600' },
-  actions: { flexDirection: 'row', gap: 8 },
-  action: {
+  gone: { ...typography.body, color: text.secondary },
+  grow: { flex: 1 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TAP_MIN },
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    backgroundColor: accent,
-    borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
   },
-  actionText: { color: onAccent, fontSize: 14, fontWeight: '700' },
-  danger: { backgroundColor: withAlpha(feedback.danger, 0.1), paddingHorizontal: 14 },
-  pager: { flexDirection: 'row', gap: 8 },
-  pageBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 10,
-    paddingVertical: 11,
-  },
-  pageOff: { opacity: 0.5 },
-  pageText: { color: accent, fontSize: 13, fontWeight: '700' },
-  pageTextOff: { color: text.faint },
+  chipText: { ...typography.label, fontSize: 11.5 },
+  date: { ...typography.label, color: text.secondary },
+  prompt: { ...typography.body, fontSize: 14, lineHeight: 22, color: text.secondary, fontStyle: 'italic' },
+  source: { ...typography.small, color: text.faint },
 });

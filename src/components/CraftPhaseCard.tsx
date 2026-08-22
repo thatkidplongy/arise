@@ -1,17 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
+import { Text, TextInput } from '@/components/ui/Text';
+import { LEARNING_NOTE_MAX } from '@/consts';
 import { useCollapse } from '@/hooks/useCollapse';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiCraft, ApiLearning } from '@/lib/api';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, onAccent, radius, surface, text, withAlpha } from '@/theme';
 
 /** Craft's colour — this is the coding/architecture attribute. */
 const HUE = STAT_META.CFT.color;
@@ -216,6 +218,7 @@ function StudyLog({ source }: { source: string }) {
         visible={editing}
         prompt={STUDY_PROMPT}
         initial={note}
+        maxLength={LEARNING_NOTE_MAX}
         onSave={(t) => {
           setEditing(false);
           setNote(t);
@@ -356,7 +359,7 @@ const styles = StyleSheet.create({
     backgroundColor: withAlpha(HUE, 0.08),
     borderWidth: 1,
     borderColor: withAlpha(HUE, 0.25),
-    borderRadius: 10,
+    borderRadius: radius.md,
     padding: 11,
   },
   nowBody: { flex: 1, minWidth: 0, gap: 2 },
@@ -385,7 +388,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     color: text.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -399,7 +402,7 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.md,
     backgroundColor: surface.base,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -441,7 +444,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: withAlpha(HUE, 0.4),
     backgroundColor: withAlpha(HUE, 0.06),
-    borderRadius: 11,
+    borderRadius: radius.md,
     padding: 13,
     gap: 10,
   },
@@ -450,7 +453,9 @@ const styles = StyleSheet.create({
   btn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 9,
     paddingHorizontal: 14,
     alignItems: 'center',

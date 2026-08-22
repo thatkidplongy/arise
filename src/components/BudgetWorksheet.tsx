@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
+import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiBudget, ApiCommitment } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import {
@@ -22,7 +23,7 @@ import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, feedback, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, radius, surface, text, typography, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color; // the wealth attribute's tone, for this whole area
 const EDITABLE: ('needs' | 'wants')[] = ['needs', 'wants'];
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
     borderBottomColor: surface.hairline,
   },
   incomeLabel: { color: text.secondary, fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  incomeValue: { color: text.primary, fontSize: 20, fontWeight: '800' },
+  incomeValue: { ...typography.numeral, fontSize: 28, color: text.primary, includeFontPadding: false },
   incomeUnset: { color: TONE, fontSize: 15, fontWeight: '700' },
   incomeInput: { minWidth: 130, textAlign: 'right' },
 
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     minHeight: TAP,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: withAlpha(TONE, 0.5),
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 9,
     color: text.primary,
@@ -531,7 +532,8 @@ const styles = StyleSheet.create({
   addBtn: {
     width: TAP,
     height: TAP,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
     borderWidth: 1,
     borderColor: TONE,
     backgroundColor: withAlpha(TONE, 0.1),
@@ -541,7 +543,7 @@ const styles = StyleSheet.create({
 
   untagged: { color: text.secondary, fontSize: 11.5, lineHeight: 17, marginTop: 8 },
   savingsFigure: { marginTop: 12, gap: 2 },
-  savingsAmount: { fontSize: 22, fontWeight: '800' },
+  savingsAmount: { ...typography.numeral, fontSize: 24, includeFontPadding: false },
 
   empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
 });

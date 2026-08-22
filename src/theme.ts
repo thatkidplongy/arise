@@ -1,41 +1,210 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 import type { Rank, StatKey } from '@/types';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 /**
- * One warm, sandy design system. Flat surfaces, generous whitespace, a single
- * clay accent, earthy stat tones. No gradients, glows, or neon — restraint is
- * the aesthetic.
+ * Arise v2 — the "Organic" language: a cream-and-sand ground, one clay accent and
+ * a sage second voice, Caprasimo over Figtree, over-rounded containers and pill
+ * controls. Everything visual comes from this file; nothing downstream hard-codes
+ * a hex, a radius or a font name.
+ *
+ * The three ramps below are the design system's, generated in OKLCH on one shared
+ * lightness scale — so step 200 of any ramp carries the same visual weight as step
+ * 200 of the others. Reach for a ramp step rather than mixing your own tint.
  */
+export const neutral = {
+  100: '#F9F4ED',
+  200: '#EEE7DB',
+  300: '#DCD3C4',
+  400: '#C0B6A5',
+  500: '#A19786',
+  600: '#82796A',
+  700: '#645C50',
+  800: '#474238',
+  900: '#2E2B25',
+} as const;
+
+/** The clay ramp — the accent's tonal family. */
+export const clay = {
+  100: '#FFF2EB',
+  200: '#FFE1D0',
+  300: '#FFC6A5',
+  400: '#F6A06B',
+  500: '#D67F48',
+  600: '#B2622D',
+  700: '#8C491A',
+  800: '#643312',
+  900: '#402310',
+} as const;
+
+/** The sage ramp — the second voice: cleared, rested, safe. Never a warning. */
+export const sage = {
+  100: '#F0FAE1',
+  200: '#E1EECC',
+  300: '#CCDBB2',
+  400: '#AEBF92',
+  500: '#8FA073',
+  600: '#728157',
+  700: '#56633F',
+  800: '#3D472B',
+  900: '#272E1B',
+} as const;
+
 export const surface = {
-  base: '#F0E8D8', // warm sand page
-  card: '#FAF5EB', // warm ivory card
-  raised: 'rgba(44, 39, 32, 0.03)',
-  hairline: '#E4D9C2', // warm tan border
-  overlay: 'rgba(44, 39, 32, 0.38)', // scrim
+  base: '#F5EAD8', // warm sand page
+  card: neutral[100], // ivory card — the default surface
+  muted: neutral[200], // inset fields, chips, quiet fills
+  raised: 'rgba(46, 43, 37, 0.03)',
+  hairline: neutral[300], // rules and card edges
+  edge: neutral[400], // a border that needs to be seen
+  overlay: 'rgba(32, 30, 29, 0.5)', // scrim
+  system: neutral[900], // the System speaks from ink
+  clayPatch: clay[100], // the North Star, and what's happening now
+  clayFill: clay[200],
+  sagePatch: sage[100],
+  sageFill: sage[200],
 };
 
 export const text = {
-  primary: '#2C2720', // espresso
-  secondary: '#7E7361', // taupe
-  faint: '#A99D85', // light taupe
+  primary: '#201E1D', // ink
+  secondary: neutral[700],
+  faint: neutral[600],
+  onClay: clay[700], // accent-coloured body copy, at a contrast that passes
+  onSage: sage[800],
+  onSystem: neutral[100],
+  onSystemDim: neutral[300],
 };
 
 /** The single accent, used sparingly. */
-export const accent = '#B0603A'; // clay
-/** Ivory text/icon that sits on a filled-accent button. (Note: distinct from
- * surface.card '#FAF5EB' — one shade brighter, intentionally.) */
-export const onAccent = '#FBF5EB';
+export const accent = '#C67139'; // clay
+/** The accent, lifted so it still reads on the ink surfaces. */
+export const accentOnDark = clay[400];
+/** Ivory text/icon that sits on a filled-accent button. */
+export const onAccent = neutral[100];
+/** The second accent — a genuine voice, not a highlight. */
+export const accent2 = '#7A8A5E'; // sage
 
 export const feedback = {
-  success: '#6F8A57', // sage
+  success: sage[600],
   danger: '#B0503F', // brick
   gold: '#BE9A57', // warm ochre
 };
 
+/** 8 / 16 / 28 for containers; anything tappable goes fully round. */
+export const radius = {
+  sm: 8,
+  md: 16,
+  lg: 28,
+  pill: 999,
+} as const;
+
+/** The spacing scale — density 1.10x, same as the design system's --space-*. */
+export const space = {
+  xs: 4,
+  sm: 9,
+  md: 13,
+  lg: 18,
+  xl: 26,
+  xxl: 35,
+} as const;
+
+/** Nothing interactive is smaller than this, ever. */
+export const TAP_MIN = 44;
+
+/** Elevation, tuned to the sand ground. */
+export const shadow: Record<'sm' | 'md' | 'lg', ViewStyle> = {
+  sm: {
+    shadowColor: neutral[900],
+    shadowOpacity: 0.14,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  md: {
+    shadowColor: neutral[900],
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: neutral[900],
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+};
+
+/**
+ * Font families. Caprasimo is the only display voice — headings and every number
+ * that matters. Figtree carries everything else. Monospace is reserved for
+ * counters, ranks and totals.
+ *
+ * These are the family names the loader in `_layout.tsx` registers; on native a
+ * custom family and a `fontWeight` must not be combined (Android synthesises a
+ * fake bold), so pick the family that already carries the weight.
+ */
+export const font = {
+  display: 'Caprasimo_400Regular',
+  regular: 'Figtree_400Regular',
+  semibold: 'Figtree_600SemiBold',
+  bold: 'Figtree_700Bold',
+  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace' }) as string,
+} as const;
+
+/** Weight -> the Figtree cut that carries it. Three cuts ship, matching the design
+ * system's own set, so 500 rounds up to SemiBold rather than pointing at nothing. */
+export const FIGTREE_BY_WEIGHT: Record<string, string> = {
+  '100': font.regular,
+  '200': font.regular,
+  '300': font.regular,
+  '400': font.regular,
+  normal: font.regular,
+  '500': font.semibold,
+  '600': font.semibold,
+  '700': font.bold,
+  '800': font.bold,
+  '900': font.bold,
+  bold: font.bold,
+};
+
+/** The type scale. Presets, so no screen invents its own size/weight pairing. */
+export const typography = {
+  /** The wordmark on Status. */
+  wordmark: { fontFamily: font.display, fontSize: 34, lineHeight: 36 } as TextStyle,
+  /** A screen's own name. */
+  screenTitle: { fontFamily: font.display, fontSize: 32, lineHeight: 33 } as TextStyle,
+  /** A heading inside a card. */
+  section: { fontFamily: font.display, fontSize: 21, lineHeight: 23 } as TextStyle,
+  /** A smaller heading, or a card that is itself the heading. */
+  heading: { fontFamily: font.display, fontSize: 18, lineHeight: 22 } as TextStyle,
+  /** A number that matters — size it at the call site. */
+  numeral: { fontFamily: font.display } as TextStyle,
+  /** Card titles and controls. */
+  cardTitle: { fontFamily: font.semibold, fontSize: 14, lineHeight: 19 } as TextStyle,
+  label: { fontFamily: font.semibold, fontSize: 12.5, lineHeight: 17 } as TextStyle,
+  /** Body copy — the voice of the app: invite, never command. */
+  body: { fontFamily: font.regular, fontSize: 13, lineHeight: 21 } as TextStyle,
+  small: { fontFamily: font.regular, fontSize: 11.5, lineHeight: 17 } as TextStyle,
+  tiny: { fontFamily: font.regular, fontSize: 10.5, lineHeight: 15 } as TextStyle,
+  /** Tracked, uppercase, above the thing it names. */
+  kicker: {
+    fontFamily: font.semibold,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  } as TextStyle,
+  button: { fontFamily: font.semibold, fontSize: 13.5, lineHeight: 18 } as TextStyle,
+  mono: { fontFamily: font.mono, fontSize: 11.5, lineHeight: 16 } as TextStyle,
+};
+
+/** Rank tiles: a tinted disc, its letter in the deep step of the same family. */
 export const RANK_COLORS: Record<Rank, string> = {
   E: '#9A8F79',
   D: '#7C8A5A',
@@ -43,6 +212,16 @@ export const RANK_COLORS: Record<Rank, string> = {
   B: '#977A8C',
   A: '#C0863E',
   S: '#BE9A57',
+};
+
+/** S is the one rank that inverts — ink disc, clay letter. */
+export const RANK_FILL: Record<Rank, { bg: string; fg: string }> = {
+  E: { bg: 'rgba(154, 143, 121, 0.22)', fg: neutral[700] },
+  D: { bg: sage[200], fg: sage[800] },
+  C: { bg: 'rgba(94, 128, 133, 0.22)', fg: '#3F5C60' },
+  B: { bg: 'rgba(151, 122, 140, 0.22)', fg: '#6B5464' },
+  A: { bg: clay[200], fg: clay[800] },
+  S: { bg: neutral[900], fg: clay[300] },
 };
 
 export const STAT_KEYS: StatKey[] = ['STR', 'CRE', 'SPI', 'CHA', 'INT', 'WLT', 'CFT'];
@@ -60,6 +239,9 @@ export const STAT_META: Record<
   CFT: { label: 'Craft', sub: 'Coding, system design & architecture', color: '#5B6C8F', icon: 'code-slash' },
 };
 
+/** The tint a stat's own colour makes when it fills a chip or a bar's track. */
+export const STAT_TINT = 0.14;
+
 /** '#RRGGBB' + alpha -> 'rgba(...)', for soft tint fills. */
 export function withAlpha(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -68,3 +250,25 @@ export function withAlpha(hex: string, alpha: number): string {
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+/**
+ * Motion, from the handoff sheet. Nothing bounces, nothing pulses to demand
+ * attention, and nothing animates on a schedule you didn't start.
+ */
+export const motion = {
+  /** XP and stat bars. */
+  bar: 500,
+  /** A completion circle filling. */
+  fill: 350,
+  /** A toast arriving. */
+  toastIn: 280,
+  /** How long an undo stays offered. */
+  undoWindow: 4500,
+  /** Bottom sheets and System notices. */
+  sheet: 300,
+  notice: 340,
+  /** The tab pill. */
+  pill: { stiffness: 280, damping: 26, mass: 1 },
+  /** The one shared easing curve. */
+  easing: [0.2, 0.8, 0.2, 1] as const,
+};

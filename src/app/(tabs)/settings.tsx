@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Button } from '@/components/ui/Button';
+import { Card, ScreenTitle } from '@/components/ui/Card';
+import { Field, TextArea } from '@/components/ui/Field';
+import { Text } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, surface, text } from '@/theme';
+import { feedback, neutral, radius, text, typography } from '@/theme';
 
 export default function SettingsScreen() {
   const state = useSystem((s) => s.state);
@@ -74,7 +78,7 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <BackLink />
-      <Text style={styles.h1}>Settings</Text>
+      <ScreenTitle>Settings</ScreenTitle>
 
       {state ? (
         <SystemPanel title="Your North Star">
@@ -82,22 +86,19 @@ export default function SettingsScreen() {
             The life you’re reaching for, in your own words — who you want to be, why you’re doing
             this. It stays at the top of your Status as a reminder. No wrong answer.
           </Text>
-          <TextInput
+          <TextArea
             value={northStarDraft}
             onChangeText={setNorthStarDraft}
-            style={[styles.input, styles.multiline]}
+            style={styles.field}
             placeholder="e.g. Someone I’m proud to see in the mirror — strong, creative, present, still growing."
-            placeholderTextColor={text.faint}
-            multiline
             maxLength={280}
           />
-          <Pressable
-            disabled={northStarSave.state === 'saving'}
-            style={({ pressed }) => [styles.btn, (pressed || northStarSave.state === 'saving') && { opacity: 0.8 }]}
+          <Button
+            label={saveLabel(northStarSave.state, 'Save North Star')}
+            busy={northStarSave.state === 'saving'}
             onPress={saveNorthStarFlow}
-          >
-            <Text style={styles.btnText}>{saveLabel(northStarSave.state, 'Save North Star')}</Text>
-          </Pressable>
+            block
+          />
         </SystemPanel>
       ) : null}
 
@@ -106,56 +107,51 @@ export default function SettingsScreen() {
           <View style={[styles.dot, { backgroundColor: statusColor }]} />
           <Text style={styles.line}>{statusMessage}</Text>
         </View>
-        <TextInput
+        <Field
           value={urlDraft}
           onChangeText={setUrlDraft}
-          style={styles.input}
+          style={styles.field}
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="https://yourhunter.duckdns.org"
-          placeholderTextColor={text.faint}
         />
-        <TextInput
+        <Field
           value={tokenDraft}
           onChangeText={setTokenDraft}
-          style={styles.input}
+          style={styles.field}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
           placeholder="Access token (leave blank for local)"
-          placeholderTextColor={text.faint}
         />
-        <Pressable
-          disabled={linkSave.state === 'saving'}
-          style={({ pressed }) => [styles.btn, (pressed || linkSave.state === 'saving') && { opacity: 0.8 }]}
-          onPress={saveLink}
-        >
-          <Text style={styles.btnText}>
-            {linkSave.state === 'saving'
+        <Button
+          label={
+            linkSave.state === 'saving'
               ? 'Reconnecting…'
               : linkSave.state === 'done'
-                ? 'Reconnected ✓'
-                : 'Save and reconnect'}
-          </Text>
-        </Pressable>
+                ? 'Reconnected'
+                : 'Save and reconnect'
+          }
+          busy={linkSave.state === 'saving'}
+          onPress={saveLink}
+          block
+        />
       </SystemPanel>
 
       <SystemPanel title="Hunter name">
-        <TextInput
+        <Field
           value={nameDraft}
           onChangeText={setNameDraft}
-          style={styles.input}
+          style={styles.field}
           placeholder="Enter hunter name"
-          placeholderTextColor={text.faint}
           maxLength={24}
         />
-        <Pressable
-          disabled={nameSave.state === 'saving'}
-          style={({ pressed }) => [styles.btn, (pressed || nameSave.state === 'saving') && { opacity: 0.8 }]}
+        <Button
+          label={saveLabel(nameSave.state, 'Save')}
+          busy={nameSave.state === 'saving'}
           onPress={saveNameFlow}
-        >
-          <Text style={styles.btnText}>{saveLabel(nameSave.state, 'Save')}</Text>
-        </Pressable>
+          block
+        />
       </SystemPanel>
 
       {state ? (
@@ -168,10 +164,19 @@ export default function SettingsScreen() {
         </SystemPanel>
       ) : null}
 
-      <SystemPanel title="Danger zone">
-        <Pressable
-          disabled={resetting}
-          style={({ pressed }) => [styles.dangerBtn, (pressed || resetting) && { opacity: 0.85 }]}
+      <Card tone="dashed" style={styles.danger}>
+        <Text style={styles.dangerTitle}>Starting over</Text>
+        <Text style={styles.help}>
+          This erases every quest, reflection and streak. There is no undo, and nothing here needs
+          it — a quiet week is not a reason to reset.
+        </Text>
+        <Button
+          label={
+            resetting ? 'Resetting…' : confirmReset ? 'Tap again to erase all progress' : 'Reset all data'
+          }
+          tone="danger"
+          busy={resetting}
+          block
           onPress={async () => {
             if (resetting) return;
             if (confirmReset) {
@@ -183,21 +188,11 @@ export default function SettingsScreen() {
               setConfirmReset(true);
             }
           }}
-        >
-          <Text style={styles.dangerText}>
-            {resetting
-              ? 'Resetting…'
-              : confirmReset
-                ? 'Tap again to erase all progress'
-                : 'Reset all data'}
-          </Text>
-        </Pressable>
+        />
         {confirmReset && !resetting ? (
-          <Pressable onPress={() => setConfirmReset(false)}>
-            <Text style={styles.cancel}>Cancel</Text>
-          </Pressable>
+          <Button label="Cancel" tone="ghost" block onPress={() => setConfirmReset(false)} />
         ) : null}
-      </SystemPanel>
+      </Card>
 
       <Text style={styles.footer}>Arise · a personal System, inspired by Solo Leveling</Text>
     </Screen>
@@ -205,88 +200,22 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  h1: {
-    color: text.primary,
-    fontSize: 20,
-    fontWeight: '700',
-  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 14,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: radius.pill,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 10,
-    backgroundColor: surface.base,
-  },
-  multiline: {
-    minHeight: 92,
-    textAlignVertical: 'top',
-    lineHeight: 20,
-  },
-  btn: {
-    backgroundColor: accent,
-    borderRadius: 9,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  btnText: {
-    color: onAccent,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  line: {
-    color: text.secondary,
-    fontSize: 13,
-    lineHeight: 20,
-    flex: 1,
-  },
-  help: {
-    color: text.secondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  recordLine: {
-    color: text.primary,
-    fontSize: 13,
-    lineHeight: 22,
-  },
-  dangerBtn: {
-    borderWidth: 1,
-    borderColor: feedback.danger,
-    borderRadius: 9,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  dangerText: {
-    color: feedback.danger,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancel: {
-    color: text.faint,
-    textAlign: 'center',
-    marginTop: 10,
-    fontSize: 13,
-  },
-  footer: {
-    color: text.faint,
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 8,
-  },
+  field: { marginBottom: 10 },
+  line: { ...typography.body, color: text.secondary, flex: 1 },
+  help: { ...typography.small, color: text.secondary, marginBottom: 12 },
+  recordLine: { ...typography.body, lineHeight: 24, color: neutral[900] },
+  danger: { gap: 10 },
+  dangerTitle: { ...typography.heading, color: feedback.danger },
+  footer: { ...typography.small, color: text.faint, textAlign: 'center', marginTop: 8 },
 });

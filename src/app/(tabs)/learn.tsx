@@ -1,17 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { Markdown } from '@/components/Markdown';
+import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { ReadingCard } from '@/components/ReadingCard';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Button } from '@/components/ui/Button';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { Field, TextArea } from '@/components/ui/Field';
+import { ChoiceChip, Tag } from '@/components/ui/Tag';
+import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
+import { LEARNING_NOTE_MAX } from '@/consts';
 import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, onAccent, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
 const KINDS: { key: LearningKind; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'book', label: 'Book', icon: 'book-outline' },
@@ -30,6 +37,8 @@ const PLACEHOLDERS: Record<LearningKind, string> = {
   video: 'e.g. A talk on system design',
   other: 'What was it?',
 };
+
+const NOTE_PROMPT = 'Look away from the page — what do you remember? (in your own words, not copied)';
 
 /** The colour Recall borrows — Grow (INT), since this is the reading attribute. */
 const HUE = STAT_META.INT.color;
@@ -56,6 +65,25 @@ function LoggedRow({ entry, onRemove }: { entry: ApiLearning; onRemove: () => vo
   );
 }
 
+/** The note you're drafting, shown the way it will read once logged. Tapping it opens
+ * the shared note editor — the same one the journal, quest reflections and craft
+ * sittings use, so formatting works the same everywhere. */
+function NoteDraft({ value, onPress }: { value: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={value ? 'Edit what you remember' : 'Write what you remember'}
+      style={({ pressed }) => [styles.draft, pressed && styles.draftPressed]}
+    >
+      <View style={styles.draftBody}>
+        {value ? <Markdown value={value} /> : <Text style={styles.draftEmpty}>{NOTE_PROMPT}</Text>}
+      </View>
+      <Ionicons name="create-outline" size={15} color={HUE} />
+    </Pressable>
+  );
+}
+
 /** What you read today, in your own words. The source alone is enough on a busy
  * day — the distiller works from a book's name. Notes make it far better, though:
  * what you wrote down is what you actually took away. */
@@ -66,6 +94,7 @@ function Capture() {
   const [kind, setKind] = useState<LearningKind>('book');
   const [source, setSource] = useState('');
   const [note, setNote] = useState('');
+  const [editing, setEditing] = useState(false);
 
   const empty = !source.trim() && !note.trim();
 
@@ -88,50 +117,46 @@ function Capture() {
       </Text>
 
       <View style={styles.pills}>
-        {KINDS.map((k) => {
-          const on = k.key === kind;
-          return (
-            <Pressable
-              key={k.key}
-              onPress={() => setKind(k.key)}
-              style={({ pressed }) => [styles.pill, on && styles.pillOn, pressed && { opacity: 0.8 }]}
-            >
-              <Ionicons name={k.icon} size={14} color={on ? onAccent : HUE} />
-              <Text style={[styles.pillText, { color: on ? onAccent : HUE }]}>{k.label}</Text>
-            </Pressable>
-          );
-        })}
+        {KINDS.map((k) => (
+          <ChoiceChip
+            key={k.key}
+            label={k.label}
+            color={HUE}
+            selected={k.key === kind}
+            onPress={() => setKind(k.key)}
+          />
+        ))}
       </View>
 
-      <TextInput
+      <Field
         value={source}
         onChangeText={setSource}
         style={styles.input}
         placeholder={PLACEHOLDERS[kind]}
-        placeholderTextColor={text.faint}
         maxLength={200}
       />
-      <TextInput
-        value={note}
-        onChangeText={setNote}
-        style={[styles.input, styles.multiline]}
-        placeholder="Look away from the page — what do you remember? (in your own words, not copied)"
-        placeholderTextColor={text.faint}
-        multiline
-        maxLength={4000}
+      <NoteDraft value={note} onPress={() => setEditing(true)} />
+
+      <NoteEditorModal
+        visible={editing}
+        prompt={NOTE_PROMPT}
+        initial={note}
+        maxLength={LEARNING_NOTE_MAX}
+        onSave={(t) => {
+          setEditing(false);
+          setNote(t);
+        }}
+        onClose={() => setEditing(false)}
       />
 
-      <Pressable
-        disabled={empty || save.state === 'saving'}
+      <Button
+        label={saveLabel(save.state, 'Log it')}
         onPress={submit}
-        style={({ pressed }) => [
-          styles.btn,
-          empty && styles.btnOff,
-          (pressed || save.state === 'saving') && { opacity: 0.8 },
-        ]}
-      >
-        <Text style={styles.btnText}>{saveLabel(save.state, 'Log it')}</Text>
-      </Pressable>
+        disabled={empty}
+        busy={save.state === 'saving'}
+        block
+        large
+      />
     </SystemPanel>
   );
 }
@@ -163,16 +188,16 @@ function GradeRow({ id }: { id: string }) {
   return (
     <View style={styles.gradeRow}>
       {GRADES.map((g) => (
-        <Pressable
+        <ChoiceChip
           key={g.key}
+          label={g.label}
+          color={HUE}
+          selected={false}
           onPress={() => {
             setDone(g.key);
             void gradeRecall(id, g.key);
           }}
-          style={({ pressed }) => [styles.gradeBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.gradeText}>{g.label}</Text>
-        </Pressable>
+        />
       ))}
     </View>
   );
@@ -201,20 +226,13 @@ function RecallRow({ item }: { item: ApiRecall }) {
       <View style={styles.recallRow}>
         <Text style={styles.recallText}>{item.cue}</Text>
         <Text style={styles.recallWhen}>{when}</Text>
-        <TextInput
+        <TextArea
           style={styles.attemptInput}
           value={attempt}
           onChangeText={setAttempt}
           placeholder="Say it first, then write what you got"
-          placeholderTextColor={text.faint}
-          multiline
         />
-        <Pressable
-          onPress={() => setShown(true)}
-          style={({ pressed }) => [styles.revealBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.revealText}>Reveal</Text>
-        </Pressable>
+        <Button label="Reveal" tone="secondary" onPress={() => setShown(true)} style={styles.reveal} />
       </View>
     );
   }
@@ -266,9 +284,7 @@ function ThreadPanel() {
   return (
     <SystemPanel title="The book so far">
       <Text style={styles.threadText}>{thread.summary}</Text>
-      <Text style={styles.threadMeta}>
-        {thread.title} · {thread.days} sitting{thread.days === 1 ? '' : 's'}
-      </Text>
+      <Tag label={`${thread.title} · ${thread.days} sitting${thread.days === 1 ? '' : 's'}`} tone="sage" />
     </SystemPanel>
   );
 }
@@ -280,10 +296,8 @@ export default function LearnScreen() {
 
   return (
     <Screen>
-      <View style={styles.head}>
-        <Text style={styles.h1}>Learn</Text>
-        <Text style={styles.sub}>What you’re reading, and what comes back.</Text>
-      </View>
+      <ScreenTitle>Learn</ScreenTitle>
+      <ScreenBlurb>What you’re reading, and what comes back.</ScreenBlurb>
 
       {!state ? (
         <ConnectionPanel />
@@ -327,109 +341,47 @@ export default function LearnScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { gap: 4, marginBottom: 2 },
-  h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
-  sub: { color: text.secondary, fontSize: 13 },
-  help: { color: text.secondary, fontSize: 12, lineHeight: 18, marginBottom: 14 },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: 9,
-    paddingVertical: 7,
-    paddingHorizontal: 11,
-    borderWidth: 1,
-    borderColor: withAlpha(HUE, 0.5),
-    backgroundColor: withAlpha(HUE, 0.08),
-  },
-  pillOn: { backgroundColor: HUE, borderColor: HUE },
-  pillText: { fontSize: 13, fontWeight: '700' },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    color: text.primary,
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  multiline: { minHeight: 92, textAlignVertical: 'top' },
-  btn: {
-    backgroundColor: accent,
-    borderRadius: 9,
-    paddingVertical: 11,
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  btnOff: { backgroundColor: withAlpha(accent, 0.35) },
-  btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
-  row: {
+  help: { ...typography.small, color: text.secondary, marginBottom: 14 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 14 },
+  input: { marginBottom: 10 },
+  draft: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: surface.muted,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    minHeight: 96,
+    marginBottom: 12,
+  },
+  draftPressed: { backgroundColor: withAlpha(HUE, 0.08) },
+  // minWidth:0 so a long unbroken line wraps instead of pushing the pen off the row.
+  draftBody: { flex: 1, minWidth: 0 },
+  draftEmpty: { ...typography.body, color: text.secondary },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
   },
   rowText: { flex: 1, gap: 3 },
-  rowSource: { color: text.primary, fontSize: 14, fontWeight: '600' },
+  rowSource: { ...typography.cardTitle, color: neutral[900] },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
-  empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  recallRow: { paddingVertical: 9, borderTopWidth: 1, borderTopColor: surface.hairline, gap: 3 },
-  recallText: { color: text.primary, fontSize: 14, lineHeight: 20 },
-  recallHook: { color: text.secondary, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
-  attemptInput: {
-    marginTop: 10,
-    minHeight: 54,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    color: text.primary,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlignVertical: 'top',
-  },
-  revealBtn: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: withAlpha(STAT_META.INT.color, 0.14),
-  },
-  revealText: { color: STAT_META.INT.color, fontSize: 12, fontWeight: '700' },
-  attemptLabel: {
-    color: text.faint,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 3,
-  },
-  attemptEcho: {
-    color: text.secondary,
-    fontSize: 13,
-    lineHeight: 19,
-    fontStyle: 'italic',
-    marginBottom: 10,
-  },
-  recallNudge: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 6 },
-  gradeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  gradeBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    backgroundColor: withAlpha(STAT_META.INT.color, 0.07),
-  },
-  gradeText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
-  gradeDone: { color: text.faint, fontSize: 11, marginTop: 10 },
-  threadText: { color: text.primary, fontSize: 14, lineHeight: 21 },
-  threadMeta: { color: text.faint, fontSize: 11, marginTop: 6 },
-  recallWhen: { color: text.faint, fontSize: 11 },
-  footer: { color: text.faint, fontSize: 12, lineHeight: 17, paddingHorizontal: 4 },
+  empty: { ...typography.body, color: text.secondary },
+  recallRow: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: surface.hairline, gap: 4 },
+  recallText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },
+  recallHook: { ...typography.small, color: text.secondary, fontStyle: 'italic' },
+  recallWhen: { ...typography.tiny, color: text.faint },
+  attemptInput: { marginTop: 10, minHeight: 72 },
+  reveal: { marginTop: 10, alignSelf: 'flex-start' },
+  attemptLabel: { ...typography.kicker, color: text.faint, marginBottom: 3 },
+  attemptEcho: { ...typography.body, color: text.secondary, fontStyle: 'italic', marginBottom: 10 },
+  recallNudge: { ...typography.small, fontSize: 11, color: text.faint, marginTop: 6 },
+  gradeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
+  gradeDone: { ...typography.small, color: text.faint, marginTop: 10 },
+  threadText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },
+  footer: { ...typography.small, color: text.faint, lineHeight: 18 },
 });

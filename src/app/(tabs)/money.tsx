@@ -4,6 +4,7 @@ import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { LogMoney } from '@/components/LogMoney';
 import { MoneyTracker } from '@/components/MoneyTracker';
 import { Screen } from '@/components/Screen';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { useSystem } from '@/store/useSystem';
 
 /** The money screen, reached from the You hub. The 50/30/20 plan comes first — the
@@ -15,6 +16,8 @@ export default function MoneyScreen() {
   return (
     <Screen>
       <BackLink />
+      <ScreenTitle>Money</ScreenTitle>
+      <ScreenBlurb>The daily floor is just logging it: what came in, what went out.</ScreenBlurb>
       {state ? (
         <>
           <BudgetWorksheet budget={state.budget} />

@@ -423,26 +423,42 @@ sequenceDiagram
   API-first: the app needs the server reachable (an offline queue is a
   possible future patch).
 
-## Design Language — "sandy" minimal
+## Design Language — "Organic" (Arise v2)
 
-Restraint is the aesthetic. Simplicity comes from taking things away, not from
-stacking trends (an earlier glass/glow/gradient version read as generic
-"AI-designed" — this replaced it).
+Restraint is still the aesthetic — simplicity comes from taking things away, not
+from stacking trends. v2 keeps that and gives it a voice: warmer ground, rounder
+containers, and a real display face for the numbers that matter.
 
-- **Warm and flat** — a sand page (`#F0E8D8`), ivory cards, espresso text. No
-  gradients, glows, blur, neon, or bracketed corners. Cards are a 1px warm
-  hairline and nothing more.
-- **One accent** — a muted clay (`#B0603A`), used sparingly (progress fills,
-  the active tab, primary buttons). Stats use desaturated earthy tones
-  (clay, ochre, sage, mauve, slate) so five categories stay legible without
-  shouting.
-- **Type does the work** — system sans, two weights (regular + semibold),
-  sentence case everywhere (no ALL-CAPS labels, no wide letter-spacing).
-  Hierarchy comes from size and spacing.
-- **Semantic tokens** — components consume roles (`surface.card`,
-  `text.secondary`, `accent`), never raw hex.
-- **Quiet motion** — XP bars ease on change; quest cards tint on press; the
-  System notice springs in gently. Never decorative.
+- **Warm and flat** — a sand page (`#F5EAD8`), ivory cards (`#F9F4ED`), ink text
+  (`#201E1D`). No gradients, glows, blur, neon, or bracketed corners. Cards carry
+  no border at all: the heading is the only rule a card needs.
+- **Two voices** — a clay accent (`#C67139`) for progress, the North Star and
+  what's happening now; a sage second accent (`#7A8A5E`) for cleared, rested and
+  safe. Sage is never a warning. Stats keep their earthy tones (clay, ochre,
+  sage, mauve, slate, teal, indigo) so seven categories stay legible without
+  shouting. Each role carries a 100–900 ramp generated on one perceptual
+  lightness scale — reach for a ramp step rather than mixing a tint.
+- **The System speaks from ink** — the toast and the notification preview invert
+  to `#2E2B25`, the only two surfaces in the app that do.
+- **Type does the work** — Caprasimo for headings and every number that matters,
+  Figtree everywhere else, monospace only for counters and addresses. Kickers are
+  the one place ALL-CAPS appears, tracked and small, above the thing they name.
+- **Over-rounded** — radii are 8 / 16 / 28, and anything tappable is fully round.
+  Nothing interactive is under 44px.
+- **Semantic tokens** — components consume roles (`surface.card`, `type.section`,
+  `radius.lg`, `clay[700]`), never raw hex, sizes or weights. Every string goes
+  through `components/ui/Text`, which resolves the weight into the matching
+  Figtree cut so a custom family and a `fontWeight` never travel together.
+- **Quiet motion** — XP and stat bars ease over 500ms on the shared curve; the
+  completion circle fills over 350ms; the undo bar drains over its 4.5s window.
+  The tab bar's trailing shadow is the one flourish and it stays as built.
+  Nothing bounces, nothing pulses to demand attention, and nothing animates on a
+  schedule you didn't start.
+- **Voice** — three rules decide every string: never open with what you didn't
+  do; never put a number on a shortfall; never imply a clock. "Whatever you
+  manage counts", never "Don't lose your streak".
+- **The mark** — a single Caprasimo A, clay on sand. It is the one glyph the
+  system already leans on and it survives being 24px on a home screen.
 
 ## Roadmap (patches)
 

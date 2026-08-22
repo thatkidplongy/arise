@@ -1,23 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View, type ViewProps } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
 
+import { Tag, type TagTone } from '@/components/ui/Tag';
+import { Text } from '@/components/ui/Text';
 import { useCollapse } from '@/hooks/useCollapse';
-import { surface, text } from '@/theme';
+import { neutral, radius, space, surface, text, typography } from '@/theme';
 
 interface Props extends ViewProps {
   title?: string;
   sub?: string;
+  /** A small pill beside the title — "Now", "Done", a count. */
+  badge?: { label: string; tone?: TagTone };
   /** Show a chevron and let the header toggle the body open/closed. */
   collapsible?: boolean;
   /** Start collapsed (only meaningful with `collapsible`). */
   defaultCollapsed?: boolean;
 }
 
-/** A flat, warm card. A quiet header label does the work — no borders-within-borders.
- * Pass `collapsible` to let the header fold the body away (state is per-session). */
+/**
+ * The app's card: over-rounded ivory on the sand ground, no border, and a display
+ * heading rather than a grey label — the heading is the only rule the card needs.
+ * Pass `collapsible` to let the header fold the body away (state is per-session).
+ */
 export function SystemPanel({
   title,
   sub,
+  badge,
   collapsible,
   defaultCollapsed = false,
   children,
@@ -32,6 +40,7 @@ export function SystemPanel({
       style={[styles.header, canCollapse && styles.headerCentered, !isOpen && styles.headerClosed]}
     >
       <Text style={styles.headerText}>{title}</Text>
+      {badge ? <Tag label={badge.label} tone={badge.tone ?? 'neutral'} style={styles.badge} /> : null}
       {sub ? <Text style={styles.subText}>{sub}</Text> : null}
       {canCollapse ? (
         <Ionicons
@@ -66,15 +75,13 @@ export function SystemPanel({
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: surface.card,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: radius.lg,
+    padding: space.xl - 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 14,
+    marginBottom: 15,
   },
   // A chevron has no text baseline, so center the row when one is present.
   headerCentered: {
@@ -88,14 +95,19 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   headerText: {
-    color: text.secondary,
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.section,
+    color: neutral[900],
+    flexShrink: 1,
+  },
+  badge: {
+    marginLeft: 9,
+    alignSelf: 'center',
   },
   subText: {
-    color: text.faint,
-    fontSize: 12,
+    ...typography.small,
+    color: text.secondary,
     marginLeft: 'auto',
+    paddingLeft: 10,
   },
   chevron: {
     marginLeft: 8,

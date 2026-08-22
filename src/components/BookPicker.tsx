@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SearchRow } from '@/components/SearchRow';
+import { Text } from '@/components/ui/Text';
 import { useSearch } from '@/hooks/useSearch';
 import type { ApiBook, ApiBookShelf } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text } from '@/theme';
+import { accent, neutral, surface, text, typography } from '@/theme';
 
 /** Estimate chapters from page count (~15 pages/chapter) — a starting guess the
  * user can adjust; 0 when the page count is unknown. */
@@ -122,7 +123,7 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12 },
-  note: { color: text.secondary, fontSize: 12, marginTop: 8 },
+  note: { ...typography.small, color: text.secondary, marginTop: 8 },
   coverPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   results: { marginTop: 8 },
   resultRow: {
@@ -134,13 +135,13 @@ const styles = StyleSheet.create({
     borderTopColor: surface.hairline,
   },
   resultMain: { flex: 1 },
-  resultTitle: { color: text.primary, fontSize: 13, fontWeight: '600' },
-  resultMeta: { color: text.faint, fontSize: 11, marginTop: 1 },
+  resultTitle: { ...typography.cardTitle, fontSize: 13, color: neutral[900] },
+  resultMeta: { ...typography.tiny, color: text.faint, marginTop: 2 },
   shelves: { marginTop: 14 },
-  shelvesLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  shelvesLabel: { ...typography.kicker, color: text.secondary, marginBottom: 10 },
   shelf: { marginBottom: 12 },
-  shelfTitle: { color: text.primary, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  shelfTitle: { ...typography.heading, fontSize: 16, color: neutral[900], marginBottom: 8 },
   shelfRow: { gap: 10, paddingRight: 8 },
   card: { width: 56 },
-  cardTitle: { color: text.secondary, fontSize: 10, lineHeight: 13, marginTop: 4 },
+  cardTitle: { ...typography.tiny, fontSize: 10, lineHeight: 13, color: text.secondary, marginTop: 5 },
 });

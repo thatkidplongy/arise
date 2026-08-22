@@ -1,13 +1,12 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { GroceryPanel } from '@/components/GroceryPanel';
 import { NutritionPanel } from '@/components/NutritionPanel';
 import { Screen } from '@/components/Screen';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { useBody } from '@/query/useBody';
-import { text } from '@/theme';
 
 export default function FoodScreen() {
   const { body, refetch } = useBody();
@@ -21,10 +20,8 @@ export default function FoodScreen() {
 
   return (
     <Screen>
-      <View style={styles.head}>
-        <Text style={styles.h1}>Food</Text>
-        <Text style={styles.sub}>Eat with intention — nourish, don’t punish.</Text>
-      </View>
+      <ScreenTitle>Food</ScreenTitle>
+      <ScreenBlurb>Eat with intention — nourish, don’t punish.</ScreenBlurb>
       {body ? (
         <>
           <NutritionPanel />
@@ -37,8 +34,3 @@ export default function FoodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  head: { gap: 4, marginBottom: 2 },
-  h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
-  sub: { color: text.secondary, fontSize: 13 },
-});

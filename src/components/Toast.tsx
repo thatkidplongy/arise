@@ -1,14 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, onAccent, surface, text, withAlpha } from '@/theme';
+import { TAP_MIN, accent, clay, motion, neutral, radius, shadow, surface, typography } from '@/theme';
 import type { Toast as ToastData } from '@/types';
 
 /** How long a toast lingers before auto-dismissing. The bottom bar drains over
  * exactly this span, so the two always stay in sync. */
-const TOAST_MS = 5000;
+const TOAST_MS = motion.undoWindow;
 
 /**
  * A transient floating confirmation, anchored above the tab bar. Shown whenever a
@@ -16,6 +16,9 @@ const TOAST_MS = 5000;
  * save that worked always says so, with a quick undo before it fades on its own. A
  * thin bar along the bottom drains as the auto-dismiss timer runs down, so you can
  * see how long you've got to hit Undo.
+ *
+ * The System speaks from ink: this is one of the two surfaces in the app that
+ * inverts, so a confirmation never gets lost among the sand-coloured cards.
  */
 export function ToastHost() {
   const toast = useSystem((s) => s.toast);
@@ -68,19 +71,16 @@ function ToastView({ toast }: { toast: ToastData }) {
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
       <View style={styles.toast}>
-        <View style={styles.badge}>
-          <Ionicons name="checkmark" size={14} color={onAccent} />
-        </View>
         <View style={styles.msg}>
           <Text style={styles.title} numberOfLines={1}>
             {toast.title}
           </Text>
-          <Text style={styles.sub}>Complete · +{toast.xp} XP</Text>
+          <Text style={styles.sub}>+{toast.xp} XP</Text>
         </View>
         <Pressable
           onPress={undoToast}
           hitSlop={10}
-          style={({ pressed }) => [styles.undo, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.undo, pressed && { backgroundColor: clay[900] }]}
         >
           <Text style={styles.undoText}>Undo</Text>
         </Pressable>
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 104,
+    bottom: 108,
     alignItems: 'center',
     paddingHorizontal: 16,
     zIndex: 90,
@@ -103,23 +103,17 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: 12,
     width: '100%',
     maxWidth: 420,
-    backgroundColor: surface.card,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 12,
-    paddingVertical: 11,
-    paddingHorizontal: 13,
+    backgroundColor: surface.system,
+    borderRadius: 22,
+    paddingTop: 15,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     // clip the countdown bar to the rounded corners
     overflow: 'hidden',
-    // a soft lift off the page
-    shadowColor: '#2C2720',
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...shadow.lg,
   },
   // Drains left-anchored from full width to nothing over the toast's lifetime.
   countdown: {
@@ -129,36 +123,31 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: accent,
   },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: feedback.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   msg: {
     flex: 1,
-    gap: 1,
+    gap: 2,
   },
   title: {
-    color: text.primary,
+    ...typography.cardTitle,
     fontSize: 13,
-    fontWeight: '700',
+    color: neutral[100],
   },
   sub: {
-    color: text.secondary,
-    fontSize: 11,
+    ...typography.small,
+    color: neutral[400],
   },
   undo: {
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: withAlpha(accent, 0.12),
+    flexShrink: 0,
+    minHeight: TAP_MIN - 4,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: clay[400],
   },
   undoText: {
-    color: accent,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.button,
+    fontSize: 12,
+    color: clay[300],
   },
 });

@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AvatarEditor } from '@/components/AvatarEditor';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Kicker } from '@/components/ui/Card';
+import { Text } from '@/components/ui/Text';
 import type { ApiState } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, STAT_META, surface, text } from '@/theme';
+import { STAT_META, clay, feedback, neutral, radius, sage, surface, text, typography } from '@/theme';
 
 // The occasional screens live here rather than crowding the tab bar. Adding more
 // later? Drop another row in — the bar stays at five.
@@ -27,13 +29,13 @@ const ITEMS = [
 function Lifetime({ record }: { record: ApiState['record'] }) {
   const top = record.top_stat ? STAT_META[record.top_stat] : null;
   const cells = [
-    { n: record.total_completions, label: 'quests' },
-    { n: record.xp, label: 'XP' },
-    { n: record.active_days, label: 'days shown up' },
-    { n: record.days_cleared, label: 'days cleared' },
+    { n: record.total_completions, label: 'quests', color: clay[700] },
+    { n: record.xp, label: 'XP', color: clay[700] },
+    { n: record.active_days, label: 'days shown up', color: sage[700] },
+    { n: record.days_cleared, label: 'days cleared', color: sage[700] },
   ];
   return (
-    <SystemPanel title="All time" sub={record.total_completions ? `${record.total_completions} done` : undefined}>
+    <SystemPanel title="All time">
       {record.total_completions === 0 ? (
         <Text style={styles.statEmpty}>Your record starts with your first quest. Whenever you&apos;re ready.</Text>
       ) : (
@@ -41,14 +43,14 @@ function Lifetime({ record }: { record: ApiState['record'] }) {
           <View style={styles.statRow}>
             {cells.map((c) => (
               <View key={c.label} style={styles.statCell}>
-                <Text style={styles.statNum}>{c.n.toLocaleString()}</Text>
+                <Text style={[styles.statNum, { color: c.color }]}>{c.n.toLocaleString()}</Text>
                 <Text style={styles.statLabel}>{c.label}</Text>
               </View>
             ))}
           </View>
           {top ? (
             <Text style={styles.statTop}>
-              Leaning into <Text style={{ color: top.color, fontWeight: '700' }}>{top.label}</Text> most overall.
+              Leaning into <Text style={[styles.statTopName, { color: top.color }]}>{top.label}</Text> most overall.
             </Text>
           ) : null}
         </>
@@ -83,19 +85,19 @@ function CompletedGroup({
 }) {
   return (
     <View style={spaced ? styles.groupSpaced : undefined}>
-      <Text style={styles.groupLabel}>{label}</Text>
+      <Kicker>{label}</Kicker>
       {rows.map((r) => (
         <View key={r.id} style={styles.doneRow}>
-          <Ionicons name="checkmark-circle" size={17} color={feedback.success} />
+          <Ionicons name="checkmark-circle" size={18} color={feedback.success} />
           <Text style={styles.doneLabel} numberOfLines={1}>
             {r.label}
           </Text>
           {r.when ? <Text style={styles.doneWhen}>{r.when}</Text> : null}
-          <Pressable onPress={() => onUndo(r.id)} hitSlop={8} accessibilityLabel={`Undo ${r.label}`}>
-            <Ionicons name="arrow-undo-outline" size={16} color={accent} />
+          <Pressable onPress={() => onUndo(r.id)} hitSlop={10} accessibilityLabel={`Undo ${r.label}`}>
+            <Ionicons name="arrow-undo-outline" size={16} color={clay[700]} />
           </Pressable>
-          <Pressable onPress={() => onDelete(r.id)} hitSlop={8} accessibilityLabel={`Delete ${r.label}`}>
-            <Text style={styles.remove}>×</Text>
+          <Pressable onPress={() => onDelete(r.id)} hitSlop={10} accessibilityLabel={`Delete ${r.label}`}>
+            <Ionicons name="close" size={17} color={text.faint} />
           </Pressable>
         </View>
       ))}
@@ -119,7 +121,7 @@ function Completed({ reminders, grocery }: Pick<ApiState, 'reminders' | 'grocery
     <SystemPanel title="Completed" sub={`${todos.length + bought.length} done`} collapsible defaultCollapsed>
       {todos.length ? (
         <CompletedGroup
-          label="TO-DOS"
+          label="To-dos"
           rows={todos.map((r) => ({ id: r.id, label: r.text, when: shortDate(r.done_at) }))}
           onUndo={(id) => void toggleReminder(id, false)}
           onDelete={(id) => void removeReminder(id)}
@@ -127,7 +129,7 @@ function Completed({ reminders, grocery }: Pick<ApiState, 'reminders' | 'grocery
       ) : null}
       {bought.length ? (
         <CompletedGroup
-          label="GROCERIES"
+          label="Groceries"
           rows={bought.map((g) => ({ id: g.id, label: g.name, when: shortDate(g.bought_at) }))}
           onUndo={(id) => void toggleGrocery(id, false)}
           onDelete={(id) => void removeGrocery(id)}
@@ -145,10 +147,10 @@ export default function YouScreen() {
     <Screen>
       <View style={styles.head}>
         <AvatarEditor />
-        <Text style={styles.h1}>You</Text>
+        <Text style={styles.h1}>{state?.player.name ?? 'You'}</Text>
         {state ? (
           <Text style={styles.sub}>
-            {state.player.name} · Level {state.player.level} · Rank {state.player.rank}
+            Level {state.player.level} · Rank {state.player.rank} · best streak {state.streak.best}
           </Text>
         ) : null}
       </View>
@@ -157,52 +159,68 @@ export default function YouScreen() {
 
       {state ? <Completed reminders={state.reminders} grocery={state.grocery} /> : null}
 
-      <SystemPanel>
-        {ITEMS.map((it, i) => (
+      {/* Two across — a hub reads faster as tiles than as a list of rows. */}
+      <View style={styles.grid}>
+        {ITEMS.map((it) => (
           <Pressable
             key={it.route}
             onPress={() => router.push(it.route)}
-            style={({ pressed }) => [styles.row, i > 0 && styles.rowBorder, pressed && { opacity: 0.65 }]}
+            style={({ pressed }) => [styles.tile, pressed && { backgroundColor: clay[100] }]}
           >
-            <Ionicons name={it.icon} size={20} color={accent} />
-            <View style={styles.rowText}>
-              <Text style={styles.rowLabel}>{it.label}</Text>
-              <Text style={styles.rowSub}>{it.sub}</Text>
+            <View style={styles.tileDisc}>
+              <Ionicons name={it.icon} size={18} color={clay[800]} />
             </View>
-            <Ionicons name="chevron-forward" size={18} color={text.faint} />
+            <Text style={styles.tileLabel}>{it.label}</Text>
+            <Text style={styles.tileSub}>{it.sub}</Text>
           </Pressable>
         ))}
-      </SystemPanel>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  head: { gap: 4, marginBottom: 2, alignItems: 'center' },
-  h1: { color: text.primary, fontSize: 20, fontWeight: '700' },
-  sub: { color: text.secondary, fontSize: 13 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
-  rowBorder: { borderTopWidth: 1, borderTopColor: surface.hairline },
-  rowText: { flex: 1, gap: 2 },
-  rowLabel: { color: text.primary, fontSize: 15, fontWeight: '600' },
-  rowSub: { color: text.secondary, fontSize: 12 },
-  statEmpty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
-  statRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14, columnGap: 12 },
+  head: { gap: 10, paddingTop: 16, paddingBottom: 4, alignItems: 'center' },
+  h1: { ...typography.numeral, fontSize: 28, color: neutral[900], includeFontPadding: false },
+  sub: { ...typography.small, fontSize: 12.5, color: text.secondary },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  tile: {
+    // Two columns with a 12px gutter, and a hair off so rounding never wraps a row.
+    width: '48%',
+    flexGrow: 1,
+    minHeight: 122,
+    gap: 10,
+    padding: 18,
+    borderRadius: radius.lg,
+    backgroundColor: surface.card,
+  },
+  tileDisc: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: clay[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileLabel: { ...typography.cardTitle, fontSize: 13.5, color: neutral[900] },
+  tileSub: { ...typography.tiny, color: text.secondary, marginTop: -6 },
+  statEmpty: { ...typography.body, color: text.secondary },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 18, columnGap: 12 },
   statCell: { width: '46%' },
-  statNum: { color: text.primary, fontSize: 22, fontWeight: '700' },
-  statLabel: { color: text.faint, fontSize: 11, marginTop: 1 },
-  statTop: { color: text.secondary, fontSize: 12, marginTop: 14, lineHeight: 17 },
-  groupSpaced: { marginTop: 16 },
-  groupLabel: { color: text.faint, fontSize: 10, fontWeight: '700', letterSpacing: 1.2, marginBottom: 4 },
+  statNum: { ...typography.numeral, fontSize: 32, includeFontPadding: false },
+  statLabel: { ...typography.small, color: text.secondary, marginTop: 4 },
+  statTop: { ...typography.small, fontSize: 12.5, color: text.secondary, marginTop: 16 },
+  statTopName: { fontWeight: '600' },
+  groupSpaced: { marginTop: 18 },
   doneRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 7,
+    minHeight: 44,
+    paddingVertical: 6,
     borderTopWidth: 1,
     borderTopColor: surface.hairline,
   },
-  doneLabel: { color: text.secondary, fontSize: 13, lineHeight: 18, flex: 1 },
-  doneWhen: { color: text.faint, fontSize: 11 },
-  remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
+  doneLabel: { ...typography.body, color: text.secondary, flex: 1 },
+  doneWhen: { ...typography.small, color: text.faint },
 });

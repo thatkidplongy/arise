@@ -1,11 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ChecklistPanel } from '@/components/ChecklistPanel';
+import { Card, Kicker } from '@/components/ui/Card';
+import { Text } from '@/components/ui/Text';
 import { fetchInsights } from '@/query/useInsights';
 import { useSystem } from '@/store/useSystem';
-import { feedback, text, withAlpha } from '@/theme';
+import { neutral, radius, sage, text, typography } from '@/theme';
 
 /** Today's line — a deterministic daily pick from the server. Tapping shuffles to
  * another captured quote — no attribution, no navigation (Inspire is its own tab). */
@@ -28,16 +29,13 @@ export function DailyQuote({ initialText }: { initialText: string }) {
   };
 
   return (
-    <Pressable
-      onPress={shuffle}
-      style={({ pressed }) => [styles.quoteCard, pressed && { opacity: 0.85 }]}
-    >
-      <View style={styles.quoteHead}>
-        <Ionicons name="sparkles-outline" size={13} color={feedback.gold} />
-        <Text style={styles.quoteLabel}>A LINE TO CARRY TODAY</Text>
-      </View>
-      <Text style={styles.quoteCardText}>“{line}”</Text>
-      <Text style={styles.quoteHint}>tap for another</Text>
+    <Pressable onPress={shuffle} style={({ pressed }) => (pressed ? styles.pressed : null)}>
+      <Card tone="sage" style={styles.quoteCard}>
+        <View pointerEvents="none" style={styles.quoteBlob} />
+        <Kicker color={sage[700]}>A line to carry today</Kicker>
+        <Text style={styles.quoteCardText}>“{line}”</Text>
+        <Text style={styles.quoteHint}>tap for another</Text>
+      </Card>
     </Pressable>
   );
 }
@@ -65,36 +63,29 @@ export function Reminders({ items }: { items: { id: string; text: string; done: 
 }
 
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.85 },
   quoteCard: {
-    backgroundColor: withAlpha(feedback.gold, 0.08),
-    borderWidth: 1,
-    borderColor: withAlpha(feedback.gold, 0.3),
-    borderRadius: 11,
-    padding: 14,
-    gap: 8,
+    gap: 9,
+    overflow: 'hidden',
   },
-  quoteHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  quoteLabel: {
-    color: feedback.gold,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+  // The soft shape that keeps a quote from reading as a plain notice.
+  quoteBlob: {
+    position: 'absolute',
+    left: -34,
+    bottom: -46,
+    width: 120,
+    height: 120,
+    borderRadius: radius.pill,
+    backgroundColor: sage[200],
   },
   quoteCardText: {
-    color: text.primary,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600',
-    fontStyle: 'italic',
+    ...typography.numeral,
+    fontSize: 19,
+    lineHeight: 27,
+    color: neutral[900],
   },
   quoteHint: {
-    color: text.faint,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    ...typography.small,
+    color: text.secondary,
   },
 });

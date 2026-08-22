@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { accent, surface, text, withAlpha } from '@/theme';
+import { accent, clay, neutral, onAccent, radius, surface, text, typography } from '@/theme';
 
 /**
  * The reading check-in. A book is never reset by a week ending — it carries on
@@ -28,7 +29,7 @@ export function ReadingReview() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>📖 Reading check-in</Text>
+      <Text style={styles.title}>Reading check-in</Text>
       <Text style={styles.body}>Looks like you’ve read enough to finish “{review.book}”. Did you?</Text>
 
       {!finishing ? (
@@ -78,21 +79,18 @@ export function ReadingReview() {
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderColor: withAlpha(accent, 0.4),
-    backgroundColor: withAlpha(accent, 0.06),
-    borderRadius: 11,
-    padding: 14,
-    gap: 8,
+    backgroundColor: clay[100],
+    borderRadius: radius.lg,
+    padding: 22,
+    gap: 11,
   },
   title: {
-    color: text.primary,
-    fontSize: 14,
-    fontWeight: '700',
+    ...typography.section,
+    color: neutral[900],
   },
   body: {
-    color: text.secondary,
-    fontSize: 13,
+    ...typography.body,
+    color: text.onClay,
   },
   row: {
     flexDirection: 'row',
@@ -102,36 +100,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: text.primary,
-    fontSize: 14,
+    ...typography.body,
+    minHeight: 50,
+    borderRadius: radius.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     backgroundColor: surface.card,
   },
   btn: {
+    flex: 1,
     borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 9,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    borderColor: clay[500],
+    borderRadius: radius.pill,
+    minHeight: 48,
+    paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnText: {
-    color: text.secondary,
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.button,
+    color: clay[700],
   },
   primary: {
     backgroundColor: accent,
     borderColor: accent,
   },
   primaryText: {
-    color: surface.card,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.button,
+    color: onAccent,
   },
 });

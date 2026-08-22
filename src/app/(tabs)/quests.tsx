@@ -1,16 +1,18 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { PriorityBoard } from '@/components/PriorityCard';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
+import { Disc } from '@/components/ui/StatChip';
+import { Text } from '@/components/ui/Text';
+import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, text, withAlpha } from '@/theme';
+import { clay, neutral, text, typography } from '@/theme';
 
 export default function QuestsScreen() {
   const state = useSystem((s) => s.state);
@@ -49,21 +51,26 @@ export default function QuestsScreen() {
   return (
     <Screen>
       <View style={styles.headerRow}>
-        <Text style={styles.h1}>Quest board</Text>
-        <Text style={styles.todayXp}>{state.today.xp} XP today</Text>
+        <Text style={styles.h1}>Quest{'\n'}board</Text>
+        <Disc
+          value={`${state.today.dailies_done}/${state.today.dailies_total}`}
+          caption="areas"
+          size={82}
+          tone="sage"
+        />
       </View>
+
+      <Text style={styles.rhythmNote}>
+        {isResting
+          ? 'Resting today — your streak is safe.'
+          : state.today.cleared
+            ? 'Every area today.'
+            : 'Your day in blocks — do what fits the moment.'}
+      </Text>
 
       <ReadingReview />
 
       <PriorityBoard priorities={state.priorities} />
-
-      <Text style={styles.rhythmNote}>
-        {isResting
-          ? 'Resting today 🌙 — your streak is safe'
-          : state.today.cleared
-            ? 'Every area today 🌱'
-            : 'Your day in blocks — do what fits the moment'}
-      </Text>
 
       {dailyBlocks.map(({ block, items }) => {
         const isNow = !isResting && block.key === nowKey;
@@ -72,7 +79,7 @@ export default function QuestsScreen() {
           <SystemPanel
             key={`${block.key}-${visit}`}
             title={block.label}
-            sub={isNow ? 'Now' : allDone ? 'Done 🌱' : ''}
+            badge={isNow ? { label: 'Now', tone: 'ink' } : allDone ? { label: 'Cleared', tone: 'sage' } : undefined}
             style={isNow ? styles.nowBlock : undefined}
             collapsible
             defaultCollapsed={allDone}
@@ -94,7 +101,7 @@ export default function QuestsScreen() {
         </View>
       </SystemPanel>
 
-      <SystemPanel title="Side quests" sub="Optional · whenever you feel like it" collapsible>
+      <SystemPanel title="Side quests" sub="Optional · whenever" collapsible>
         <View style={styles.list}>
           {side.map((q) => (
             <QuestCard key={q.id} quest={q} />
@@ -108,31 +115,32 @@ export default function QuestsScreen() {
 const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+    paddingTop: 6,
+    paddingHorizontal: 2,
   },
   h1: {
-    color: text.primary,
-    fontSize: 20,
-    fontWeight: '700',
+    ...typography.screenTitle,
+    flex: 1,
+    lineHeight: 33,
+    color: neutral[900],
   },
   todayXp: {
-    color: feedback.success,
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.label,
+    color: text.secondary,
   },
   list: {
-    gap: 8,
+    gap: 10,
   },
   rhythmNote: {
-    color: text.faint,
-    fontSize: 12,
+    ...typography.body,
+    color: text.secondary,
     fontStyle: 'italic',
-    marginTop: -4,
-    marginBottom: 2,
+    marginTop: -8,
+    paddingLeft: 2,
   },
   nowBlock: {
-    borderColor: withAlpha(accent, 0.55),
-    backgroundColor: withAlpha(accent, 0.05),
+    backgroundColor: clay[100],
   },
 });

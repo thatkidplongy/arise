@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { ProgressRing } from '@/components/ProgressRing';
+import { Text } from '@/components/ui/Text';
 import { toBoundedDataUri } from '@/lib/image';
 import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { accent, onAccent, surface, text, withAlpha } from '@/theme';
+import { clay, onAccent, radius, sage, surface, text, typography } from '@/theme';
 
 /** The tappable profile picture on the You hub: pick a square photo, or remove it.
  * Displayed elsewhere (Status) read-only via useAvatar. */
@@ -43,15 +44,15 @@ export function AvatarEditor() {
           {shown ? (
             <Image source={{ uri: shown }} style={styles.img} />
           ) : (
-            <Ionicons name="person-outline" size={30} color={text.faint} />
+            <Ionicons name="person-outline" size={40} color={sage[800]} />
           )}
           <View style={styles.editBadge}>
-            <Ionicons name="camera" size={12} color={onAccent} />
+            <Ionicons name="camera" size={14} color={onAccent} />
           </View>
         </View>
         {busy ? (
           <View style={styles.progressOverlay} pointerEvents="none">
-            <ProgressRing size={84} progress={progress} stroke={3} />
+            <ProgressRing size={112} progress={progress} stroke={3} />
           </View>
         ) : null}
       </Pressable>
@@ -70,8 +71,8 @@ export function AvatarEditor() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', gap: 8, marginBottom: 4 },
-  ringWrap: { width: 84, height: 84, alignItems: 'center', justifyContent: 'center' },
+  wrap: { alignItems: 'center', gap: 10 },
+  ringWrap: { width: 112, height: 112, alignItems: 'center', justifyContent: 'center' },
   progressOverlay: {
     position: 'absolute',
     top: 0,
@@ -82,31 +83,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ring: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 1,
-    borderColor: withAlpha(accent, 0.4),
-    backgroundColor: surface.raised,
+    width: 104,
+    height: 104,
+    borderRadius: radius.pill,
+    backgroundColor: sage[300],
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
   },
-  img: { width: 74, height: 74, borderRadius: 37 },
+  img: { width: 104, height: 104, borderRadius: radius.pill },
   editBadge: {
     position: 'absolute',
-    right: -1,
-    bottom: -1,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: accent,
+    right: 2,
+    bottom: 2,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    backgroundColor: clay[600],
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: surface.base,
   },
-  actions: { flexDirection: 'row', gap: 16 },
-  actionText: { color: accent, fontSize: 13, fontWeight: '600' },
-  removeText: { color: text.faint, fontSize: 13, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 8 },
+  actionText: {
+    ...typography.button,
+    fontSize: 12.5,
+    minHeight: 40,
+    lineHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    backgroundColor: surface.muted,
+    color: clay[700],
+  },
+  removeText: {
+    ...typography.button,
+    fontSize: 12.5,
+    minHeight: 40,
+    lineHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    color: text.faint,
+  },
 });

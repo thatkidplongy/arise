@@ -571,12 +571,14 @@ def quizzable(recall: list[dict]) -> list[dict]:
 
 # ── Rendering ────────────────────────────────────────────────────────────────
 
-_BASE = "#F0E8D8"
-_CARD = "#FAF5EB"
-_HAIRLINE = "#E4D9C2"
-_TEXT = "#2C2720"
-_MUTED = "#7E7361"
-_ACCENT = "#B0603A"
+# The Organic palette the app runs on (src/theme.ts) — the email is the same
+# system seen through a mail client, so the tokens are kept in step by hand.
+_BASE = "#F5EAD8"
+_CARD = "#F9F4ED"
+_HAIRLINE = "#DCD3C4"
+_TEXT = "#201E1D"
+_MUTED = "#645C50"
+_ACCENT = "#C67139"
 
 
 # The profile picture travels as an inline attachment the HTML points at by content
@@ -902,7 +904,7 @@ def render_html(ctx: dict, avatar_src: str | None = None) -> str:
                 f'sitting{"s" if thread["days"] != 1 else ""}</div>'
             )
         body += (
-            f'<div style="background:{_BASE};border-radius:10px;padding:14px 16px;'
+            f'<div style="background:{_BASE};border-radius:16px;padding:16px 18px;'
             f'margin-top:26px;color:{_TEXT};font-size:13px;line-height:1.5">'
             f'{FLESH_NUDGE}</div>'
         )
@@ -911,7 +913,7 @@ def render_html(ctx: dict, avatar_src: str | None = None) -> str:
         f'<div style="background:{_BASE};padding:28px 16px;'
         f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif">'
         f'<div style="max-width:560px;margin:0 auto;background:{_CARD};'
-        f'border:1px solid {_HAIRLINE};border-radius:14px;padding:28px">'
+        f'border-radius:28px;padding:28px">'
         f'{_masthead(ctx, avatar_src)}'
         f'{body}'
         f'<div style="border-top:1px solid {_HAIRLINE};margin-top:28px;padding-top:14px;'

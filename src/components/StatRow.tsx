@@ -1,8 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { StatChip } from '@/components/ui/StatChip';
+import { Text } from '@/components/ui/Text';
 import type { ApiProgression, ApiStat } from '@/lib/api';
-import { STAT_META, text, withAlpha } from '@/theme';
+import { STAT_META, STAT_TINT, neutral, text, typography, withAlpha } from '@/theme';
 
 import { XpBar } from './XpBar';
 
@@ -27,9 +28,7 @@ export function StatRow({ stat, prog }: { stat: ApiStat; prog?: ApiProgression }
 
   return (
     <View style={styles.row}>
-      <View style={[styles.iconBox, { backgroundColor: withAlpha(meta.color, 0.12) }]}>
-        <Ionicons name={meta.icon} size={17} color={meta.color} />
-      </View>
+      <StatChip statKey={stat.key} size={44} />
       <View style={styles.body}>
         <View style={styles.labelRow}>
           <Text style={styles.label}>{meta.label}</Text>
@@ -39,7 +38,8 @@ export function StatRow({ stat, prog }: { stat: ApiStat; prog?: ApiProgression }
           value={atCap ? required : cleared}
           max={required}
           color={meta.color}
-          height={4}
+          height={6}
+          track={withAlpha(meta.color, STAT_TINT)}
         />
         <View style={styles.labelRow}>
           <Text style={styles.sub}>{meta.sub}</Text>
@@ -53,42 +53,36 @@ export function StatRow({ stat, prog }: { stat: ApiStat; prog?: ApiProgression }
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 9,
-  },
-  iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 14,
+    paddingVertical: 9,
   },
   body: {
     flex: 1,
-    gap: 5,
+    gap: 6,
   },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   label: {
-    color: text.primary,
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.cardTitle,
+    fontSize: 13.5,
+    color: neutral[900],
   },
   level: {
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.numeral,
+    fontSize: 15,
     marginLeft: 'auto',
   },
   sub: {
+    ...typography.tiny,
     color: text.faint,
-    fontSize: 11,
     flex: 1,
   },
   note: {
+    ...typography.tiny,
     color: text.secondary,
-    fontSize: 11,
     marginLeft: 8,
   },
 });

@@ -2,7 +2,7 @@ import type { StatKey } from '@/types';
 
 export interface DayBlock {
   key: string;
-  label: string; // carries a small emoji glyph so it reads in a plain string title
+  label: string; // the block's name, plain — the type carries the tone, not a glyph
   startHour: number; // local hour (0–23) this block begins
 }
 
@@ -11,10 +11,10 @@ export interface DayBlock {
 // afternoon, Evening for the deep block, Wind-down at night. Times are sensible
 // defaults for now (easy to make user-editable later).
 export const DAY_BLOCKS: DayBlock[] = [
-  { key: 'morning', label: '☀️ Morning', startHour: 5 },
-  { key: 'day', label: '🌤️ Day', startHour: 11 },
-  { key: 'evening', label: '🌆 Evening', startHour: 17 },
-  { key: 'night', label: '🌙 Wind-down', startHour: 22 },
+  { key: 'morning', label: 'Morning', startHour: 5 },
+  { key: 'day', label: 'Day', startHour: 11 },
+  { key: 'evening', label: 'Evening', startHour: 17 },
+  { key: 'night', label: 'Wind-down', startHour: 22 },
 ];
 
 // Which window each attribute's daily quest sits in by default. Life-friendly:

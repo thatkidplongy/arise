@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiBodyProfile } from '@/lib/api';
 import { num } from '@/lib/num';
 import { useBody } from '@/query/useBody';
-import { accent, onAccent, STAT_META, surface, text } from '@/theme';
+import { STAT_META, TAP_MIN, accent, onAccent, radius, surface, text } from '@/theme';
 
 const TONE = STAT_META.CFT.color;
 const SEX = [
@@ -184,7 +185,7 @@ const styles = StyleSheet.create({
   segment: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 99,
+    borderRadius: radius.pill,
     paddingVertical: 7,
     paddingHorizontal: 12,
   },
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     color: text.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -202,7 +203,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: surface.base,
   },
-  btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+  btn: { backgroundColor: accent, borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 11, alignItems: 'center' },
   btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   cancel: { color: text.faint, textAlign: 'center', marginTop: 10, fontSize: 13 },
 });

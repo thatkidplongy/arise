@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
+import { StatChip } from '@/components/ui/StatChip';
+import { Text, TextInput } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
-import { accent, onAccent, STAT_KEYS, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_KEYS, STAT_META, TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
 
 // Tap-to-add focus suggestions for the less-obvious attributes. Tapping one adds
 // it to that attribute's focus set (same as typing it). Extend per stat as needed.
@@ -147,7 +149,10 @@ export function FocusAreasCard() {
         const items = focusDraft[k] ?? [];
         return (
           <View key={k} style={styles.focusRow}>
-            <Text style={[styles.focusLabel, { color: STAT_META[k].color }]}>{STAT_META[k].label}</Text>
+            <View style={styles.focusHead}>
+              <StatChip statKey={k} size={38} />
+              <Text style={styles.focusLabel}>{STAT_META[k].label}</Text>
+            </View>
             {items.length > 0 ? (
               <View style={styles.chips}>
                 {items.map((item, i) => (
@@ -240,7 +245,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     color: text.primary,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -248,23 +253,26 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: surface.base,
   },
-  btn: { backgroundColor: accent, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+  btn: { backgroundColor: accent, borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 11, alignItems: 'center' },
   btnText: { color: onAccent, fontSize: 14, fontWeight: '700' },
   focusRow: { marginBottom: 14 },
-  focusLabel: { fontSize: 12, fontWeight: '700', marginBottom: 7 },
+  focusHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  focusLabel: { ...typography.heading, color: neutral[900] },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 99,
+    borderRadius: radius.pill,
     paddingVertical: 5,
     paddingHorizontal: 11,
   },
   chipText: { fontSize: 12, fontWeight: '600' },
   chipX: { fontSize: 15, fontWeight: '700', marginTop: -1 },
   suggestChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  suggestChip: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 99, paddingVertical: 5, paddingHorizontal: 11 },
+  suggestChip: { borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 11 },
   suggestChipText: { fontSize: 12, fontWeight: '600' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addInput: { flex: 1, marginBottom: 0 },
@@ -272,7 +280,9 @@ const styles = StyleSheet.create({
   addBtn: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
@@ -285,7 +295,7 @@ const styles = StyleSheet.create({
     backgroundColor: surface.base,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.md,
     paddingVertical: 9,
     paddingHorizontal: 12,
     marginBottom: 10,

@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiPriority } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import type { StatKey } from '@/types';
-import { accent, onAccent, STAT_KEYS, STAT_META, surface, text, withAlpha } from '@/theme';
+import { STAT_KEYS, STAT_META, TAP_MIN, accent, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Scope = 'day' | 'week' | 'open';
 const SCOPES: { key: Scope; label: string }[] = [
@@ -161,7 +162,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: withAlpha(accent, 0.4),
     borderStyle: 'dashed',
-    borderRadius: 11,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
     paddingVertical: 11,
   },
   setText: { color: accent, fontSize: 13, fontWeight: '600' },
@@ -169,16 +171,16 @@ const styles = StyleSheet.create({
     backgroundColor: surface.card,
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 14,
+    borderRadius: radius.md,
     padding: 16,
     gap: 6,
   },
   editing: { borderColor: withAlpha(accent, 0.55), backgroundColor: withAlpha(accent, 0.05) },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 3 },
   badgeText: { color: onAccent, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   scopeTag: { fontSize: 12, fontWeight: '700' },
-  title: { color: text.primary, fontSize: 16, fontWeight: '700' },
+  title: { ...typography.heading, color: text.primary },
   note: { color: text.secondary, fontSize: 13, lineHeight: 18 },
   steps: { gap: 6, marginTop: 4 },
   stepRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
@@ -199,7 +201,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     paddingHorizontal: 11,
     paddingVertical: 9,
     color: text.primary,
@@ -208,12 +210,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scopeRow: { flexDirection: 'row', gap: 7, marginTop: 2 },
-  chip: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: surface.hairline, borderRadius: 8, paddingVertical: 7 },
+  chip: { flex: 1, alignItems: 'center', borderWidth: 1, borderColor: surface.hairline, borderRadius: radius.pill, paddingVertical: 7 },
   chipOn: { borderColor: accent, backgroundColor: withAlpha(accent, 0.12) },
   chipText: { color: text.faint, fontSize: 12, fontWeight: '600' },
   chipTextOn: { color: accent },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 8 },
-  save: { backgroundColor: accent, borderRadius: 9, paddingVertical: 9, paddingHorizontal: 18 },
+  save: { backgroundColor: accent, borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 18 },
   saveText: { color: onAccent, fontSize: 13, fontWeight: '700' },
   linkText: { fontSize: 13, fontWeight: '600' },
   linkMuted: { color: text.faint, fontSize: 13, fontWeight: '600' },

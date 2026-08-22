@@ -1,5 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+
+import { Text } from '@/components/ui/Text';
+import { typography } from '@/theme';
 
 /** WCAG 2.5.5 — anything tappable clears 44pt. */
 const TAP = 44;
@@ -50,5 +53,5 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: TAP,
   },
-  text: { fontSize: 12, fontWeight: '600' },
+  text: { ...typography.button, fontSize: 12.5 },
 });

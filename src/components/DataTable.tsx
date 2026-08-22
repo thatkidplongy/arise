@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/ui/Text';
 import { useCollapse } from '@/hooks/useCollapse';
-import { surface, text as palette, withAlpha } from '@/theme';
+import { TAP_MIN, neutral, radius, surface, text as palette, typography } from '@/theme';
 
 /** One column of a {@link DataTable}. `render` returns the cell's contents for a
  * row; width pins a column (icon, date, xp), otherwise `flex` shares the rest. */
@@ -143,22 +144,27 @@ export function DataTable<T>({
 const styles = StyleSheet.create({
   table: {
     backgroundColor: surface.card,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 13 },
-  headRow: { backgroundColor: surface.raised, paddingVertical: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: TAP_MIN,
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+  },
+  headRow: { paddingVertical: 8, minHeight: 0 },
   divider: { borderTopWidth: 1, borderTopColor: surface.hairline },
-  pressed: { backgroundColor: withAlpha(palette.primary, 0.04) },
+  pressed: { backgroundColor: surface.muted },
   right: { alignItems: 'flex-end' },
   chevron: { width: 16, alignItems: 'flex-end' },
-  headText: { color: palette.faint, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  titleBar: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 13 },
-  titleBarOpen: { borderBottomWidth: 1, borderBottomColor: surface.hairline },
-  titleText: { color: palette.secondary, fontSize: 13, fontWeight: '600' },
-  subText: { color: palette.faint, fontSize: 12, marginLeft: 'auto' },
+  headText: { ...typography.kicker, fontSize: 10, letterSpacing: 0.8, color: palette.faint },
+  titleBar: { flexDirection: 'row', alignItems: 'center', minHeight: TAP_MIN, paddingTop: 20, paddingBottom: 14, paddingHorizontal: 22 },
+  titleBarOpen: {},
+  titleText: { ...typography.section, color: neutral[900] },
+  subText: { ...typography.small, color: palette.secondary, marginLeft: 'auto', paddingLeft: 10 },
   titleChevron: { marginLeft: 8 },
   titleChevronAlone: { marginLeft: 'auto' },
 });

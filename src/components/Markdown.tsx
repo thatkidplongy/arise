@@ -1,6 +1,7 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
-import { surface, text as palette, withAlpha } from '@/theme';
+import { Text } from '@/components/ui/Text';
+import { radius, surface, text as palette, typography, withAlpha } from '@/theme';
 
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 
@@ -144,22 +145,22 @@ export function Markdown({ value, color }: { value: string; color?: string }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 3 },
-  line: { color: palette.primary, fontSize: 13, lineHeight: 19 },
+  wrap: { gap: 4 },
+  line: { ...typography.body, color: palette.primary },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
   strike: { textDecorationLine: 'line-through', color: palette.faint },
-  h1: { fontSize: 17, lineHeight: 23, fontWeight: '700', marginTop: 2 },
-  h2: { fontSize: 15, lineHeight: 21, fontWeight: '700', marginTop: 2 },
-  h3: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  h1: { ...typography.numeral, fontSize: 19, lineHeight: 25, marginTop: 4 },
+  h2: { ...typography.numeral, fontSize: 16, lineHeight: 22, marginTop: 4 },
+  h3: { ...typography.cardTitle, fontSize: 14, lineHeight: 20 },
   bulletRow: { flexDirection: 'row', gap: 7, alignItems: 'flex-start' },
   marker: { lineHeight: 19, minWidth: 14 },
   bulletText: { flex: 1, minWidth: 0 },
   quoteRow: {
     borderLeftWidth: 3,
-    borderLeftColor: surface.hairline,
-    paddingLeft: 10,
-    marginVertical: 1,
+    borderLeftColor: surface.edge,
+    paddingLeft: 12,
+    marginVertical: 2,
   },
   quoteText: { color: palette.secondary, fontStyle: 'italic' },
   code: {
@@ -169,13 +170,11 @@ const styles = StyleSheet.create({
     backgroundColor: withAlpha(palette.primary, 0.07),
   },
   codeBlock: {
-    backgroundColor: withAlpha(palette.primary, 0.06),
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 11,
-    marginVertical: 2,
+    backgroundColor: surface.muted,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginVertical: 3,
   },
   codeBlockText: { fontFamily: MONO, fontSize: 12.5, lineHeight: 18, color: palette.primary },
   gap: { height: 7 },

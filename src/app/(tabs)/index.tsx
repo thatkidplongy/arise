@@ -1,19 +1,22 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { RankBadge } from '@/components/RankBadge';
 import { Screen } from '@/components/Screen';
 import { StatRow } from '@/components/StatRow';
 import { DailyQuote, Reminders } from '@/components/StatusCards';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
+import { IconButton } from '@/components/ui/Button';
+import { Card, Kicker } from '@/components/ui/Card';
+import { Disc } from '@/components/ui/StatChip';
+import { Tag } from '@/components/ui/Tag';
+import { Text } from '@/components/ui/Text';
 import { dateKey } from '@/lib/dates';
 import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { accent, feedback, surface, text, withAlpha } from '@/theme';
+import { accent, clay, feedback, neutral, radius, sage, text, typography } from '@/theme';
 
 // Quiet reminders — that rest and living are part of the path, not a detour.
 const REMINDERS = [
@@ -34,34 +37,42 @@ function reminderForToday(): string {
   return REMINDERS[sum % REMINDERS.length];
 }
 
-function Masthead() {
+/** The wordmark, a face, and the one way through to your titles. */
+function Masthead({ avatarUri, initial }: { avatarUri?: string | null; initial: string }) {
   return (
     <View style={styles.masthead}>
-      <Text style={styles.wordmark}>Arise</Text>
-      <View style={styles.rule} />
-      <Text style={styles.tagline}>rise beyond your limits</Text>
+      {avatarUri ? (
+        <Image source={{ uri: avatarUri }} style={styles.avatarSmall} />
+      ) : (
+        <View style={styles.initialDisc}>
+          <Text style={styles.initial}>{initial}</Text>
+        </View>
+      )}
+      <View style={styles.mastheadCopy}>
+        <Text style={styles.wordmark}>Arise</Text>
+        <Text style={styles.tagline}>rise beyond your limits</Text>
+      </View>
+      <IconButton icon="sparkles-outline" label="Achievements" onPress={() => router.push('/achievements')} />
     </View>
   );
 }
 
+/** The reason behind all of this, on the one clay patch that opens the screen. */
 function NorthStar({ value }: { value: string }) {
   const has = value.trim().length > 0;
   return (
-    <Pressable
-      onPress={() => router.push('/settings')}
-      style={({ pressed }) => [styles.northStar, pressed && { opacity: 0.85 }]}
-    >
-      <View style={styles.northStarHead}>
-        <Ionicons name="compass-outline" size={14} color={accent} />
-        <Text style={styles.northStarLabel}>YOUR NORTH STAR</Text>
-      </View>
-      {has ? (
-        <Text style={styles.northStarText}>{value.trim()}</Text>
-      ) : (
-        <Text style={styles.northStarEmpty}>
-          Write the life you’re reaching for — the reason behind all of this. Tap to set it.
-        </Text>
-      )}
+    <Pressable onPress={() => router.push('/settings')} style={({ pressed }) => (pressed ? styles.pressed : null)}>
+      <Card tone="clay" style={styles.northStar}>
+        <View pointerEvents="none" style={styles.northStarBlob} />
+        <Kicker color={clay[700]}>Your north star</Kicker>
+        {has ? (
+          <Text style={styles.northStarText}>{value.trim()}</Text>
+        ) : (
+          <Text style={styles.northStarEmpty}>
+            Write the life you’re reaching for — the reason behind all of this. Tap to set it.
+          </Text>
+        )}
+      </Card>
     </Pressable>
   );
 }
@@ -76,7 +87,7 @@ export default function StatusScreen() {
   if (!state) {
     return (
       <Screen>
-        <Masthead />
+        <Masthead initial="A" />
         <ConnectionPanel />
       </Screen>
     );
@@ -93,25 +104,25 @@ export default function StatusScreen() {
 
   return (
     <Screen>
-      <Masthead />
+      <Masthead avatarUri={avatarUri} initial={player.name.slice(0, 1).toUpperCase() || 'A'} />
 
       <NorthStar value={player.north_star} />
 
       {state.daily_quote ? <DailyQuote initialText={state.daily_quote.text} /> : null}
 
-      <SystemPanel>
+      <SystemPanel style={styles.identityCard}>
         <View style={styles.identityRow}>
           {avatarUri ? (
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
           ) : (
-            <RankBadge rank={player.rank} />
+            <Disc value={player.level} caption="level" size={86} />
           )}
           <View style={styles.identity}>
             <Text style={styles.name}>{player.name}</Text>
-            {player.equipped_title ? (
-              <Text style={styles.title}>{player.equipped_title}</Text>
-            ) : null}
-            <Text style={styles.meta}>Hunter · {player.rank}-Rank · Level {player.level}</Text>
+            {player.equipped_title ? <Tag label={player.equipped_title} tone="sage" /> : null}
+            <Text style={styles.meta}>
+              Hunter · {player.rank}-Rank · Level {player.level}
+            </Text>
           </View>
         </View>
 
@@ -121,21 +132,12 @@ export default function StatusScreen() {
             {player.xp_into.toLocaleString()} / {player.xp_needed.toLocaleString()}
           </Text>
         </View>
-        <XpBar value={player.xp_into} max={player.xp_needed} height={8} />
+        <XpBar value={player.xp_into} max={player.xp_needed} height={12} track={clay[200]} />
 
         <View style={styles.chips}>
-          <View style={styles.chip}>
-            <Ionicons name="flame-outline" size={14} color={feedback.gold} />
-            <Text style={styles.chipText}>{streak.current} day streak</Text>
-          </View>
-          <View style={styles.chip}>
-            <Ionicons name="ribbon-outline" size={14} color={accent} />
-            <Text style={styles.chipText}>best {streak.best}</Text>
-          </View>
-          <View style={styles.chip}>
-            <Ionicons name="add-circle-outline" size={14} color={feedback.success} />
-            <Text style={styles.chipText}>{today.xp} XP today</Text>
-          </View>
+          <Tag label={`${streak.current} day streak`} />
+          <Tag label={`best ${streak.best}`} />
+          <Tag label={`${today.xp} XP today`} tone="sage" />
         </View>
       </SystemPanel>
 
@@ -151,7 +153,7 @@ export default function StatusScreen() {
         title="Today"
         sub={
           today.resting
-            ? 'Resting today 🌙'
+            ? 'Resting today'
             : today.cleared
               ? 'All of today — beautiful'
               : 'Whatever you manage counts'
@@ -167,50 +169,48 @@ export default function StatusScreen() {
           value={today.resting ? today.dailies_total : today.dailies_done}
           max={today.dailies_total}
           color={today.cleared || today.resting ? feedback.success : accent}
-          height={8}
+          height={12}
+          track={today.cleared || today.resting ? sage[200] : clay[200]}
         />
         {today.resting ? (
           <Text style={styles.restNote}>Your streak is safe. Rest is part of it.</Text>
         ) : null}
       </SystemPanel>
 
-      {/* Rest is part of the path — never a failure. */}
-      <Pressable
-        onPress={onRest}
-        disabled={restPending}
-        style={({ pressed }) => [
-          styles.rest,
-          today.resting && styles.restOn,
-          (pressed || restPending) && { opacity: 0.85 },
-        ]}
-      >
-        {restPending ? (
-          <ActivityIndicator size="small" color={accent} />
-        ) : (
-          <>
-            <Text style={[styles.restTitle, today.resting && { color: feedback.success }]}>
-              {today.resting ? 'You’re resting today 🌙' : 'Take a rest day'}
-            </Text>
-            <Text style={styles.restSub}>
-              {today.resting
-                ? 'Your streak is safe. Tap to undo.'
-                : 'Not feeling it? Rest still counts — your streak stays.'}
-            </Text>
-          </>
-        )}
+      {/* Rest is part of the path — never a failure. An invitation, so it's dashed. */}
+      <Pressable onPress={onRest} disabled={restPending}>
+        <Card
+          tone={today.resting ? 'sage' : 'dashed'}
+          style={[styles.rest, restPending ? styles.pressed : null]}
+        >
+          {restPending ? (
+            <ActivityIndicator size="small" color={accent} />
+          ) : (
+            <>
+              <Text style={styles.restTitle}>
+                {today.resting ? 'You’re resting today' : 'Take a rest day'}
+              </Text>
+              <Text style={styles.restSub}>
+                {today.resting
+                  ? 'Your streak is safe. Tap to undo.'
+                  : 'Not feeling it? Rest still counts — your streak stays.'}
+              </Text>
+            </>
+          )}
+        </Card>
       </Pressable>
 
       {next_rank ? (
-        <SystemPanel title="Next rank">
-          <Text style={styles.gateHeading}>Rank {next_rank.rank} requires</Text>
+        <Card tone="sage" style={styles.gate}>
+          <Kicker color={sage[700]}>Next rank</Kicker>
+          <Text style={styles.gateHeading}>Rank {next_rank.rank} asks for</Text>
           <Text style={styles.gateLine}>
-            Level {next_rank.level} <Text style={styles.gateNow}>(now {player.level})</Text>
+            Level {next_rank.level} — you’re at {player.level}
           </Text>
           <Text style={styles.gateLine}>
-            Best streak of {next_rank.streak} days{' '}
-            <Text style={styles.gateNow}>(now {streak.best})</Text>
+            A best streak of {next_rank.streak} — you’re at {streak.best}
           </Text>
-        </SystemPanel>
+        </Card>
       ) : null}
 
       <Text style={styles.reminder}>{reminderForToday()}</Text>
@@ -219,179 +219,157 @@ export default function StatusScreen() {
 }
 
 const styles = StyleSheet.create({
+  pressed: { opacity: 0.85 },
   masthead: {
-    alignItems: 'center',
-    paddingTop: 4,
-    paddingBottom: 4,
-    gap: 8,
-  },
-  wordmark: {
-    color: accent,
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: 5,
-    paddingLeft: 5, // balance the trailing letter-spacing so it reads centered
-  },
-  rule: {
-    width: 30,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: withAlpha(accent, 0.45),
-  },
-  tagline: {
-    color: text.secondary,
-    fontSize: 12,
-    letterSpacing: 1,
-  },
-  northStar: {
-    backgroundColor: surface.card,
-    borderWidth: 1,
-    borderColor: withAlpha(accent, 0.35),
-    borderLeftWidth: 3,
-    borderLeftColor: accent,
-    borderRadius: 11,
-    padding: 14,
-    gap: 8,
-  },
-  northStarHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 14,
+    paddingTop: 6,
+    paddingHorizontal: 2,
   },
-  northStarLabel: {
-    color: accent,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+  mastheadCopy: { flex: 1, gap: 1 },
+  wordmark: {
+    ...typography.wordmark,
+    color: clay[700],
+    includeFontPadding: false,
   },
-  northStarText: {
-    color: text.primary,
-    fontSize: 15,
-    lineHeight: 23,
-    fontWeight: '600',
-  },
-  northStarEmpty: {
-    color: text.secondary,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  restNote: {
-    color: feedback.success,
+  tagline: {
+    ...typography.small,
     fontSize: 12,
-    marginTop: 10,
+    color: text.secondary,
   },
-  rest: {
+  initialDisc: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
+    backgroundColor: sage[300],
     alignItems: 'center',
-    gap: 3,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: 11,
-    borderStyle: 'dashed',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    minHeight: 64,
     justifyContent: 'center',
   },
-  restOn: {
-    borderStyle: 'solid',
-    backgroundColor: withAlpha(feedback.success, 0.06),
-    borderColor: withAlpha(feedback.success, 0.4),
+  initial: {
+    ...typography.numeral,
+    fontSize: 22,
+    color: sage[800],
+    includeFontPadding: false,
   },
-  restTitle: {
-    color: text.primary,
-    fontSize: 14,
-    fontWeight: '700',
+  avatarSmall: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
   },
-  restSub: {
-    color: text.faint,
-    fontSize: 12,
-    textAlign: 'center',
+  northStar: { overflow: 'hidden', gap: 9 },
+  northStarBlob: {
+    position: 'absolute',
+    right: -38,
+    top: -38,
+    width: 120,
+    height: 120,
+    borderRadius: radius.pill,
+    backgroundColor: clay[200],
   },
-  reminder: {
-    color: text.faint,
-    fontSize: 12,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: 4,
-    marginBottom: 4,
+  northStarText: {
+    ...typography.numeral,
+    fontSize: 20,
+    lineHeight: 27,
+    color: neutral[900],
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: withAlpha(accent, 0.4),
+  northStarEmpty: {
+    ...typography.body,
+    color: text.onClay,
   },
+  identityCard: { gap: 18 },
   identityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
+    gap: 18,
+    marginBottom: 18,
   },
   identity: {
     flex: 1,
-    gap: 3,
+    gap: 5,
+    alignItems: 'flex-start',
+  },
+  avatar: {
+    width: 86,
+    height: 86,
+    borderRadius: radius.pill,
+    borderWidth: 3,
+    borderColor: clay[400],
   },
   name: {
-    color: text.primary,
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  title: {
-    color: accent,
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.numeral,
+    fontSize: 26,
+    color: neutral[900],
+    includeFontPadding: false,
   },
   meta: {
+    ...typography.small,
+    fontSize: 12,
     color: text.secondary,
-    fontSize: 13,
   },
   xpRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 7,
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
   xpLabel: {
-    color: text.secondary,
+    ...typography.small,
     fontSize: 12,
+    color: text.secondary,
   },
   xpValue: {
-    color: text.primary,
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.label,
+    fontSize: 12,
+    color: neutral[800],
   },
   chips: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    marginTop: 14,
+    marginTop: 16,
   },
-  chip: {
-    flexDirection: 'row',
+  restNote: {
+    ...typography.small,
+    color: feedback.success,
+    marginTop: 10,
+  },
+  rest: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
-    backgroundColor: surface.raised,
-    borderRadius: 99,
-    paddingVertical: 6,
-    paddingHorizontal: 11,
+    minHeight: 84,
+    paddingVertical: 20,
   },
-  chipText: {
-    color: text.primary,
-    fontSize: 11,
-    fontWeight: '600',
+  restTitle: {
+    ...typography.heading,
+    color: neutral[900],
   },
+  restSub: {
+    ...typography.small,
+    fontSize: 12,
+    color: text.secondary,
+    textAlign: 'center',
+  },
+  gate: { gap: 8 },
   gateHeading: {
-    color: text.primary,
-    fontWeight: '600',
-    fontSize: 14,
-    marginBottom: 6,
+    ...typography.numeral,
+    fontSize: 24,
+    lineHeight: 27,
+    color: neutral[900],
   },
   gateLine: {
-    color: text.primary,
-    fontSize: 13,
-    lineHeight: 22,
+    ...typography.body,
+    lineHeight: 23,
+    color: sage[900],
   },
-  gateNow: {
+  reminder: {
+    ...typography.body,
     color: text.secondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginTop: 4,
+    marginBottom: 4,
   },
 });
