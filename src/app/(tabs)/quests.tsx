@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { DailyQuestWindow } from '@/components/DailyQuestWindow';
 import { PriorityBoard } from '@/components/PriorityCard';
 import { QuestCard } from '@/components/QuestCard';
 import { ReadingReview } from '@/components/ReadingReview';
@@ -130,7 +129,7 @@ export default function QuestsScreen() {
             : 'Your day in blocks — do what fits the moment.'}
       </Text>
 
-      {featured ? <DailyQuestWindow quest={featured} /> : null}
+      {featured ? <QuestCard quest={featured} featured /> : null}
 
       <ReadingReview />
 
@@ -146,7 +145,7 @@ export default function QuestsScreen() {
             key={`${block.key}-${visit}`}
             title={block.label}
             badge={isNow ? { label: 'Now', tone: 'ink' } : allDone ? { label: 'Cleared', tone: 'sage' } : undefined}
-            style={isNow ? styles.nowBlock : undefined}
+            style={styles.blockPanel}
             collapsible
             defaultCollapsed={allDone}
           >
@@ -172,7 +171,7 @@ export default function QuestsScreen() {
         </>
       ) : null}
 
-      <SystemPanel title="Side quests" sub="Optional · whenever" collapsible>
+      <SystemPanel title="Side quests" sub="Optional · whenever" collapsible style={styles.blockPanel}>
         <View style={styles.list}>
           {side.map((q) => (
             <QuestCard key={q.id} quest={q} />
@@ -221,7 +220,7 @@ const styles = StyleSheet.create({
     color: neutral[900],
   },
   list: {
-    gap: 10,
+    gap: 14,
   },
   rhythmNote: {
     ...typography.body,
@@ -230,7 +229,12 @@ const styles = StyleSheet.create({
     marginTop: -8,
     paddingLeft: 2,
   },
-  nowBlock: {
-    backgroundColor: clay[100],
+  // Each quest is its own window now, so the block is a heading and nothing more —
+  // a card around the cards would be a third frame on the same content.
+  blockPanel: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    paddingBottom: 0,
   },
 });
