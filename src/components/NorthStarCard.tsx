@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { PropsWithChildren } from 'react';
 import { useState } from 'react';
@@ -7,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import type { ApiDailyQuote } from '@/lib/api';
 import { fetchInsights } from '@/query/useInsights';
-import { TAP_MIN, clay, font, neutral, radius, sage, surface, text, typography } from '@/theme';
+import { clay, font, neutral, sage, surface, text, typography } from '@/theme';
 
 /**
  * The two lines you carry, on one card with no fills.
@@ -77,44 +76,37 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
   // Reset to the server's daily pick whenever it changes, the "adjust state during
   // render" way (no effect); shuffle can still swap `line` in between.
   const [line, setLine] = useState(quote.text);
-  const [source, setSource] = useState(quote.source_title);
   const [seed, setSeed] = useState(quote.text);
   if (seed !== quote.text) {
     setSeed(quote.text);
     setLine(quote.text);
-    setSource(quote.source_title);
   }
 
   const shuffle = async () => {
     const insights = await fetchInsights(); // cached, or lazy-loaded on first tap
-    const pool = insights.flatMap((i) => i.quotes.map((q) => ({ q, title: i.summary })));
-    const others = pool.filter((p) => p.q !== line);
+    const quotes = insights.flatMap((i) => i.quotes);
+    const others = quotes.filter((q) => q !== line);
     if (others.length === 0) return;
-    const pick = others[Math.floor(Math.random() * others.length)];
-    setLine(pick.q);
-    setSource(pick.title);
+    setLine(others[Math.floor(Math.random() * others.length)]);
   };
 
+  // The whole block is the control, the way it was before this card existed: a quiet
+  // lowercase line says so, and no button chrome competes with the quote it sits
+  // under. An outlined pill here fought the card's own premise — that the coloured
+  // rules are the only structure and the sand page shows through everything else.
   return (
-    <Block edge={sage[400]}>
-      <Text style={[styles.kicker, { color: sage[700] }]}>A line to carry today</Text>
-      <Text style={styles.quote}>“{line}”</Text>
-      <View style={styles.actionRow}>
-        <Pressable
-          onPress={shuffle}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.another, pressed ? { backgroundColor: sage[100] } : null]}
-        >
-          <Ionicons name="refresh" size={14} color={sage[700]} />
-          <Text style={styles.anotherText}>Another line</Text>
-        </Pressable>
-        {source ? (
-          <Text style={styles.source} numberOfLines={1}>
-            {source}
-          </Text>
-        ) : null}
-      </View>
-    </Block>
+    <Pressable
+      onPress={shuffle}
+      accessibilityRole="button"
+      accessibilityLabel="Show another line"
+      style={({ pressed }) => (pressed ? styles.pressed : null)}
+    >
+      <Block edge={sage[400]}>
+        <Text style={[styles.kicker, { color: sage[700] }]}>A line to carry today</Text>
+        <Text style={styles.quote}>“{line}”</Text>
+        <Text style={styles.hint}>tap for another</Text>
+      </Block>
+    </Pressable>
   );
 }
 
@@ -133,17 +125,8 @@ const styles = StyleSheet.create({
   starRest: { ...typography.body, fontSize: 14, color: text.secondary, marginTop: -2 },
   starEmpty: { ...typography.body, fontSize: 14, color: text.secondary },
   quote: { fontFamily: font.regular, fontSize: 19, lineHeight: 28, color: neutral[900] },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 2 },
-  another: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    minHeight: TAP_MIN,
-    paddingHorizontal: 18,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: sage[400],
-  },
-  anotherText: { ...typography.button, color: sage[700] },
-  source: { ...typography.small, flex: 1, minWidth: 0, color: text.secondary },
+  // Lowercase and quiet: an instruction, not a control. The block's own size is the
+  // tap target, so nothing here needs TAP_MIN. marginTop keeps the spacing the row
+  // that used to hold it had.
+  hint: { ...typography.small, color: text.secondary, marginTop: 2 },
 });

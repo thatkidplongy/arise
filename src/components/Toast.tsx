@@ -3,7 +3,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { TAP_MIN, accent, clay, motion, neutral, radius, shadow, surface, typography } from '@/theme';
+import { TAP_MIN, accent, clay, motion, neutral, radius, shadow, surface, text, typography } from '@/theme';
 import type { Toast as ToastData } from '@/types';
 
 /** How long a toast lingers before auto-dismissing. The bottom bar drains over
@@ -17,8 +17,10 @@ const TOAST_MS = motion.undoWindow;
  * thin bar along the bottom drains as the auto-dismiss timer runs down, so you can
  * see how long you've got to hit Undo.
  *
- * The System speaks from ink: this is one of the two surfaces in the app that
- * inverts, so a confirmation never gets lost among the sand-coloured cards.
+ * Light, like the rest of the page. It reads as a sheet lifted off the cards rather
+ * than the System cutting in, and the drop shadow — not a change of palette — is what
+ * separates it. Ink is rationed to at most two windows a screen, and a five-second
+ * confirmation is a poor use of that budget; the Card 'ink' tone keeps it instead.
  */
 export function ToastHost() {
   const toast = useSystem((s) => s.toast);
@@ -80,7 +82,7 @@ function ToastView({ toast }: { toast: ToastData }) {
         <Pressable
           onPress={undoToast}
           hitSlop={10}
-          style={({ pressed }) => [styles.undo, pressed && { backgroundColor: clay[900] }]}
+          style={({ pressed }) => [styles.undo, pressed && { backgroundColor: clay[100] }]}
         >
           <Text style={styles.undoText}>Undo</Text>
         </Pressable>
@@ -106,7 +108,10 @@ const styles = StyleSheet.create({
     gap: 12,
     width: '100%',
     maxWidth: 420,
-    backgroundColor: surface.system,
+    // Ivory on sand is 1.09:1 — the same as every card in the app, which is fine for
+    // something sitting *in* the page. This floats over one, so the shadow is what
+    // marks it as lifted rather than part of what's underneath.
+    backgroundColor: surface.card,
     borderRadius: 22,
     paddingTop: 15,
     paddingBottom: 16,
@@ -130,11 +135,11 @@ const styles = StyleSheet.create({
   title: {
     ...typography.cardTitle,
     fontSize: 13,
-    color: neutral[100],
+    color: neutral[900],
   },
   sub: {
     ...typography.small,
-    color: neutral[400],
+    color: text.secondary,
   },
   undo: {
     flexShrink: 0,
@@ -143,11 +148,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: clay[400],
+    // clay[600], not the clay[400] this used on ink: on ivory that step is 1.89:1,
+    // under the 3:1 floor for a control's own outline, so the pill lost its edge.
+    borderColor: clay[600],
   },
+  // clay[300] was legible on ink and is far too pale on ivory. onClay is the ramp
+  // step the theme vouches for as accent-coloured copy that passes on the light side.
   undoText: {
     ...typography.button,
     fontSize: 12,
-    color: clay[300],
+    color: text.onClay,
   },
 });
