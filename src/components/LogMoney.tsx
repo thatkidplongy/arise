@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import { Text, TextInput } from '@/components/ui/Text';
-import { dateKey, prettyDay, recentDays } from '@/lib/dates';
 import { readMoneyDraft, type MoneyBucket, type MoneyDirection } from '@/lib/moneyEntry';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, TAP_MIN, radius, surface, text, withAlpha } from '@/theme';
@@ -35,20 +34,6 @@ const BUCKET_LABEL: Record<BucketChoice, string> = { needs: 'Needs', wants: 'Wan
 
 function toBucket(choice: BucketChoice): MoneyBucket {
   return choice === 'untagged' ? null : choice;
-}
-
-/** How far back the day strip reaches. A week covers "I forgot to log Tuesday";
- * older than that is rare enough not to earn the width. */
-const DAYS_BACK = 7;
-
-/** 'Today' / 'Yest.' / 'Wed 19' — the weekday is the point, since that's how a
- * forgotten spend is remembered ("that Thursday dinner"), not by date. */
-function dayChipLabel(day: string, today: string, yesterday: string): string {
-  if (day === today) return 'Today';
-  if (day === yesterday) return 'Yest.';
-  const [y, m, d] = day.split('-').map(Number);
-  const weekday = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short' });
-  return `${weekday} ${d}`;
 }
 
 /** One selectable pill. 36pt box plus 6pt of hitSlop clears the 44pt target without
@@ -87,39 +72,26 @@ function Chip({
  * for the rest of time. Being able to log it here is what keeps that list to the
  * bills that actually recur.
  *
- * The day strip is the other half of that: without it a spend can only be stamped
- * today, so a week caught up on in one sitting collapses onto one day and the real
- * day ends up written into the note.
+ * Every line lands on the day it's logged. The wire still carries a day and the
+ * server still honours one, so back-dating stays possible — it just isn't worth a
+ * seven-pill row above a two-field form.
  */
 export function LogMoney() {
   const addMoney = useSystem((s) => s.addMoney);
   const qc = useQueryClient();
 
-  const today = dateKey();
-  const days = recentDays(today, DAYS_BACK);
-  const yesterday = days[1] ?? '';
-
   const [direction, setDirection] = useState<MoneyDirection>('out');
   const [bucket, setBucket] = useState<BucketChoice>('needs');
-  const [day, setDay] = useState(today);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
 
-  // '' rather than today's key when nothing is back-dated: the server already treats
-  // a blank day as the day of the request, so this sends no opinion at all.
-  const entry = readMoneyDraft({
-    amount,
-    note,
-    direction,
-    bucket: toBucket(bucket),
-    day: day === today ? '' : day,
-  });
+  // No day at all: the server stamps the entry with the day of the request.
+  const entry = readMoneyDraft({ amount, note, direction, bucket: toBucket(bucket) });
 
   const submit = async () => {
     if (!entry) return; // half-typed — nothing to log yet
     setAmount('');
     setNote('');
-    setDay(today); // the next line is almost always for today; back-dating is the exception
     await addMoney(entry);
     void qc.invalidateQueries({ queryKey: ['money-history'] });
   };
@@ -147,18 +119,6 @@ export function LogMoney() {
           ))}
         </View>
       ) : null}
-
-      <View style={styles.chipRow}>
-        {days.map((d) => (
-          <Chip
-            key={d}
-            label={dayChipLabel(d, today, yesterday)}
-            on={day === d}
-            onPress={() => setDay(d)}
-            accessibilityLabel={d === today ? 'Today' : prettyDay(d)}
-          />
-        ))}
-      </View>
 
       <View style={styles.addRow}>
         <TextInput
