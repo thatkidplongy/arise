@@ -22,6 +22,19 @@ echo "▸ Injecting PWA meta tags…"
 OUT="$OUT" python3 - <<'PY'
 import os, pathlib, re
 
+# The browser's own focus ring is a skyblue box that belongs to no part of this
+# palette, and on a phone it flashes on every tap of a field. :focus-visible is the
+# split that matters: browsers only match it for keyboard focus, so tapping a field
+# shows nothing while tabbing to one still gets a ring — in clay, via box-shadow so
+# it doesn't fight the border react-native-web sets inline.
+FOCUS_CSS = """
+<style>
+input:focus,textarea:focus,select:focus,[contenteditable]:focus{outline:none}
+input:focus-visible,textarea:focus-visible,select:focus-visible,[contenteditable]:focus-visible{
+outline:none;box-shadow:0 0 0 2px rgba(198,113,57,.38)}
+</style>
+"""
+
 META = """
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -46,6 +59,8 @@ for html in pathlib.Path(os.environ["OUT"]).glob("**/*.html"):
         text = re.sub(r"(<head[^>]*>)", r"\1" + VIEWPORT, text, count=1)
     if "apple-mobile-web-app-capable" not in text:
         text = re.sub(r"(<head[^>]*>)", r"\1" + META, text, count=1)
+    if "focus-visible" not in text:
+        text = re.sub(r"(<head[^>]*>)", r"\1" + FOCUS_CSS, text, count=1)
     html.write_text(text)
 PY
 

@@ -11,13 +11,16 @@ import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
 import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
-import { Field, TextArea } from '@/components/ui/Field';
+import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
+import { EdgeBlock } from '@/components/ui/EdgeBlock';
 import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
 import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/api';
+import { buildBringBack, type BringBack } from '@/lib/bringBack';
 import { describeThreadBook } from '@/lib/reading';
+import { useInsights } from '@/query/useInsights';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
@@ -204,72 +207,99 @@ function GradeRow({ id }: { id: string }) {
   );
 }
 
-/**
- * One question, with somewhere to put your answer before you see the real one.
- *
- * Writing it first is the whole point. Recognising an answer feels identical to
- * knowing it, which is how you can review something for weeks and still come up
- * blank when it matters. Producing the answer cold is the only thing that tells the
- * two apart — and it makes the grade afterwards evidence rather than a feeling.
- */
-function RecallRow({ item }: { item: ApiRecall }) {
-  const [shown, setShown] = useState(false);
-  const [attempt, setAttempt] = useState('');
-  const asks = Boolean(item.cue) && !shown;
-  const tried = attempt.trim();
+function describeWhen(item: ApiRecall): string {
+  const ago = item.days_ago === 1 ? 'yesterday' : `${item.days_ago} days ago`;
+  return item.source_label ? `${ago} · ${item.source_label}` : ago;
+}
 
-  const when = `${item.days_ago === 1 ? 'yesterday' : `${item.days_ago} days ago`}${
-    item.source_label ? ` · ${item.source_label}` : ''
-  }`;
-
-  if (asks) {
-    return (
-      <View style={styles.recallRow}>
-        <Text style={styles.recallText}>{item.cue}</Text>
-        <Text style={styles.recallWhen}>{when}</Text>
-        <TextArea
-          style={styles.attemptInput}
-          value={attempt}
-          onChangeText={setAttempt}
-          placeholder="Say it first, then write what you got"
-        />
-        <Button label="Reveal" tone="secondary" onPress={() => setShown(true)} style={styles.reveal} />
-      </View>
-    );
-  }
-
+/** The question, before the answer is out. */
+function RecallAsk({ item }: { item: ApiRecall }) {
   return (
-    <View style={styles.recallRow}>
-      {tried ? (
-        <>
-          <Text style={styles.attemptLabel}>You said</Text>
-          <Text style={styles.attemptEcho}>{tried}</Text>
-        </>
-      ) : null}
-      <Text style={styles.recallText}>{item.text}</Text>
-      {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
-      <Text style={styles.recallWhen}>{when}</Text>
-      {item.cue && !tried ? (
-        <Text style={styles.recallNudge}>
-          Nothing written — careful, recognising this isn&apos;t the same as recalling it.
-        </Text>
-      ) : null}
-      {item.cue ? <GradeRow id={item.id} /> : null}
-    </View>
+    <>
+      <Text style={styles.bringText}>{item.cue}</Text>
+      <Text style={styles.bringMeta}>{describeWhen(item)}</Text>
+      <Text style={styles.bringHint}>tap to reveal</Text>
+    </>
   );
 }
 
-/** Older highlights coming back around — the reason any of this works. */
-function RecallPanel() {
+/** The answer, and the grade that reschedules it. */
+function RecallAnswer({ item }: { item: ApiRecall }) {
+  return (
+    <>
+      <Text style={styles.bringText}>{item.text}</Text>
+      {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
+      <Text style={styles.bringMeta}>{describeWhen(item)}</Text>
+      <GradeRow id={item.id} />
+    </>
+  );
+}
+
+/** A line from a tips capture. Nothing to grade — it isn't on a schedule. */
+function TipLine({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
+  return (
+    <>
+      <Text style={styles.bringText}>{tip.text}</Text>
+      <Text style={styles.bringMeta}>
+        {tip.action ? 'to do' : 'idea'} · {tip.source}
+      </Text>
+      <Text style={styles.bringHint}>tap for another</Text>
+    </>
+  );
+}
+
+/**
+ * One thing at a time, in the edge-marked block the daily line uses — tap it and the
+ * next thing comes round.
+ *
+ * A recall item reveals on the first tap and advances on the second, so the answer
+ * is never on screen beside its own question. Note that this reveals directly rather
+ * than asking you to write the answer first: quicker, at the cost of the step that
+ * separates recognising something from actually recalling it. The grade you give
+ * afterwards is a feeling now rather than evidence.
+ */
+function BringBackBlock() {
   const recall = useSystem((s) => s.state?.recall) ?? [];
-  if (!recall.length) return null;
+  const { insights } = useInsights();
+  const items = buildBringBack(recall, insights);
+  const [at, setAt] = useState(0);
+  const [shown, setShown] = useState(false);
+
+  if (!items.length) return null;
+  // The pool shrinks as recall items are graded off, so clamp rather than index past
+  // the end and render a blank block.
+  const current = items[at % items.length];
+
+  const advance = () => {
+    setShown(false);
+    setAt((i) => (i + 1) % items.length);
+  };
+  // A recall item earns two taps: reveal, then move on. Everything else is one.
+  const onTap = () => {
+    if (current.kind === 'recall' && current.item.cue && !shown) {
+      setShown(true);
+      return;
+    }
+    advance();
+  };
 
   return (
-    <SystemPanel title="Try to recall" sub={`${recall.length}`}>
-      {recall.map((r) => (
-        <RecallRow key={r.id} item={r} />
-      ))}
-    </SystemPanel>
+    <Pressable
+      onPress={onTap}
+      accessibilityRole="button"
+      accessibilityLabel={shown ? 'Next' : 'Reveal'}
+      style={({ pressed }) => (pressed ? styles.bringPressed : null)}
+    >
+      <EdgeBlock edge={HUE} kicker={current.kind === 'tip' ? 'From your tips' : 'Try to recall'}>
+        {current.kind === 'tip' ? (
+          <TipLine tip={current} />
+        ) : shown || !current.item.cue ? (
+          <RecallAnswer item={current.item} />
+        ) : (
+          <RecallAsk item={current.item} />
+        )}
+      </EdgeBlock>
+    </Pressable>
   );
 }
 
@@ -329,7 +359,7 @@ export default function LearnScreen() {
 
           <ThreadPanel />
 
-          <RecallPanel />
+          <BringBackBlock />
 
           {!state.digest_enabled ? (
             <Text style={styles.footer}>
@@ -374,15 +404,11 @@ const styles = StyleSheet.create({
   rowSource: { ...typography.cardTitle, color: neutral[900] },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   empty: { ...typography.body, color: text.secondary },
-  recallRow: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: surface.hairline, gap: 4 },
-  recallText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },
+  bringPressed: { opacity: 0.85 },
+  bringText: { ...typography.body, fontSize: 17, lineHeight: 26, color: neutral[900] },
+  bringMeta: { ...typography.small, color: text.secondary },
+  bringHint: { ...typography.small, color: text.secondary },
   recallHook: { ...typography.small, color: text.secondary, fontStyle: 'italic' },
-  recallWhen: { ...typography.tiny, color: text.faint },
-  attemptInput: { marginTop: 10, minHeight: 72 },
-  reveal: { marginTop: 10, alignSelf: 'flex-start' },
-  attemptLabel: { ...typography.kicker, color: text.faint, marginBottom: 3 },
-  attemptEcho: { ...typography.body, color: text.secondary, fontStyle: 'italic', marginBottom: 10 },
-  recallNudge: { ...typography.small, fontSize: 11, color: text.faint, marginTop: 6 },
   gradeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
   gradeDone: { ...typography.small, color: text.faint, marginTop: 10 },
   threadText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },

@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import type { PropsWithChildren } from 'react';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { EdgeBlock } from '@/components/ui/EdgeBlock';
 import { Text } from '@/components/ui/Text';
 import type { ApiDailyQuote } from '@/lib/api';
 import { fetchInsights } from '@/query/useInsights';
@@ -37,16 +37,6 @@ export function NorthStarCard({ northStar, quote }: { northStar: string; quote: 
   );
 }
 
-/** One edge-marked block: the coloured rule, then everything it sorts. */
-function Block({ edge, children }: PropsWithChildren<{ edge: string }>) {
-  return (
-    <View style={styles.block}>
-      <View style={[styles.edge, { backgroundColor: edge }]} />
-      <View style={styles.blockBody}>{children}</View>
-    </View>
-  );
-}
-
 function NorthStar({ value }: { value: string }) {
   const written = value.trim();
   // Everything after the first sentence reads as the quieter second line.
@@ -55,8 +45,7 @@ function NorthStar({ value }: { value: string }) {
   const rest = split > 0 ? written.slice(split).trim() : '';
 
   return (
-    <Block edge={clay[400]}>
-      <Text style={[styles.kicker, { color: clay[700] }]}>Your north star</Text>
+    <EdgeBlock edge={clay[400]} kicker="Your north star" kickerColor={clay[700]}>
       {written ? (
         <>
           <Text style={styles.starLead}>{lead}</Text>
@@ -67,7 +56,7 @@ function NorthStar({ value }: { value: string }) {
           Write the life you&apos;re reaching for — the reason behind all of this. Tap to set it.
         </Text>
       )}
-    </Block>
+    </EdgeBlock>
   );
 }
 
@@ -114,13 +103,12 @@ function DailyLine({ quote }: { quote: ApiDailyQuote }) {
       accessibilityLabel="Show another line"
       style={({ pressed }) => (pressed ? styles.pressed : null)}
     >
-      <Block edge={sage[400]}>
-        <Text style={[styles.kicker, { color: sage[700] }]}>A line to carry today</Text>
+      <EdgeBlock edge={sage[400]} kicker="A line to carry today" kickerColor={sage[700]}>
         {/* Quotation marks only around what was actually said. Wrapping a distilled
             takeaway in them would invent a speaker for the model's own words. */}
         <Text style={styles.quote}>{line.verbatim ? `“${line.text}”` : line.text}</Text>
         <Text style={styles.hint}>tap for another</Text>
-      </Block>
+      </EdgeBlock>
     </Pressable>
   );
 }
@@ -130,12 +118,7 @@ const styles = StyleSheet.create({
   // so the block sits in the page gutter rather than on a card floated above it.
   card: { paddingVertical: 6 },
   pressed: { opacity: 0.85 },
-  block: { flexDirection: 'row', gap: 16 },
-  // The rule that does the sorting. It runs the height of its block, not the card.
-  edge: { width: 4, borderRadius: 2, alignSelf: 'stretch' },
-  blockBody: { flex: 1, minWidth: 0, gap: 10 },
   divider: { height: 1, backgroundColor: surface.hairline, marginVertical: 22 },
-  kicker: { ...typography.kicker, fontSize: 11, letterSpacing: 1.5 },
   starLead: { ...typography.numeral, fontSize: 23, lineHeight: 31, color: neutral[900] },
   starRest: { ...typography.body, fontSize: 14, color: text.secondary, marginTop: -2 },
   starEmpty: { ...typography.body, fontSize: 14, color: text.secondary },
