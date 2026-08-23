@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app import digest, llm, reading, state
+from app import digest, digest_render, llm, reading, state
 from app.models import Completion, Highlight, Learning, ReadingLog, Thread
 
 DAY = "2026-07-18"
@@ -319,7 +319,7 @@ def _recalled(text, cue, days_ago=7, source="", hook=""):
 def test_render_text_asks_before_it_answers():
     ctx = _ctx([("Depth beats speed.", "What beats speed?")],
                [_recalled("Start small.", "How big should a new habit be?")])
-    out = digest.render_text(ctx)
+    out = digest_render.render_text(ctx)
 
     assert out.index("TRY TO RECALL") < out.index("ANSWERS")
     # every cue precedes every answer — the whole point of the layout
@@ -330,30 +330,30 @@ def test_render_text_asks_before_it_answers():
 
 def test_render_text_shows_a_hook_only_with_the_answer():
     ctx = _ctx(recall=[_recalled("Mango.", "Which symbol means mango?", hook="a fruit on a roof")])
-    out = digest.render_text(ctx)
+    out = digest_render.render_text(ctx)
     assert out.index("Which symbol means mango?") < out.index("a fruit on a roof")
 
 
 def test_render_text_is_kind_about_an_empty_day():
-    out = digest.render_text(_ctx())
+    out = digest_render.render_text(_ctx())
     assert "rest counts" in out
     assert "TRY TO RECALL" not in out
 
 
 def test_render_keeps_a_cueless_highlight_rather_than_dropping_it():
     ctx = _ctx(["Depth beats speed."])  # no cue — legacy row
-    assert "Depth beats speed." in digest.render_text(ctx)
-    assert "Depth beats speed." in digest.render_html(ctx)
+    assert "Depth beats speed." in digest_render.render_text(ctx)
+    assert "Depth beats speed." in digest_render.render_html(ctx)
 
 
 def test_render_html_inlines_every_style():
-    html = digest.render_html(_ctx([("Depth beats speed.", "What beats speed?")]))
+    html = digest_render.render_html(_ctx([("Depth beats speed.", "What beats speed?")]))
     assert "Depth beats speed." in html
     assert "<style" not in html and "class=" not in html  # mail clients strip stylesheets
 
 
 def test_render_html_puts_the_answers_below_the_questions():
-    html = digest.render_html(_ctx([("Depth beats speed.", "What beats speed?")]))
+    html = digest_render.render_html(_ctx([("Depth beats speed.", "What beats speed?")]))
     assert html.index("Try to recall") < html.index("Answers")
     assert html.index("What beats speed?") < html.index("Depth beats speed.")
 
@@ -361,20 +361,20 @@ def test_render_html_puts_the_answers_below_the_questions():
 def test_every_email_invites_adding_flesh():
     """The 24-hour window: what can still be dredged up today is gone tomorrow."""
     ctx = _ctx([("Depth beats speed.", "What beats speed?")])
-    assert digest.FLESH_NUDGE in digest.render_text(ctx)
-    assert digest.FLESH_NUDGE in digest.render_html(ctx)
+    assert digest_render.FLESH_NUDGE in digest_render.render_text(ctx)
+    assert digest_render.FLESH_NUDGE in digest_render.render_html(ctx)
 
 
 def test_quiz_items_asks_yesterday_first():
     ctx = _ctx([("Fresh.", "Fresh cue?")], [_recalled("Older.", "Older cue?")])
-    items = digest.quiz_items(ctx)
+    items = digest_render.quiz_items(ctx)
     assert [i["text"] for i in items] == ["Fresh.", "Older."]
     assert items[0]["fresh"] and not items[1]["fresh"]
 
 
 def test_subject_counts_the_questions():
-    assert digest.subject_for(_ctx([("a", "a?"), ("b", "b?")])).startswith("Recall · 2 questions")
-    assert digest.subject_for(_ctx([("a", "a?")])).startswith("Recall · 1 question from")
+    assert digest_render.subject_for(_ctx([("a", "a?"), ("b", "b?")])).startswith("Recall · 2 questions")
+    assert digest_render.subject_for(_ctx([("a", "a?")])).startswith("Recall · 1 question from")
 
 
 # ── send_daily ────────────────────────────────────────────────────────────────
@@ -571,7 +571,7 @@ def test_backfill_hooks_gives_older_answers_the_hook_fresh_ones_come_with(db, mo
     assert digest.backfill_hooks(db, player, ctx) == 1
 
     # The email renders from the context, and the row keeps it for every later showing.
-    assert "a feather on one pan" in digest.render_text(ctx)
+    assert "a feather on one pan" in digest_render.render_text(ctx)
     assert db.query(Highlight).filter_by(player_id=player.id).one().hook.startswith("a feather")
     assert asked[0] == [{
         "text": "Losses weigh about twice as much as equal gains.",
@@ -619,7 +619,7 @@ def test_backfill_hooks_leaves_the_answers_bare_when_it_fails(db, monkeypatch):
     problems: list[str] = []
     assert digest.backfill_hooks(db, player, ctx, problems) == 0
     assert problems and "hooks not written" in problems[0]
-    assert "What beats speed?" in digest.render_text(ctx)
+    assert "What beats speed?" in digest_render.render_text(ctx)
 
 
 def test_backfill_hooks_stops_when_the_days_quota_is_gone(db, monkeypatch):
@@ -677,7 +677,7 @@ def test_quiz_items_drops_an_idea_already_asked():
         [("System 1 is fast and automatic; System 2 is slow and effortful.", "Fresh cue?")],
         [_recalled("System 2 is slow and effortful, System 1 fast and automatic.", "Older cue?")],
     )
-    items = digest.quiz_items(ctx)
+    items = digest_render.quiz_items(ctx)
     assert [i["cue"] for i in items] == ["Fresh cue?"]
 
 
@@ -686,11 +686,11 @@ def test_quiz_items_keeps_genuinely_different_ideas():
         [("Loss aversion makes losses hurt twice as much as equal gains.", "a?")],
         [_recalled("The base rate is the background probability before details.", "b?")],
     )
-    assert len(digest.quiz_items(ctx)) == 2
+    assert len(digest_render.quiz_items(ctx)) == 2
 
 
 def test_too_alike_ignores_shared_filler_words():
-    assert not digest._too_alike(
+    assert not digest_render._too_alike(
         "This idea is about deliberate practice being hard.",
         "This idea is about sleep being restorative.",
     )
@@ -834,8 +834,8 @@ def test_thread_for_ignores_a_summary_from_the_future(db):
 def test_render_shows_the_running_summary():
     ctx = _ctx([("Depth beats speed.", "What beats speed?")])
     ctx["thread"] = {"title": "Deep Work", "summary": "Focus compounds.", "sittings": 3}
-    assert "Focus compounds." in digest.render_text(ctx)
-    html = digest.render_html(ctx)
+    assert "Focus compounds." in digest_render.render_text(ctx)
+    html = digest_render.render_html(ctx)
     assert "Focus compounds." in html and "3 sittings" in html
 
 
@@ -846,15 +846,15 @@ PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="
 
 
 def test_avatar_part_splits_the_stored_data_uri():
-    part = digest.avatar_part(PNG)
+    part = digest_render.avatar_part(PNG)
     assert part["content"] == "iVBORw0KGgoAAAANSUhEUg=="  # base64 only, no data: prefix
     assert part["content_type"] == "image/png"
     assert part["filename"] == "avatar.png"
-    assert part["content_id"] == digest.AVATAR_CID  # what src="cid:…" points at
+    assert part["content_id"] == digest_render.AVATAR_CID  # what src="cid:…" points at
 
 
 def test_avatar_part_names_a_jpeg_sensibly():
-    assert digest.avatar_part("data:image/jpeg;base64,AAAA")["filename"] == "avatar.jpg"
+    assert digest_render.avatar_part("data:image/jpeg;base64,AAAA")["filename"] == "avatar.jpg"
 
 
 def test_avatar_part_ignores_anything_unusable():
@@ -862,12 +862,12 @@ def test_avatar_part_ignores_anything_unusable():
     dropped rather than risking the send."""
     for bad in ("", "   ", "https://example.com/me.png", "data:image/png;base64,",
                 "data:text/plain;base64,AAAA", "not a uri"):
-        assert digest.avatar_part(bad) is None
+        assert digest_render.avatar_part(bad) is None
 
 
 def test_the_header_shows_the_picture_by_content_id_when_sending():
     ctx = {**_ctx(["Depth beats speed."]), "avatar": PNG}
-    html = digest.render_html(ctx, avatar_src=digest.AVATAR_SRC)
+    html = digest_render.render_html(ctx, avatar_src=digest_render.AVATAR_SRC)
     assert 'src="cid:arise-avatar"' in html
     assert "base64" not in html  # the bytes travel as a part, never in the markup
 
@@ -876,11 +876,11 @@ def test_the_preview_shows_the_picture_inline_instead():
     """The in-app preview is a browser, not a mail client: cid: resolves to nothing
     there, so with no src passed the stored data URI is used directly."""
     ctx = {**_ctx(["Depth beats speed."]), "avatar": PNG}
-    assert PNG in digest.render_html(ctx)
+    assert PNG in digest_render.render_html(ctx)
 
 
 def test_the_header_is_unchanged_when_no_picture_is_set():
-    html = digest.render_html(_ctx(["Depth beats speed."]))
+    html = digest_render.render_html(_ctx(["Depth beats speed."]))
     assert "<img" not in html
     assert "Recall" in html and "Saturday, 18 July" in html
 
@@ -896,7 +896,7 @@ def test_send_attaches_the_picture_and_points_the_html_at_it(db, monkeypatch):
                         lambda s, h, t, attachments=None: seen.update(html=h, parts=attachments))
 
     digest.send_daily(db, player, DAY)
-    assert seen["parts"][0]["content_id"] == digest.AVATAR_CID
+    assert seen["parts"][0]["content_id"] == digest_render.AVATAR_CID
     assert 'src="cid:arise-avatar"' in seen["html"]
 
 
@@ -916,5 +916,5 @@ def test_the_email_warns_against_recognising_instead_of_recalling():
     """Oakley's illusion of competence: recognising an answer feels exactly like
     knowing it, so the email has to say produce it first, not just 'have a go'."""
     ctx = _ctx([("Depth beats speed.", "What beats speed?")])
-    for rendered in (digest.render_text(ctx), digest.render_html(ctx)):
-        assert digest.RECALL_INSTRUCTION in rendered
+    for rendered in (digest_render.render_text(ctx), digest_render.render_html(ctx)):
+        assert digest_render.RECALL_INSTRUCTION in rendered

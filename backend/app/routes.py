@@ -3,8 +3,8 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import (body, books, digest, insights, llm, mailer, nutrition, recall, service, skincare,
-               state, transcript)
+from . import (body, books, digest, digest_render, insights, llm, mailer, nutrition,
+               recall, service, skincare, state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
@@ -423,12 +423,12 @@ def preview_digest(day: str | None = Query(None), db: Session = Depends(get_db))
         raise HTTPException(502, "Couldn't distil that day — try again in a moment.")
     return {
         "day": valid,
-        "subject": digest.subject_for(ctx),
+        "subject": digest_render.subject_for(ctx),
         "highlights": [h["text"] for h in ctx["highlights"]],
         "recall": ctx["recall"],
         "thread": ctx["thread"],
-        "html": digest.render_html(ctx),
-        "text": digest.render_text(ctx),
+        "html": digest_render.render_html(ctx),
+        "text": digest_render.render_text(ctx),
     }
 
 
