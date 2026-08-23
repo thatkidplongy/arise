@@ -108,9 +108,14 @@ def test_a_book_with_no_length_is_never_asked_about(client):
         client.post("/reading/log", json={"chapters": 1, "label": str(i + 1), "day": day})
     assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is False
 
-    # But saying so still works, and rolls to the next book.
+    # But saying so still works, and rolls to the next book. The response is an
+    # ActionResult now — the review can unlock an achievement, so it answers with
+    # events alongside the state rather than the state alone.
     body = client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Next"}).json()
-    assert body["player"]["books_finished"] == 1 and body["player"]["current_book"] == "Next"
+    player = body["state"]["player"]
+    assert player["books_finished"] == 1 and player["current_book"] == "Next"
+    # Unasked-about or not, finishing it still earns the achievement.
+    assert [e["data"]["id"] for e in body["events"] if e["type"] == "achievement"] == ["book-1"]
 
 
 def test_finishing_the_chapters_triggers_the_check_in(client):
@@ -306,3 +311,52 @@ def test_a_caller_cannot_mutate_the_curated_shelves(monkeypatch):
     before = len(books.CURATED[0]["books"])
     books.suggestions()[0]["books"].clear()
     assert len(books.CURATED[0]["books"]) == before
+
+
+def test_finishing_a_book_unlocks_the_achievement_on_the_same_tap(client):
+    """Answering "yes, finished it" is what earns Cover to Cover, and the events come
+    back with that answer rather than turning up later on an unrelated quest."""
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 3})
+
+    # Not offered until the logged chapters actually cover the book.
+    client.post("/reading/log", json={"chapters": 2, "label": "1-2", "day": day})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is False
+
+    client.post("/reading/log", json={"chapters": 1, "label": "3", "day": day})
+    assert client.get(f"/state?day={day}").json()["book_review"]["pending"] is True
+
+    r = client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Deep Work"}).json()
+    assert [e["data"]["id"] for e in r["events"] if e["type"] == "achievement"] == ["book-1"]
+
+    # And the state that comes back has already rolled to the next book.
+    reading = r["state"]["reading"]
+    assert reading["book"] == "Deep Work"
+    assert reading["books_finished"] == 1
+    assert reading["chapters"] == 0  # length unknown until set, so no bar yet
+    assert r["state"]["book_review"]["pending"] is False
+
+
+def test_book_achievement_is_awarded_once(client):
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "One", "chapters": 1})
+    client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
+    first = client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Two"}).json()
+    assert any(e["data"]["id"] == "book-1" for e in first["events"])
+
+    # A second book earns nothing new — book-5 is still four away.
+    client.put(f"/book?day={day}", json={"current_book": "Two", "chapters": 1})
+    client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
+    second = client.post(f"/book/review?day={day}", json={"finished": True, "next_book": ""}).json()
+    assert [e["data"]["id"] for e in second["events"] if e["type"] == "achievement"] == []
+    assert second["state"]["reading"] is None  # no next book, so nothing to show
+
+
+def test_not_finished_earns_nothing_and_keeps_the_book(client):
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 2})
+    client.post("/reading/log", json={"chapters": 2, "label": "1-2", "day": day})
+    r = client.post(f"/book/review?day={day}", json={"finished": False, "next_book": ""}).json()
+    assert r["events"] == []
+    assert r["state"]["reading"]["book"] == "Atomic Habits"
+    assert r["state"]["reading"]["books_finished"] == 0

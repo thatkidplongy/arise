@@ -13,6 +13,10 @@ class Snapshot:
     daily_clears: int
     total_completions: int
     side_completions: int
+    # Not derived from completions like everything above it — a finished book is a
+    # counter on the player, so it has to be handed in. Defaults to 0 so any caller
+    # that only cares about quests keeps working.
+    books_finished: int = 0
     quest_counts: dict[str, int] = field(default_factory=dict)
 
     def count_of(self, quest_id: str) -> int:
@@ -122,6 +126,19 @@ ACHIEVEMENTS: list[AchievementDef] = [
         desc="Raise Craft to level 15.",
         title_reward="The Architect",
         check=lambda s: s.stat_levels.get("CFT", 0) >= 15,
+    ),
+    AchievementDef(
+        id="book-1",
+        name="Cover to Cover",
+        desc="Finish a book you were reading.",
+        title_reward="The Well Read",
+        check=lambda s: s.books_finished >= 1,
+    ),
+    AchievementDef(
+        id="book-5",
+        name="Shelf Life",
+        desc="Finish five books.",
+        check=lambda s: s.books_finished >= 5,
     ),
     AchievementDef(
         id="xp-1000",

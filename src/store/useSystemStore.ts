@@ -361,8 +361,18 @@ export const useSystemStore = create<SystemStore>()(
       reviewCraftPhase: (done) => mutate((b, t, d) => api.reviewCraftPhase(b, t, done, d)),
       finishCraftPiece: (done) => mutate((b, t, d) => api.finishCraftPiece(b, t, done, d)),
       setCraftSource: (source) => mutate((b, t, d) => api.setCraftSource(b, t, source, d)),
-      reviewBook: (finished, nextBook) =>
-        mutate((b, t, d) => api.reviewBook(b, t, finished, nextBook, d)),
+      // Not `mutate` like its neighbours: this one answers with events as well as
+      // state, because saying you finished a book is what earns the achievement.
+      reviewBook: async (finished, nextBook) => {
+        const { serverUrl, apiToken, notices } = get();
+        try {
+          const { events, state } = await api.reviewBook(serverUrl, apiToken, finished, nextBook, dateKey());
+          set({ state, status: 'online', notices: [...notices, ...noticesFrom(events)] });
+        } catch (e) {
+          const { status, notice } = errorOutcome(e);
+          set({ status, notices: notice ? [...notices, notice] : notices });
+        }
+      },
       setInterviewMode: (enabled) => mutate((b, t, d) => api.setInterviewMode(b, t, enabled, d)),
 
       // Book lookup (Open Library). Search lets errors surface so the picker can

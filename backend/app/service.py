@@ -83,8 +83,20 @@ def _apply_completion(db: Session, player: Player, quest: QuestDef, day: str, ro
     if after_rank != before_rank:
         events.append({"type": "rank_up", "data": {"from": before_rank, "to": after_rank}})
 
+    events += unlock_achievements(db, player, after)
+    return events
+
+
+def unlock_achievements(db: Session, player: Player, agg: dict) -> list[dict]:
+    """Award anything newly earned and return the events for it. Does not commit.
+
+    Its own function because completing a quest is no longer the only thing that can
+    earn something — finishing a book is a counter on the player, and while this
+    lived inside _apply_completion the book achievements could only ever arrive
+    later, attached to whatever unrelated quest you happened to tick next."""
     unlocked = {u.achievement_id for u in db.query(AchievementUnlock).filter_by(player_id=player.id)}
-    snap = snapshot(after)
+    snap = snapshot(agg, books_finished=player.books_finished or 0)
+    events: list[dict] = []
     for a in ACHIEVEMENTS:
         if a.id not in unlocked and a.check(snap):
             db.add(AchievementUnlock(player_id=player.id, achievement_id=a.id))
@@ -408,19 +420,27 @@ def set_interview_mode(db: Session, player: Player, enabled: bool) -> None:
     db.commit()
 
 
-def review_book(db: Session, player: Player, finished: bool, next_book: str, day: str) -> None:
+def review_book(db: Session, player: Player, finished: bool, next_book: str, day: str) -> list[dict]:
     """Answer the reading check-in. Finished → count it and roll to the next book;
     not yet → keep the current one and carry its progress on. Either way, don't ask
-    again this week (it re-appears next week only if still past the finish pace)."""
+    again this week (it re-appears next week only if still past the finish pace).
+
+    Returns the System events finishing earned, so the moment you say you're done is
+    the moment you're told — rather than the achievement turning up hours later
+    bolted onto an unrelated quest."""
     week = game.week_key(day)
+    events: list[dict] = []
     if finished:
         if player.current_book:
             player.books_finished += 1
         player.current_book = (next_book or "").strip()
         player.current_book_chapters = 0  # new book, length unknown until set
         player.book_started_week = week if player.current_book else ""
+        db.flush()  # the counter has to be visible to the achievement predicates
+        events = unlock_achievements(db, player, aggregate(completions_of(db, player), quest_defs(db)))
     player.book_review_week = week
     db.commit()
+    return events
 
 
 def _clear_generated(db: Session, player: Player) -> None:

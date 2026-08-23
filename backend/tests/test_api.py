@@ -100,11 +100,14 @@ def test_reading_review_flow(client):
     assert st["reading"]["progress"] >= 1.0
     assert st["book_review"]["pending"] is True
     # Finish it → counts, rolls to the next book, and stops asking this week.
+    # ActionResult: the review answers with the events finishing earned, then state.
     r = client.post(f"/book/review?day={last}", json={"finished": True, "next_book": "Deep Work"})
     body = r.json()
-    assert body["player"]["books_finished"] == 1
-    assert body["player"]["current_book"] == "Deep Work"
-    assert body["book_review"]["pending"] is False
+    assert [e["data"]["id"] for e in body["events"] if e["type"] == "achievement"] == ["book-1"]
+    st = body["state"]
+    assert st["player"]["books_finished"] == 1
+    assert st["player"]["current_book"] == "Deep Work"
+    assert st["book_review"]["pending"] is False
 
 
 def test_craft_phase_waits_for_reading_not_for_a_date(client):

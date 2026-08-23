@@ -631,7 +631,9 @@ export const api = {
     nextBook: string,
     day: string,
   ) =>
-    request<ApiState>(base, `/book/review?day=${day}`, token, {
+    // ActionResult, not ApiState: finishing a book can unlock an achievement, and
+    // the events ride back with the state so the notice fires on the same tap.
+    request<ActionResult>(base, `/book/review?day=${day}`, token, {
       method: 'POST',
       body: JSON.stringify({ finished, next_book: nextBook }),
     }),

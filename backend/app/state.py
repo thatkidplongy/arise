@@ -371,7 +371,7 @@ def _top_stat(by_stat: dict[str, int]) -> str | None:
     return top if top is not None and by_stat.get(top, 0) > 0 else None
 
 
-def snapshot(agg: dict) -> Snapshot:
+def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
     return Snapshot(
         total_xp=agg["total_xp"],
         level=game.level_info(agg["total_xp"])["level"],
@@ -380,6 +380,7 @@ def snapshot(agg: dict) -> Snapshot:
         daily_clears=len(agg["bonus_days"]),
         total_completions=agg["total_completions"],
         side_completions=agg["side_completions"],
+        books_finished=books_finished,
         quest_counts=agg["quest_counts"],
     )
 

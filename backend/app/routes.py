@@ -186,13 +186,17 @@ def books_suggest(db: Session = Depends(get_db)):
         return []  # suggestions are a nicety — never an error
 
 
-@router.post("/book/review", response_model=StateOut)
+@router.post("/book/review", response_model=ActionResult)
 def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session = Depends(get_db)):
     """Answer the weekly reading review: finished → counts it and rolls to
-    next_book; not yet → keeps the current book. Asked once per new week."""
+    next_book; not yet → keeps the current book. Asked once per new week.
+
+    Returns events as well as state: finishing a book can unlock an achievement, and
+    the answer to "did you finish it?" is the moment to say so."""
     player = state.get_or_create_player(db)
-    service.review_book(db, player, body.finished, body.next_book, _valid_day(day))
-    return state.build_state(db, player, _valid_day(day))
+    d = _valid_day(day)
+    events = service.review_book(db, player, body.finished, body.next_book, d)
+    return {"events": events, "state": state.build_state(db, player, d)}
 
 
 @router.put("/craft/source", response_model=StateOut)
