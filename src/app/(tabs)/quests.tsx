@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { PriorityBoard } from '@/components/PriorityCard';
 import { QuestCard } from '@/components/QuestCard';
-import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { NorthStarCard } from '@/components/NorthStarCard';
@@ -131,7 +130,6 @@ export default function QuestsScreen() {
 
       {featured ? <QuestCard quest={featured} featured /> : null}
 
-      <ReadingReview />
 
       <PriorityBoard priorities={state.priorities} />
 

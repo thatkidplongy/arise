@@ -44,7 +44,7 @@ function ProgressBar({ reading }: { reading: ApiReading }) {
       />
       <Text style={styles.meta}>
         {done
-          ? 'That’s the whole book by your count — the check-in will ask if you’re done.'
+          ? 'That’s the whole book by your count. Did you finish it?'
           : `About ${pct}% of the way, at whatever pace suits you`}
       </Text>
     </>

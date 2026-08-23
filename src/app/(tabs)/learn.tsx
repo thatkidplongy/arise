@@ -7,6 +7,7 @@ import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { ReadingCard } from '@/components/ReadingCard';
+import { ReadingReview } from '@/components/ReadingReview';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
@@ -361,6 +362,12 @@ export default function LearnScreen() {
           {/* The two things being worked through, then everything else you read.
               Both are paced by what you log, never by a schedule. */}
           <ReadingCard />
+
+          {/* Directly under the book it asks about. It used to live on Quests, which
+              meant finishing a book here showed you a line saying a check-in would
+              ask — and the check-in was on another tab. It shows itself only once
+              the logged chapters cover the book, so it costs nothing until then. */}
+          <ReadingReview />
 
           <CraftPhaseCard />
 
