@@ -948,5 +948,11 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "reflections": reflections,  # quest-linked takeaways, newest first
         "learnings": digest.list_learnings(db, player.id, day),  # what you read today
         "recall": digest.recall_set(db, player, day),  # older highlights coming back around
-        "thread": digest.thread_for(db, player, day),  # the running summary of the book
+        # Scoped to the book actually open: unscoped, this keeps showing the sentence
+        # for a book you've finished until the next one earns a thread of its own.
+        "thread": (
+            digest.thread_for(db, player, day, key=reading.book_key(player.current_book))
+            if player.current_book
+            else None
+        ),
     }

@@ -360,3 +360,98 @@ def test_not_finished_earns_nothing_and_keeps_the_book(client):
     assert r["events"] == []
     assert r["state"]["reading"]["book"] == "Atomic Habits"
     assert r["state"]["reading"]["books_finished"] == 0
+
+
+def _plant_generated_reading_quest(day: str, title: str) -> None:
+    """A personalised reading day that names the book, as the LLM would leave it."""
+    import json as _json
+
+    from app.db import SessionLocal
+    from app.models import GeneratedQuest, Player
+
+    session = SessionLocal()
+    pid = session.query(Player).first().id
+    session.add(
+        GeneratedQuest(
+            player_id=pid, quest_id="d-read", period_key=day,
+            title="Grimoire Study", desc=f"20 min in {title}",
+            steps=_json.dumps([f"Read {title} at your pace, then log which chapters"]),
+            resource="📖 " + title,
+        )
+    )
+    session.commit()
+    session.close()
+
+
+def test_finishing_a_book_stops_the_quests_naming_it(client):
+    """Rolling to the next book has to drop the personalised reading day with it.
+
+    Otherwise the Quests tab keeps telling you to read the book you just finished —
+    the title is baked into the generated row, not substituted at read time."""
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 2})
+    client.post("/reading/log", json={"chapters": 2, "label": "1-2", "day": day})
+    _plant_generated_reading_quest(day, "Atomic Habits")
+
+    # It really is being served before the finish.
+    q = next(x for x in client.get(f"/state?day={day}").json()["quests"] if x["id"] == "d-read")
+    assert "Atomic Habits" in q["steps"][0]
+
+    client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Deep Work"})
+
+    st = client.get(f"/state?day={day}").json()
+    assert st["reading"]["book"] == "Deep Work"
+    q = next(x for x in st["quests"] if x["id"] == "d-read")
+    assert "Atomic Habits" not in " ".join(q["steps"]) + q["desc"] + q["resource"]
+
+
+def test_not_finished_keeps_the_personalised_reading_day(client):
+    """Saying "not yet" changes nothing about the book, so the quest tuned to it
+    stands — re-generating it would be a day's LLM call spent on no news."""
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 2})
+    client.post("/reading/log", json={"chapters": 2, "label": "1-2", "day": day})
+    _plant_generated_reading_quest(day, "Atomic Habits")
+
+    client.post(f"/book/review?day={day}", json={"finished": False, "next_book": ""})
+
+    q = next(x for x in client.get(f"/state?day={day}").json()["quests"] if x["id"] == "d-read")
+    assert "Atomic Habits" in q["steps"][0]
+
+
+def test_the_book_so_far_follows_the_book_you_are_actually_reading(client):
+    """Finishing a book must not leave its running sentence on the Learn tab.
+
+    thread_for picks the most recently touched thread, which is right for a digest
+    built for a past morning and wrong for the app — unscoped, the panel goes on
+    describing the book you just closed until the next one earns a thread."""
+    import json as _json
+
+    from app.db import SessionLocal
+    from app.models import Player, Thread
+
+    day = "2026-07-18"
+    client.put(f"/book?day={day}", json={"current_book": "Atomic Habits", "chapters": 1})
+    client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
+
+    session = SessionLocal()
+    pid = session.query(Player).first().id
+    session.add(Thread(
+        player_id=pid, key="atomic habits", title="Atomic Habits",
+        summary="Small habits compound.", days=3, day=day,
+    ))
+    session.commit()
+    session.close()
+
+    assert client.get(f"/state?day={day}").json()["thread"]["title"] == "Atomic Habits"
+
+    # Roll to a book that has no thread of its own yet.
+    client.post(f"/book/review?day={day}", json={"finished": True, "next_book": "Deep Work"})
+    st = client.get(f"/state?day={day}").json()
+    assert st["reading"]["book"] == "Deep Work"
+    assert st["thread"] is None, "the finished book's sentence is still on the screen"
+
+    # And with no book at all there is nothing to summarise.
+    client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
+    client.post(f"/book/review?day={day}", json={"finished": True, "next_book": ""})
+    assert client.get(f"/state?day={day}").json()["thread"] is None

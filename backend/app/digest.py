@@ -284,15 +284,23 @@ def sittings_behind(db: Session, player: Player, row: Thread, book: str) -> int:
     return logged or (row.days or 0)
 
 
-def thread_for(db: Session, player: Player, day: str) -> dict | None:
+def thread_for(db: Session, player: Player, day: str, key: str | None = None) -> dict | None:
     """The running summary to show alongside `day` — the thread last touched on or
-    before it, so the digest reflects what was true that morning."""
-    row = (
-        db.query(Thread)
-        .filter(Thread.player_id == player.id, Thread.day <= day, Thread.summary != "")
-        .order_by(Thread.day.desc(), Thread.updated_at.desc())
-        .first()
+    before it, so the digest reflects what was true that morning.
+
+    `key` narrows it to one book. The two callers want different things and the
+    difference matters: a digest for a past day should show whatever thread was
+    current that morning, even if that book is long finished, while the app should
+    only ever show the sentence for the book actually open — otherwise finishing a
+    book leaves "The book so far" describing the one you just closed, because the
+    unscoped query picks the most recently touched thread regardless of book.
+    """
+    q = db.query(Thread).filter(
+        Thread.player_id == player.id, Thread.day <= day, Thread.summary != ""
     )
+    if key is not None:
+        q = q.filter(Thread.key == key)
+    row = q.order_by(Thread.day.desc(), Thread.updated_at.desc()).first()
     if row is None:
         return None
     # Stripped again on the way out: rows written before titles were normalised still

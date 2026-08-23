@@ -428,17 +428,25 @@ def review_book(db: Session, player: Player, finished: bool, next_book: str, day
     Returns the System events finishing earned, so the moment you say you're done is
     the moment you're told — rather than the achievement turning up hours later
     bolted onto an unrelated quest."""
-    week = game.week_key(day)
     events: list[dict] = []
     if finished:
         if player.current_book:
             player.books_finished += 1
-        player.current_book = (next_book or "").strip()
+        # Rolling to the next book is the same act as choosing one on the Learn
+        # screen, so it goes through the same door rather than a second hand-rolled
+        # version of it. That version set three fields and missed the fourth thing
+        # _open_new_book does: dropping the generated reading day. The book's title
+        # is baked into those rows, so the Quests tab went on naming the book you
+        # had just finished.
+        _open_new_book(db, player, (next_book or "").strip(), day)
         player.current_book_chapters = 0  # new book, length unknown until set
-        player.book_started_week = week if player.current_book else ""
         db.flush()  # the counter has to be visible to the achievement predicates
         events = unlock_achievements(db, player, aggregate(completions_of(db, player), quest_defs(db)))
-    player.book_review_week = week
+    else:
+        # Not yet: the book stands, so don't ask again until next week. Only this
+        # branch sets it — _open_new_book clears it above, which is what leaves a
+        # newly started book free to be asked about in the same week.
+        player.book_review_week = game.week_key(day)
     db.commit()
     return events
 
