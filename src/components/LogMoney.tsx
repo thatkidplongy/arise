@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
+import { ChoiceChip, ChoiceRow } from '@/components/ui/ChoiceChip';
 import { Text, TextInput } from '@/components/ui/Text';
 import { readMoneyDraft, type MoneyBucket, type MoneyDirection } from '@/lib/moneyEntry';
 import { useSystem } from '@/store/useSystem';
@@ -34,33 +35,6 @@ const BUCKET_LABEL: Record<BucketChoice, string> = { needs: 'Needs', wants: 'Wan
 
 function toBucket(choice: BucketChoice): MoneyBucket {
   return choice === 'untagged' ? null : choice;
-}
-
-/** One selectable pill. 36pt box plus 6pt of hitSlop clears the 44pt target without
- * stacking three 44pt-tall rows into a form that also has inputs. */
-function Chip({
-  label,
-  on,
-  onPress,
-  accessibilityLabel,
-}: {
-  label: string;
-  on: boolean;
-  onPress: () => void;
-  accessibilityLabel?: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.85 }]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      accessibilityLabel={accessibilityLabel ?? label}
-    >
-      <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 /**
@@ -98,18 +72,18 @@ export function LogMoney() {
 
   return (
     <SystemPanel title="Log money">
-      <View style={styles.chipRow}>
+      <ChoiceRow style={styles.chipRow}>
         {DIRECTIONS.map((d) => (
-          <Chip key={d} label={DIRECTION_LABEL[d]} on={direction === d} onPress={() => setDirection(d)} />
+          <ChoiceChip key={d} label={DIRECTION_LABEL[d]} on={direction === d} onPress={() => setDirection(d)} />
         ))}
-      </View>
+      </ChoiceRow>
 
       {/* Income isn't divided by the rule — it's what the rule divides — so the tags
           only exist on the way out. */}
       {direction === 'out' ? (
-        <View style={styles.chipRow}>
+        <ChoiceRow style={styles.chipRow}>
           {BUCKET_CHOICES.map((b) => (
-            <Chip
+            <ChoiceChip
               key={b}
               label={BUCKET_LABEL[b]}
               on={bucket === b}
@@ -117,7 +91,7 @@ export function LogMoney() {
               accessibilityLabel={`Count against ${BUCKET_LABEL[b]}`}
             />
           ))}
-        </View>
+        </ChoiceRow>
       ) : null}
 
       <View style={styles.addRow}>
@@ -156,18 +130,7 @@ export function LogMoney() {
 }
 
 const styles = StyleSheet.create({
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  chip: {
-    minHeight: 36,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-  },
-  chipOn: { borderColor: TONE, backgroundColor: withAlpha(TONE, 0.1) },
-  chipText: { color: text.faint, fontSize: 12, fontWeight: '600' },
-  chipTextOn: { color: TONE },
+  chipRow: { marginBottom: 8 },
 
   addRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 4 },
   input: {

@@ -64,13 +64,26 @@ export function formatDayBand(day: string, today: string): string {
   return month ? `${weekdayDay(day)} ${month}` : weekdayDay(day);
 }
 
-/** The same day named mid-sentence — 'today', 'yesterday', then 'Aug 21'. Lowercase
- * on the relative two so it reads as prose in a button or a caption ("Add to today",
- * "a bill you paid yesterday"), where the band heading's Title Case would not. */
-export function formatDayInline(day: string, today: string): string {
+/** A day as a chip in a picker: 'Today', 'Yesterday', then the band's own wording —
+ * 'Fri 21' — so a chip and the band it files into never name the same day two ways.
+ * Deliberately not shortDay's 'Aug 21', which repeats the month down a whole week. */
+export function formatDayChip(day: string, today: string): string {
   const relative = shortDay(day, today);
-  if (relative === 'Today' || relative === 'Yesterday') return relative.toLowerCase();
-  return relative;
+  if (relative === 'Today' || relative === 'Yesterday') return relative;
+  return formatDayBand(day, today);
+}
+
+/** The chip's day named mid-sentence — 'today', 'yesterday', then 'Fri 21'. Lowercase
+ * on the relative two so it reads as prose in a button or a caption ("Add to today",
+ * "a bill you paid yesterday"), where the band heading's Title Case would not.
+ *
+ * Built on formatDayChip rather than shortDay so a dated day is worded once for the
+ * whole card: the chip, the button that files onto it and the band it lands in all
+ * say 'Fri 21', instead of the button alone calling it 'Aug 21'. */
+export function formatDayInline(day: string, today: string): string {
+  const chip = formatDayChip(day, today);
+  if (chip === 'Today' || chip === 'Yesterday') return chip.toLowerCase();
+  return chip;
 }
 
 /** Server timestamps arrive as naive UTC ('2026-08-22 12:40:53') — SQLite keeps no

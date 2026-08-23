@@ -4,6 +4,7 @@ import {
   dayMonth,
   formatClock,
   formatDayBand,
+  formatDayChip,
   formatDayInline,
   recentDays,
   toUtcIso,
@@ -103,7 +104,20 @@ describe('formatDayInline', () => {
     expect(formatDayInline('2026-08-22', '2026-08-23')).toBe('yesterday');
   });
 
-  it('keeps a dated day as it is written', () => {
-    expect(formatDayInline('2026-08-21', '2026-08-23')).toBe('Aug 21');
+  it('words a dated day exactly as its chip and band do', () => {
+    expect(formatDayInline('2026-08-21', '2026-08-23')).toBe('Fri 21');
+    expect(formatDayInline('2026-07-30', '2026-08-02')).toBe('Thu 30 Jul');
+  });
+});
+
+describe('formatDayChip', () => {
+  it('keeps the relative days, then borrows the band wording', () => {
+    expect(formatDayChip('2026-08-23', '2026-08-23')).toBe('Today');
+    expect(formatDayChip('2026-08-22', '2026-08-23')).toBe('Yesterday');
+    expect(formatDayChip('2026-08-21', '2026-08-23')).toBe('Fri 21');
+  });
+
+  it('names the month once the strip reaches back into the last one', () => {
+    expect(formatDayChip('2026-07-30', '2026-08-02')).toBe('Thu 30 Jul');
   });
 });
