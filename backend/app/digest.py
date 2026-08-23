@@ -1,8 +1,10 @@
-"""Recall: yesterday's learning, turned into questions and emailed back each morning.
+"""The morning digest: yesterday's learning distilled, and older cards asked again.
 
 Reading a lot and remembering little is the problem this solves. Each day's
 learnings (see models.Learning) are distilled once by the LLM into a handful of
-keepable lines — Highlights — each carrying the question it answers.
+keepable lines — Highlights — each carrying the question it answers. Those cards
+are then scheduled by recall.py; this module makes them, gathers the day around
+them, and renders and sends the email.
 
 The email asks before it tells. Cues come first, answers sit well below them, and
 the picks span an expanding ladder of past days. Three things drive that shape:
@@ -10,7 +12,7 @@ the picks span an expanding ladder of past days. Three things drive that shape:
 * **Retrieval, not review.** Being asked and briefly failing fixes a memory;
   re-reading a line you recognise mostly produces the feeling of knowing it.
 * **Expanding intervals.** Forgetting is steepest early, so the rungs start close
-  and stretch (RECALL_INTERVALS).
+  and stretch (recall.RECALL_INTERVALS).
 * **The 24-hour window.** Yesterday's material is asked first, because that's the
   last moment the surrounding detail can still be dredged up and written down —
   hence FLESH_NUDGE at the foot of every email.
@@ -21,30 +23,21 @@ an idea you could re-derive gets the picture it lives in instead, which is an ai
 to the understanding rather than a rival to it. Highlights distilled before that
 was true are hooked a morning at a time by `backfill_hooks`.
 
-Reads and the single write path both live here, like insights.py. `recall_set` is
-a pure derive-on-read — same day, same picks, rotating as the days pass.
+Distilling is idempotent — a day already distilled is never paid for twice — so a
+preview costs nothing and `send_daily` is the only step with a side effect.
 """
 
-import random
 import re
 import sys
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import llm, mailer, reading, recap
+from . import llm, mailer, reading, recall, recap
 from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
                      Thread)
 
 READING_QUEST_ID = "d-read"
-
-# An expanding ladder, not evenly spaced: forgetting is steepest in the first days,
-# so the early touches sit close together and later ones stretch out. Each rung is
-# roughly twice the last.
-RECALL_INTERVALS = (1, 3, 7, 16, 35)
-# Five questions is a few minutes of real effort; ten is homework, and homework is
-# what stops getting done. A backlog waits its turn rather than arriving at once.
-PER_DIGEST = 5
 
 
 def to_out(row: Learning) -> dict:
@@ -212,7 +205,7 @@ def build_highlights(db: Session, player: Player, day: str,
         Highlight(
             player_id=player.id, day=day, text=it["text"],
             cue=it.get("cue", ""), hook=it.get("hook", ""), source_label=label,
-            box=0, due=_due_after(day, 0),
+            box=0, due=recall.due_after(day, 0),
         )
         for it in items
     ]
@@ -314,212 +307,6 @@ def thread_for(db: Session, player: Player, day: str, key: str | None = None) ->
     }
 
 
-# ── Recall — the spaced part ─────────────────────────────────────────────────
-
-
-def interval_for(box: int) -> int:
-    """Days until a highlight in `box` comes back. Past the last rung it stays there
-    — something recalled five times running doesn't need a sixth schedule."""
-    return RECALL_INTERVALS[min(max(box, 0), len(RECALL_INTERVALS) - 1)]
-
-
-def _due_after(day: str, box: int) -> str:
-    return (date.fromisoformat(day) + timedelta(days=interval_for(box))).isoformat()
-
-
-def _backfill_due(db: Session, player: Player) -> None:
-    """Give a due date to highlights distilled before scheduling existed. Spread by
-    their own age rather than set to today, so a long backlog doesn't all come due in
-    one morning."""
-    rows = db.query(Highlight).filter(
-        Highlight.player_id == player.id, Highlight.due == ""
-    ).all()
-    if not rows:
-        return
-    for r in rows:
-        r.box = r.box or 0
-        r.due = _due_after(r.day, r.box)
-    db.commit()
-
-
-def recall_set(db: Session, player: Player, day: str) -> list[dict]:
-    """The highlights that have come due — the spaced half of the digest.
-
-    Leitner: every highlight sits in a box, each box further from the last. Being
-    shown moves it up one; grading it as missed drops it back to the first, so it
-    returns tomorrow rather than in a month. Oldest-due first, so nothing rots at the
-    bottom of the pile.
-
-    A read never advances anything — only `advance_shown`, once a digest is actually
-    sent — so preview and the app can look as often as they like."""
-    _backfill_due(db, player)
-    rows = (
-        db.query(Highlight)
-        .filter(
-            Highlight.player_id == player.id,
-            Highlight.day < day,  # the day's own highlights are the fresh section
-            Highlight.due != "",
-            Highlight.due <= day,
-        )
-        .order_by(Highlight.due, Highlight.created_at)
-        .limit(PER_DIGEST * 3)  # a pool to interleave from, not the final cut
-        .all()
-    )
-    born = _learnings_for(db, rows)
-    picked = [_recall_out(r, day, born) for r in rows]
-    return _interleave(picked)[:PER_DIGEST]
-
-
-def _learnings_for(db: Session, rows: list[Highlight]) -> dict[str, Learning]:
-    """The learnings a batch of highlights was distilled from, by id — one query,
-    so shaping a whole library doesn't become a query per card."""
-    ids = [r.learning_id for r in rows if r.learning_id]
-    if not ids:
-        return {}
-    found = db.query(Learning).filter(Learning.id.in_(ids)).all()
-    return {l.id: l for l in found}
-
-
-def _origin_of(learning: Learning | None) -> str:
-    """Where a card was met, as a line for the back of it. Empty when the highlight
-    was derived (a reading daily with no note) — there's no story to tell."""
-    if learning is None:
-        return ""
-    if learning.source and learning.text:
-        return f"You logged “{learning.source}” and wrote this in your own words."
-    if learning.source:
-        return f"Distilled from “{learning.source}”, as you logged it."
-    return "Distilled from what you logged that day."
-
-
-def _recall_out(r: Highlight, day: str, born: dict[str, Learning]) -> dict:
-    learning = born.get(r.learning_id or "")
-    box = r.box or 0
-    return {
-        "id": r.id,
-        "text": r.text,
-        "cue": r.cue or "",
-        "hook": r.hook or "",
-        "box": box,
-        "day": r.day,
-        "source_label": r.source_label,
-        # The label with any chapter marker stripped, so every sitting of one book
-        # files under one name when the app sorts the deck into per-book piles —
-        # and the marker on its own, for the card's corner tag.
-        "material": reading.book_name(r.source_label) if r.source_label else "",
-        "chapter": reading.chapter_marker(r.source_label),
-        "seen": r.seen or 0,
-        # Whether the answer is in the reader's own words — a note was written, not
-        # just a source named — and the story of where the card was born.
-        "own_words": bool(learning is not None and learning.text),
-        "origin": _origin_of(learning),
-        # What each grade would do, so the buttons can say it before being pressed.
-        "if_missed": interval_for(0),
-        "if_shaky": interval_for(box),
-        "if_got": interval_for(box + 1),
-        "days_ago": (date.fromisoformat(day) - date.fromisoformat(r.day)).days,
-    }
-
-
-def recall_library(db: Session, player: Player, day: str) -> list[dict]:
-    """Every highlight ever distilled — the whole shelf, where `recall_set` is only
-    what the schedule owes today.
-
-    The app's recall card taps through this once the due handful runs out, so
-    browsing keeps meeting new material instead of wrapping the same five. Shuffled
-    with the day as the seed: newest-first would resurface the same recent lines
-    every visit and the old ones would never come up, while a fresh shuffle per read
-    would reorder mid-browse. Seeding by day gives each morning its own walk through
-    everything, stable for that day.
-
-    A pure read, like `recall_set` — browsing never advances the ladder."""
-    rows = (
-        db.query(Highlight)
-        .filter(Highlight.player_id == player.id, Highlight.day <= day)
-        .order_by(Highlight.day, Highlight.created_at)  # a stable deck to shuffle from
-        .all()
-    )
-    born = _learnings_for(db, rows)
-    out = [_recall_out(r, day, born) for r in rows]
-    random.Random(day).shuffle(out)
-    return out
-
-
-def edit(db: Session, player: Player, highlight_id: str, text_value: str) -> dict | None:
-    """Rewrite the back of a card. The whole point of the cards is that they're in
-    your own words — so the words stay editable after the distiller's first pass.
-    The schedule is untouched: better words aren't a recall event."""
-    cleaned = text_value.strip()
-    if not cleaned:
-        raise ValueError("a card can't have a blank back")
-    row = db.get(Highlight, highlight_id)
-    if row is None or row.player_id != player.id:
-        return None
-    row.text = cleaned
-    db.commit()
-    return {"id": row.id}
-
-
-GRADES = ("got", "shaky", "missed")
-
-
-def grade(db: Session, player: Player, highlight_id: str, value: str, day: str) -> dict | None:
-    """Record how a recall went, and reschedule accordingly.
-
-    Straight from the index-card method: one you knew goes to the back of the pile,
-    one you half-knew slides into the middle, one you had no clue about goes near the
-    front where you'll meet it again almost immediately."""
-    if value not in GRADES:
-        raise ValueError(f"grade must be one of {GRADES}")
-
-    row = db.get(Highlight, highlight_id)
-    if row is None or row.player_id != player.id:
-        return None
-
-    if value == "got":
-        row.box = (row.box or 0) + 1
-    elif value == "missed":
-        row.box = 0
-    # 'shaky' leaves the box where it is: seen again at the same spacing, not further.
-
-    row.due = _due_after(day, row.box)
-    row.seen = (row.seen or 0) + 1
-    db.commit()
-    return {"id": row.id, "box": row.box, "due": row.due}
-
-
-def advance_shown(db: Session, player: Player, day: str, items: list[dict]) -> None:
-    """Move every highlight the email just asked about up a box.
-
-    This is what keeps the ladder working for someone who never grades anything: a
-    plain exposure counts as a pass, which reproduces the fixed 1/3/7/16/35 spacing.
-    Grading only ever corrects that guess."""
-    for it in items:
-        row = db.get(Highlight, it.get("id") or "")
-        if row is None or row.player_id != player.id:
-            continue
-        row.box = (row.box or 0) + 1
-        row.due = _due_after(day, row.box)
-        row.seen = (row.seen or 0) + 1
-    db.commit()
-
-
-def _interleave(picks: list[dict]) -> list[dict]:
-    """Reorder so consecutive cues rarely share a source. Practice blocked by one book
-    feels smoother and sticks less: mixing forces you to work out *what kind* of thing
-    is being asked before you can answer it, which is most of the work in real recall.
-
-    Greedy and order-stable — no randomness, so a given day always renders the same."""
-    remaining = list(picks)
-    out: list[dict] = []
-    while remaining:
-        prev = out[-1]["source_label"] if out else None
-        nxt = next((p for p in remaining if p["source_label"] != prev), remaining[0])
-        remaining.remove(nxt)
-        out.append(nxt)
-    return out
-
-
 # How far back a repair run will reach. Beyond a week the recall value has mostly
 # gone, and a long backlog would spend the allowance on history instead of today.
 CATCH_UP_DAYS = 7
@@ -591,7 +378,7 @@ def build_context(db: Session, player: Player, day: str) -> dict:
             }
             for h in highlights
         ],
-        "recall": recall_set(db, player, day),
+        "recall": recall.due_set(db, player, day),
         "thread": thread_for(db, player, day),
         "recap": recap.of(db, player, day),
         "avatar": player.avatar or "",  # data URI; "" when no picture is set
@@ -600,7 +387,7 @@ def build_context(db: Session, player: Player, day: str) -> dict:
 
 # Two digests' worth in one call: the answers asked this morning, with a little room
 # for the ones a repeat pushed out, so the backlog drains in mornings rather than weeks.
-HOOKS_PER_CALL = PER_DIGEST * 2
+HOOKS_PER_CALL = recall.PER_DIGEST * 2
 
 
 def backfill_hooks(db: Session, player: Player, ctx: dict,
@@ -651,14 +438,6 @@ def backfill_hooks(db: Session, player: Player, ctx: dict,
     if written:
         db.commit()
     return written
-
-
-def quizzable(recall: list[dict]) -> list[dict]:
-    """The recall picks that can actually be asked. Highlights distilled before cues
-    existed have none, and a highlight without a question is better left out than
-    asked with one made up on the spot."""
-    return [r for r in recall if r.get("cue")]
-
 
 # ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -782,7 +561,7 @@ def quiz_items(ctx: dict) -> list[dict]:
     candidates = [
         {**h, "days_ago": 1, "fresh": True} for h in ctx["highlights"] if h.get("cue")
     ]
-    candidates += [{**r, "fresh": False} for r in quizzable(ctx["recall"])]
+    candidates += [{**r, "fresh": False} for r in recall.quizzable(ctx["recall"])]
 
     items: list[dict] = []
     for c in candidates:
@@ -1090,7 +869,7 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
 
     # Only after it actually left: a send that failed asks the same questions again
     # tomorrow rather than silently burning a rung.
-    advance_shown(db, player, day, quiz_items(ctx))
+    recall.advance_shown(db, player, day, quiz_items(ctx))
     # 'sent' with a note: the email went out, and the note says what it went out
     # without — otherwise a quota-shaped hole in a morning leaves no trace anywhere.
     return _record(db, player, day, "sent", notes, len(ctx["highlights"]))

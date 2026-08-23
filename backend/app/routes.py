@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from . import (body, books, digest, insights, llm, mailer, nutrition, service, skincare,
+from . import (body, books, digest, insights, llm, mailer, nutrition, recall, service, skincare,
                state, transcript)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
@@ -437,7 +437,7 @@ def recall_library(day: str | None = Query(None), db: Session = Depends(get_db))
     """Every highlight ever distilled, in the day's own shuffled order — the shelf
     the app's recall card browses once the due handful runs out."""
     player = state.get_or_create_player(db)
-    return digest.recall_library(db, player, _valid_day(day))
+    return recall.library(db, player, _valid_day(day))
 
 
 @router.patch("/recall/{highlight_id}", response_model=StateOut)
@@ -447,7 +447,7 @@ def edit_recall(highlight_id: str, body: RecallEditIn, day: str | None = Query(N
     pass. The schedule is untouched."""
     player = state.get_or_create_player(db)
     try:
-        result = digest.edit(db, player, highlight_id, body.text)
+        result = recall.edit(db, player, highlight_id, body.text)
     except ValueError as err:
         raise HTTPException(422, str(err))
     if result is None:
@@ -464,7 +464,7 @@ def grade_recall(highlight_id: str, body: RecallGradeIn, day: str | None = Query
     player = state.get_or_create_player(db)
     valid = _valid_day(day)
     try:
-        result = digest.grade(db, player, highlight_id, body.grade, valid)
+        result = recall.grade(db, player, highlight_id, body.grade, valid)
     except ValueError as err:
         raise HTTPException(422, str(err))
     if result is None:

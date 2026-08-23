@@ -12,7 +12,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import body, digest, game, insights, llm, mailer, progression, quests, reading, transcript
+from . import (body, digest, game, insights, llm, mailer, progression, quests, reading,
+               recall, transcript)
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -957,7 +958,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "journal": _journal_of(db, player),  # free-form daily entries, newest first
         "reflections": reflections,  # quest-linked takeaways, newest first
         "learnings": digest.list_learnings(db, player.id, day),  # what you read today
-        "recall": digest.recall_set(db, player, day),  # older highlights coming back around
+        "recall": recall.due_set(db, player, day),  # older highlights coming back around
         # Scoped to the book actually open: unscoped, this keeps showing the sentence
         # for a book you've finished until the next one earns a thread of its own.
         "thread": (
