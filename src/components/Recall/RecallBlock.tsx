@@ -1,4 +1,5 @@
-import { RecallSession } from '@/components/Recall/RecallSession';
+import { router } from 'expo-router';
+
 import { StackPicker } from '@/components/Recall/StackPicker';
 import { buildBringBack } from '@/lib/bringBack';
 import { ALL_PILE, deckFor, listStacks, stackOf } from '@/lib/deck';
@@ -9,10 +10,10 @@ import { useRecallDeck } from '@/store/useRecallDeck';
 import { useSystem } from '@/store/useSystem';
 
 /**
- * The recall corner of the Learn screen: pick a stack, then work it like a pile of
- * index cards. The deck behind it covers everything — the due handful first, then
- * tips, then the whole library in the day's shuffled order — and the walk survives
- * leaving the screen. Gone entirely on a day with nothing distilled or captured.
+ * The recall corner of the Learn screen: the shelf of stacks, and nothing else.
+ * Picking one pushes /recall — a sitting is a place you go, with its own screen
+ * and its own back, not a card that swaps its face mid-scroll. Gone entirely on a
+ * day with nothing distilled or captured.
  */
 export function RecallBlock() {
   const recall = useSystem((s) => s.state?.recall) ?? [];
@@ -26,14 +27,13 @@ export function RecallBlock() {
   const state = deckFor(dateKey(), deck);
   const dueIds = recall.map((r) => r.id);
   const stacks = listStacks(items, state.met, dueIds);
+  const whole = stackOf(items, state.met, dueIds, ALL_PILE);
 
-  // A pile chosen yesterday — or naming a stack with nothing in today's deck —
-  // means the picker, not an empty session.
-  const pile = deck.pile;
-  if (pile === null || (pile !== ALL_PILE && !stacks.some((s) => s.name === pile))) {
-    const whole = stackOf(items, state.met, dueIds, ALL_PILE);
-    return <StackPicker stacks={stacks} dueLeft={whole.dueLeft} onPick={deck.setPile} />;
-  }
-
-  return <RecallSession items={items} state={state} pile={pile} dueIds={dueIds} />;
+  return (
+    <StackPicker
+      stacks={stacks}
+      dueLeft={whole.dueLeft}
+      onPick={(pile) => router.push({ pathname: '/recall', params: { pile } })}
+    />
+  );
 }

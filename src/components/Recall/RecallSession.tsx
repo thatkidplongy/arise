@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -55,8 +56,16 @@ function TipCard({ tip, onNext }: { tip: Extract<BringBack, { kind: 'tip' }>; on
   );
 }
 
-/** The pile's end — every card met, with a way to go through it again. */
+/** The pile's end — every card met, with a way to go through it again. A pile with
+ * no cards at all is a stale link or a still-loading library, not an achievement. */
 function PileDone({ total, onAgain }: { total: number; onAgain: () => void }) {
+  if (total === 0) {
+    return (
+      <View style={styles.done}>
+        <Text style={styles.doneText}>Nothing in this stack today — pick another from the shelf.</Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.done}>
       <Text style={styles.doneText}>
@@ -131,8 +140,10 @@ export function RecallSession({
   return (
     <Card style={styles.wrap}>
       <View style={styles.head}>
+        {/* replace, not back(): inside the Tabs navigator back() lands on Status,
+            not the shelf this sitting was opened from. */}
         <Pressable
-          onPress={() => deck.setPile(null)}
+          onPress={() => router.replace('/learn')}
           accessibilityRole="button"
           accessibilityLabel="Back to the stacks"
           style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
