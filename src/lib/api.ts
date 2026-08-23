@@ -106,6 +106,7 @@ export interface ApiRecall {
   hook: string; // a memory aid — empty only on highlights distilled before hooks were on all of them
   day: string; // the day it was learned
   source_label: string;
+  material: string; // source_label without chapter markers — the per-book pile it files under
   days_ago: number;
 }
 

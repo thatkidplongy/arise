@@ -4,7 +4,10 @@ import type { ApiInsight, ApiRecall } from '@/lib/api';
 import { buildBringBack } from '@/lib/bringBack';
 
 function recall(id: string): ApiRecall {
-  return { id, text: `answer ${id}`, cue: `cue ${id}`, hook: '', day: '2026-08-01', source_label: 'Book', days_ago: 5 };
+  return {
+    id, text: `answer ${id}`, cue: `cue ${id}`, hook: '', day: '2026-08-01',
+    source_label: 'Book', material: 'Book', days_ago: 5,
+  };
 }
 
 function insight(over: Partial<ApiInsight>): ApiInsight {

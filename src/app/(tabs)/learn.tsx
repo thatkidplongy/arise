@@ -20,9 +20,12 @@ import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
 import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/api';
 import { buildBringBack, type BringBack } from '@/lib/bringBack';
+import { dateKey } from '@/lib/dates';
+import { ALL_PILE, currentEntry, deckFor, listMaterials, pileProgress } from '@/lib/deck';
 import { describeThreadBook } from '@/lib/reading';
 import { useInsights } from '@/query/useInsights';
 import { useRecallLibrary } from '@/query/useRecallLibrary';
+import { useRecallDeck } from '@/store/useRecallDeck';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
@@ -179,7 +182,7 @@ const GRADES: { key: RecallGrade; label: string }[] = [
  * would just be asking you to predict yourself; the honest signal is how it felt
  * against the real answer.
  */
-function GradeRow({ id }: { id: string }) {
+function GradeRow({ id, onGraded }: { id: string; onGraded: (grade: RecallGrade) => void }) {
   const gradeRecall = useSystem((s) => s.gradeRecall);
   const [done, setDone] = useState<RecallGrade | null>(null);
 
@@ -202,6 +205,7 @@ function GradeRow({ id }: { id: string }) {
           onPress={() => {
             setDone(g.key);
             void gradeRecall(id, g.key);
+            onGraded(g.key);
           }}
         />
       ))}
@@ -228,7 +232,7 @@ function describeWhen(item: ApiRecall): string {
  * couldn't check what was actually asked while looking at the answer — and comparing
  * the two is the whole reason to be here.
  */
-function DueItem({ item }: { item: ApiRecall }) {
+function DueItem({ item, onGraded }: { item: ApiRecall; onGraded: (grade: RecallGrade) => void }) {
   const [open, setOpen] = useState(false);
   // Highlights distilled before cues existed have no question to ask, so there's
   // nothing to fold — they just show.
@@ -252,7 +256,7 @@ function DueItem({ item }: { item: ApiRecall }) {
             <>
               <Text style={styles.answerText}>{item.text}</Text>
               {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
-              <GradeRow id={item.id} />
+              <GradeRow id={item.id} onGraded={onGraded} />
             </>
           ) : null}
         </>
@@ -274,9 +278,79 @@ function TipItem({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
   );
 }
 
+/** The piles the deck sorts into — every material, plus the whole deck up front. */
+function PileRow({
+  materials,
+  pile,
+  onPick,
+}: {
+  materials: { name: string; left: number }[];
+  pile: string;
+  onPick: (pile: string) => void;
+}) {
+  // A single material would be a row of one redundant choice.
+  if (materials.length < 2) return null;
+  return (
+    <View style={styles.pileRow}>
+      <ChoiceChip label="All" color={HUE} selected={pile === ALL_PILE} onPress={() => onPick(ALL_PILE)} />
+      {materials.map((m) => (
+        <ChoiceChip
+          key={m.name}
+          label={m.left ? `${m.name} · ${m.left}` : m.name}
+          color={HUE}
+          selected={pile === m.name}
+          onPress={() => onPick(m.name)}
+        />
+      ))}
+    </View>
+  );
+}
+
+/** The end of a pile — every card met today, with a way to go through it again. */
+function PileDone({ total, onAgain }: { total: number; onAgain: () => void }) {
+  return (
+    <>
+      <Text style={styles.bringText}>
+        That&apos;s the pile — all {total} met today.
+      </Text>
+      <Pressable onPress={onAgain} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go through this pile again">
+        <Text style={styles.bringAgain}>go again</Text>
+      </Pressable>
+    </>
+  );
+}
+
+/** The face of the card: the pile's end, a tip, or a question to try. */
+function PileCardBody({
+  current,
+  total,
+  onAgain,
+  onGraded,
+}: {
+  current: BringBack | null;
+  total: number;
+  onAgain: () => void;
+  onGraded: (grade: RecallGrade) => void;
+}) {
+  if (!current) return <PileDone total={total} onAgain={onAgain} />;
+  if (current.kind === 'tip') return <TipItem tip={current} />;
+  return <DueItem item={current.item} onGraded={onGraded} />;
+}
+
+/** Long enough to read the reschedule line, short enough to feel like sorting cards. */
+const GRADE_LINGER_MS = 1200;
+
 /**
- * What's come back around, at the top of the screen: one thing at a time, tap the
- * card for the next.
+ * What's come back around, at the top of the screen — an index-card pile, worked
+ * through one card at a time.
+ *
+ * The deck covers everything: the due handful first, then tips, then the whole
+ * library of past highlights in the day's shuffled order. The chips sort it into
+ * per-book piles, because a mixed walk through every topic at once drills none of
+ * them. A card you move past leaves the pile for the day — here and in every other
+ * pile — a graded card sorts itself after a beat, and one graded "no clue" comes
+ * back a few cards later, like the physical pile. The walk survives leaving the
+ * screen and ends when the pile does.
  *
  * The answer is a fold under the question rather than a second tap that replaces it.
  * Two reasons: the pair stays comparable, and the card's own tap keeps one meaning —
@@ -286,30 +360,38 @@ function TipItem({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
  * the cost of the step that separates recognising something from recalling it, which
  * makes the grade afterwards a feeling rather than evidence.
  *
- * Past the due handful and the tips, tapping walks the whole library of past
- * highlights in the day's shuffled order — so a browse keeps meeting new material
- * instead of wrapping the same five questions.
- *
  * The whole card is gone on a day with nothing owed and nothing captured.
  */
 function BringBackBlock() {
   const recall = useSystem((s) => s.state?.recall) ?? [];
   const { insights } = useInsights();
   const library = useRecallLibrary();
+  const deck = useRecallDeck();
   const items = buildBringBack(recall, insights, library);
-  const [at, setAt] = useState(0);
 
   if (!items.length) return null;
-  // The list shrinks as items are graded off, so wrap rather than index past the end
-  // and render an empty card.
-  const current = items[at % items.length];
+
+  const state = deckFor(dateKey(), deck);
+  const materials = listMaterials(items, state.met);
+  // A pile picked yesterday, or for a book with nothing in today's deck, falls
+  // back to the whole deck rather than an empty card.
+  const pile = materials.some((m) => m.name === deck.pile) ? deck.pile : ALL_PILE;
+  const current = currentEntry(items, pile, state);
+  const { done, total } = pileProgress(items, pile, state.met);
+
+  const onGraded = (id: string) => (grade: RecallGrade) => {
+    setTimeout(() => {
+      if (grade === 'missed') deck.miss(id);
+      else deck.meet(id);
+    }, GRADE_LINGER_MS);
+  };
 
   return (
     <Pressable
-      onPress={() => setAt((i) => (i + 1) % items.length)}
+      onPress={current ? () => deck.meet(current.id) : undefined}
       accessibilityRole="button"
       accessibilityLabel="Show the next one"
-      style={({ pressed }) => (pressed ? styles.bringPressed : null)}
+      style={({ pressed }) => (pressed && current ? styles.bringPressed : null)}
     >
       {/* On a card rather than bare on the page, unlike the daily line: this one opens
           the screen, and the ivory is what makes it read as the thing to do first
@@ -320,16 +402,23 @@ function BringBackBlock() {
           inside the first, saying what the card already said. */}
       <Card style={styles.bringCard}>
         <Text style={styles.bringKicker}>
-          {current.kind === 'tip' ? 'From your tips' : 'Try to recall'}
+          {current?.kind === 'tip' ? 'From your tips' : 'Try to recall'}
         </Text>
+        <PileRow materials={materials} pile={pile} onPick={deck.setPile} />
         {/* Keyed so the next question arrives with its answer folded shut, rather
             than inheriting the last one's open fold. */}
-        {current.kind === 'tip' ? (
-          <TipItem key={current.id} tip={current} />
-        ) : (
-          <DueItem key={current.id} item={current.item} />
-        )}
-        <Text style={styles.bringHint}>tap for another</Text>
+        <PileCardBody
+          key={current?.id ?? 'done'}
+          current={current}
+          total={total}
+          onAgain={() => deck.restart(items, pile)}
+          onGraded={current ? onGraded(current.id) : () => undefined}
+        />
+        {current ? (
+          <Text style={styles.bringHint}>
+            tap for another · {Math.min(done + 1, total)} of {total}
+          </Text>
+        ) : null}
       </Card>
     </Pressable>
   );
@@ -454,6 +543,10 @@ const styles = StyleSheet.create({
   bringText: { ...typography.body, fontSize: 17, lineHeight: 26, color: neutral[900] },
   bringHint: { ...typography.small, color: text.secondary },
   bringMeta: { ...typography.small, color: text.secondary },
+  // Tighter than the capture pills: these sit inside a card that already spaces
+  // its children, so the row only owes gaps between the chips themselves.
+  pileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bringAgain: { ...typography.small, color: HUE, fontWeight: '600' },
   // The answer reads back a step from the question so the pair is scannable.
   answerText: { ...typography.body, fontSize: 15, lineHeight: 23, color: text.secondary, marginTop: 6 },
   // Left-aligned, unlike the list folds this component shares — it belongs to the

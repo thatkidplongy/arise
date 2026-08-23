@@ -528,6 +528,7 @@ class RecallOut(BaseModel):
     box: int = 0  # Leitner rung — higher means it keeps being recalled
     day: str  # the day it was learned
     source_label: str
+    material: str = ""  # source_label without chapter markers — the per-book pile it files under
     days_ago: int
 
 

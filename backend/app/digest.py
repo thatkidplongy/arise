@@ -378,6 +378,9 @@ def _recall_out(r: Highlight, day: str) -> dict:
         "box": r.box or 0,
         "day": r.day,
         "source_label": r.source_label,
+        # The label with any chapter marker stripped, so every sitting of one book
+        # files under one name when the app sorts the deck into per-book piles.
+        "material": reading.book_name(r.source_label) if r.source_label else "",
         "days_ago": (date.fromisoformat(day) - date.fromisoformat(r.day)).days,
     }
 

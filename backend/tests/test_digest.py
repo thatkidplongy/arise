@@ -407,6 +407,18 @@ def test_recall_library_walks_differently_each_day_but_holds_still_within_one(db
     assert today != tomorrow
 
 
+def test_recall_items_carry_the_material_they_file_under(db):
+    """One book read across many days carries many chapter markers — the material
+    strips them, so the app's per-book piles see one name, not one pile per day."""
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, _back(5), "a line")
+    row.source_label = "Thinking, fast and slow, ch 29-30"
+    db.commit()
+
+    out = digest.recall_library(db, player, DAY)
+    assert out[0]["material"] == "Thinking, fast and slow"
+
+
 def test_recall_library_is_a_pure_read(db):
     player = state.get_or_create_player(db)
     row = _highlight(db, player, _back(5), "on the shelf")
