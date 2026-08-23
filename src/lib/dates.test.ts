@@ -43,6 +43,11 @@ describe('formatDayBand', () => {
     expect(formatDayBand('2026-08-22', '2026-08-23')).toBe('Yesterday · Sat 22');
     expect(formatDayBand('2026-08-21', '2026-08-23')).toBe('Fri 21');
   });
+
+  it('names the month once the day leaves this one, so two 23rds can be told apart', () => {
+    expect(formatDayBand('2026-07-23', '2026-08-23')).toBe('Thu 23 Jul');
+    expect(formatDayBand('2025-08-23', '2026-08-23')).toBe('Sat 23 Aug');
+  });
 });
 
 describe('toUtcIso', () => {

@@ -161,7 +161,9 @@ export interface ApiState {
   };
   // Personal lists. Open items show on their tab (to-dos on Status, groceries on
   // Body); finished ones move to the You tab's Completed record, dated by *_at.
-  reminders: { id: string; text: string; done: boolean; done_at: string | null }[];
+  // created_at is the day band the to-do list files an open item under; done_at is
+  // what the You tab's Completed record dates a finished one by.
+  reminders: { id: string; text: string; done: boolean; created_at: string; done_at: string | null }[];
   grocery: { id: string; name: string; bought: boolean; bought_at: string | null }[];
   money: ApiMoney; // the money log (in/out) + today/this-week totals, on You
   budget: ApiBudget; // take-home pay + standing commitments, for the 50/30/20 worksheet

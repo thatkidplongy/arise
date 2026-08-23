@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { NorthStarCard } from '@/components/NorthStarCard';
-import { Reminders } from '@/components/StatusCards';
+import { Reminders } from '@/components/Reminders';
 import { StatusWindow } from '@/components/StatusWindow';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';

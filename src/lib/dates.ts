@@ -46,12 +46,22 @@ export function weekdayDay(day: string): string {
   return `${WEEKDAYS[new Date(y, m - 1, d).getDay()]} ${d}`;
 }
 
-/** A dated band's heading, relative to `today` (a 'YYYY-MM-DD'): 'Today · Sun 23',
- * 'Yesterday · Sat 22', then just 'Fri 21' — past two days old, the weekday carries it. */
+/**
+ * A dated band's heading, relative to `today` (a 'YYYY-MM-DD'): 'Today · Sun 23',
+ * 'Yesterday · Sat 22', then just 'Fri 21' — past two days old, the weekday carries
+ * it.
+ *
+ * Outside today's month the month comes back: a band from July the 23rd reading
+ * 'Thu 23' directly under 'Today · Sun 23' is indistinguishable from this month's,
+ * and a to-do can sit for weeks.
+ */
 export function formatDayBand(day: string, today: string): string {
   const relative = shortDay(day, today);
   if (relative === 'Today' || relative === 'Yesterday') return `${relative} · ${weekdayDay(day)}`;
-  return weekdayDay(day);
+  const sameMonth = day.slice(0, 7) === today.slice(0, 7);
+  if (sameMonth) return weekdayDay(day);
+  const month = MONTHS[Number(day.slice(5, 7)) - 1];
+  return month ? `${weekdayDay(day)} ${month}` : weekdayDay(day);
 }
 
 /** Server timestamps arrive as naive UTC ('2026-08-22 12:40:53') — SQLite keeps no
@@ -60,6 +70,13 @@ export function formatDayBand(day: string, today: string): string {
 export function toUtcIso(stamp: string): string {
   const t = stamp.trim().replace(' ', 'T');
   return /([zZ]|[+-]\d\d:?\d\d)$/.test(t) ? t : `${t}Z`;
+}
+
+/** The local calendar day a server timestamp falls on — the band a dated row files
+ * under. '' when the stamp won't parse, which no band will claim. */
+export function dayOfStamp(stamp: string): string {
+  const t = new Date(toUtcIso(stamp));
+  return Number.isNaN(t.getTime()) ? '' : dateKey(t);
 }
 
 /** '9:12 am' — a Date's local wall-clock, in the ledger's lowercase voice. */

@@ -1,11 +1,9 @@
 import type { ApiCommitment, ApiMoneyEntry } from '@/lib/api';
+import { groupByDay, type DayGroup } from '@/lib/dayGroups';
 
-/** One calendar day of a bucket's spending — a band of the dated ledger. */
-export interface LedgerDay {
-  /** 'YYYY-MM-DD'. */
-  day: string;
-  /** Newest first — by the day's clock, so the latest spend sits on top. */
-  entries: ApiMoneyEntry[];
+/** One calendar day of a bucket's spending — a band of the dated ledger. Items are
+ * newest first, by the day's clock, so the latest spend sits on top. */
+export interface LedgerDay extends DayGroup<ApiMoneyEntry> {
   total: number;
   /** How many of the day's entries were standing bills, for the collapsed row's tag. */
   bills: number;
@@ -52,22 +50,11 @@ export function readBucketLedger(
     .filter((e) => e.direction === 'out' && e.bucket === bucket)
     .sort((a, b) => b.day.localeCompare(a.day) || b.created_at.localeCompare(a.created_at));
 
-  const byDay = new Map<string, ApiMoneyEntry[]>();
-  byDay.set(today, []); // today always gets a band, even before anything is spent
-  for (const e of mine) {
-    const band = byDay.get(e.day);
-    if (band) band.push(e);
-    else byDay.set(e.day, [e]);
-  }
-
-  const days = [...byDay.entries()]
-    .map(([day, dayEntries]) => ({
-      day,
-      entries: dayEntries,
-      total: round2(dayEntries.reduce((sum, e) => sum + e.amount, 0)),
-      bills: dayEntries.filter((e) => e.commitment_id).length,
-    }))
-    .sort((a, b) => b.day.localeCompare(a.day));
+  const days = groupByDay(mine, (e) => e.day, today).map((band) => ({
+    ...band,
+    total: round2(band.items.reduce((sum, e) => sum + e.amount, 0)),
+    bills: band.items.filter((e) => e.commitment_id).length,
+  }));
 
   const due = commitments.filter(isPayable);
   return {

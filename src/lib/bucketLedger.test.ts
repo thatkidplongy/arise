@@ -45,7 +45,7 @@ describe('readBucketLedger', () => {
       TODAY,
     );
     expect(ledger.days.map((d) => d.day)).toEqual(['2026-08-23', '2026-08-22', '2026-08-21']);
-    expect(ledger.days[0].entries).toEqual([]);
+    expect(ledger.days[0].items).toEqual([]);
     expect(ledger.days[0].total).toBe(0);
   });
 
@@ -62,7 +62,7 @@ describe('readBucketLedger', () => {
       'needs',
       TODAY,
     );
-    expect(ledger.days[0].entries).toEqual([mine]);
+    expect(ledger.days[0].items).toEqual([mine]);
     expect(ledger.spent).toBe(100);
   });
 
@@ -70,7 +70,7 @@ describe('readBucketLedger', () => {
     const early = entry({ created_at: '2026-08-23 01:00:00' });
     const late = entry({ created_at: '2026-08-23 09:12:00' });
     const ledger = readBucketLedger([early, late], [], 'needs', TODAY);
-    expect(ledger.days[0].entries).toEqual([late, early]);
+    expect(ledger.days[0].items).toEqual([late, early]);
   });
 
   it('totals each day and counts its bills', () => {

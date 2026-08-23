@@ -624,7 +624,8 @@ def _reminders_of(db: Session, player: Player) -> list[dict]:
     """The to-do list: open items first (by when added), finished ones after. The
     client shows the open ones on Status and the finished ones on the You record."""
     return [
-        {"id": r.id, "text": r.text, "done": r.done, "done_at": r.done_at}
+        {"id": r.id, "text": r.text, "done": r.done,
+         "created_at": r.created_at, "done_at": r.done_at}
         for r in sorted(
             db.query(Reminder).filter_by(player_id=player.id),
             key=lambda r: (r.done, r.created_at),

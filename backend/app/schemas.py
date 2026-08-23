@@ -602,6 +602,7 @@ class ReminderOut(BaseModel):
     id: str
     text: str
     done: bool
+    created_at: datetime  # when it was jotted — the day band the client files it under
     done_at: datetime | None = None  # when it was ticked — powers the Completed record
 
 
