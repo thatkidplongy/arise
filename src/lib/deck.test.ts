@@ -10,6 +10,7 @@ import {
   listStacks,
   meetCard,
   missCard,
+  pickShelf,
   restartPile,
   stackOf,
 } from '@/lib/deck';
@@ -21,6 +22,13 @@ function card(id: string, material = 'A book'): BringBack {
     origin: '', if_missed: 1, if_shaky: 3, if_got: 7, days_ago: 5,
   };
   return { kind: 'recall', id, item };
+}
+
+/** A card whose source carried a chapter marker, as the API splits it out. */
+function chaptered(id: string, chapter: string, material = 'Book one'): BringBack {
+  const entry = card(id, material);
+  if (entry.kind === 'recall') entry.item.chapter = chapter;
+  return entry;
 }
 
 function tip(id: string, source = 'A video'): BringBack {
@@ -44,12 +52,55 @@ describe('listStacks', () => {
   it('counts a stack every way its picker row says it', () => {
     const items = [card('a', 'Book one'), card('b', 'Book one'), card('c', 'Book one')];
     expect(listStacks(items, ['a'], ['a', 'b'])).toEqual([
-      { name: 'Book one', total: 3, left: 2, due: 2, dueLeft: 1 },
+      { name: 'Book one', total: 3, left: 2, due: 2, dueLeft: 1, byline: '3 cards' },
     ]);
+  });
+
+  it('writes the byline off the cards — the platform tips came from, the chapters a book covers', () => {
+    const chapters = [chaptered('a', 'ch 3'), chaptered('b', 'ch 9-10'), chaptered('c', 'pp 40-52')];
+    expect(listStacks(chapters, [], [])[0].byline).toBe('3 cards · ch. 3–10');
+    expect(listStacks([tip('t')], [], [])[0].byline).toBe('YouTube · 1 card');
+  });
+
+  it('drops the platform when the stack is already named after it', () => {
+    expect(listStacks([tip('t', 'Tips · YouTube')], [], [])[0].byline).toBe('1 card');
+  });
+
+  it('leaves the span off a book whose sources never name a chapter', () => {
+    expect(listStacks([card('a', 'Book one')], [], [])[0].byline).toBe('1 card');
+    expect(listStacks([chaptered('a', 'pp 40-52')], [], [])[0].byline).toBe('1 card');
   });
 
   it('leaves unlabeled cards off the list — they live only in the all-pile', () => {
     expect(listStacks([card('a', '')], [], [])).toEqual([]);
+  });
+});
+
+describe('pickShelf', () => {
+  const shelf = () =>
+    listStacks(
+      [card('a', 'Due book'), card('b', 'Quiet book'), tip('t', 'Tips · a channel')],
+      [],
+      ['a'],
+    );
+
+  it('shelves only what the schedule is asking for', () => {
+    expect(pickShelf(shelf(), '', false).map((s) => s.name)).toEqual(['Due book']);
+  });
+
+  it('opens the whole shelf once the reader asks for all of it', () => {
+    expect(pickShelf(shelf(), '', true).map((s) => s.name)).toEqual(['Due book', 'Quiet book', 'Tips · a channel']);
+  });
+
+  it('searches every material, due or not, on the name or the line under it', () => {
+    expect(pickShelf(shelf(), 'quiet', false).map((s) => s.name)).toEqual(['Quiet book']);
+    expect(pickShelf(shelf(), 'YOUTUBE', false).map((s) => s.name)).toEqual(['Tips · a channel']);
+    expect(pickShelf(shelf(), 'nothing here', false)).toEqual([]);
+  });
+
+  it('falls back to the whole shelf on a day with nothing scheduled', () => {
+    const quiet = listStacks([card('a', 'Due book'), card('b', 'Quiet book')], [], []);
+    expect(pickShelf(quiet, '', false).map((s) => s.name)).toEqual(['Due book', 'Quiet book']);
   });
 });
 

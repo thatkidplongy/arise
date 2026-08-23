@@ -1,4 +1,5 @@
 import type { BringBack } from '@/lib/bringBack';
+import { chapterSpan } from '@/lib/reading';
 
 /**
  * The index-card pile behind the recall card.
@@ -67,13 +68,37 @@ function countInto(stack: Stack, id: string, met: Set<string>, due: Set<string>)
   if (!met.has(id)) stack.dueLeft += 1;
 }
 
+/**
+ * One row on the shelf: a stack, plus the line that sits under its name.
+ *
+ * The byline is derived here rather than in the picker because it is read off the
+ * cards themselves — where they were captured from, how many there are, which
+ * chapters they came out of — and the picker only has the counts.
+ */
+export interface ShelfStack extends Stack {
+  byline: string;
+}
+
+/** What a stack says about itself under its name: 'YouTube · 6 cards',
+ * '22 cards · ch. 1–9'. The API carries no author, so a book leads with its count.
+ *
+ * The platform is dropped when the stack is already named after it — a capture
+ * titled "YouTube" would otherwise read 'Tips · YouTube' over 'YouTube · 17 cards'. */
+function bylineOf(stack: Stack, via: string, markers: string[]): string {
+  const cards = `${stack.total} ${stack.total === 1 ? 'card' : 'cards'}`;
+  const named = via && stack.name.toLocaleLowerCase().includes(via.toLocaleLowerCase());
+  return [named ? '' : via, cards, chapterSpan(markers)].filter(Boolean).join(' · ');
+}
+
 /** Every material in the deck as a pickable stack, in first-appearance order —
  * due items lead the deck, so the books owing work list first. */
-export function listStacks(items: BringBack[], met: string[], dueIds: string[]): Stack[] {
+export function listStacks(items: BringBack[], met: string[], dueIds: string[]): ShelfStack[] {
   const metSet = new Set(met);
   const dueSet = new Set(dueIds);
-  const out: Stack[] = [];
+  const out: ShelfStack[] = [];
   const at = new Map<string, number>();
+  const vias: string[] = [];
+  const markers: string[][] = [];
   for (const entry of items) {
     const name = materialOf(entry);
     if (!name) continue;
@@ -81,11 +106,39 @@ export function listStacks(items: BringBack[], met: string[], dueIds: string[]):
     if (found === undefined) {
       found = out.length;
       at.set(name, found);
-      out.push({ name, total: 0, left: 0, due: 0, dueLeft: 0 });
+      out.push({ name, total: 0, left: 0, due: 0, dueLeft: 0, byline: '' });
+      vias.push('');
+      markers.push([]);
     }
     countInto(out[found], entry.id, metSet, dueSet);
+    if (entry.kind === 'tip') vias[found] = vias[found] || entry.platform;
+    else markers[found].push(entry.item.chapter);
   }
+  out.forEach((stack, n) => (stack.byline = bylineOf(stack, vias[n], markers[n])));
   return out;
+}
+
+/** Whether a stack answers to what was typed — its name, or the line under it, so
+ * searching a platform ('YouTube') or a chapter finds the stack that carries it. */
+function stackMatches(stack: ShelfStack, query: string): boolean {
+  return `${stack.name} ${stack.byline}`.toLocaleLowerCase().includes(query);
+}
+
+/**
+ * Which stacks the picker puts on the shelf: what's due today, with everything else
+ * behind the search — the three books owing work are the point of the screen, and a
+ * list of every material ever read buries them.
+ *
+ * A day with nothing scheduled falls back to the whole shelf. There is nothing to
+ * hide behind on that day, and an empty picker under a search box reads as a screen
+ * that has failed rather than one with no work to hand out.
+ */
+export function pickShelf(stacks: ShelfStack[], query: string, showAll: boolean): ShelfStack[] {
+  const typed = query.trim().toLocaleLowerCase();
+  if (typed) return stacks.filter((s) => stackMatches(s, typed));
+  if (showAll) return stacks;
+  const owing = stacks.filter((s) => s.due > 0);
+  return owing.length > 0 ? owing : stacks;
 }
 
 /** One pile's counts — works for a material or for ALL_PILE, which no picker row names. */

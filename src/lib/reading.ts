@@ -47,3 +47,28 @@ export function describeThreadBook(title: string, sittings: number): string {
   if (sittings <= 0) return title;
   return `${title} · ${sittings} sitting${sittings === 1 ? '' : 's'}`;
 }
+
+// A source's marker names chapters ('ch 2', 'chapters 5–7') or pages ('pp 40-52').
+// Only the chapter ones place you in the book — page numbers belong to one edition
+// and wouldn't line up with a chapter count anyway — so a span never mixes the two.
+const CHAPTER_MARKER = /^(?:ch|chap|chapter|chapters)\b/i;
+
+/**
+ * The chapters a set of sources covers, as a stack's byline wears it: 'ch 1',
+ * 'ch 3-4' and 'ch 9' together read "ch. 1–9".
+ *
+ * Empty when nothing in the set names a chapter. A stack of page markers, or of
+ * sources logged without one, says nothing about where in the book you are, and a
+ * byline that made a span up would be read as progress.
+ */
+export function chapterSpan(markers: readonly string[]): string {
+  const numbers: number[] = [];
+  for (const marker of markers) {
+    if (!CHAPTER_MARKER.test(marker.trim())) continue;
+    for (const found of marker.match(NUMBER) ?? []) numbers.push(Number(found));
+  }
+  if (numbers.length === 0) return '';
+  const low = Math.min(...numbers);
+  const high = Math.max(...numbers);
+  return low === high ? `ch. ${low}` : `ch. ${low}–${high}`;
+}

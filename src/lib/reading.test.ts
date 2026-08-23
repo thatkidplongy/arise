@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countChapters, describeChaptersRead, describeThreadBook } from '@/lib/reading';
+import { chapterSpan, countChapters, describeChaptersRead, describeThreadBook } from '@/lib/reading';
 
 describe('countChapters', () => {
   it('counts a single chapter', () => {
@@ -55,5 +55,25 @@ describe('describeThreadBook', () => {
 
   it('lets the book stand alone rather than claiming no sittings', () => {
     expect(describeThreadBook('Deep Work', 0)).toBe('Deep Work');
+  });
+});
+
+describe('chapterSpan', () => {
+  it('spans the lowest chapter named to the highest', () => {
+    expect(chapterSpan(['ch 3', 'ch 9-10', 'chapters 1–2'])).toBe('ch. 1–10');
+  });
+
+  it('names a single chapter on its own', () => {
+    expect(chapterSpan(['ch 4', 'ch. 4'])).toBe('ch. 4');
+  });
+
+  it('ignores page markers — they place you in an edition, not in the book', () => {
+    expect(chapterSpan(['pp 40-52', 'p 8'])).toBe('');
+    expect(chapterSpan(['pp 40-52', 'ch 6'])).toBe('ch. 6');
+  });
+
+  it('says nothing when no source named a chapter', () => {
+    expect(chapterSpan([])).toBe('');
+    expect(chapterSpan(['', 'the intro'])).toBe('');
   });
 });
