@@ -673,11 +673,22 @@ def pay_commitment(
 ):
     """Log a standing commitment as paid — writes the money-log entry for you, tagged
     to the right bucket, so a bill is never typed twice. 409 when it's already been
-    paid this month, since paying twice would double-count against the bucket."""
+    paid this month, since paying twice would double-count against the bucket.
+
+    `day` in the body back-dates the payment to the day the bill was really settled,
+    for one remembered a few days late; omit it and it lands on the query day, as
+    tapping a bill while you pay it expects. Note the month that decides "already
+    paid" follows the *paid* day, so a bill back-dated into last month is settled
+    there and comes due again in this one."""
     player = state.get_or_create_player(db)
     d = _valid_day(day)
+    on = _valid_day(body_in.day) if body_in and body_in.day else d
+    # A payment that hasn't happened yet isn't a payment, and would land in a period
+    # the app can't navigate to. Same refusal as POST /money.
+    if on > d:
+        raise HTTPException(400, "day cannot be in the future")
     amount = body_in.amount if body_in else None
-    if not service.pay_commitment(db, player, commitment_id, d, amount):
+    if not service.pay_commitment(db, player, commitment_id, on, amount):
         raise HTTPException(status_code=409, detail="No such commitment, or already paid this month")
     return state.build_state(db, player, d)
 

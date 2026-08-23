@@ -64,6 +64,15 @@ export function formatDayBand(day: string, today: string): string {
   return month ? `${weekdayDay(day)} ${month}` : weekdayDay(day);
 }
 
+/** The same day named mid-sentence — 'today', 'yesterday', then 'Aug 21'. Lowercase
+ * on the relative two so it reads as prose in a button or a caption ("Add to today",
+ * "a bill you paid yesterday"), where the band heading's Title Case would not. */
+export function formatDayInline(day: string, today: string): string {
+  const relative = shortDay(day, today);
+  if (relative === 'Today' || relative === 'Yesterday') return relative.toLowerCase();
+  return relative;
+}
+
 /** Server timestamps arrive as naive UTC ('2026-08-22 12:40:53') — SQLite keeps no
  * zone — and Date() would read that as local wall-clock, shifting every time by the
  * timezone offset. Restores the UTC marker before parsing; zoned stamps pass through. */

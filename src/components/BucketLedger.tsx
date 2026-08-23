@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { DayBand, bandRow } from '@/components/DayBand';
-import { DueBills } from '@/components/DueBills';
+import { BillRow, DueBills } from '@/components/DueBills';
 import { Button } from '@/components/ui/Button';
 import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiCommitment, ApiMoneyEntry } from '@/lib/api';
 import { useDayBands } from '@/hooks/useDayBands';
 import { readBucketLedger, type LedgerDay } from '@/lib/bucketLedger';
-import { dateKey, formatClock, toUtcIso } from '@/lib/dates';
+import { dateKey, formatClock, formatDayInline, toUtcIso } from '@/lib/dates';
 import { peso } from '@/lib/money';
 import { readMoneyDraft } from '@/lib/moneyEntry';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
@@ -85,19 +85,40 @@ function describeBand(band: LedgerDay): string {
 }
 
 /**
- * Log a spend onto today, from inside today's band. Rests as the one filled button
- * on the card, because adding to today is what this panel is for; the fields only
- * appear once you've asked for them, so a card you're only reading stays readable.
+ * Log a spend onto the band it sits in. Rests as the one filled button on the card,
+ * because adding a spend is what this panel is for; the fields only appear once
+ * you've asked for them, so a card you're only reading stays readable.
+ *
+ * The band's own day is the date — which is the whole answer to "I forgot to log
+ * Friday". Nothing here asks which day, because opening Friday already said so.
  */
-function AddToToday({ bucket }: { bucket: LedgerBucket }) {
+function AddSpend({
+  bucket,
+  day,
+  today,
+  bills,
+}: {
+  bucket: LedgerBucket;
+  /** The band's day — what this form files onto. */
+  day: string;
+  today: string;
+  /** The bills still owed, offered on a past day so one paid then can be filed there.
+   * Absent on today, where the Still to pay band directly below already offers them. */
+  bills?: { items: ApiCommitment[]; onPay: (id: string) => void };
+}) {
   const addMoney = useSystem((s) => s.addMoney);
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
 
-  // No day at all: the spend is being logged as it happens, so it lands on today.
-  const draft = readMoneyDraft({ amount, note, direction: 'out', bucket });
+  const when = formatDayInline(day, today);
+  const label = `Add to ${when}`;
+  // Today sends no day at all — the server stamps the request's own day, which is what
+  // logging a spend as it happens means, and keeps the phone's midnight authoritative.
+  // A past band names its day outright.
+  const filedOn = day === today ? '' : day;
+  const draft = readMoneyDraft({ amount, note, direction: 'out', bucket, day: filedOn });
 
   const close = () => {
     setOpen(false);
@@ -114,7 +135,7 @@ function AddToToday({ bucket }: { bucket: LedgerBucket }) {
   };
 
   if (!open) {
-    return <Button label="Add to today" onPress={() => setOpen(true)} block style={styles.primary} />;
+    return <Button label={label} onPress={() => setOpen(true)} block style={styles.primary} />;
   }
 
   return (
@@ -141,7 +162,21 @@ function AddToToday({ bucket }: { bucket: LedgerBucket }) {
         />
       </View>
       {/* Stays open after a log — one sitting is usually more than one spend. */}
-      <Button label="Add to today" onPress={() => void submit()} disabled={!draft} block />
+      <Button label={label} onPress={() => void submit()} disabled={!draft} block />
+      {bills && bills.items.length > 0 ? (
+        <>
+          <Text style={styles.orBills}>Or a bill you paid {when}</Text>
+          {bills.items.map((item) => (
+            <BillRow
+              key={item.id}
+              item={item}
+              onPay={() => bills.onPay(item.id)}
+              action="tap to file it here"
+              spoken={`File ${item.label} as paid ${when}, ${peso(item.amount)}`}
+            />
+          ))}
+        </>
+      ) : null}
       <Button label="Done" onPress={close} tone="ghost" block />
     </View>
   );
@@ -182,6 +217,12 @@ export function BucketLedger({
     await payCommitment(id);
     refresh();
   };
+  // Paying onto an earlier day — a bill settled Friday and only remembered now. The
+  // month still decides whether it's owed, so this only moves which day carries it.
+  const payOn = async (id: string, on: string) => {
+    await payCommitment(id, undefined, on);
+    refresh();
+  };
   // Also how a mis-tapped "pay" is undone: paid_this_month is derived from the
   // entry, so deleting a bill's payment puts the bill back on the due list.
   const removeEntry = async (id: string) => {
@@ -210,7 +251,7 @@ export function BucketLedger({
         {todayBand.items.map((entry) => (
           <EntryRow key={entry.id} entry={entry} today={today} onRemove={() => void removeEntry(entry.id)} />
         ))}
-        <AddToToday bucket={bucket} />
+        <AddSpend bucket={bucket} day={todayBand.day} today={today} />
       </DayBand>
       <DueBills
         due={ledger.due}
@@ -231,6 +272,12 @@ export function BucketLedger({
           {band.items.map((entry) => (
             <EntryRow key={entry.id} entry={entry} today={today} onRemove={() => void removeEntry(entry.id)} />
           ))}
+          <AddSpend
+            bucket={bucket}
+            day={band.day}
+            today={today}
+            bills={{ items: ledger.due, onPay: (id) => void payOn(id, band.day) }}
+          />
         </DayBand>
       ))}
     </>
@@ -243,6 +290,7 @@ const styles = StyleSheet.create({
   headlineOf: { color: text.secondary, fontSize: 13, fontWeight: '600', flexShrink: 1 },
 
   empty: { color: text.secondary, fontSize: 13, lineHeight: 19 },
+  orBills: { color: text.secondary, fontSize: 12, fontWeight: '600', paddingTop: 6 },
 
   addForm: { paddingTop: 10, gap: 8 },
   addRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },

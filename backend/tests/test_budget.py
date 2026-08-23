@@ -189,3 +189,38 @@ def test_budget_rejects_bad_input(client):
     assert _add(client, "Rent", 500, "savings").status_code == 422       # savings is the remainder
     assert _add(client, "Rent", 500, "needs", due_day=32).status_code == 422
     assert client.put("/budget/income", json={"monthly_income": -1}).status_code == 422
+
+
+def test_a_bill_can_be_paid_onto_an_earlier_day(client):
+    """A bill settled on Friday and only remembered on Sunday belongs on Friday —
+    otherwise Sunday's day total carries a spend that wasn't Sunday's."""
+    cid = _add(client, "Rent", 12000, "needs", due_day=5).json()["budget"]["commitments"][0]["id"]
+
+    body = client.post(f"/budget/commitments/{cid}/pay?day={DAY}", json={"day": "2026-08-03"})
+    assert body.status_code == 200
+    entries = client.get(f"/money/history?scope=month&day={DAY}").json()["entries"]
+    assert [(e["day"], e["note"], e["commitment_id"]) for e in entries] == [("2026-08-03", "Rent", cid)]
+    # Still off the due list, and still counted against needs for the month.
+    assert body.json()["budget"]["commitments"][0]["paid_this_month"] is True
+    assert body.json()["budget"]["actual"]["needs"] == 12000
+    # The day it was tapped stays clean — that's the whole point.
+    assert body.json()["budget"]["today"] == {"needs": 0, "wants": 0}
+
+
+def test_back_dating_a_payment_cannot_reach_the_future(client):
+    cid = _add(client, "Rent", 12000, "needs").json()["budget"]["commitments"][0]["id"]
+    assert client.post(f"/budget/commitments/{cid}/pay?day={DAY}", json={"day": "2026-08-09"}).status_code == 400
+    assert client.post(f"/budget/commitments/{cid}/pay?day={DAY}", json={"day": "nope"}).status_code == 422
+    # Nothing was written by either refusal.
+    assert _budget(client)["commitments"][0]["paid_this_month"] is False
+
+
+def test_a_back_dated_payment_settles_the_month_it_landed_in(client):
+    """The month deciding "already paid" follows the paid day, not the tap day — so a
+    bill filed into last month is owed again in this one."""
+    cid = _add(client, "Rent", 12000, "needs").json()["budget"]["commitments"][0]["id"]
+    assert client.post(f"/budget/commitments/{cid}/pay?day={DAY}", json={"day": "2026-07-28"}).status_code == 200
+
+    assert _budget(client)["commitments"][0]["paid_this_month"] is False  # August still owes it
+    assert client.get("/state?day=2026-07-30").json()["budget"]["commitments"][0]["paid_this_month"] is True
+    assert client.post(f"/budget/commitments/{cid}/pay?day={DAY}").status_code == 200  # payable in August

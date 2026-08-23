@@ -858,10 +858,12 @@ export const api = {
 
   /** Log a commitment as paid — writes the money-log entry, tagged, so a bill is
    * never typed twice. `amount` overrides the plan (for variable allowances). */
-  payCommitment: (base: string, token: string, id: string, day: string, amount?: number) =>
+  /** `on` is the day the bill was really paid, for one remembered late; omit it and
+   * the payment lands on `day`, which is what tapping a bill as you pay it wants. */
+  payCommitment: (base: string, token: string, id: string, day: string, amount?: number, on?: string) =>
     request<ApiState>(base, `/budget/commitments/${id}/pay?day=${day}`, token, {
       method: 'POST',
-      body: JSON.stringify({ amount: amount ?? null }),
+      body: JSON.stringify({ amount: amount ?? null, day: on ?? '' }),
     }),
 
   // ── Priority (a per-attribute focus pinned on top of the plan) ────────────

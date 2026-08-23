@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayMonth, formatClock, formatDayBand, recentDays, toUtcIso, weekdayDay } from '@/lib/dates';
+import {
+  dayMonth,
+  formatClock,
+  formatDayBand,
+  formatDayInline,
+  recentDays,
+  toUtcIso,
+  weekdayDay,
+} from '@/lib/dates';
 
 describe('recentDays', () => {
   it('counts back from today, most recent first', () => {
@@ -86,5 +94,16 @@ describe('dayMonth', () => {
 
   it('hands back what it cannot parse', () => {
     expect(dayMonth('not-a-day')).toBe('not-a-day');
+  });
+});
+
+describe('formatDayInline', () => {
+  it('lowercases the relative days so they read as prose', () => {
+    expect(formatDayInline('2026-08-23', '2026-08-23')).toBe('today');
+    expect(formatDayInline('2026-08-22', '2026-08-23')).toBe('yesterday');
+  });
+
+  it('keeps a dated day as it is written', () => {
+    expect(formatDayInline('2026-08-21', '2026-08-23')).toBe('Aug 21');
   });
 });

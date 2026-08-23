@@ -140,6 +140,11 @@ class PayCommitmentIn(BaseModel):
     """Log a standing commitment as paid. `amount` overrides the planned figure,
     which is what a variable allowance like groceries needs."""
     amount: float | None = Field(None, gt=0, le=1_000_000_000)
+    # The day the bill was actually paid, when that isn't the day it was tapped — one
+    # remembered on Sunday belongs on Friday. Same split as MoneyIn.day: this is when
+    # the money moved, while the query day stays the screen doing the asking. Blank =
+    # the request's own day, which is what tapping a bill as you pay it sends.
+    day: str = Field("", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
 
 
 class IncomeIn(BaseModel):

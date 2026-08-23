@@ -119,7 +119,8 @@ export interface SystemStore {
   toggleGrocery: (id: string, bought: boolean) => Promise<void>;
   removeGrocery: (id: string) => Promise<void>;
   addMoney: (entry: ApiMoneyInput) => Promise<void>;
-  payCommitment: (id: string, amount?: number) => Promise<void>;
+  /** `on` back-dates the payment to the day the bill was really settled. */
+  payCommitment: (id: string, amount?: number, on?: string) => Promise<void>;
   removeMoney: (id: string) => Promise<void>;
   resetMoney: () => Promise<void>;
   setIncome: (monthlyIncome: number) => Promise<void>;
@@ -324,7 +325,7 @@ export const useSystemStore = create<SystemStore>()(
       toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
       removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
       addMoney: (entry) => mutate((b, t, d) => api.addMoney(b, t, entry, d)),
-      payCommitment: (id, amount) => mutate((b, t, d) => api.payCommitment(b, t, id, d, amount)),
+      payCommitment: (id, amount, on) => mutate((b, t, d) => api.payCommitment(b, t, id, d, amount, on)),
       removeMoney: (id) => mutate((b, t, d) => api.removeMoney(b, t, id, d)),
       resetMoney: () => mutate((b, t, d) => api.resetMoney(b, t, d)),
       setIncome: (monthlyIncome) => mutate((b, t, d) => api.setIncome(b, t, monthlyIncome, d)),

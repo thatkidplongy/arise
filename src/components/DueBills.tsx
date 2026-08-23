@@ -17,19 +17,38 @@ function ordinal(day: number): string {
   return 'th';
 }
 
-/** A bill still owed this month — one tap logs the spend, never retyped. */
-function DueRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: () => void; onRemove: () => void }) {
+/**
+ * A bill still owed this month — one tap logs the spend, never retyped.
+ *
+ * Shared with the ledger's back-date form, where the same bill is offered against an
+ * earlier day. `action` is what the tap will do, because there it isn't "pay" but
+ * "file the payment you already made"; `onRemove` is omitted there, since deleting a
+ * standing bill is not something to reach while back-filling one day.
+ */
+export function BillRow({
+  item,
+  onPay,
+  onRemove,
+  action = 'tap to pay',
+  spoken,
+}: {
+  item: ApiCommitment;
+  onPay: () => void;
+  onRemove?: () => void;
+  action?: string;
+  spoken?: string;
+}) {
   const meta = [
     item.due_day > 0 ? `due the ${item.due_day}${ordinal(item.due_day)}` : null,
     item.variable ? 'varies' : null,
-    'tap to pay',
+    action,
   ]
     .filter(Boolean)
     .join(' · ');
 
   return (
     <View style={bandRow.row}>
-      <Pressable onPress={onPay} style={bandRow.main} accessibilityLabel={`Mark ${item.label} paid, ${peso(item.amount)}`}>
+      <Pressable onPress={onPay} style={bandRow.main} accessibilityLabel={spoken ?? `Mark ${item.label} paid, ${peso(item.amount)}`}>
         <Ionicons name="ellipse-outline" size={17} color={TONE} />
         <View style={bandRow.text}>
           <Text style={bandRow.label} numberOfLines={1}>
@@ -39,9 +58,11 @@ function DueRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: () => v
         </View>
         <Text style={bandRow.amount}>{peso(item.amount)}</Text>
       </Pressable>
-      <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={`Remove ${item.label}`} style={bandRow.remove}>
-        <Text style={bandRow.removeGlyph}>×</Text>
-      </Pressable>
+      {onRemove ? (
+        <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={`Remove ${item.label}`} style={bandRow.remove}>
+          <Text style={bandRow.removeGlyph}>×</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -86,7 +107,7 @@ export function DueBills({
       {expanded ? (
         <View style={styles.body}>
           {due.map((item) => (
-            <DueRow key={item.id} item={item} onPay={() => onPay(item.id)} onRemove={() => onRemove(item.id)} />
+            <BillRow key={item.id} item={item} onPay={() => onPay(item.id)} onRemove={() => onRemove(item.id)} />
           ))}
         </View>
       ) : null}
