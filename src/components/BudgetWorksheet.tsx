@@ -3,11 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BucketLedger } from '@/components/BucketLedger';
 import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import { Text, TextInput } from '@/components/ui/Text';
-import type { ApiBudget, ApiCommitment } from '@/lib/api';
+import type { ApiBudget } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import {
   BUCKET_LABEL,
@@ -19,7 +20,6 @@ import {
   type BucketReading,
   type DailyLine,
 } from '@/lib/budget';
-import { useShowMore } from '@/hooks/useShowMore';
 import { peso } from '@/lib/money';
 import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
@@ -111,109 +111,23 @@ function BucketRow({ reading, daily }: { reading: BucketReading; daily?: DailyLi
   );
 }
 
-/** Live and unpaid — the only state in which a line still wants a tap. Shared so the
- * row and the fold that hides it can't disagree about what's still owed. */
-function isPayable(item: ApiCommitment): boolean {
-  return item.active && !item.paid_this_month;
-}
-
-function CommitmentRow({ item, onPay, onRemove }: { item: ApiCommitment; onPay: () => void; onRemove: () => void }) {
-  const meta = [
-    item.due_day > 0 ? `${item.due_day}${ordinal(item.due_day)}` : null,
-    item.variable ? 'varies' : null,
-    item.paid_this_month ? 'paid' : 'tap to pay',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  // Unpaid → tapping the row logs the spend against this bucket (one tap, never
-  // retyped). Paid ones aren't tappable — the month's obligation is already met.
-  const payable = isPayable(item);
-
-  return (
-    <View style={styles.line}>
-      <Pressable
-        onPress={payable ? onPay : undefined}
-        disabled={!payable}
-        style={styles.lineMain}
-        accessibilityLabel={payable ? `Mark ${item.label} paid, ${peso(item.amount)}` : `${item.label}, paid`}
-      >
-        {/* Paid gets a tick as well as the word — a colour alone wouldn't say it. */}
-        <Ionicons
-          name={item.paid_this_month ? 'checkmark-circle' : 'ellipse-outline'}
-          size={17}
-          color={item.paid_this_month ? feedback.success : TONE}
-        />
-        <View style={styles.lineText}>
-          <Text style={styles.lineLabel} numberOfLines={1}>
-            {item.label}
-          </Text>
-          {meta ? <Text style={styles.lineMeta}>{meta}</Text> : null}
-        </View>
-        <Text style={styles.lineAmount}>{peso(item.amount)}</Text>
-      </Pressable>
-      <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={`Remove ${item.label}`} style={styles.lineRemove}>
-        <Text style={styles.remove}>×</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/** How many commitment rows a bucket shows before it starts folding them away. */
-const VISIBLE_LINES = 10;
-
-/**
- * One bucket's commitments, capped so a long list doesn't bury the rest of the
- * screen. Order is left exactly as the server sorted it (dated bills in due order,
- * then undated) — a collapsed list that reshuffles itself is harder to read than a
- * long one.
- *
- * Pagination was the other option and is worse here: pages put the thing you want
- * behind a control you have to operate, and the count is small enough that "show
- * the rest" is one tap instead of several.
- */
-/** What the fold says it's holding back. Hiding a bill that still needs paying is the
- * one bad outcome here, so that gets named rather than folded into a row count. */
-function describeFold(expanded: boolean, hidden: number, unpaid: number): string {
-  if (expanded) return 'Show fewer';
-  if (unpaid > 0) return `${hidden} more · ${unpaid} still to pay`;
-  return `${hidden} more`;
-}
-
-function CommitmentList({
-  items,
-  onPay,
-  onRemove,
-}: {
-  items: ApiCommitment[];
-  onPay: (id: string) => void;
-  onRemove: (id: string) => void;
-}) {
-  const { shown, rest, folds, expanded, toggle } = useShowMore(items, VISIBLE_LINES);
-
+/** The standing-bill form, folded away. Day-to-day spending goes through the
+ * ledger's own add row, so the rarer setup task doesn't sit open under every bucket. */
+function BillAdd({ bucket }: { bucket: 'needs' | 'wants' }) {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      {shown.map((item) => (
-        <CommitmentRow key={item.id} item={item} onPay={() => onPay(item.id)} onRemove={() => onRemove(item.id)} />
-      ))}
-      {folds ? (
-        <FoldToggle
-          expanded={expanded}
-          label={describeFold(expanded, rest.length, rest.filter(isPayable).length)}
-          total={items.length}
-          color={TONE}
-          onPress={toggle}
-          style={styles.foldDivider}
-        />
-      ) : null}
+      <FoldToggle
+        expanded={open}
+        label={open ? 'Done adding bills' : 'Add a monthly bill'}
+        color={TONE}
+        onPress={() => setOpen((o) => !o)}
+        accessibilityLabel={open ? 'Hide the monthly bill form' : 'Add a monthly bill'}
+        style={styles.foldDivider}
+      />
+      {open ? <AddLine bucket={bucket} /> : null}
     </>
   );
-}
-
-function ordinal(day: number): string {
-  if (day % 10 === 1 && day !== 11) return 'st';
-  if (day % 10 === 2 && day !== 12) return 'nd';
-  if (day % 10 === 3 && day !== 13) return 'rd';
-  return 'th';
 }
 
 /** Add a line to one bucket: label, monthly amount, and an optional due day. */
@@ -390,18 +304,9 @@ function EmptyState() {
  * a needs overrun visibly come out of it.
  */
 export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
-  const removeCommitment = useSystem((s) => s.removeCommitment);
-  const payCommitment = useSystem((s) => s.payCommitment);
-  const qc = useQueryClient();
   const reading = readBudget(budget);
   const payday = budget?.monthly_income ?? 0; // stored per-payday amount — a setting, not money
   const commitments = budget?.commitments ?? [];
-
-  // Paying a commitment writes a money-out entry, so refresh the graph on /money.
-  const pay = async (id: string) => {
-    await payCommitment(id);
-    void qc.invalidateQueries({ queryKey: ['money-history'] });
-  };
 
   return (
     <>
@@ -436,28 +341,16 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
         )}
       </SystemPanel>
 
-      {EDITABLE.map((bucket) => {
-        const items = commitments.filter((c) => c.bucket === bucket);
-        const share = Math.round(BUDGET_SPLIT[bucket] * 100);
-        return (
-          <SystemPanel key={bucket} title={BUCKET_LABEL[bucket]} sub={`${share}% of pay`}>
-            {items.length === 0 ? (
-              <Text style={styles.empty}>
-                {bucket === 'needs'
-                  ? 'Rent, bills, groceries — what you owe every month.'
-                  : 'The things you choose. Eating out, subscriptions, hobbies.'}
-              </Text>
-            ) : (
-              <CommitmentList
-                items={items}
-                onPay={(id) => void pay(id)}
-                onRemove={(id) => void removeCommitment(id)}
-              />
-            )}
-            <AddLine bucket={bucket} />
-          </SystemPanel>
-        );
-      })}
+      {EDITABLE.map((bucket) => (
+        <SystemPanel key={bucket} title={BUCKET_LABEL[bucket]} sub={`${Math.round(BUDGET_SPLIT[bucket] * 100)}% of pay`}>
+          <BucketLedger
+            bucket={bucket}
+            commitments={commitments.filter((c) => c.bucket === bucket)}
+            target={reading[bucket].target}
+          />
+          <BillAdd bucket={bucket} />
+        </SystemPanel>
+      ))}
 
       <SystemPanel title={BUCKET_LABEL.savings} sub="20% of pay">
         <Text style={styles.empty}>
@@ -546,22 +439,7 @@ const styles = StyleSheet.create({
     borderTopColor: surface.hairline,
   },
 
-  line: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  lineMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: TAP },
-  lineText: { flex: 1, minWidth: 0 },
-  lineLabel: { color: text.primary, fontSize: 13 },
-  lineMeta: { color: text.secondary, fontSize: 11, marginTop: 1 },
-  lineAmount: { color: text.primary, fontSize: 13, fontWeight: '700' },
-  lineRemove: { minWidth: 24, minHeight: TAP, alignItems: 'flex-end', justifyContent: 'center' },
-  remove: { color: text.secondary, fontSize: 18, fontWeight: '700' },
-
-  // Reads as a continuation of the list it folds, so it carries the same hairline.
-  // The fold sits at the foot of a ruled list, so it keeps the rule going.
+  // Reads as a continuation of the ledger above it, so it carries the same hairline.
   foldDivider: { borderTopWidth: 1, borderTopColor: surface.hairline },
 
   addRow: { flexDirection: 'row', gap: 6, marginTop: 12, alignItems: 'center' },

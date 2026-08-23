@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { recentDays } from '@/lib/dates';
+import { dayMonth, formatClock, formatDayBand, recentDays, toUtcIso, weekdayDay } from '@/lib/dates';
 
 describe('recentDays', () => {
   it('counts back from today, most recent first', () => {
@@ -23,5 +23,63 @@ describe('recentDays', () => {
     expect(recentDays('', 7)).toEqual([]);
     expect(recentDays('yesterday', 7)).toEqual([]);
     expect(recentDays('2026-08-22', 0)).toEqual([]);
+  });
+});
+
+describe('weekdayDay', () => {
+  it('names the weekday and day of the month', () => {
+    expect(weekdayDay('2026-08-23')).toBe('Sun 23');
+    expect(weekdayDay('2026-08-22')).toBe('Sat 22');
+  });
+
+  it('passes nonsense through untouched', () => {
+    expect(weekdayDay('yesterday')).toBe('yesterday');
+  });
+});
+
+describe('formatDayBand', () => {
+  it('leads with Today and Yesterday, then lets the weekday carry it', () => {
+    expect(formatDayBand('2026-08-23', '2026-08-23')).toBe('Today · Sun 23');
+    expect(formatDayBand('2026-08-22', '2026-08-23')).toBe('Yesterday · Sat 22');
+    expect(formatDayBand('2026-08-21', '2026-08-23')).toBe('Fri 21');
+  });
+});
+
+describe('toUtcIso', () => {
+  it('marks a naive server stamp as the UTC it is', () => {
+    expect(toUtcIso('2026-08-22 12:40:53.421532')).toBe('2026-08-22T12:40:53.421532Z');
+    expect(toUtcIso('2026-08-22T12:40:53')).toBe('2026-08-22T12:40:53Z');
+  });
+
+  it('leaves an already-zoned stamp alone', () => {
+    expect(toUtcIso('2026-08-22T12:40:53Z')).toBe('2026-08-22T12:40:53Z');
+    expect(toUtcIso('2026-08-22T12:40:53+08:00')).toBe('2026-08-22T12:40:53+08:00');
+    expect(toUtcIso('2026-08-22T12:40:53-0500')).toBe('2026-08-22T12:40:53-0500');
+  });
+});
+
+describe('formatClock', () => {
+  it('reads the wall-clock in the ledger voice', () => {
+    expect(formatClock(new Date(2026, 7, 23, 9, 12))).toBe('9:12 am');
+    expect(formatClock(new Date(2026, 7, 23, 23, 59))).toBe('11:59 pm');
+  });
+
+  it('keeps noon and midnight on the twelve', () => {
+    expect(formatClock(new Date(2026, 7, 23, 0, 5))).toBe('12:05 am');
+    expect(formatClock(new Date(2026, 7, 23, 12, 0))).toBe('12:00 pm');
+  });
+
+  it('says nothing for a time that never parsed', () => {
+    expect(formatClock(new Date('nonsense'))).toBe('');
+  });
+});
+
+describe('dayMonth', () => {
+  it('wears the day first and drops the year', () => {
+    expect(dayMonth('2026-08-14')).toBe('14 Aug');
+  });
+
+  it('hands back what it cannot parse', () => {
+    expect(dayMonth('not-a-day')).toBe('not-a-day');
   });
 });
