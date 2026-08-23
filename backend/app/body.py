@@ -34,6 +34,12 @@ def _targets(p: BodyProfile | None) -> dict | None:
     )
 
 
+def targets_of(db: Session, player_id: str) -> dict | None:
+    """The current nutrition targets, or None until the profile has real numbers.
+    The Fuel quest's floor is written from these (see quests.fuel_floor)."""
+    return _targets(_profile_row(db, player_id))
+
+
 def _food_day(db: Session, player_id: str, day: str) -> dict:
     rows = (
         db.query(FoodEntry)

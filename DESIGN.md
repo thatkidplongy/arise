@@ -64,7 +64,7 @@ keeps working** — the app is designed so an outside service can never take it 
 
 | Slot | Hobby | Stat | Notes |
 |---|---|---|---|
-| Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank floor that *climbs with your level* (see Progression), tuned for toning, not bulk |
+| Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank + explosive-core floor that *climbs with your level* (see Progression) at real training volume — sets × reps that force adaptation, not a warm-up. A second always-on daily, **Fuel**, carries the diet plan: its floor is written from your own body-profile targets (protein, calorie band, fibre), because the physique the training asks for is written in the kitchen |
 | Creative | Drawing, dance, singing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
 | Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |

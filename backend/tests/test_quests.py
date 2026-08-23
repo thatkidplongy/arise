@@ -56,9 +56,57 @@ def test_floor_climbs_with_level():
     floors = quests.FLOORS["d-train"]
     assert lv0[: len(floors[0])] == floors[0]
     assert lv5[: len(floors[5])] == floors[5]
-    assert "5 push-ups" in lv0[0] and "20 push-ups" in lv5[0]
+    assert "3 × 10 push-ups" in lv0[0] and "5 × 20 push-ups" in lv5[0]
     # Beyond the cap it just holds at the top tier — no runaway numbers.
     assert quests.content_for(q, "2026-07-18", level=99)[2][: len(floors[-1])] == floors[-1]
+
+
+def _fuel_targets() -> dict:
+    # The shape nutrition.targets returns, with easy-to-spot numbers.
+    return {"protein_g": 137, "target_low": 2066, "target_high": 2266, "fibre_g": 30}
+
+
+def test_fuel_floor_is_written_from_the_hunters_own_targets():
+    # The diet quest is *my* plan, not advice: the floor carries the numbers the
+    # body profile computed. Logging is always step one.
+    floor = quests.fuel_floor(_fuel_targets(), 0)
+    assert len(floor) == 2
+    assert "Log" in floor[0] and "Body tab" in floor[0]
+    assert "137 g" in floor[1]
+
+
+def test_fuel_floor_climbs_by_adding_marks_not_harshness():
+    # Protein first; the calorie band joins mid-climb; fibre at the top. The band
+    # stays a range to land inside, never a single number to fail at.
+    t = _fuel_targets()
+    lv0, lv2, lv3 = quests.fuel_floor(t, 0), quests.fuel_floor(t, 2), quests.fuel_floor(t, 3)
+    assert "kcal" not in lv0[1]
+    assert "2066–2266 kcal" in lv2[1]
+    assert "fibre ≥ 30 g" in lv3[1]
+    # Beyond the cap it holds at the top tier.
+    assert quests.fuel_floor(t, 99) == quests.fuel_floor(t, 5)
+
+
+def test_fuel_floor_without_a_profile_asks_for_one():
+    # No profile → no real numbers, so the floor's first job is to send you to set
+    # one up rather than inventing targets.
+    floor = quests.fuel_floor(None, 3)
+    assert "body profile" in floor[0]
+    assert not any(ch.isdigit() for ch in floor[0])
+
+
+def test_fuel_daily_is_floor_plus_one_rotating_habit():
+    # Two floor steps + at most one variant step — a plan, not a checklist.
+    q = _q("d-fuel", "STR", "daily")
+    floor = quests.fuel_floor(_fuel_targets(), 0)
+    titles = set()
+    for d in range(10, 25):
+        title, _, steps, _ = quests.content_for(q, f"2026-07-{d:02d}", fuel=_fuel_targets())
+        steps = quests.cap_steps(steps, len(floor))
+        assert steps[: len(floor)] == floor  # the targets lead every day
+        assert len(steps) == 3
+        titles.add(title)
+    assert len(titles) > 1  # the habit on top still rotates
 
 
 def test_reading_floor_asks_rather_than_setting_a_quota():

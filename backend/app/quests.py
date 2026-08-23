@@ -12,9 +12,11 @@ prompts) so a quest tells you exactly what to do, not just its theme.
 
 Some daily slots also carry a *non-negotiable* floor (see FLOORS): a small core
 prepended to that day's steps and met every day regardless of the variant (e.g.
-push-ups + plank + an explosive core rep on the physical daily). The floor is *leveled* — it starts
-gentle and climbs as the hunter shows up consistently (see progression.py), so
-there's no stagnation. Where a quest is about learning, it points at a trusted
+push-ups + plank + an explosive core rep on the physical daily). The floor is
+*leveled* — it climbs as the hunter shows up consistently (see progression.py),
+so there's no stagnation. Most floors start gentle so you can begin at zero; the
+physical floor is the exception on purpose — it starts at working volume (sets ×
+reps), because a floor too light to adapt to trains the habit but not the body. Where a quest is about learning, it points at a trusted
 source (see RESOURCES), matched to the variant.
 
 Progression also shapes the *variety* where "harder" isn't a number: each level
@@ -24,7 +26,10 @@ the complicated stuff — learn-how-to-learn before domains, principles before
 tactics.
 
 The pools are tuned to the hunter's real interests:
-  STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor
+  STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor,
+       plus a daily *fuel* slot (d-fuel) — the diet plan, because a physique is
+       written in the kitchen: its floor carries the hunter's own protein/calorie
+       targets from the body profile (see fuel_floor)
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
@@ -53,39 +58,64 @@ from .models import QuestDef
 # first entry, so an unrotated read looks like the original quest.
 POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     # ── Daily ────────────────────────────────────────────────────────────────
-    "d-train": [  # STR — conditioning, plyo + home strength
-        ("Hunter Conditioning", "Quick full-body circuit", [
-            "3 rounds: 10 jump squats, 10 push-ups, 20s plank",
-            "Rest 45s between rounds",
-            "Finish with 1 min jumping jacks",
+    "d-train": [  # STR — conditioning, plyo + home strength, at volumes that force adaptation
+        ("Hunter Conditioning", "Full-body circuit, real volume", [
+            "5 rounds: 15 jump squats, 12 push-ups, 40s plank",
+            "Rest 45s between rounds — no longer",
+            "Finish with 3 min jumping jacks or jump rope",
         ]),
         ("Plyo Burst", "Explosive lower-body plyometrics", [
-            "4 sets × 10 jump squats",
-            "3 sets × 8 box or step jumps",
-            "3 sets × 20s pogo hops · rest 60s between",
+            "5 × 12 jump squats — full depth, max height",
+            "4 × 10 box or step jumps",
+            "4 × 30s pogo hops · rest 60s between",
         ]),
         ("Home Circuit", "No-equipment home workout", [
-            "3 rounds: 12 squats, 10 push-ups, 12 lunges (6/side), 30s plank",
+            "5 rounds: 20 squats, 12 push-ups, 16 lunges (8/side), 45s plank",
             "Rest 60s between rounds",
         ]),
         ("Legs & Lunges", "Lower-body strength", [
-            "4 × 12 bodyweight squats",
-            "3 × 10 reverse lunges per leg",
-            "3 × 15 calf raises",
+            "5 × 20 bodyweight squats — slow down, drive up",
+            "4 × 12 reverse lunges per leg",
+            "4 × 20 calf raises + 3 × 15 glute bridges",
         ]),
         ("Explosive Footwork", "Plyo footwork for the court", [
-            "5 × 10s split-step into lunge",
-            "4 × 20s fast feet (ladder or line)",
-            "3 × 6 jump lunges",
+            "8 × 15s split-step into lunge",
+            "6 × 30s fast feet (ladder or line)",
+            "4 × 10 jump lunges",
         ]),
         ("Push & Core", "Upper body and core", [
-            "4 × 8–12 push-ups (scale as needed)",
-            "3 × 30s plank",
-            "3 × 15 slow bicycle crunches",
+            "5 × 12–15 push-ups (feet elevated or diamond once easy)",
+            "3 × 60s plank",
+            "3 × 20 slow bicycle crunches + 15 V-ups",
         ]),
         ("Jump Rope", "Rope conditioning intervals", [
-            "8 rounds: 40s skipping, 20s rest",
+            "12 rounds: 45s skipping, 15s rest",
             "Mix in high knees or double-unders if you can",
+        ]),
+    ],
+    "d-fuel": [  # STR — the diet plan. The floor (fuel_floor) carries the hunter's own
+        # targets; these variants rotate one habit on top. Only the first step survives
+        # the cap, so each variant leads with the one that matters.
+        ("Fuel Discipline", "Eat to your targets", [
+            "Build each plate: a palm of protein, a fist of veg, a cupped hand of carbs",
+        ]),
+        ("Protein First", "Order of eating matters", [
+            "Eat the protein on your plate first — it protects muscle and blunts cravings",
+        ]),
+        ("Hunter's Rations", "Prep beats willpower", [
+            "Cook or portion tomorrow's protein in advance — decided food doesn't get debated",
+        ]),
+        ("Water Discipline", "Thirst reads as hunger", [
+            "A glass of water before every meal, and 2L across the day",
+        ]),
+        ("Clean Sweep", "Cut the liquid calories", [
+            "No soft drinks, milk tea or juice today — water, black coffee, or plain tea",
+        ]),
+        ("Slow Eater", "Give fullness time to land", [
+            "Eat one meal with no screen, putting the spoon down between bites",
+        ]),
+        ("Stock the Arsenal", "Make the good choice the easy one", [
+            "Restock lean protein and veg — the Body tab suggests picks you can actually buy",
         ]),
     ],
     "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
@@ -434,12 +464,12 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Choose the shot you dodge in games",
             "20 min: slow reps → game-speed reps",
         ]),
-        ("Plyo Set", "5×5 max-effort jump squats, full rest", [
-            "5 × 5 max-effort jump squats",
+        ("Plyo Set", "6×6 max-effort jump squats, full rest", [
+            "6 × 6 max-effort jump squats — every rep as high as the first",
             "Full rest between sets — don't rush",
         ]),
-        ("Home Strength", "3 rounds: squats, push-ups, plank", [
-            "3 × 12 squats, 3 × 10 push-ups, 3 × 30s plank",
+        ("Home Strength", "4 rounds: squats, push-ups, plank", [
+            "4 × 15 squats, 4 × 12 push-ups, 3 × 45s plank",
         ]),
         ("Footwork Ladder", "10 min ladder + shadow footwork", [
             "5 min ladder drills",
@@ -839,24 +869,28 @@ def focus_steps(stat: str, focus: str) -> list[str]:
 # to that day's rotating steps and met every day no matter which variant shows —
 # but it *climbs* with the attribute's progression level (see progression.py).
 # FLOORS[slot][level] is the floor at that level; the last entry is the cap, held
-# once you've built the habit. Fundamentals-first: each starts gentle (5 push-ups,
-# 3 breaths, just log the money) so you can begin at zero. Only the areas below
-# have a floor; Creativity and Connection stay floor-free (a single rotating
-# action is the day's commitment) and progress by content band instead.
+# once you've built the habit. Most start gentle (3 breaths, just log the money)
+# so you can begin at zero — but the physical floor starts at working volume (sets
+# × reps): a single set of five push-ups builds the habit, not the body, and the
+# hunter is here for the body. Scale a set down mid-set if form breaks; never the
+# plan. Only the areas below have a floor; Creativity and Connection stay
+# floor-free (a single rotating action is the day's commitment) and progress by
+# content band instead.
 FLOORS: dict[str, list[list[str]]] = {
-    "d-train": [  # STR — progressive overload + an explosive, home-only core rep (no equipment)
-        ["5 push-ups (or knee push-ups — form first)", "20s plank",
-         "6 tuck jumps — knees to chest, land soft and quiet"],
-        ["8 push-ups (good form)", "30s plank",
-         "8 tuck jumps — land soft, reset between reps"],
-        ["10 push-ups", "40s plank",
-         "10 tuck jumps + 20s fast mountain climbers"],
-        ["12 push-ups", "45s plank",
-         "12 tuck jumps + 12 explosive V-ups"],
-        ["15 push-ups", "50s plank",
-         "15 tuck jumps + 15 explosive V-ups"],
-        ["20 push-ups", "60s plank",
-         "20 tuck jumps + 20 explosive V-ups — max intent, reset between"],  # cap
+    "d-train": [  # STR — real training volume + an explosive, home-only core rep (no equipment)
+        ["3 × 10 push-ups — chest to floor, rest 60s (drop to knees only when form breaks)",
+         "3 × 30s plank — braced flat, no sagging hips",
+         "3 × 10 tuck jumps — knees to chest, land soft and quiet"],
+        ["3 × 12 push-ups, rest 60s", "3 × 40s plank",
+         "3 × 12 tuck jumps + 20s fast mountain climbers"],
+        ["4 × 12 push-ups, rest 60s", "3 × 50s plank",
+         "3 × 12 tuck jumps + 12 explosive V-ups"],
+        ["4 × 15 push-ups — last set to failure", "3 × 60s plank",
+         "4 × 12 tuck jumps + 15 explosive V-ups"],
+        ["5 × 15 push-ups — last set to failure", "3 × 75s plank + 30s side plank each side",
+         "4 × 15 tuck jumps + 20 explosive V-ups"],
+        ["5 × 20 push-ups — last set to failure", "3 × 90s plank + 45s side plank each side",
+         "5 × 15 tuck jumps + 25 explosive V-ups — max intent, reset between"],  # cap
     ],
     "d-meditate": [  # SPI — from a pause, toward a real sit
         ["Pause for 3 slow breaths before you begin"],
@@ -881,7 +915,10 @@ FLOORS: dict[str, list[list[str]]] = {
 # source. Keyed by the variant's title, so the pointer matches the day's focus.
 # The emoji signals the medium: 📖 book · 🎥 YouTube · 🎧 audio/app · 🌐 site.
 RESOURCES: dict[str, str] = {
-    # STR — technique worth studying
+    # STR — technique worth studying, and how to eat for the body you're training
+    "Fuel Discipline": "🌐 Precision Nutrition — hand-portion guide",
+    "Protein First": "🎥 Jeff Nippard — nutrition science (YouTube)",
+    "Hunter's Rations": "🎥 Joshua Weissman — meal prep (YouTube)",
     "Explosive Footwork": "🎥 Badminton Insight (YouTube)",
     "Dungeon Raid: Badminton": "🎥 Badminton Insight (YouTube)",
     "Doubles Raid": "🎥 Badminton Insight (YouTube)",
@@ -1055,6 +1092,36 @@ def reading_floor(book: str | None) -> str:
     return f"Read {what} at your pace, then log which chapters"
 
 
+def fuel_floor(targets: dict | None, level: int) -> list[str]:
+    """The diet non-negotiable — the numbers are the hunter's own, computed from
+    their body profile (nutrition.targets), so the quest reads as *my* diet plan
+    rather than generic advice. Two steps at every level: log it, and hit today's
+    marks. What climbs with level is how many marks a day carries — protein first,
+    then the calorie band, then fibre — never how harshly they're judged: the band
+    stays a range to land inside, not a line to fail at.
+
+    Without a profile there are no real numbers, so the floor's first job is to
+    send you to set one up."""
+    if not targets:
+        return [
+            "Set your body profile (Body tab) so your targets are real numbers",
+            "Log everything you eat today in the Body tab",
+        ]
+    protein, lo, hi, fibre = (targets["protein_g"], targets["target_low"],
+                              targets["target_high"], targets["fibre_g"])
+    log = "Log everything you eat today in the Body tab — every meal counted"
+    plan = "Log each meal before you eat it — decide, then eat"
+    tiers = [
+        [log, f"Protein ≥ {protein} g — muscle is built from it"],
+        [log, f"Protein ≥ {protein} g · nothing sugary to drink"],
+        [log, f"Protein ≥ {protein} g · finish inside {lo}–{hi} kcal"],
+        [log, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g"],
+        [plan, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g"],
+        [plan, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g · nothing sugary to drink"],  # cap
+    ]
+    return tiers[max(0, min(level, len(tiers) - 1))]
+
+
 # A self-set priority that sits on top of the plan (e.g. "abs this week"). Common
 # asks get a handcrafted frame; anything else gets a clean generic one. Matched by
 # keyword substring on the lowercased focus — no LLM, always free.
@@ -1126,12 +1193,13 @@ def cap_steps(steps: list[str], floor_len: int) -> list[str]:
 
 
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
-              craft_source: str | None = None) -> list[str]:
+              craft_source: str | None = None, fuel: dict | None = None) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
     an LLM wrote it. Leveled floors (STR/SPI/WLT) climb through FLOORS; Grow opens
-    with the reading floor, which is level-independent by design. Empty for slots
-    with no floor (Creativity, Connection, and all non-daily slots)."""
+    with the reading floor, which is level-independent by design; Fuel's floor is
+    built from the hunter's own nutrition targets (`fuel`). Empty for slots with
+    no floor (Creativity, Connection, and all non-daily slots)."""
     tiers = FLOORS.get(quest.id)
     if tiers is not None:
         return list(tiers[max(0, min(level, len(tiers) - 1))])
@@ -1139,6 +1207,8 @@ def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
         return [reading_floor(book)]
     if quest.id == "d-craft":
         return [craft_floor(craft_source, level)]
+    if quest.id == "d-fuel":
+        return fuel_floor(fuel, level)
     return []
 
 
@@ -1488,6 +1558,7 @@ def content_for(
     interview: bool = False,
     jp_week: int = 0,
     craft_source: str | None = None,
+    fuel: dict | None = None,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1496,8 +1567,9 @@ def content_for(
     day to day. `book` names the current read in the reading floor. `level` is the
     stat's progression level — it climbs the floor and picks the content band.
     `interview` (Craft only) swaps in the interview-prep pool. `jp_week` drives the
-    Japanese plan; `craft_source` is the one thing Craft is studying. `resource`
-    points at a trusted place to learn (empty when there isn't one)."""
+    Japanese plan; `craft_source` is the one thing Craft is studying; `fuel` is the
+    hunter's nutrition targets for the diet floor. `resource` points at a trusted
+    place to learn (empty when there isn't one)."""
     if quest.id == "d-jp":
         return japanese_content(jp_week or 1, day)  # follows the kana→grammar→kanji plan
     if quest.id == "d-craft" and not interview:
@@ -1515,5 +1587,5 @@ def content_for(
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
     title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
-    steps = floor_for(quest, book, level, craft_source) + steps  # non-negotiables first, then variety
+    steps = floor_for(quest, book, level, craft_source, fuel) + steps  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

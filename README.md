@@ -63,7 +63,7 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   each Monday. Free, offline, deterministic (no LLM).
 - **Progression that climbs** — every attribute has a level that starts at 0 and
   grows as you show up consistently, so the challenge never stagnates. The daily
-  floor ratchets up (5 push-ups → 20; a pause → a 5-min sit) and the harder areas
+  floor ratchets up (3×10 push-ups → 5×20; a pause → a 5-min sit) and the harder areas
   move fundamentals-first (learn *how to learn* before the hard subjects; money
   *psychology* before hustle). Miss a week and it eases down gently; your all-time
   **peak never drops**, and there are no penalties.

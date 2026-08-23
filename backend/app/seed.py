@@ -7,6 +7,7 @@ from .models import QuestDef
 SEED_QUESTS = [
     # Daily quests — the non-negotiable core loop
     dict(id="d-train", title="Hunter Conditioning", desc="15 min of footwork, jump rope, or strength work", stat="STR", xp=10, cadence="daily", target=1),
+    dict(id="d-fuel", title="Fuel Discipline", desc="Eat to your targets — protein up, calories in the band", stat="STR", xp=10, cadence="daily", target=1),
     dict(id="d-sketch", title="Daily Sketch", desc="Draw for 20 minutes — anything counts", stat="CRE", xp=10, cadence="daily", target=1),
     dict(id="d-meditate", title="Inner Gate", desc="Meditate for 10 minutes", stat="SPI", xp=10, cadence="daily", target=1),
     dict(id="d-connect", title="Send a Signal", desc="Reach out to a friend or family member", stat="CHA", xp=10, cadence="daily", target=1),

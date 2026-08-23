@@ -3,7 +3,7 @@
 from app import quests
 
 DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
+DAILY_IDS = ["d-train", "d-fuel", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
 
 
 def _state(client):
@@ -50,7 +50,7 @@ def test_state_shape(client):
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
-    # The physical daily always carries its non-negotiable floor (Lv0 → 5 push-ups).
+    # The physical daily always carries its non-negotiable floor (Lv0 → 3 × 10 push-ups).
     assert "push-ups" in q["steps"][0]
     # …and an explosive (plyometric) core rep is always on top, whatever the workout.
     assert any("tuck jump" in st for st in q["steps"])
@@ -307,17 +307,15 @@ def test_step_checklist_autocompletes_and_reverses(client):
 def test_daily_rotation(client):
     from app.state import active_daily_ids
 
-    # Physical shows every day; the other dailies rotate over a 3-day cycle.
+    # Physical and Fuel show every day; the other dailies rotate over a 3-day cycle.
     seen = []
     for d in ("2026-07-18", "2026-07-19", "2026-07-20"):
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
-        assert "d-train" in shown and shown == active_daily_ids(d)
+        assert {"d-train", "d-fuel"} <= shown and shown == active_daily_ids(d)
         seen.append(shown)
     assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
     # Across the full cycle every daily comes around.
-    assert set().union(*seen) == {
-        "d-train", "d-read", "d-wealth", "d-craft", "d-sketch", "d-jp", "d-meditate", "d-connect",
-    }
+    assert set().union(*seen) == set(DAILY_IDS)
 
 
 def test_step_toggle_rejected_for_multi_target(client):
