@@ -4,9 +4,12 @@ import { Text } from '@/components/ui/Text';
 import type { RecallGrade } from '@/lib/api';
 import { clay, font, neutral, onAccent, radius, sage, surface, text } from '@/theme';
 
+/** When this grade would bring the card back. Spelled with the verb, because a bare
+ * "in 3 days" on a button reads like a delay being imposed rather than the next
+ * meeting being booked. */
 function describeReturn(days: number): string {
-  if (days === 1) return 'tomorrow';
-  return `in ${days} days`;
+  if (days === 1) return 'back tomorrow';
+  return `back in ${days} days`;
 }
 
 /** One of the three piles a graded card can land in. */
@@ -26,7 +29,7 @@ function GradeButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label} — back ${sub}`}
+      accessibilityLabel={`${label} — ${sub}`}
       style={({ pressed }) => [styles.button, skin.box, pressed && styles.pressed]}
     >
       <Text style={[styles.label, skin.text]}>{label}</Text>
@@ -54,7 +57,7 @@ export function GradeBar({
 }) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.ask}>How close were you?</Text>
+      <Text style={styles.ask}>How close were you? Your answer sets when you see this card again.</Text>
       <View style={styles.row}>
         <GradeButton label="Missed" sub={describeReturn(ifMissed)} emphasis="plain" onPress={() => onGrade('missed')} />
         <GradeButton label="Shaky" sub={describeReturn(ifShaky)} emphasis="soft" onPress={() => onGrade('shaky')} />
@@ -81,7 +84,7 @@ const SKINS = {
 
 const styles = StyleSheet.create({
   wrap: { gap: 8 },
-  ask: { fontFamily: font.regular, fontSize: 11.5, color: text.secondary, paddingLeft: 4 },
+  ask: { fontFamily: font.regular, fontSize: 11.5, lineHeight: 17, color: text.secondary, paddingLeft: 4 },
   row: { flexDirection: 'row', gap: 8 },
   button: {
     flex: 1,
@@ -93,5 +96,5 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.85 },
   label: { fontFamily: font.semibold, fontSize: 12.5 },
-  sub: { fontFamily: font.regular, fontSize: 10 },
+  sub: { fontFamily: font.regular, fontSize: 9.5 },
 });

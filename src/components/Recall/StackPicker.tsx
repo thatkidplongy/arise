@@ -10,37 +10,49 @@ import { STAT_META, accent2, clay, font, neutral, onAccent, radius, surface, tex
 const SPINES = [accent2, STAT_META.INT.color, STAT_META.CFT.color, STAT_META.CRE.color];
 
 function describeDue(due: number): string {
-  if (due === 0) return 'Nothing due today. Browse a stack anyway — extra meetings never hurt.';
-  if (due === 1) return 'One card is due. Pick what you want to be tested on.';
+  if (due === 0) return 'Nothing scheduled today — tap any stack to test yourself anyway.';
+  if (due === 1) return 'One card is ready to be tested today. Or tap any stack to go further.';
   const word = spellCount(due);
-  return `${word.charAt(0).toUpperCase()}${word.slice(1)} cards are due. Pick what you want to be tested on.`;
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)} cards are ready to be tested today. Pick a stack.`;
 }
 
-/** One stack on the shelf: its spine, its counts, and what it owes today. */
+/**
+ * One stack on the shelf: its spine, how many cards it holds, and whether the
+ * schedule is asking for any today.
+ *
+ * A stack with nothing due is never dimmed and never labelled with a verb. It used
+ * to be greyed at 0.62 with "clear" on the right, which read as a disabled row with
+ * a button on it — and it is neither: every stack opens, whether or not it owes
+ * anything, because testing yourself early is always allowed.
+ */
 function StackRow({ stack, hue, onPress }: { stack: Stack; hue: string; onPress: () => void }) {
-  const resting = stack.dueLeft === 0;
+  const askingToday = stack.dueLeft > 0;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${stack.name} — ${stack.dueLeft ? `${stack.dueLeft} due` : 'nothing due'}`}
-      style={({ pressed }) => [styles.row, resting && styles.rowResting, pressed && styles.rowPressed]}
+      accessibilityLabel={
+        askingToday
+          ? `${stack.name} — ${stack.dueLeft} of ${stack.total} cards ready to test today`
+          : `${stack.name} — ${stack.total} cards, none scheduled today`
+      }
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
       <View style={[styles.spine, { backgroundColor: withAlpha(hue, 0.28), borderColor: hue }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowName} numberOfLines={1}>{stack.name}</Text>
         <Text style={styles.rowByline} numberOfLines={1}>
           {stack.total} {stack.total === 1 ? 'card' : 'cards'}
-          {resting ? ' · all resting' : ''}
+          {askingToday ? '' : ' · none scheduled today'}
         </Text>
       </View>
-      {resting ? (
-        <Text style={styles.clear}>clear</Text>
-      ) : (
+      {askingToday ? (
         <View style={styles.dueWrap}>
           <Text style={styles.dueBadge}>{stack.dueLeft}</Text>
-          <Text style={styles.dueWord}>due</Text>
+          <Text style={styles.dueWord}>to test</Text>
         </View>
+      ) : (
+        <Text style={styles.browse}>test early</Text>
       )}
     </Pressable>
   );
@@ -109,7 +121,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: surface.muted,
   },
-  rowResting: { opacity: 0.62 },
   rowPressed: { backgroundColor: surface.sageFill },
   spine: { width: 38, height: 52, borderRadius: 7, borderWidth: 1 },
   rowText: { flex: 1, minWidth: 0, gap: 3 },
@@ -129,7 +140,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dueWord: { fontFamily: font.regular, fontSize: 9.5, color: text.secondary },
-  clear: { fontFamily: font.regular, fontSize: 11, color: text.secondary },
+  browse: { fontFamily: font.semibold, fontSize: 11, color: text.secondary },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4 },
   orLine: { flex: 1, height: 1, backgroundColor: surface.hairline },
   orWord: { fontFamily: font.regular, fontSize: 11, color: text.secondary },
