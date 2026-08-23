@@ -120,10 +120,9 @@ function BillAdd({ bucket }: { bucket: 'needs' | 'wants' }) {
       <FoldToggle
         expanded={open}
         label={open ? 'Done adding bills' : 'Add a monthly bill'}
-        color={TONE}
+        color={text.secondary}
         onPress={() => setOpen((o) => !o)}
         accessibilityLabel={open ? 'Hide the monthly bill form' : 'Add a monthly bill'}
-        style={styles.foldDivider}
       />
       {open ? <AddLine bucket={bucket} /> : null}
     </>
@@ -439,8 +438,6 @@ const styles = StyleSheet.create({
     borderTopColor: surface.hairline,
   },
 
-  // Reads as a continuation of the ledger above it, so it carries the same hairline.
-  foldDivider: { borderTopWidth: 1, borderTopColor: surface.hairline },
 
   addRow: { flexDirection: 'row', gap: 6, marginTop: 12, alignItems: 'center' },
   input: {
