@@ -2,45 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { StackRow, spineFor } from '@/components/Recall/StackRow';
 import { Card } from '@/components/ui/Card';
 import { Text, TextInput } from '@/components/ui/Text';
 import { ALL_PILE, pickShelf, type ShelfStack } from '@/lib/deck';
-import { initialsOf, spellCount } from '@/lib/text';
-import {
-  STAT_META,
-  accent2,
-  clay,
-  deepen,
-  font,
-  neutral,
-  onAccent,
-  radius,
-  surface,
-  text,
-  withAlpha,
-} from '@/theme';
-
-/** Spine colours, rotated per stack — the muted family the design's shelf uses. */
-const SPINES = [accent2, STAT_META.INT.color, STAT_META.CFT.color, STAT_META.CRE.color];
-
-/**
- * The stack's spine, as the design sheet draws it (12a): a squared binding edge on
- * the left, rounded fore-edge on the right, and the material's initials stamped low
- * on it the way a real spine is labelled.
- *
- * It shipped as the tint and nothing else — no binding, no label, corners even all
- * round — and a bare colour block beside a title reads as a cover image that failed
- * to load. The label is what makes it a book instead of a placeholder.
- */
-function StackSpine({ name, hue }: { name: string; hue: string }) {
-  return (
-    <View style={[styles.spine, { backgroundColor: withAlpha(hue, 0.2), borderColor: hue }]}>
-      <Text style={[styles.spineLabel, { color: deepen(hue) }]} numberOfLines={1}>
-        {initialsOf(name)}
-      </Text>
-    </View>
-  );
-}
+import { spellCount } from '@/lib/text';
+import { TAP_MIN, font, neutral, radius, surface, text } from '@/theme';
 
 function describeDue(dueLeft: number, materials: number): string {
   if (dueLeft === 0) return 'Nothing is scheduled today — open any material and test yourself anyway.';
@@ -49,45 +16,6 @@ function describeDue(dueLeft: number, materials: number): string {
   const cards = dueLeft === 1 ? 'card is' : 'cards are';
   if (materials <= 1) return `${opener} ${cards} ready to be tested today. Anything else, search for it.`;
   return `${opener} ${cards} ready to be tested today, across ${spellCount(materials)} materials. Anything else, search for it.`;
-}
-
-/**
- * One stack on the shelf: its spine, the line the deck writes about it, and whether
- * the schedule is asking for any of it today.
- *
- * A stack with nothing due is never dimmed and never labelled with a verb. It used
- * to be greyed at 0.62 with "clear" on the right, which read as a disabled row with
- * a button on it — and it is neither: every stack opens, whether or not it owes
- * anything, because testing yourself early is always allowed.
- */
-function StackRow({ stack, hue, onPress }: { stack: ShelfStack; hue: string; onPress: () => void }) {
-  const askingToday = stack.dueLeft > 0;
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={
-        askingToday
-          ? `${stack.name} — ${stack.dueLeft} of ${stack.total} cards ready to test today`
-          : `${stack.name} — ${stack.total} cards, none scheduled today`
-      }
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-    >
-      <StackSpine name={stack.name} hue={hue} />
-      <View style={styles.rowText}>
-        <Text style={styles.rowName} numberOfLines={1}>{stack.name}</Text>
-        <Text style={styles.rowByline} numberOfLines={1}>{stack.byline}</Text>
-      </View>
-      {askingToday ? (
-        <View style={styles.dueWrap}>
-          <Text style={styles.dueBadge}>{stack.dueLeft}</Text>
-          <Text style={styles.dueWord}>to test</Text>
-        </View>
-      ) : (
-        <Text style={styles.browse}>test early</Text>
-      )}
-    </Pressable>
-  );
 }
 
 /**
@@ -111,18 +39,71 @@ function SearchField({ query, onQuery }: { query: string; onQuery: (q: string) =
   );
 }
 
-/** What's behind the search: the materials the schedule isn't asking for today. */
-function OtherMaterials({ count, onShowAll }: { count: number; onShowAll: () => void }) {
-  if (count === 0) return null;
+/** The line under the shelf: what it isn't showing, and the way to change that. */
+function FoldRow({
+  note,
+  action,
+  spoken,
+  onPress,
+}: {
+  note: string;
+  action: string;
+  spoken: string;
+  onPress: () => void;
+}) {
   return (
     <View style={styles.otherRow}>
-      <Text style={styles.otherText}>
-        {count} other {count === 1 ? 'material' : 'materials'} — nothing to test today
-      </Text>
-      <Pressable onPress={onShowAll} accessibilityRole="button" accessibilityLabel="Show every material">
-        <Text style={styles.showAll}>Search all</Text>
+      <Text style={styles.otherText}>{note}</Text>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={spoken}
+        style={styles.foldTap}
+      >
+        <Text style={styles.showAll}>{action}</Text>
       </Pressable>
     </View>
+  );
+}
+
+/**
+ * The way into the rest of the library, and back out of it again.
+ *
+ * The same line does both, because a shelf that opens with no way to close it leaves
+ * the reader scrolling past forty materials to reach the mix at the foot — the fold
+ * has to swing shut the way it swung open. A search needs neither: clearing the field
+ * is already the way back, and a second control beside it would just compete.
+ */
+function ShelfFold({
+  hidden,
+  showAll,
+  searching,
+  onToggle,
+}: {
+  hidden: number;
+  showAll: boolean;
+  searching: boolean;
+  onToggle: () => void;
+}) {
+  if (searching) return null;
+  if (showAll) {
+    return (
+      <FoldRow
+        note="Showing every material you have"
+        action="Just what's due"
+        spoken="Show only the materials due today"
+        onPress={onToggle}
+      />
+    );
+  }
+  if (hidden === 0) return null;
+  return (
+    <FoldRow
+      note={`${hidden} other ${hidden === 1 ? 'material' : 'materials'} — nothing to test today`}
+      action="Search all"
+      spoken="Show every material"
+      onPress={onToggle}
+    />
   );
 }
 
@@ -141,7 +122,7 @@ function ShelfRows({ stacks, query, onPick }: { stacks: ShelfStack[]; query: str
   return (
     <>
       {stacks.map((s, n) => (
-        <StackRow key={s.name} stack={s} hue={SPINES[n % SPINES.length]} onPress={() => onPick(s.name)} />
+        <StackRow key={s.name} stack={s} hue={spineFor(n)} onPress={() => onPick(s.name)} />
       ))}
     </>
   );
@@ -169,8 +150,8 @@ export function StackPicker({
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
 
+  const searching = query.trim().length > 0;
   const shown = pickShelf(stacks, query, showAll);
-  const hidden = query.trim() ? 0 : stacks.length - shown.length;
 
   return (
     <Card style={styles.wrap}>
@@ -183,7 +164,12 @@ export function StackPicker({
 
       <View style={styles.shelf}>
         <ShelfRows stacks={shown} query={query} onPick={onPick} />
-        <OtherMaterials count={hidden} onShowAll={() => setShowAll(true)} />
+        <ShelfFold
+          hidden={stacks.length - shown.length}
+          showAll={showAll}
+          searching={searching}
+          onToggle={() => setShowAll((open) => !open)}
+        />
       </View>
 
       <View style={styles.orRow}>
@@ -224,51 +210,6 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, minWidth: 0, fontFamily: font.regular, fontSize: 13, paddingVertical: 0 },
   shelf: { gap: 9 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    minHeight: 76,
-    padding: 14,
-    borderRadius: radius.md,
-    backgroundColor: surface.muted,
-  },
-  rowPressed: { backgroundColor: surface.sageFill },
-  spine: {
-    width: 40,
-    height: 54,
-    // Squared at the binding, rounded at the fore-edge — which way the book faces.
-    borderTopLeftRadius: 5,
-    borderBottomLeftRadius: 5,
-    borderTopRightRadius: 9,
-    borderBottomRightRadius: 9,
-    borderWidth: 1,
-    borderLeftWidth: 5,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 3,
-    paddingBottom: 5,
-    overflow: 'hidden',
-  },
-  spineLabel: { fontFamily: font.display, fontSize: 10, lineHeight: 11.5, letterSpacing: 0.4, textAlign: 'center' },
-  rowText: { flex: 1, minWidth: 0, gap: 3 },
-  rowName: { fontFamily: font.semibold, fontSize: 14.5, color: neutral[900] },
-  rowByline: { fontFamily: font.regular, fontSize: 11.5, color: text.secondary },
-  dueWrap: { alignItems: 'center', gap: 2 },
-  dueBadge: {
-    minWidth: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    backgroundColor: clay[700],
-    color: onAccent,
-    fontFamily: font.semibold,
-    fontSize: 12,
-    textAlign: 'center',
-    overflow: 'hidden',
-  },
-  dueWord: { fontFamily: font.regular, fontSize: 9.5, color: text.secondary },
-  browse: { fontFamily: font.semibold, fontSize: 11, color: text.secondary },
   otherRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,6 +218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   otherText: { flex: 1, minWidth: 0, fontFamily: font.regular, fontSize: 11.5, lineHeight: 17, color: text.secondary },
+  foldTap: { minHeight: TAP_MIN, justifyContent: 'center', paddingLeft: 8 },
   showAll: {
     fontFamily: font.semibold,
     fontSize: 11.5,
