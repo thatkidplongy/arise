@@ -12,7 +12,22 @@ cd "$(dirname "$0")/.."
 OUT="${ARISE_WEB_OUT:-dist}"
 
 echo "▸ Exporting web build…"
-npx expo export --platform web --output-dir "$OUT"
+# ARISE_WEB_CLEAR=1 discards Metro's cache first. Worth it when the project root has
+# moved — building from a fresh git worktree, say — because a cache still keyed to a
+# path that no longer exists makes route discovery come back empty, and `expo export`
+# reports that as success: bundles and assets, no HTML at all.
+CLEAR=""
+[ "${ARISE_WEB_CLEAR:-0}" = "1" ] && CLEAR="--clear"
+npx expo export --platform web --output-dir "$OUT" ${CLEAR}
+
+# A build with no entry document is not a build. Without this the swap in deploy.sh
+# would put a directory of bundles where the app used to be, and the phone would get
+# a 404 from a step that printed a tick.
+if [ ! -f "$OUT/index.html" ]; then
+  echo "✖ export produced no index.html — refusing to call this a build." >&2
+  echo "  Retry with ARISE_WEB_CLEAR=1 (a stale Metro cache does exactly this)." >&2
+  exit 1
+fi
 
 echo "▸ Generating home-screen icon…"
 # 180x180 is the size iOS uses for apple-touch-icon.
