@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { snippet, spellCount } from '@/lib/text';
+import { initialOf, initialsOf, snippet, spellCount } from '@/lib/text';
 
 describe('snippet', () => {
   it('takes the first non-empty line', () => {
@@ -44,6 +44,70 @@ describe('snippet', () => {
   it('returns empty for nothing to preview', () => {
     expect(snippet('')).toBe('');
     expect(snippet('   \n  \n')).toBe('');
+  });
+});
+
+describe('initialOf', () => {
+  it('takes the first letter, uppercased', () => {
+    expect(initialOf('Deep Work')).toBe('D');
+    expect(initialOf('patterns & problem-solving')).toBe('P');
+  });
+
+  it('skips what a title merely opens with', () => {
+    expect(initialOf('  Japanese — hiragana')).toBe('J');
+    expect(initialOf('“Rework”')).toBe('R');
+    expect(initialOf('- a captured note')).toBe('A');
+  });
+
+  it('keeps a character that has no uppercase of its own', () => {
+    expect(initialOf('日本語')).toBe('日');
+    expect(initialOf('ひらがな')).toBe('ひ');
+  });
+
+  it('takes an astral character whole', () => {
+    expect(initialOf('📕 shelf')).toBe('📕');
+  });
+
+  it('returns empty when there is no name', () => {
+    expect(initialOf('')).toBe('');
+    expect(initialOf('   ')).toBe('');
+  });
+});
+
+describe('initialsOf', () => {
+  it('takes one letter per word it is known by', () => {
+    expect(initialsOf('Deep Work')).toBe('DW');
+    expect(initialsOf('Thinking, fast and slow')).toBe('TFS');
+  });
+
+  it('skips the words the title only leans on', () => {
+    expect(initialsOf('The Psychology of Money')).toBe('PM');
+    expect(initialsOf('From your reflections')).toBe('FR');
+  });
+
+  it('reads a separator as a word break', () => {
+    expect(initialsOf('Tips · YouTube')).toBe('TY');
+    expect(initialsOf('Patterns & problem-solving')).toBe('PP');
+    expect(initialsOf('Japanese — hiragana')).toBe('JH');
+  });
+
+  it('stops at three, so a long title stays initials', () => {
+    expect(initialsOf('How to Read a Book, Mortimer J. Adler')).toBe('HRB');
+  });
+
+  it('leaves a one-word title as what it already is', () => {
+    expect(initialsOf('DDIA')).toBe('DDIA');
+    expect(initialsOf('Meditations')).toBe('M');
+    expect(initialsOf('日本語')).toBe('日本語');
+  });
+
+  it('keeps a minor word when that is the whole title', () => {
+    expect(initialsOf('The')).toBe('T');
+  });
+
+  it('returns empty when there is no name', () => {
+    expect(initialsOf('')).toBe('');
+    expect(initialsOf(' · ')).toBe('');
   });
 });
 

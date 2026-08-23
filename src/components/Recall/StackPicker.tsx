@@ -3,11 +3,43 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { ALL_PILE, type Stack } from '@/lib/deck';
-import { spellCount } from '@/lib/text';
-import { STAT_META, accent2, clay, font, neutral, onAccent, radius, surface, text, withAlpha } from '@/theme';
+import { initialsOf, spellCount } from '@/lib/text';
+import {
+  STAT_META,
+  accent2,
+  clay,
+  deepen,
+  font,
+  neutral,
+  onAccent,
+  radius,
+  surface,
+  text,
+  withAlpha,
+} from '@/theme';
 
 /** Spine colours, rotated per stack — the muted family the design's shelf uses. */
 const SPINES = [accent2, STAT_META.INT.color, STAT_META.CFT.color, STAT_META.CRE.color];
+
+/**
+ * The stack's spine, as the design sheet draws it (12a): a squared binding edge on
+ * the left, rounded fore-edge on the right, and the material's initials stamped low
+ * on it the way a real spine is labelled.
+ *
+ * It shipped as the tint and nothing else — no binding, no label, corners even all
+ * round — and a bare colour block beside a title reads as a cover image that failed
+ * to load. The label is what makes it a book instead of a placeholder.
+ */
+function StackSpine({ name, hue }: { name: string; hue: string }) {
+  return (
+    <View style={[styles.spine, { backgroundColor: withAlpha(hue, 0.2), borderColor: hue }]}>
+      <View style={[styles.binding, { backgroundColor: hue }]} />
+      <Text style={[styles.spineLabel, { color: deepen(hue) }]} numberOfLines={1}>
+        {initialsOf(name)}
+      </Text>
+    </View>
+  );
+}
 
 function describeDue(due: number): string {
   if (due === 0) return 'Nothing scheduled today — tap any stack to test yourself anyway.';
@@ -38,7 +70,7 @@ function StackRow({ stack, hue, onPress }: { stack: Stack; hue: string; onPress:
       }
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
-      <View style={[styles.spine, { backgroundColor: withAlpha(hue, 0.28), borderColor: hue }]} />
+      <StackSpine name={stack.name} hue={hue} />
       <View style={styles.rowText}>
         <Text style={styles.rowName} numberOfLines={1}>{stack.name}</Text>
         <Text style={styles.rowByline} numberOfLines={1}>
@@ -122,7 +154,27 @@ const styles = StyleSheet.create({
     backgroundColor: surface.muted,
   },
   rowPressed: { backgroundColor: surface.sageFill },
-  spine: { width: 38, height: 52, borderRadius: 7, borderWidth: 1 },
+  spine: {
+    width: 40,
+    height: 54,
+    // Squared at the binding, rounded at the fore-edge — which way the book faces.
+    borderTopLeftRadius: 5,
+    borderBottomLeftRadius: 5,
+    borderTopRightRadius: 9,
+    borderBottomRightRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    // Left padding clears the binding, so the label centres on the page block.
+    paddingLeft: 8,
+    paddingRight: 3,
+    paddingBottom: 5,
+    overflow: 'hidden',
+  },
+  // The binding is its own strip rather than a wider left border: iOS won't render a
+  // border that differs per side once the corners are rounded.
+  binding: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  spineLabel: { fontFamily: font.display, fontSize: 10, lineHeight: 11.5, letterSpacing: 0.4, textAlign: 'center' },
   rowText: { flex: 1, minWidth: 0, gap: 3 },
   rowName: { fontFamily: font.semibold, fontSize: 14.5, color: neutral[900] },
   rowByline: { fontFamily: font.regular, fontSize: 11.5, color: text.secondary },

@@ -284,6 +284,16 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** The hue taken down toward ink, for a label that has to read on a tint of that
+ * same hue. The three ramps carry their own 900 step for this; the stat colours have
+ * no ramp, so the design sheet mixed theirs by hand — #5E8085 -> #31494d — and this
+ * is that mix, at the factor those hand-picked values sit at. */
+export function deepen(hex: string, factor = 0.55): string {
+  const h = hex.replace('#', '');
+  const down = [0, 2, 4].map((at) => Math.round(parseInt(h.slice(at, at + 2), 16) * factor));
+  return `#${down.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /**
  * Motion, from the handoff sheet. Nothing bounces, nothing pulses to demand
  * attention, and nothing animates on a schedule you didn't start.
