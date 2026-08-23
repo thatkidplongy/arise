@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BucketLedger } from '@/components/BucketLedger';
+import { FoldToggle } from '@/components/FoldToggle';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
 import { Text, TextInput } from '@/components/ui/Text';
@@ -24,7 +25,7 @@ import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, feedback, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, radius, surface, text, typography, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color; // the wealth attribute's tone, for this whole area
 const EDITABLE: ('needs' | 'wants')[] = ['needs', 'wants'];
@@ -106,6 +107,89 @@ function BucketRow({ reading, daily }: { reading: BucketReading; daily?: DailyLi
         {peso(reading.actual)} {spentLabel}
       </Text>
       {daily ? <DailyRow line={daily} /> : null}
+    </View>
+  );
+}
+
+/** The standing-bill form, folded away. Day-to-day spending goes through the
+ * ledger's own add row, so the rarer setup task doesn't sit open under every bucket. */
+function BillAdd({ bucket }: { bucket: 'needs' | 'wants' }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <FoldToggle
+        expanded={open}
+        label={open ? 'Done adding bills' : 'Add a monthly bill'}
+        color={TONE}
+        onPress={() => setOpen((o) => !o)}
+        accessibilityLabel={open ? 'Hide the monthly bill form' : 'Add a monthly bill'}
+        style={styles.foldDivider}
+      />
+      {open ? <AddLine bucket={bucket} /> : null}
+    </>
+  );
+}
+
+/** Add a line to one bucket: label, monthly amount, and an optional due day. */
+function AddLine({ bucket }: { bucket: 'needs' | 'wants' }) {
+  const addCommitment = useSystem((s) => s.addCommitment);
+  const [label, setLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDay, setDueDay] = useState('');
+
+  const submit = async () => {
+    const value = num(amount);
+    if (!label.trim() || value <= 0) return;
+    const day = Math.round(num(dueDay));
+    setLabel('');
+    setAmount('');
+    setDueDay('');
+    await addCommitment({
+      label: label.trim(),
+      amount: value,
+      bucket,
+      due_day: day >= 1 && day <= 31 ? day : 0,
+    });
+  };
+
+  return (
+    <View style={styles.addRow}>
+      <TextInput
+        value={label}
+        onChangeText={setLabel}
+        placeholder={bucket === 'needs' ? 'Rent, internet…' : 'Eating out, gym…'}
+        placeholderTextColor={text.faint}
+        style={[styles.input, styles.inputLabel]}
+        returnKeyType="done"
+        onSubmitEditing={submit}
+      />
+      <TextInput
+        value={amount}
+        onChangeText={setAmount}
+        placeholder="₱"
+        placeholderTextColor={text.faint}
+        keyboardType="numeric"
+        style={[styles.input, styles.inputAmount]}
+        returnKeyType="done"
+        onSubmitEditing={submit}
+      />
+      <TextInput
+        value={dueDay}
+        onChangeText={setDueDay}
+        placeholder="day"
+        placeholderTextColor={text.faint}
+        keyboardType="numeric"
+        style={[styles.input, styles.inputDay]}
+        returnKeyType="done"
+        onSubmitEditing={submit}
+      />
+      <Pressable
+        onPress={submit}
+        style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+        accessibilityLabel={`Add a ${bucket} line`}
+      >
+        <Ionicons name="add" size={18} color={TONE} />
+      </Pressable>
     </View>
   );
 }
@@ -264,6 +348,7 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
             commitments={commitments.filter((c) => c.bucket === bucket)}
             target={reading[bucket].target}
           />
+          <BillAdd bucket={bucket} />
         </SystemPanel>
       ))}
 
@@ -354,7 +439,10 @@ const styles = StyleSheet.create({
     borderTopColor: surface.hairline,
   },
 
-  // Still here for the take-home pay field, the one input left on this panel.
+  // Reads as a continuation of the ledger above it, so it carries the same hairline.
+  foldDivider: { borderTopWidth: 1, borderTopColor: surface.hairline },
+
+  addRow: { flexDirection: 'row', gap: 6, marginTop: 12, alignItems: 'center' },
   input: {
     borderWidth: 1,
     borderColor: surface.hairline,
@@ -365,6 +453,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     backgroundColor: surface.card,
     minHeight: TAP,
+  },
+  inputLabel: { flex: 1, minWidth: 0 },
+  inputAmount: { width: 76 },
+  inputDay: { width: 52 },
+  addBtn: {
+    width: TAP,
+    height: TAP,
+    borderRadius: radius.pill,
+    minHeight: TAP_MIN,
+    borderWidth: 1,
+    borderColor: TONE,
+    backgroundColor: withAlpha(TONE, 0.1),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   untagged: { color: text.secondary, fontSize: 11.5, lineHeight: 17, marginTop: 8 },
