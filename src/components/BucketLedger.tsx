@@ -11,7 +11,7 @@ import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiCommitment, ApiMoneyEntry } from '@/lib/api';
 import { useDayBands } from '@/hooks/useDayBands';
 import { readBucketLedger, type LedgerDay } from '@/lib/bucketLedger';
-import { dateKey, formatClock, formatDayChip, formatDayInline, recentDays, toUtcIso } from '@/lib/dates';
+import { dateKey, formatClock, formatDayChip, formatDayInline, monthToDate, toUtcIso } from '@/lib/dates';
 import { peso } from '@/lib/money';
 import { readMoneyDraft } from '@/lib/moneyEntry';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
@@ -85,9 +85,10 @@ function describeBand(band: LedgerDay): string {
   return band.items.length === 1 ? '1 entry' : `${band.items.length} entries`;
 }
 
-/** How many days back the strip offers. A week covers everything you'd remember
- * having forgotten; past that the day stops being "Tuesday" and becomes a date. */
-const DAY_CHOICES = 7;
+/** How many days the strip shows before folding the rest of the cycle away. A week
+ * covers everything you'd remember having forgotten; the days before it are reachable
+ * but not worth five rows of pills above the fields. */
+const DAYS_SHOWN = 7;
 
 /**
  * The one way into this bucket: pick the day, say what it was, log it.
@@ -113,8 +114,13 @@ function LogSpend({
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(today);
+  const [showEarlier, setShowEarlier] = useState(false);
   const [note, setNote] = useState('');
   const [amount, setAmount] = useState('');
+
+  const cycle = monthToDate(today);
+  const days = showEarlier ? cycle : cycle.slice(0, DAYS_SHOWN);
+  const earlier = cycle.length - days.length;
 
   const when = formatDayInline(day, today);
   // Today sends no day at all — the server stamps the request's own day, which is what
@@ -124,6 +130,7 @@ function LogSpend({
   const close = () => {
     setOpen(false);
     setDay(today);
+    setShowEarlier(false);
     setNote('');
     setAmount('');
   };
@@ -143,7 +150,7 @@ function LogSpend({
   return (
     <View style={styles.addForm}>
       <ChoiceRow>
-        {recentDays(today, DAY_CHOICES).map((d) => (
+        {days.map((d) => (
           <ChoiceChip
             key={d}
             label={formatDayChip(d, today)}
@@ -152,6 +159,14 @@ function LogSpend({
             accessibilityLabel={`File onto ${formatDayInline(d, today)}`}
           />
         ))}
+        {earlier > 0 ? (
+          <ChoiceChip
+            label={`${earlier} earlier`}
+            on={false}
+            onPress={() => setShowEarlier(true)}
+            accessibilityLabel={`Show the other ${earlier} days of this cycle`}
+          />
+        ) : null}
       </ChoiceRow>
       <View style={styles.addRow}>
         <TextInput

@@ -6,6 +6,7 @@ import {
   formatDayBand,
   formatDayChip,
   formatDayInline,
+  monthToDate,
   recentDays,
   toUtcIso,
   weekdayDay,
@@ -119,5 +120,23 @@ describe('formatDayChip', () => {
 
   it('names the month once the strip reaches back into the last one', () => {
     expect(formatDayChip('2026-07-30', '2026-08-02')).toBe('Thu 30 Jul');
+  });
+});
+
+describe('monthToDate', () => {
+  it('reaches back to the 1st and no further', () => {
+    expect(monthToDate('2026-08-03')).toEqual(['2026-08-03', '2026-08-02', '2026-08-01']);
+    expect(monthToDate('2026-08-01')).toEqual(['2026-08-01']);
+  });
+
+  it('covers a long month without leaving it', () => {
+    const days = monthToDate('2026-08-31');
+    expect(days).toHaveLength(31);
+    expect(days[0]).toBe('2026-08-31');
+    expect(days[30]).toBe('2026-08-01');
+  });
+
+  it('is empty for a day it cannot read', () => {
+    expect(monthToDate('nonsense')).toEqual([]);
   });
 });

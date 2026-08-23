@@ -117,6 +117,21 @@ export function formatClock(t: Date): string {
  * boundary can't land on a day that doesn't exist (the classic `setDate(0)` bug),
  * and DST can't make a step land twice on the same date.
  */
+/**
+ * Every day of the cycle so far, newest first — the 1st of `today`'s month up to
+ * today itself.
+ *
+ * Stops at the 1st rather than counting a fixed number back, because that's exactly
+ * how far a back-dated entry can usefully reach: the bucket ledgers read one month
+ * at a time, so a spend filed into last month would be counted there and never
+ * appear on the card that filed it.
+ */
+export function monthToDate(today: string): string[] {
+  const dayOfMonth = Number(today.slice(8, 10));
+  if (!dayOfMonth) return [];
+  return recentDays(today, dayOfMonth);
+}
+
 export function recentDays(today: string, count: number): string[] {
   const [y, m, d] = today.split('-').map(Number);
   if (!y || !m || !d || count < 1) return [];
