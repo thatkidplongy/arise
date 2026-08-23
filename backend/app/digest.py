@@ -365,22 +365,58 @@ def recall_set(db: Session, player: Player, day: str) -> list[dict]:
         .limit(PER_DIGEST * 3)  # a pool to interleave from, not the final cut
         .all()
     )
-    picked = [_recall_out(r, day) for r in rows]
+    born = _learnings_for(db, rows)
+    picked = [_recall_out(r, day, born) for r in rows]
     return _interleave(picked)[:PER_DIGEST]
 
 
-def _recall_out(r: Highlight, day: str) -> dict:
+def _learnings_for(db: Session, rows: list[Highlight]) -> dict[str, Learning]:
+    """The learnings a batch of highlights was distilled from, by id — one query,
+    so shaping a whole library doesn't become a query per card."""
+    ids = [r.learning_id for r in rows if r.learning_id]
+    if not ids:
+        return {}
+    found = db.query(Learning).filter(Learning.id.in_(ids)).all()
+    return {l.id: l for l in found}
+
+
+def _origin_of(learning: Learning | None) -> str:
+    """Where a card was met, as a line for the back of it. Empty when the highlight
+    was derived (a reading daily with no note) — there's no story to tell."""
+    if learning is None:
+        return ""
+    if learning.source and learning.text:
+        return f"You logged “{learning.source}” and wrote this in your own words."
+    if learning.source:
+        return f"Distilled from “{learning.source}”, as you logged it."
+    return "Distilled from what you logged that day."
+
+
+def _recall_out(r: Highlight, day: str, born: dict[str, Learning]) -> dict:
+    learning = born.get(r.learning_id or "")
+    box = r.box or 0
     return {
         "id": r.id,
         "text": r.text,
         "cue": r.cue or "",
         "hook": r.hook or "",
-        "box": r.box or 0,
+        "box": box,
         "day": r.day,
         "source_label": r.source_label,
         # The label with any chapter marker stripped, so every sitting of one book
-        # files under one name when the app sorts the deck into per-book piles.
+        # files under one name when the app sorts the deck into per-book piles —
+        # and the marker on its own, for the card's corner tag.
         "material": reading.book_name(r.source_label) if r.source_label else "",
+        "chapter": reading.chapter_marker(r.source_label),
+        "seen": r.seen or 0,
+        # Whether the answer is in the reader's own words — a note was written, not
+        # just a source named — and the story of where the card was born.
+        "own_words": bool(learning is not None and learning.text),
+        "origin": _origin_of(learning),
+        # What each grade would do, so the buttons can say it before being pressed.
+        "if_missed": interval_for(0),
+        "if_shaky": interval_for(box),
+        "if_got": interval_for(box + 1),
         "days_ago": (date.fromisoformat(day) - date.fromisoformat(r.day)).days,
     }
 
@@ -403,9 +439,25 @@ def recall_library(db: Session, player: Player, day: str) -> list[dict]:
         .order_by(Highlight.day, Highlight.created_at)  # a stable deck to shuffle from
         .all()
     )
-    out = [_recall_out(r, day) for r in rows]
+    born = _learnings_for(db, rows)
+    out = [_recall_out(r, day, born) for r in rows]
     random.Random(day).shuffle(out)
     return out
+
+
+def edit(db: Session, player: Player, highlight_id: str, text_value: str) -> dict | None:
+    """Rewrite the back of a card. The whole point of the cards is that they're in
+    your own words — so the words stay editable after the distiller's first pass.
+    The schedule is untouched: better words aren't a recall event."""
+    cleaned = text_value.strip()
+    if not cleaned:
+        raise ValueError("a card can't have a blank back")
+    row = db.get(Highlight, highlight_id)
+    if row is None or row.player_id != player.id:
+        return None
+    row.text = cleaned
+    db.commit()
+    return {"id": row.id}
 
 
 GRADES = ("got", "shaky", "missed")
@@ -431,6 +483,7 @@ def grade(db: Session, player: Player, highlight_id: str, value: str, day: str) 
     # 'shaky' leaves the box where it is: seen again at the same spacing, not further.
 
     row.due = _due_after(day, row.box)
+    row.seen = (row.seen or 0) + 1
     db.commit()
     return {"id": row.id, "box": row.box, "due": row.due}
 
@@ -447,6 +500,7 @@ def advance_shown(db: Session, player: Player, day: str, items: list[dict]) -> N
             continue
         row.box = (row.box or 0) + 1
         row.due = _due_after(day, row.box)
+        row.seen = (row.seen or 0) + 1
     db.commit()
 
 

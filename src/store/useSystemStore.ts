@@ -153,6 +153,7 @@ export interface SystemStore {
   addLearning: (entry: { kind: LearningKind; source: string; text: string }) => Promise<void>;
   removeLearning: (id: string) => Promise<void>;
   gradeRecall: (id: string, grade: RecallGrade) => Promise<void>;
+  editRecall: (id: string, text: string) => Promise<void>;
   generate: () => Promise<void>;
   toggleRest: () => Promise<void>;
   saveBook: (currentBook: string, chapters?: number) => Promise<void>;
@@ -342,6 +343,7 @@ export const useSystemStore = create<SystemStore>()(
       addLearning: (entry) => mutate((b, t, d) => api.addLearning(b, t, entry, d)),
       removeLearning: (id) => mutate((b, t, d) => api.removeLearning(b, t, id, d)),
       gradeRecall: (id, grade) => mutate((b, t, d) => api.gradeRecall(b, t, id, grade, d)),
+      editRecall: (id, text) => mutate((b, t, d) => api.editRecall(b, t, id, text, d)),
 
       generate: async () => {
         const { serverUrl, apiToken } = get();

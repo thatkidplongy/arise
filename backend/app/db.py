@@ -87,6 +87,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # rather than all coming due at once.
     ("highlights", "box", "INTEGER DEFAULT 0"),
     ("highlights", "due", "VARCHAR DEFAULT ''"),
+    # How many times a card has been met (digest send or grade). Existing rows start
+    # at 0 — their history was never counted, and pretending otherwise would lie.
+    ("highlights", "seen", "INTEGER DEFAULT 0"),
     ("players", "craft_started_week", "VARCHAR DEFAULT ''"),
     ("players", "craft_phase", "INTEGER DEFAULT 1"),
     ("players", "craft_phase_day", "VARCHAR DEFAULT ''"),

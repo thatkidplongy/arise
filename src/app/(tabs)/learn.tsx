@@ -8,24 +8,18 @@ import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { ReadingCard } from '@/components/ReadingCard';
 import { ReadingReview } from '@/components/ReadingReview';
+import { RecallBlock } from '@/components/Recall/RecallBlock';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
-import { Card, ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
-import { FoldToggle } from '@/components/FoldToggle';
 import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
-import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/api';
-import { buildBringBack, type BringBack } from '@/lib/bringBack';
-import { dateKey } from '@/lib/dates';
-import { ALL_PILE, currentEntry, deckFor, listMaterials, pileProgress } from '@/lib/deck';
+import type { ApiLearning, LearningKind } from '@/lib/api';
 import { describeThreadBook } from '@/lib/reading';
-import { useInsights } from '@/query/useInsights';
-import { useRecallLibrary } from '@/query/useRecallLibrary';
-import { useRecallDeck } from '@/store/useRecallDeck';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
@@ -49,7 +43,7 @@ const PLACEHOLDERS: Record<LearningKind, string> = {
 
 const NOTE_PROMPT = 'Look away from the page — what do you remember? (in your own words, not copied)';
 
-/** The colour Recall borrows — Grow (INT), since this is the reading attribute. */
+/** The colour Learn borrows — Grow (INT), since this is the reading attribute. */
 const HUE = STAT_META.INT.color;
 
 /** One thing you logged today, with a way to take it back. */
@@ -170,260 +164,6 @@ function Capture() {
   );
 }
 
-/** The three answers from the index-card method, in the order you'd sort a pile. */
-const GRADES: { key: RecallGrade; label: string }[] = [
-  { key: 'got', label: 'Knew it' },
-  { key: 'shaky', label: 'Sort of' },
-  { key: 'missed', label: 'No clue' },
-];
-
-/**
- * Grading buttons, shown only once the answer is out. Asking before you've tried
- * would just be asking you to predict yourself; the honest signal is how it felt
- * against the real answer.
- */
-function GradeRow({ id, onGraded }: { id: string; onGraded: (grade: RecallGrade) => void }) {
-  const gradeRecall = useSystem((s) => s.gradeRecall);
-  const [done, setDone] = useState<RecallGrade | null>(null);
-
-  if (done) {
-    return (
-      <Text style={styles.gradeDone}>
-        {done === 'missed' ? 'Back tomorrow.' : done === 'shaky' ? 'Same spacing.' : 'Pushed further out.'}
-      </Text>
-    );
-  }
-
-  return (
-    <View style={styles.gradeRow}>
-      {GRADES.map((g) => (
-        <ChoiceChip
-          key={g.key}
-          label={g.label}
-          color={HUE}
-          selected={false}
-          onPress={() => {
-            setDone(g.key);
-            void gradeRecall(id, g.key);
-            onGraded(g.key);
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-// The library can hand over today's own highlights, so 0 has to read as a word.
-function describeAgo(daysAgo: number): string {
-  if (daysAgo === 0) return 'today';
-  if (daysAgo === 1) return 'yesterday';
-  return `${daysAgo} days ago`;
-}
-
-function describeWhen(item: ApiRecall): string {
-  const ago = describeAgo(item.days_ago);
-  return item.source_label ? `${ago} · ${item.source_label}` : ago;
-}
-
-/**
- * One due highlight: the question, with its answer folded away underneath.
- *
- * The question stays put when the answer opens. Swapping one for the other meant you
- * couldn't check what was actually asked while looking at the answer — and comparing
- * the two is the whole reason to be here.
- */
-function DueItem({ item, onGraded }: { item: ApiRecall; onGraded: (grade: RecallGrade) => void }) {
-  const [open, setOpen] = useState(false);
-  // Highlights distilled before cues existed have no question to ask, so there's
-  // nothing to fold — they just show.
-  const hasQuestion = Boolean(item.cue);
-
-  return (
-    <>
-      <Text style={styles.bringText}>{hasQuestion ? item.cue : item.text}</Text>
-      <Text style={styles.bringMeta}>{describeWhen(item)}</Text>
-      {!hasQuestion ? null : (
-        <>
-          <FoldToggle
-            expanded={open}
-            label={open ? 'hide answer' : 'show answer'}
-            color={HUE}
-            onPress={() => setOpen((o) => !o)}
-            accessibilityLabel={open ? 'Hide the answer' : 'Show the answer'}
-            style={styles.answerFold}
-          />
-          {open ? (
-            <>
-              <Text style={styles.answerText}>{item.text}</Text>
-              {item.hook ? <Text style={styles.recallHook}>{item.hook}</Text> : null}
-              <GradeRow id={item.id} onGraded={onGraded} />
-            </>
-          ) : null}
-        </>
-      )}
-    </>
-  );
-}
-
-/** One line from a tips capture. Nothing to fold and nothing to grade — it was never
- * a question, and it was never on a schedule. */
-function TipItem({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
-  return (
-    <>
-      <Text style={styles.bringText}>{tip.text}</Text>
-      <Text style={styles.bringMeta}>
-        {tip.action ? 'to do' : 'idea'} · {tip.source}
-      </Text>
-    </>
-  );
-}
-
-/** The piles the deck sorts into — every material, plus the whole deck up front. */
-function PileRow({
-  materials,
-  pile,
-  onPick,
-}: {
-  materials: { name: string; left: number }[];
-  pile: string;
-  onPick: (pile: string) => void;
-}) {
-  // A single material would be a row of one redundant choice.
-  if (materials.length < 2) return null;
-  return (
-    <View style={styles.pileRow}>
-      <ChoiceChip label="All" color={HUE} selected={pile === ALL_PILE} onPress={() => onPick(ALL_PILE)} />
-      {materials.map((m) => (
-        <ChoiceChip
-          key={m.name}
-          label={m.left ? `${m.name} · ${m.left}` : m.name}
-          color={HUE}
-          selected={pile === m.name}
-          onPress={() => onPick(m.name)}
-        />
-      ))}
-    </View>
-  );
-}
-
-/** The end of a pile — every card met today, with a way to go through it again. */
-function PileDone({ total, onAgain }: { total: number; onAgain: () => void }) {
-  return (
-    <>
-      <Text style={styles.bringText}>
-        That&apos;s the pile — all {total} met today.
-      </Text>
-      <Pressable onPress={onAgain} hitSlop={8} accessibilityRole="button" accessibilityLabel="Go through this pile again">
-        <Text style={styles.bringAgain}>go again</Text>
-      </Pressable>
-    </>
-  );
-}
-
-/** The face of the card: the pile's end, a tip, or a question to try. */
-function PileCardBody({
-  current,
-  total,
-  onAgain,
-  onGraded,
-}: {
-  current: BringBack | null;
-  total: number;
-  onAgain: () => void;
-  onGraded: (grade: RecallGrade) => void;
-}) {
-  if (!current) return <PileDone total={total} onAgain={onAgain} />;
-  if (current.kind === 'tip') return <TipItem tip={current} />;
-  return <DueItem item={current.item} onGraded={onGraded} />;
-}
-
-/** Long enough to read the reschedule line, short enough to feel like sorting cards. */
-const GRADE_LINGER_MS = 1200;
-
-/**
- * What's come back around, at the top of the screen — an index-card pile, worked
- * through one card at a time.
- *
- * The deck covers everything: the due handful first, then tips, then the whole
- * library of past highlights in the day's shuffled order. The chips sort it into
- * per-book piles, because a mixed walk through every topic at once drills none of
- * them. A card you move past leaves the pile for the day — here and in every other
- * pile — a graded card sorts itself after a beat, and one graded "no clue" comes
- * back a few cards later, like the physical pile. The walk survives leaving the
- * screen and ends when the pile does.
- *
- * The answer is a fold under the question rather than a second tap that replaces it.
- * Two reasons: the pair stays comparable, and the card's own tap keeps one meaning —
- * "next" — instead of meaning "reveal" or "next" depending on hidden state.
- *
- * Note this reveals rather than asking you to write your answer first. Quicker, at
- * the cost of the step that separates recognising something from recalling it, which
- * makes the grade afterwards a feeling rather than evidence.
- *
- * The whole card is gone on a day with nothing owed and nothing captured.
- */
-function BringBackBlock() {
-  const recall = useSystem((s) => s.state?.recall) ?? [];
-  const { insights } = useInsights();
-  const library = useRecallLibrary();
-  const deck = useRecallDeck();
-  const items = buildBringBack(recall, insights, library);
-
-  if (!items.length) return null;
-
-  const state = deckFor(dateKey(), deck);
-  const materials = listMaterials(items, state.met);
-  // A pile picked yesterday, or for a book with nothing in today's deck, falls
-  // back to the whole deck rather than an empty card.
-  const pile = materials.some((m) => m.name === deck.pile) ? deck.pile : ALL_PILE;
-  const current = currentEntry(items, pile, state);
-  const { done, total } = pileProgress(items, pile, state.met);
-
-  const onGraded = (id: string) => (grade: RecallGrade) => {
-    setTimeout(() => {
-      if (grade === 'missed') deck.miss(id);
-      else deck.meet(id);
-    }, GRADE_LINGER_MS);
-  };
-
-  return (
-    <Pressable
-      onPress={current ? () => deck.meet(current.id) : undefined}
-      accessibilityRole="button"
-      accessibilityLabel="Show the next one"
-      style={({ pressed }) => (pressed && current ? styles.bringPressed : null)}
-    >
-      {/* On a card rather than bare on the page, unlike the daily line: this one opens
-          the screen, and the ivory is what makes it read as the thing to do first
-          rather than a caption above the reading card.
-
-          No edge rule either, for the same reason. A coloured rule earns its place
-          when it's the only structure there is; on a card it's a second boundary
-          inside the first, saying what the card already said. */}
-      <Card style={styles.bringCard}>
-        <Text style={styles.bringKicker}>
-          {current?.kind === 'tip' ? 'From your tips' : 'Try to recall'}
-        </Text>
-        <PileRow materials={materials} pile={pile} onPick={deck.setPile} />
-        {/* Keyed so the next question arrives with its answer folded shut, rather
-            than inheriting the last one's open fold. */}
-        <PileCardBody
-          key={current?.id ?? 'done'}
-          current={current}
-          total={total}
-          onAgain={() => deck.restart(items, pile)}
-          onGraded={current ? onGraded(current.id) : () => undefined}
-        />
-        {current ? (
-          <Text style={styles.bringHint}>
-            tap for another · {Math.min(done + 1, total)} of {total}
-          </Text>
-        ) : null}
-      </Card>
-    </Pressable>
-  );
-}
-
 /**
  * The book so far, in one sentence — rewritten every sitting rather than added to.
  * Condensing a growing pile of ideas back into one line is what turns a stack of
@@ -457,9 +197,9 @@ export default function LearnScreen() {
         <ConnectionPanel />
       ) : (
         <>
-          {/* First on the screen: what's due to come back beats what's new to read,
-              and it's gone once the last item is graded off. */}
-          <BringBackBlock />
+          {/* First on the screen: what's due to come back beats what's new to read.
+              Pick a stack, then work it like a pile of index cards. */}
+          <RecallBlock />
 
           {/* The two things being worked through, then everything else you read.
               Both are paced by what you log, never by a schedule. */}
@@ -533,29 +273,6 @@ const styles = StyleSheet.create({
   rowSource: { ...typography.cardTitle, color: neutral[900] },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   empty: { ...typography.body, color: text.secondary },
-  bringPressed: { opacity: 0.85 },
-  // gap 10, not the card's own 13: the spacing the edge block used to set, kept so
-  // dropping the rule changed the rule and nothing else.
-  bringCard: { gap: 10 },
-  // The kicker's own size and tracking, which the edge block was overriding — base
-  // typography.kicker is 10px at 1.6, a visibly different label.
-  bringKicker: { ...typography.kicker, fontSize: 11, letterSpacing: 1.5, color: HUE },
-  bringText: { ...typography.body, fontSize: 17, lineHeight: 26, color: neutral[900] },
-  bringHint: { ...typography.small, color: text.secondary },
-  bringMeta: { ...typography.small, color: text.secondary },
-  // Tighter than the capture pills: these sit inside a card that already spaces
-  // its children, so the row only owes gaps between the chips themselves.
-  pileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  bringAgain: { ...typography.small, color: HUE, fontWeight: '600' },
-  // The answer reads back a step from the question so the pair is scannable.
-  answerText: { ...typography.body, fontSize: 15, lineHeight: 23, color: text.secondary, marginTop: 6 },
-  // Left-aligned, unlike the list folds this component shares — it belongs to the
-  // question above it rather than to a column of rows.
-  answerFold: { justifyContent: 'flex-start', minHeight: 34 },
-
-  recallHook: { ...typography.small, color: text.secondary, fontStyle: 'italic' },
-  gradeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
-  gradeDone: { ...typography.small, color: text.faint, marginTop: 10 },
   threadText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },
   footer: { ...typography.small, color: text.faint, lineHeight: 18 },
 });

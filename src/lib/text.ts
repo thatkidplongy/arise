@@ -12,6 +12,16 @@ function stripInline(line: string): string {
   });
 }
 
+const COUNT_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+];
+
+/** A small count as a word — 'nine', the way a sentence would say it. Numerals past
+ * twelve: 'thirteen cards' reads slower than '13 cards', not warmer. */
+export function spellCount(n: number): string {
+  return COUNT_WORDS[n] ?? String(n);
+}
+
 /** A one-line plain-text preview of a (possibly markdown) note, for table rows.
  * Takes the first non-empty line and strips the markers our small Markdown renderer
  * understands — the leading block ones (#, >, -, *, `1.`) and the inline ones

@@ -72,6 +72,13 @@ def test_book_name_keeps_the_title_as_written():
     assert reading.book_name("Catch 22") == "Catch 22"
 
 
+def test_chapter_marker_is_the_complement_of_book_name():
+    """The recall card wears the marker as its corner tag, next to the book's name."""
+    assert reading.chapter_marker("Thinking, fast and slow, ch 31-32") == "ch 31-32"
+    assert reading.chapter_marker("Deep Work pp 40-52") == "pp 40-52"
+    assert reading.chapter_marker("Catch 22") == ""
+
+
 def test_furthest_chapter_reads_a_label_the_way_a_reader_would():
     assert reading.furthest_chapter("21-22") == 22
     assert reading.furthest_chapter("ch 5 – 7") == 7

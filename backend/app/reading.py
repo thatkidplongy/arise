@@ -39,6 +39,16 @@ def book_name(source: str) -> str:
     return " ".join(_CHAPTER_MARKER.sub("", source).split()).strip(" ,;:-–")
 
 
+def chapter_marker(source: str) -> str:
+    """The complement of `book_name`: just the chapter marker a source carries.
+    'Deep Work, ch 2' → 'ch 2'; empty when the source names no chapters. The recall
+    card wears this as its corner tag, so the book's own name isn't repeated."""
+    found = _CHAPTER_MARKER.search(source)
+    if found is None:
+        return ""
+    return " ".join(found.group(0).split()).strip(" ,;:-–")
+
+
 def book_key(source: str) -> str:
     """`book_name` folded for comparison — so every sitting on one book lands on the
     same thread, and a re-spelled title still finds its own sittings.

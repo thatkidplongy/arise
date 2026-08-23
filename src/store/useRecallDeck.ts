@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { BringBack } from '@/lib/bringBack';
-import { ALL_PILE, deckFor, meetCard, missCard, restartPile, type DeckState } from '@/lib/deck';
+import { deckFor, meetCard, missCard, restartPile, type DeckState } from '@/lib/deck';
 import { dateKey } from '@/lib/dates';
 
 /**
@@ -13,9 +13,10 @@ import { dateKey } from '@/lib/dates';
  */
 interface RecallDeckStore extends DeckState {
   day: string;
-  /** Which pile is being drilled — a material name, or ALL_PILE. */
-  pile: string;
-  setPile: (pile: string) => void;
+  /** The stack being drilled — a material name, ALL_PILE for the mix, or null
+   * while the picker is showing. Each morning starts back at the picker. */
+  pile: string | null;
+  setPile: (pile: string | null) => void;
   meet: (id: string) => void;
   miss: (id: string) => void;
   restart: (items: BringBack[], pile: string) => void;
@@ -24,14 +25,14 @@ interface RecallDeckStore extends DeckState {
 /** Apply a deck move to today's state — rolled fresh first if the date has turned. */
 function onToday(s: RecallDeckStore, move: (state: DeckState) => DeckState): Partial<RecallDeckStore> {
   const day = dateKey();
-  return { day, pile: s.day === day ? s.pile : ALL_PILE, ...move(deckFor(day, s)) };
+  return { day, pile: s.day === day ? s.pile : null, ...move(deckFor(day, s)) };
 }
 
 export const useRecallDeck = create<RecallDeckStore>()(
   persist(
     (set) => ({
       day: '',
-      pile: ALL_PILE,
+      pile: null,
       met: [],
       deferred: {},
       ticks: 0,
@@ -43,7 +44,7 @@ export const useRecallDeck = create<RecallDeckStore>()(
     {
       name: 'arise-recall-deck-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
     },
   ),
 );

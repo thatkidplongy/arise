@@ -1011,6 +1011,73 @@ def test_grade_shaky_holds_the_spacing(db):
     assert row.box == 2 and row.due == _back(-digest.RECALL_INTERVALS[2])
 
 
+def test_grading_counts_as_a_meeting_whatever_the_grade(db):
+    """`seen` only ever counts up — a miss drops the box, not the history."""
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, DAY, "Depth beats speed.")
+    digest.grade(db, player, row.id, "got", DAY)
+    digest.grade(db, player, row.id, "missed", DAY)
+    db.refresh(row)
+    assert row.seen == 2
+
+
+def test_a_sent_digest_counts_as_a_meeting_too(db):
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, _back(5), "Depth beats speed.")
+    digest.advance_shown(db, player, DAY, [{"id": row.id}])
+    db.refresh(row)
+    assert row.seen == 1
+
+
+def test_edit_rewrites_the_back_without_touching_the_schedule(db):
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, _back(5), "the distiller's words")
+    row.box, row.due = 2, DAY
+    db.commit()
+
+    assert digest.edit(db, player, row.id, "  my own words  ") is not None
+    db.refresh(row)
+    assert row.text == "my own words"
+    assert row.box == 2 and row.due == DAY
+
+
+def test_edit_refuses_a_blank_back(db):
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, _back(5), "keep me")
+    with pytest.raises(ValueError):
+        digest.edit(db, player, row.id, "   ")
+
+
+def test_recall_out_carries_the_cards_face_details(db):
+    """Chapter tag, meeting count, provenance and the grade previews — everything
+    the card wears comes shaped from here, not recomputed by the app."""
+    player = state.get_or_create_player(db)
+    learning = Learning(player_id=player.id, day=_back(5), kind="book",
+                        source="Deep Work, ch 3", text="my note in my words")
+    db.add(learning)
+    db.commit()
+    row = _highlight(db, player, _back(5), "a line")
+    row.source_label, row.learning_id, row.box, row.seen = "Deep Work, ch 3", learning.id, 1, 3
+    db.commit()
+
+    out = digest.recall_library(db, player, DAY)[0]
+    assert out["chapter"] == "ch 3"
+    assert out["seen"] == 3
+    assert out["own_words"] is True
+    assert "Deep Work, ch 3" in out["origin"]
+    assert out["if_missed"] == digest.RECALL_INTERVALS[0]
+    assert out["if_shaky"] == digest.RECALL_INTERVALS[1]
+    assert out["if_got"] == digest.RECALL_INTERVALS[2]
+
+
+def test_a_derived_highlight_has_no_origin_story(db):
+    player = state.get_or_create_player(db)
+    _highlight(db, player, _back(5), "a derived line")
+    out = digest.recall_library(db, player, DAY)[0]
+    assert out["origin"] == ""
+    assert out["own_words"] is False
+
+
 def test_grade_rejects_an_unknown_value(db):
     player = state.get_or_create_player(db)
     row = _highlight(db, player, DAY, "Depth beats speed.")

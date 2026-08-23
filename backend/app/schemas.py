@@ -91,6 +91,11 @@ class LearningIn(BaseModel):
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
+class RecallEditIn(BaseModel):
+    """New words for the back of a card."""
+    text: str
+
+
 class RecallGradeIn(BaseModel):
     """How a recall went. 'got' pushes it further out, 'shaky' holds the spacing,
     'missed' brings it back tomorrow."""
@@ -529,6 +534,13 @@ class RecallOut(BaseModel):
     day: str  # the day it was learned
     source_label: str
     material: str = ""  # source_label without chapter markers — the per-book pile it files under
+    chapter: str = ""  # just the chapter marker, for the card's corner tag
+    seen: int = 0  # times actually met — a digest send or a grade, never a plain read
+    own_words: bool = False  # the answer came from a note the reader wrote, not just a named source
+    origin: str = ""  # where the card was born, for the back — empty on derived highlights
+    if_missed: int = 0  # days until it returns, per grade — so the buttons can say so
+    if_shaky: int = 0
+    if_got: int = 0
     days_ago: int
 
 

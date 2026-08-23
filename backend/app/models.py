@@ -432,6 +432,9 @@ class Highlight(Base):
     # the plain expanding ladder; grading only pulls a shaky one back down.
     box: Mapped[int] = mapped_column(Integer, default=0)
     due: Mapped[str] = mapped_column(String, default="", index=True)
+    # Times this card has actually been met — a digest send or a grade, never a
+    # plain read. The box can fall back to 0 on a miss; this only ever counts up.
+    seen: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

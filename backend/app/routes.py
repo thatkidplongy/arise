@@ -12,7 +12,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
-                      LearningIn, LearningOut, RecallGradeIn, RecallOut,
+                      LearningIn, LearningOut, RecallEditIn, RecallGradeIn, RecallOut,
                       MoneyIn, MoneyHistoryOut, PayCommitmentIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReadingLogIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
@@ -438,6 +438,21 @@ def recall_library(day: str | None = Query(None), db: Session = Depends(get_db))
     the app's recall card browses once the due handful runs out."""
     player = state.get_or_create_player(db)
     return digest.recall_library(db, player, _valid_day(day))
+
+
+@router.patch("/recall/{highlight_id}", response_model=StateOut)
+def edit_recall(highlight_id: str, body: RecallEditIn, day: str | None = Query(None),
+                db: Session = Depends(get_db)):
+    """Rewrite the back of a card — the words stay yours after the distiller's first
+    pass. The schedule is untouched."""
+    player = state.get_or_create_player(db)
+    try:
+        result = digest.edit(db, player, highlight_id, body.text)
+    except ValueError as err:
+        raise HTTPException(422, str(err))
+    if result is None:
+        raise HTTPException(404, "No such highlight.")
+    return state.build_state(db, player, _valid_day(day))
 
 
 @router.post("/recall/{highlight_id}/grade", response_model=StateOut)

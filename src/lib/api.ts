@@ -107,6 +107,13 @@ export interface ApiRecall {
   day: string; // the day it was learned
   source_label: string;
   material: string; // source_label without chapter markers — the per-book pile it files under
+  chapter: string; // just the chapter marker, for the card's corner tag
+  seen: number; // times actually met — a digest send or a grade, never a plain read
+  own_words: boolean; // the answer came from a note the reader wrote, not just a named source
+  origin: string; // where the card was born, for the back — empty on derived highlights
+  if_missed: number; // days until it returns, per grade — so the buttons can say so
+  if_shaky: number;
+  if_got: number;
   days_ago: number;
 }
 
@@ -926,6 +933,12 @@ export const api = {
 
   getRecallLibrary: (base: string, token: string, day: string) =>
     request<ApiRecall[]>(base, `/recall/library?day=${day}`, token),
+
+  editRecall: (base: string, token: string, id: string, text: string, day: string) =>
+    request<ApiState>(base, `/recall/${id}?day=${day}`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ text }),
+    }),
 };
 
 /** The API surface with the server base + token bound in, so callers pass only

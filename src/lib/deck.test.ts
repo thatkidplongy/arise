@@ -7,17 +7,18 @@ import {
   EMPTY_DECK,
   currentEntry,
   deckFor,
-  listMaterials,
+  listStacks,
   meetCard,
   missCard,
-  pileProgress,
   restartPile,
+  stackOf,
 } from '@/lib/deck';
 
 function card(id: string, material = 'A book'): BringBack {
   const item: ApiRecall = {
     id, text: `answer ${id}`, cue: `cue ${id}`, hook: '', day: '2026-08-01',
-    source_label: material, material, days_ago: 5,
+    source_label: material, material, chapter: '', seen: 0, own_words: false,
+    origin: '', if_missed: 1, if_shaky: 3, if_got: 7, days_ago: 5,
   };
   return { kind: 'recall', id, item };
 }
@@ -34,19 +35,37 @@ describe('deckFor', () => {
   });
 });
 
-describe('listMaterials', () => {
+describe('listStacks', () => {
   it('names each material once, in the order the deck first shows it', () => {
     const items = [card('a', 'Book one'), tip('t', 'A video'), card('b', 'Book one'), card('c', 'Book two')];
-    expect(listMaterials(items, []).map((m) => m.name)).toEqual(['Book one', 'A video', 'Book two']);
+    expect(listStacks(items, [], []).map((m) => m.name)).toEqual(['Book one', 'A video', 'Book two']);
   });
 
-  it('counts only the cards still unmet', () => {
-    const items = [card('a', 'Book one'), card('b', 'Book one')];
-    expect(listMaterials(items, ['a'])).toEqual([{ name: 'Book one', left: 1 }]);
+  it('counts a stack every way its picker row says it', () => {
+    const items = [card('a', 'Book one'), card('b', 'Book one'), card('c', 'Book one')];
+    expect(listStacks(items, ['a'], ['a', 'b'])).toEqual([
+      { name: 'Book one', total: 3, left: 2, due: 2, dueLeft: 1 },
+    ]);
   });
 
   it('leaves unlabeled cards off the list — they live only in the all-pile', () => {
-    expect(listMaterials([card('a', '')], [])).toEqual([]);
+    expect(listStacks([card('a', '')], [], [])).toEqual([]);
+  });
+});
+
+describe('stackOf', () => {
+  it('counts the whole deck for the all-pile, unlabeled cards included', () => {
+    const items = [card('a', 'Book one'), card('b', '')];
+    expect(stackOf(items, ['a'], ['a'], ALL_PILE)).toEqual({
+      name: ALL_PILE, total: 2, left: 1, due: 1, dueLeft: 0,
+    });
+  });
+
+  it('counts one material alone when the pile names it', () => {
+    const items = [card('a', 'Book one'), card('b', 'Book two')];
+    expect(stackOf(items, [], ['b'], 'Book two')).toEqual({
+      name: 'Book two', total: 1, left: 1, due: 1, dueLeft: 1,
+    });
   });
 });
 
@@ -78,14 +97,6 @@ describe('currentEntry', () => {
     const items = [card('a'), card('b')];
     const state = meetCard(missCard(EMPTY_DECK, 'a'), 'b');
     expect(currentEntry(items, ALL_PILE, state)?.id).toBe('a');
-  });
-});
-
-describe('pileProgress', () => {
-  it('counts the chosen pile only', () => {
-    const items = [card('a', 'Book one'), card('b', 'Book two')];
-    expect(pileProgress(items, 'Book one', ['a'])).toEqual({ done: 1, total: 1 });
-    expect(pileProgress(items, ALL_PILE, ['a'])).toEqual({ done: 1, total: 2 });
   });
 });
 

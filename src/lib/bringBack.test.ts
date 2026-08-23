@@ -6,7 +6,8 @@ import { buildBringBack } from '@/lib/bringBack';
 function recall(id: string): ApiRecall {
   return {
     id, text: `answer ${id}`, cue: `cue ${id}`, hook: '', day: '2026-08-01',
-    source_label: 'Book', material: 'Book', days_ago: 5,
+    source_label: 'Book', material: 'Book', chapter: '', seen: 0, own_words: false,
+    origin: '', if_missed: 1, if_shaky: 3, if_got: 7, days_ago: 5,
   };
 }
 

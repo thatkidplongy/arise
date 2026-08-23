@@ -50,24 +50,53 @@ function isInPile(entry: BringBack, pile: string): boolean {
   return pile === ALL_PILE || materialOf(entry) === pile;
 }
 
-/** Every material in the deck with how many of its cards are still unmet, in
- * first-appearance order — due items lead the deck, so books owing work list first. */
-export function listMaterials(items: BringBack[], met: string[]): { name: string; left: number }[] {
+/** One stack in the picker: a material's cards, counted every way the row says. */
+export interface Stack {
+  name: string;
+  total: number; // cards in the stack
+  left: number; // still unmet today
+  due: number; // cards the schedule owes today
+  dueLeft: number; // due cards still unmet
+}
+
+function countInto(stack: Stack, id: string, met: Set<string>, due: Set<string>): void {
+  stack.total += 1;
+  if (!met.has(id)) stack.left += 1;
+  if (!due.has(id)) return;
+  stack.due += 1;
+  if (!met.has(id)) stack.dueLeft += 1;
+}
+
+/** Every material in the deck as a pickable stack, in first-appearance order —
+ * due items lead the deck, so the books owing work list first. */
+export function listStacks(items: BringBack[], met: string[], dueIds: string[]): Stack[] {
   const metSet = new Set(met);
-  const out: { name: string; left: number }[] = [];
+  const dueSet = new Set(dueIds);
+  const out: Stack[] = [];
   const at = new Map<string, number>();
   for (const entry of items) {
     const name = materialOf(entry);
     if (!name) continue;
-    const found = at.get(name);
+    let found = at.get(name);
     if (found === undefined) {
-      at.set(name, out.length);
-      out.push({ name, left: metSet.has(entry.id) ? 0 : 1 });
-    } else if (!metSet.has(entry.id)) {
-      out[found].left += 1;
+      found = out.length;
+      at.set(name, found);
+      out.push({ name, total: 0, left: 0, due: 0, dueLeft: 0 });
     }
+    countInto(out[found], entry.id, metSet, dueSet);
   }
   return out;
+}
+
+/** One pile's counts — works for a material or for ALL_PILE, which no picker row names. */
+export function stackOf(items: BringBack[], met: string[], dueIds: string[], pile: string): Stack {
+  const metSet = new Set(met);
+  const dueSet = new Set(dueIds);
+  const stack: Stack = { name: pile, total: 0, left: 0, due: 0, dueLeft: 0 };
+  for (const entry of items) {
+    if (isInPile(entry, pile)) countInto(stack, entry.id, metSet, dueSet);
+  }
+  return stack;
 }
 
 /**
@@ -87,19 +116,6 @@ export function currentEntry(items: BringBack[], pile: string, state: DeckState)
     waiting = waiting ?? entry;
   }
   return waiting;
-}
-
-/** How far through the pile today is: cards met, out of cards in the pile. */
-export function pileProgress(items: BringBack[], pile: string, met: string[]): { done: number; total: number } {
-  const metSet = new Set(met);
-  let done = 0;
-  let total = 0;
-  for (const entry of items) {
-    if (!isInPile(entry, pile)) continue;
-    total += 1;
-    if (metSet.has(entry.id)) done += 1;
-  }
-  return { done, total };
 }
 
 /** Move past a card — tapped along, or graded got/shaky. It leaves today's pile. */

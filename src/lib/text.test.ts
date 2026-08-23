@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { snippet } from '@/lib/text';
+import { snippet, spellCount } from '@/lib/text';
 
 describe('snippet', () => {
   it('takes the first non-empty line', () => {
@@ -44,5 +44,16 @@ describe('snippet', () => {
   it('returns empty for nothing to preview', () => {
     expect(snippet('')).toBe('');
     expect(snippet('   \n  \n')).toBe('');
+  });
+});
+
+describe('spellCount', () => {
+  it('says small counts the way a sentence would', () => {
+    expect(spellCount(9)).toBe('nine');
+    expect(spellCount(0)).toBe('zero');
+  });
+
+  it('falls back to numerals past twelve', () => {
+    expect(spellCount(13)).toBe('13');
   });
 });
