@@ -24,7 +24,7 @@ function card(id: string, material = 'A book'): BringBack {
 }
 
 function tip(id: string, source = 'A video'): BringBack {
-  return { kind: 'tip', id, text: `tip ${id}`, source, action: false };
+  return { kind: 'tip', id, text: `tip ${id}`, cue: `cue ${id}`, source, platform: 'YouTube', day: '2026-08-01', action: false };
 }
 
 describe('deckFor', () => {

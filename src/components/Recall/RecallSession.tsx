@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FlashCard } from '@/components/Recall/FlashCard';
+import { TipCard } from '@/components/Recall/TipCard';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -37,22 +38,6 @@ function DueDashes({ stack, currentIsDue }: { stack: Stack; currentIsDue: boolea
         <View key={i} style={[styles.dash, i < filled && styles.dashFilled]} />
       ))}
     </View>
-  );
-}
-
-/** A tip has no back and no schedule — it's met, read, and moved past. */
-function TipCard({ tip, onNext }: { tip: Extract<BringBack, { kind: 'tip' }>; onNext: () => void }) {
-  return (
-    <>
-      <View style={styles.tipCard}>
-        <Text style={styles.tipKicker}>From your tips</Text>
-        <Text style={styles.tipText}>{tip.text}</Text>
-        <Text style={styles.tipMeta}>
-          {tip.action ? 'to do' : 'idea'} · {tip.source}
-        </Text>
-      </View>
-      <Button label="Next card" tone="secondary" onPress={onNext} block />
-    </>
   );
 }
 
@@ -202,10 +187,6 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', gap: 4 },
   dash: { width: 18, height: 5, borderRadius: 999, backgroundColor: surface.hairline },
   dashFilled: { backgroundColor: sage[600] },
-  tipCard: { gap: 10, padding: 18, borderRadius: 20, backgroundColor: surface.card },
-  tipKicker: { fontFamily: font.semibold, fontSize: 9.5, letterSpacing: 1.4, textTransform: 'uppercase', color: sage[800] },
-  tipText: { fontFamily: font.regular, fontSize: 15, lineHeight: 24, color: neutral[900] },
-  tipMeta: { fontFamily: font.regular, fontSize: 11.5, color: text.secondary },
   done: { gap: 14, paddingTop: 4 },
   doneText: { fontFamily: font.regular, fontSize: 14, lineHeight: 22, color: neutral[900] },
 });
