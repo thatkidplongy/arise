@@ -22,6 +22,7 @@ import type { ApiLearning, ApiRecall, LearningKind, RecallGrade } from '@/lib/ap
 import { buildBringBack, type BringBack } from '@/lib/bringBack';
 import { describeThreadBook } from '@/lib/reading';
 import { useInsights } from '@/query/useInsights';
+import { useRecallLibrary } from '@/query/useRecallLibrary';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
 
@@ -208,8 +209,15 @@ function GradeRow({ id }: { id: string }) {
   );
 }
 
+// The library can hand over today's own highlights, so 0 has to read as a word.
+function describeAgo(daysAgo: number): string {
+  if (daysAgo === 0) return 'today';
+  if (daysAgo === 1) return 'yesterday';
+  return `${daysAgo} days ago`;
+}
+
 function describeWhen(item: ApiRecall): string {
-  const ago = item.days_ago === 1 ? 'yesterday' : `${item.days_ago} days ago`;
+  const ago = describeAgo(item.days_ago);
   return item.source_label ? `${ago} · ${item.source_label}` : ago;
 }
 
@@ -278,12 +286,17 @@ function TipItem({ tip }: { tip: Extract<BringBack, { kind: 'tip' }> }) {
  * the cost of the step that separates recognising something from recalling it, which
  * makes the grade afterwards a feeling rather than evidence.
  *
+ * Past the due handful and the tips, tapping walks the whole library of past
+ * highlights in the day's shuffled order — so a browse keeps meeting new material
+ * instead of wrapping the same five questions.
+ *
  * The whole card is gone on a day with nothing owed and nothing captured.
  */
 function BringBackBlock() {
   const recall = useSystem((s) => s.state?.recall) ?? [];
   const { insights } = useInsights();
-  const items = buildBringBack(recall, insights);
+  const library = useRecallLibrary();
+  const items = buildBringBack(recall, insights, library);
   const [at, setAt] = useState(0);
 
   if (!items.length) return null;

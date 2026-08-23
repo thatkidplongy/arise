@@ -6,5 +6,6 @@ export const qk = {
   history: ['history'] as const,
   money: (scope: string, day: string) => ['money-history', scope, day] as const,
   insights: ['insights'] as const,
+  recallLibrary: (day: string) => ['recall-library', day] as const,
   state: (day: string) => ['state', day] as const,
 };

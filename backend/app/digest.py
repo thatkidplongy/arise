@@ -25,6 +25,7 @@ Reads and the single write path both live here, like insights.py. `recall_set` i
 a pure derive-on-read — same day, same picks, rotating as the days pass.
 """
 
+import random
 import re
 import sys
 from datetime import date, timedelta
@@ -364,20 +365,44 @@ def recall_set(db: Session, player: Player, day: str) -> list[dict]:
         .limit(PER_DIGEST * 3)  # a pool to interleave from, not the final cut
         .all()
     )
-    picked = [
-        {
-            "id": r.id,
-            "text": r.text,
-            "cue": r.cue or "",
-            "hook": r.hook or "",
-            "box": r.box or 0,
-            "day": r.day,
-            "source_label": r.source_label,
-            "days_ago": (date.fromisoformat(day) - date.fromisoformat(r.day)).days,
-        }
-        for r in rows
-    ]
+    picked = [_recall_out(r, day) for r in rows]
     return _interleave(picked)[:PER_DIGEST]
+
+
+def _recall_out(r: Highlight, day: str) -> dict:
+    return {
+        "id": r.id,
+        "text": r.text,
+        "cue": r.cue or "",
+        "hook": r.hook or "",
+        "box": r.box or 0,
+        "day": r.day,
+        "source_label": r.source_label,
+        "days_ago": (date.fromisoformat(day) - date.fromisoformat(r.day)).days,
+    }
+
+
+def recall_library(db: Session, player: Player, day: str) -> list[dict]:
+    """Every highlight ever distilled — the whole shelf, where `recall_set` is only
+    what the schedule owes today.
+
+    The app's recall card taps through this once the due handful runs out, so
+    browsing keeps meeting new material instead of wrapping the same five. Shuffled
+    with the day as the seed: newest-first would resurface the same recent lines
+    every visit and the old ones would never come up, while a fresh shuffle per read
+    would reorder mid-browse. Seeding by day gives each morning its own walk through
+    everything, stable for that day.
+
+    A pure read, like `recall_set` — browsing never advances the ladder."""
+    rows = (
+        db.query(Highlight)
+        .filter(Highlight.player_id == player.id, Highlight.day <= day)
+        .order_by(Highlight.day, Highlight.created_at)  # a stable deck to shuffle from
+        .all()
+    )
+    out = [_recall_out(r, day) for r in rows]
+    random.Random(day).shuffle(out)
+    return out
 
 
 GRADES = ("got", "shaky", "missed")

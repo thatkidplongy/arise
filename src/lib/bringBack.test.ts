@@ -59,4 +59,23 @@ describe('buildBringBack', () => {
     expect(buildBringBack([], [insight({ takeaways: ['idea'] })]).map((x) => x.kind)).toEqual(['tip']);
     expect(buildBringBack([], [])).toEqual([]);
   });
+
+  it('puts the library after the tips — the shelf can be hundreds long, so anything behind it would never be reached', () => {
+    const out = buildBringBack(
+      [recall('due')],
+      [insight({ takeaways: ['idea'] })],
+      [recall('old-1'), recall('old-2')],
+    );
+    expect(out.map((x) => x.id)).toEqual(['due', 'i1-t0', 'old-1', 'old-2']);
+  });
+
+  it('drops library entries already owed today, so a due question is met once up front', () => {
+    const out = buildBringBack([recall('a')], [], [recall('a'), recall('b')]);
+    expect(out.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps the library in the order it arrived — the server owns the day’s shuffle', () => {
+    const out = buildBringBack([], [], [recall('c'), recall('a'), recall('b')]);
+    expect(out.map((x) => x.id)).toEqual(['c', 'a', 'b']);
+  });
 });

@@ -366,6 +366,58 @@ def test_recall_set_ignores_the_day_itself(db):
     assert digest.recall_set(db, player, DAY) == []
 
 
+# ── recall_library — the whole shelf ──────────────────────────────────────────
+
+
+def test_recall_library_returns_everything_whatever_the_schedule_says(db):
+    player = state.get_or_create_player(db)
+    due = _highlight(db, player, _back(5), "due today")
+    due.due = DAY
+    later = _highlight(db, player, _back(5), "not due for a while")
+    later.due = _back(-10)  # ten days from now
+    db.commit()
+
+    texts = {r["text"] for r in digest.recall_library(db, player, DAY)}
+    assert texts == {"due today", "not due for a while"}
+
+
+def test_recall_library_includes_the_day_itself(db):
+    """recall_set keeps today's lines out because the digest shows them fresh; the
+    shelf is for browsing everything learned, and today belongs to that."""
+    player = state.get_or_create_player(db)
+    _highlight(db, player, DAY, "learned today")
+
+    out = digest.recall_library(db, player, DAY)
+    assert [r["text"] for r in out] == ["learned today"]
+    assert out[0]["days_ago"] == 0
+
+
+def test_recall_library_walks_differently_each_day_but_holds_still_within_one(db):
+    """Newest-first would resurface the same recent lines every visit; a fresh
+    shuffle per read would reorder mid-browse. Day-seeded gets both right."""
+    player = state.get_or_create_player(db)
+    for i in range(10):
+        _highlight(db, player, _back(i + 1), f"line {i}")
+
+    today = [r["id"] for r in digest.recall_library(db, player, DAY)]
+    again = [r["id"] for r in digest.recall_library(db, player, DAY)]
+    tomorrow = [r["id"] for r in digest.recall_library(db, player, _back(-1))]
+    assert today == again
+    assert set(today) == set(tomorrow)
+    assert today != tomorrow
+
+
+def test_recall_library_is_a_pure_read(db):
+    player = state.get_or_create_player(db)
+    row = _highlight(db, player, _back(5), "on the shelf")
+    row.due, row.box = DAY, 1
+    db.commit()
+
+    digest.recall_library(db, player, DAY)
+    db.refresh(row)
+    assert row.box == 1 and row.due == DAY
+
+
 # ── Rendering ─────────────────────────────────────────────────────────────────
 
 

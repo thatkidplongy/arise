@@ -922,6 +922,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ grade }),
     }),
+
+  getRecallLibrary: (base: string, token: string, day: string) =>
+    request<ApiRecall[]>(base, `/recall/library?day=${day}`, token),
 };
 
 /** The API surface with the server base + token bound in, so callers pass only

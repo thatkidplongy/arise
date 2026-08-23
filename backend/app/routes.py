@@ -12,7 +12,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
-                      LearningIn, LearningOut, RecallGradeIn,
+                      LearningIn, LearningOut, RecallGradeIn, RecallOut,
                       MoneyIn, MoneyHistoryOut, PayCommitmentIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReadingLogIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
@@ -430,6 +430,14 @@ def preview_digest(day: str | None = Query(None), db: Session = Depends(get_db))
         "html": digest.render_html(ctx),
         "text": digest.render_text(ctx),
     }
+
+
+@router.get("/recall/library", response_model=list[RecallOut])
+def recall_library(day: str | None = Query(None), db: Session = Depends(get_db)):
+    """Every highlight ever distilled, in the day's own shuffled order — the shelf
+    the app's recall card browses once the due handful runs out."""
+    player = state.get_or_create_player(db)
+    return digest.recall_library(db, player, _valid_day(day))
 
 
 @router.post("/recall/{highlight_id}/grade", response_model=StateOut)
