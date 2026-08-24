@@ -95,29 +95,30 @@ _KATAKANA_ROWS: list[tuple[str, str, list[str]]] = [
     ]),
 ]
 
-# What a step asks of you, once the characters are in front of you. Same three lines
-# for every row, because the work is the same work — and the third line is the deck
-# on Learn, so the drilling has somewhere to happen rather than being an instruction
-# to go and find an app.
-def _kana_steps(lines: list[str], stack: str) -> list[str]:
-    return [
-        *lines,
-        "Write each one 5× while saying its sound out loud",
-        f"Then work the {stack} stack on Learn until today's are coming back clean",
-    ]
+# What a step asks of you, once the characters are in front of you: the row, the hand,
+# then somewhere to actually retrieve it from. `close` is that last part, and it differs by
+# script — hiragana has a stack on Learn, and katakana has the loanwords it exists for.
+# It used to send a katakana row to the Hiragana stack, which holds none of its
+# characters: an instruction to drill today's row in a pile it isn't in.
+def _kana_steps(lines: list[str], close: str) -> list[str]:
+    return [*lines, "Write each one 5× while saying its sound out loud", close]
 
 
-def _kana_plan(rows: list[tuple[str, str, list[str]]], stage: str, script: str, stack: str, resource: str) -> list[dict]:
+def _kana_plan(rows: list[tuple[str, str, list[str]]], stage: str, script: str, close: str, resource: str) -> list[dict]:
     return [
         {
             "stage": stage,
             "title": f"{script}: {label}",
             "desc": f"10 min — {note}",
-            "steps": _kana_steps(lines, stack),
+            "steps": _kana_steps(lines, close),
             "resource": resource,
         }
         for label, note, lines in rows
     ]
+
+
+_HIRAGANA_CLOSE = "Then work the Hiragana stack on Learn until today's are coming back clean"
+_KATAKANA_CLOSE = "Then find five loanwords that use today's row and read them out loud"
 
 
 _TOFUGU_HIRAGANA = "🌐 Tofugu — hiragana guide (with mnemonics)"
@@ -387,8 +388,8 @@ def _with_holds(steps: list[dict], holds: dict[int, dict]) -> list[dict]:
 
 
 PLAN: list[dict] = [
-    *_with_holds(_kana_plan(_HIRAGANA_ROWS, HIRAGANA, "Hiragana", "Hiragana", _TOFUGU_HIRAGANA), _HIRAGANA_HOLDS),
-    *_with_holds(_kana_plan(_KATAKANA_ROWS, KATAKANA, "Katakana", "Hiragana", _TOFUGU_KATAKANA), _KATAKANA_HOLDS),
+    *_with_holds(_kana_plan(_HIRAGANA_ROWS, HIRAGANA, "Hiragana", _HIRAGANA_CLOSE, _TOFUGU_HIRAGANA), _HIRAGANA_HOLDS),
+    *_with_holds(_kana_plan(_KATAKANA_ROWS, KATAKANA, "Katakana", _KATAKANA_CLOSE, _TOFUGU_KATAKANA), _KATAKANA_HOLDS),
     *_WORD_STEPS,
     *_SENTENCE_STEPS,
     *_KANJI_STEPS,
@@ -401,12 +402,6 @@ def step_at(position: int) -> dict:
     """The step held at `position`, clamped. Past the end the plan holds on its last
     step rather than running out — there is no day on which Japanese is finished."""
     return PLAN[max(0, min(position, LAST_STEP))]
-
-
-def stage_at(position: int) -> str:
-    """Which stage a position falls in — derived, never stored, so the two can't
-    disagree about where you are."""
-    return step_at(position)["stage"]
 
 
 def progress(position: int) -> dict:

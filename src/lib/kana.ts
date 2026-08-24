@@ -158,8 +158,3 @@ export function gradeKana(book: KanaBook, char: string, grade: RecallGrade, day:
     },
   };
 }
-
-/** How much of the chart you have met, for the line under the stack's name. */
-export function countKanaMet(book: KanaBook): number {
-  return HIRAGANA.filter((k) => book[k.char] !== undefined).length;
-}

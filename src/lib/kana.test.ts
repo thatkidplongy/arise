@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   KANA_NEW_PER_DAY,
   buildKanaDeck,
-  countKanaMet,
   gradeKana,
   kanaIntervalFor,
   type KanaBook,
@@ -97,13 +96,5 @@ describe('buildKanaDeck', () => {
     const deck = buildKanaDeck(bookWith(['か'], '2026-08-24'), TODAY);
     const ka = deck.find((k) => k.char === 'か');
     expect(ka).toMatchObject({ box: 1, seen: 1, fresh: false, due: true, ifMissed: 1, ifShaky: 3, ifGot: 7 });
-  });
-});
-
-describe('countKanaMet', () => {
-  it('counts the chart you have met, and ignores anything not on it', () => {
-    expect(countKanaMet({})).toBe(0);
-    expect(countKanaMet(bookWith(['あ', 'い', 'ん'], TODAY))).toBe(3);
-    expect(countKanaMet(bookWith(['ア'], TODAY))).toBe(0);
   });
 });

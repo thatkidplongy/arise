@@ -334,7 +334,7 @@ def test_side_quest_focus_overrides_and_rotates():
 def test_japanese_plan_is_held_at_a_position_not_a_date():
     """The plan walks hiragana → katakana → words → sentences → kanji, and where you
     are is a position you finished your way to — never how many weeks have passed."""
-    stages = [japanese.stage_at(n) for n in range(len(japanese.PLAN))]
+    stages = [step["stage"] for step in japanese.PLAN]
     assert stages[0] == japanese.HIRAGANA
     assert stages[-1] == japanese.KANJI
     # Each stage runs contiguously, in the beginner order, and none is skipped.
@@ -498,3 +498,14 @@ def test_a_kana_row_is_served_whole():
     assert any("ぱ" in s for s in quests.cap_steps(list(row["steps"]), 0, "d-jp"))
     # Everything else still gets the lean two.
     assert len(quests.cap_steps(["a", "b", "c"], 0, "d-sketch")) == 2
+
+
+def test_a_kana_row_sends_you_somewhere_it_actually_lives():
+    """Every row ends by asking you to retrieve it, and where depends on the script:
+    hiragana has the stack on Learn, katakana has the loanwords it exists for. A
+    katakana row pointed at the Hiragana stack is a pile that holds none of it."""
+    hira = japanese.step_at(6)   # Hiragana: H row
+    kata = japanese.step_at(20)  # Katakana: H row
+    assert "Hiragana stack" in hira["steps"][-1]
+    assert "Hiragana stack" not in kata["steps"][-1]
+    assert "loanwords" in kata["steps"][-1]

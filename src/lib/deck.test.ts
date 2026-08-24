@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { ApiRecall } from '@/lib/api';
 import type { BringBack } from '@/lib/bringBack';
+import { kanaId } from '@/lib/kana';
+import { HIRAGANA } from '@/lib/kanaChart';
 import {
   ALL_PILE,
   EMPTY_DECK,
@@ -33,6 +35,18 @@ function chaptered(id: string, chapter: string, material = 'Book one'): BringBac
 
 function tip(id: string, source = 'A video'): BringBack {
   return { kind: 'tip', id, text: `tip ${id}`, cue: `cue ${id}`, source, platform: 'YouTube', day: '2026-08-01', action: false };
+}
+
+/** A character off the chart, as the deck hands it over. `fresh` is what the shelf
+ * counts to say how far through the chart you are. */
+function kana(char: string, fresh = true): BringBack {
+  const item = HIRAGANA.find((k) => k.char === char);
+  if (!item) throw new Error(`${char} is not on the chart`);
+  return {
+    kind: 'kana',
+    id: kanaId(char),
+    item: { ...item, box: 0, seen: 0, fresh, due: false, ifMissed: 1, ifShaky: 1, ifGot: 3 },
+  };
 }
 
 describe('deckFor', () => {
@@ -177,5 +191,37 @@ describe('restartPile', () => {
     const out = restartPile(state, items, 'Book one');
     expect(out.met).toEqual(['b']);
     expect(currentEntry(items, 'Book one', out)?.id).toBe('a');
+  });
+});
+
+describe('the kana stack on the shelf', () => {
+  it('files every character under one stack, whatever row it came from', () => {
+    const items = [card('a', 'Book one'), kana('あ'), kana('ぎゃ'), kana('ん')];
+    const stacks = listStacks(items, [], []);
+    expect(stacks.map((s) => s.name)).toEqual(['Book one', 'Hiragana']);
+    expect(stacks[1].total).toBe(3);
+  });
+
+  it('says how far through the chart you are, which a book has nothing to say', () => {
+    const items = [kana('あ', false), kana('い', false), kana('う')];
+    expect(listStacks(items, [], [])[0].byline).toBe('Japanese · 3 cards · 2 learned');
+    // A brand-new chart claims no progress rather than claiming none learned.
+    expect(listStacks([kana('あ')], [], [])[0].byline).toBe('Japanese · 1 card');
+    // A book's stack is a pile of notes you wrote — its size says all there is to say.
+    expect(listStacks([card('a', 'Book one')], [], [])[0].byline).toBe('1 card');
+  });
+
+  it('is searchable by the track it belongs to, not just its name', () => {
+    const stacks = listStacks([kana('あ')], [], []);
+    expect(pickShelf(stacks, 'japanese', false).map((s) => s.name)).toEqual(['Hiragana']);
+    expect(pickShelf(stacks, 'hiragana', false).map((s) => s.name)).toEqual(['Hiragana']);
+  });
+
+  it('walks its own pile without dragging a book’s cards into it', () => {
+    const items = [card('a', 'Book one'), kana('あ'), kana('い')];
+    const state = { ...EMPTY_DECK };
+    expect(currentEntry(items, 'Hiragana', state)?.id).toBe(kanaId('あ'));
+    expect(stackOf(items, [], [], 'Hiragana').total).toBe(2);
+    expect(stackOf(items, [], [], 'Book one').total).toBe(1);
   });
 });
