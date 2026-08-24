@@ -72,6 +72,25 @@ def test_book_name_keeps_the_title_as_written():
     assert reading.book_name("Catch 22") == "Catch 22"
 
 
+def test_chapter_marker_drops_a_chapter_s_own_title():
+    """A Notion page names the chapter and then titles it. The number is the marker;
+    the title is neither the book's name nor the tag, and printing it in the corner of
+    every card drawn from that page is how it used to read."""
+    label = "DDIA ch 1 — Reliable, Scalable and Maintainable Applications"
+    assert reading.chapter_marker(label) == "ch 1"
+    # The pile is still the book, so ch 1 and ch 2 stack together rather than apart.
+    assert reading.book_name(label) == "DDIA"
+    assert reading.book_name("DDIA ch 2 — Data Models and Query Languages") == "DDIA"
+
+
+def test_chapter_marker_keeps_a_list_of_chapters_whole():
+    """Several sittings in a day name several chapters; the tag is all of them."""
+    assert reading.chapter_marker("Thinking, fast and slow, ch 33, 34-35, 36-37") == (
+        "ch 33, 34-35, 36-37"
+    )
+    assert reading.chapter_marker("Deep Work, chapters 5–7") == "chapters 5–7"
+
+
 def test_chapter_marker_is_the_complement_of_book_name():
     """The recall card wears the marker as its corner tag, next to the book's name."""
     assert reading.chapter_marker("Thinking, fast and slow, ch 31-32") == "ch 31-32"

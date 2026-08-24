@@ -28,6 +28,17 @@ _CHAPTER_MARKER = re.compile(
 
 _CHAPTER_NUMBER = re.compile(r"\d+")
 
+# Inside a marker, the part that actually names chapters: the keyword and the numbers
+# it introduces, as a range or a list of them ('ch 2', 'pp 40-52', 'ch 33, 34-35').
+# Prose after the numbers is not part of it — a Notion page called
+# 'DDIA ch 1 — Reliable, Scalable and Maintainable Applications' names one chapter
+# and then titles it, and the title is neither the book's name nor the marker's.
+_MARKER_NUMBERS = re.compile(
+    r"(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*"
+    r"\d+(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–—]\s*\d+)?)*",
+    re.I,
+)
+
 
 def book_name(source: str) -> str:
     """The book on its own, with the chapter marker a day's source carries stripped
@@ -40,13 +51,22 @@ def book_name(source: str) -> str:
 
 
 def chapter_marker(source: str) -> str:
-    """The complement of `book_name`: just the chapter marker a source carries.
-    'Deep Work, ch 2' → 'ch 2'; empty when the source names no chapters. The recall
-    card wears this as its corner tag, so the book's own name isn't repeated."""
+    """The chapter marker a source carries. 'Deep Work, ch 2' → 'ch 2'; empty when the
+    source names no chapters. The recall card wears this as its corner tag, so the
+    book's own name isn't repeated.
+
+    Not quite the complement of `book_name`, and deliberately: `book_name` strips from
+    the marker to the end of the label, because whatever follows is that sitting's
+    business and not the book's — that's what turns both DDIA pages into one 'DDIA'
+    pile. The tag keeps only the marker itself, so a chapter's title doesn't end up
+    printed in the corner of every card drawn from it."""
     found = _CHAPTER_MARKER.search(source)
     if found is None:
         return ""
-    return " ".join(found.group(0).split()).strip(" ,;:-–")
+    numbered = _MARKER_NUMBERS.search(found.group(0))
+    if numbered is None:
+        return ""
+    return " ".join(numbered.group(0).split()).strip(" ,;:-–")
 
 
 def book_key(source: str) -> str:

@@ -22,7 +22,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from . import game
+from . import game, reading as reading_lib
 from .models import (
     AchievementUnlock,
     Completion,
@@ -65,6 +65,25 @@ def peso(amount: float) -> str:
     if whole == int(whole):
         return f"₱{int(whole):,}"
     return f"₱{whole:,.2f}"
+
+
+def _reading_recap(logs: list[ReadingLog]) -> dict:
+    """What the day's reading adds up to, for the one book the line names.
+
+    The first book read is the one named, and only its own sittings are counted with
+    it. Lumping every log under that name is the same mistake as crediting a book with
+    another source's highlights: it reads as one long sitting on a book you barely
+    opened."""
+    if not logs:
+        return {"chapters": [], "count": 0, "book": ""}
+    book = logs[0].book
+    key = reading_lib.book_key(book or "")
+    same = [r for r in logs if reading_lib.book_key(r.book or "") == key]
+    return {
+        "chapters": [r.label.strip() for r in same if r.label.strip()],
+        "count": sum(r.chapters for r in same),
+        "book": book,
+    }
 
 
 def _quest_titles(db: Session, player: Player, day: str) -> dict[str, str]:
@@ -161,11 +180,9 @@ def of(db: Session, player: Player, day: str) -> dict:
             if _on(r.done_at, day)
         ],
         "money": {"in": money_in, "out": money_out, "lines": money_lines},
-        "reading": {
-            "chapters": [r.label.strip() for r in reading if r.label.strip()],
-            "count": sum(r.chapters for r in reading),
-            "book": reading[0].book if reading else "",
-        },
+        # Named after one book, so the chapters and the count have to be that book's.
+        # A day with two books would otherwise read as one long sitting on the first.
+        "reading": _reading_recap(reading),
         "food": {
             "kcal": sum(f.kcal for f in food),
             "protein_g": sum(f.protein_g for f in food),

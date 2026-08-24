@@ -139,6 +139,40 @@ def test_the_rest_of_the_surfaces_are_gathered(db):
     assert r["captures"] == ["@someone"]
 
 
+def test_a_second_book_is_not_counted_under_the_first(db):
+    """The line names one book, so the chapters and the count have to be that book's.
+    Lumping every log under the first title reads as one long sitting on a book you
+    barely opened — the same mistake as crediting it with another source's cards."""
+    player = state.get_or_create_player(db)
+    db.add_all([
+        ReadingLog(player_id=player.id, day=DAY, book="Thinking, Fast and Slow",
+                   label="21-22", chapters=2),
+        ReadingLog(player_id=player.id, day=DAY, book="Meditations",
+                   label="1-4", chapters=4),
+    ])
+    db.commit()
+
+    assert recap.of(db, player, DAY)["reading"] == {
+        "chapters": ["21-22"], "count": 2, "book": "Thinking, Fast and Slow",
+    }
+
+
+def test_the_same_book_respelled_still_counts_together(db):
+    """book_key is how a title is matched everywhere else, so a re-spelling is the
+    same book here too rather than a second one silently dropped."""
+    player = state.get_or_create_player(db)
+    db.add_all([
+        ReadingLog(player_id=player.id, day=DAY, book="How to Read a Book",
+                   label="1", chapters=1),
+        ReadingLog(player_id=player.id, day=DAY, book="how to read a book",
+                   label="2", chapters=1),
+    ])
+    db.commit()
+
+    r = recap.of(db, player, DAY)["reading"]
+    assert r["count"] == 2 and r["chapters"] == ["1", "2"]
+
+
 def test_notion_reading_is_named_in_the_recap(db):
     """The system-design plan runs on Notion, so what was read there has to reach the
     email by name — counting it as an anonymous 'learning' loses the point."""
