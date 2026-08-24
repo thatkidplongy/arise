@@ -224,14 +224,16 @@ def resolve_content(
     pk = quests.period_key(quest.cadence, day)
     floor = quests.floor_for(quest, book, level, craft_source, fuel)
     gen = gen_by.get((quest.id, pk))
-    if gen is not None:
-        steps = quests.cap_steps(floor + gen["steps"], len(floor))
+    # A run day is a plan, not a prompt for variety: generated content would quietly
+    # swap out the 5 km, and "every Mon/Wed/Fri" has to mean every Mon/Wed/Fri.
+    if gen is not None and not quests.is_roadwork(quest.id, day):
+        steps = quests.cap_steps(floor + gen["steps"], len(floor), quest.id)
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
         interview=interview, jp_week=jp_week, craft_source=craft_source, fuel=fuel,
     )
-    return title, desc, quests.cap_steps(steps, len(floor)), resource
+    return title, desc, quests.cap_steps(steps, len(floor), quest.id), resource
 
 
 def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:

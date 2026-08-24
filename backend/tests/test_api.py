@@ -54,8 +54,11 @@ def test_state_shape(client):
     assert "push-ups" in q["steps"][0]
     # …and an explosive (plyometric) core rep is always on top, whatever the workout.
     assert any("tuck jump" in st for st in q["steps"])
-    # Quests stay lean: ≤3 steps when there's a mandatory floor, ≤2 without one.
-    assert len(q["steps"]) <= 3
+    # Quests stay lean: ≤3 steps when there's a mandatory floor, ≤2 without one —
+    # except Physical, whose floor is three steps on its own, so it gets 5 and the
+    # day's actual training survives instead of being trimmed away (STEP_CAPS).
+    assert len(q["steps"]) == 5
+    assert q["steps"][3:] != []  # the variant, below the floor
     # A non-floored daily (Creativity) caps at 2 — checked on a day it's in rotation.
     sketch = _quest(client.get("/state?day=2026-07-19").json(), "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2

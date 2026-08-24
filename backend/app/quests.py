@@ -78,6 +78,15 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "4 × 12 reverse lunges per leg",
             "4 × 20 calf raises + 3 × 15 glute bridges",
         ]),
+        # The complement to the MWF 5K (see ROADWORK): running is quad- and
+        # calf-dominant, both legs in one plane, so what it leaves behind is
+        # hamstrings, glutes and single-leg control — which is also where runners
+        # get hurt. Unilateral and slow on purpose; the road already covers volume.
+        ("Hips & Hamstrings", "The bits running doesn't build", [
+            "4 × 8 single-leg RDLs per leg — slow down, hips square, feel the hamstring take it",
+            "4 × 10 Bulgarian split squats per leg — back foot on a chair, knee tracks over the toes",
+            "3 × 15 single-leg glute bridges + 3 × 20 side-lying leg raises per side",
+        ]),
         ("Explosive Footwork", "Plyo footwork for the court", [
             "8 × 15s split-step into lunge",
             "6 × 30s fast feet (ladder or line)",
@@ -1185,11 +1194,24 @@ def priority_content(focus: str) -> tuple[str, str, list[str]]:
     )
 
 
-def cap_steps(steps: list[str], floor_len: int) -> list[str]:
+# Slots whose cap isn't the usual 3. Physical is the one exception: its floor is
+# three steps on its own (push-ups, plank, tuck jumps), so at a cap of 3 the floor
+# ate the whole budget and every rotating variant was built and then trimmed away
+# — the card read "Legs & Lunges" while listing push-ups, identically, every day.
+# Five leaves room for the floor plus the two steps of the day's actual training.
+STEP_CAPS: dict[str, int] = {"d-train": 5}
+_STEP_CAP_WITH_FLOOR = 3
+_STEP_CAP_BARE = 2
+
+
+def cap_steps(steps: list[str], floor_len: int, slot_id: str = "") -> list[str]:
     """Keep a quest lean and glanceable: at most 2 steps, or 3 when it carries a
-    mandatory floor. Floor steps come first, so they're the ones kept up to the cap;
-    extra variety beyond that is trimmed."""
-    return steps[: 3 if floor_len > 0 else 2]
+    mandatory floor (per-slot exceptions in STEP_CAPS). Floor steps come first, so
+    they're the ones kept up to the cap; extra variety beyond that is trimmed —
+    which is why every variant leads with the step that matters most."""
+    if floor_len <= 0:
+        return steps[:_STEP_CAP_BARE]
+    return steps[: STEP_CAPS.get(slot_id, _STEP_CAP_WITH_FLOOR)]
 
 
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
@@ -1549,6 +1571,33 @@ def craft_content(day: str) -> tuple[str, str, list[str], str]:
     return _CRAFT_METHODS[_pick("d-craft", f"craft:{day}", len(_CRAFT_METHODS))]
 
 
+# ── Roadwork: the fixed running days ─────────────────────────────────────────
+# Mon/Wed/Fri, with a rest day between each — the standard spacing for building
+# distance, and the reason this is a weekday rule rather than a stride like
+# `is_systems_day`. A weekday rule is only safe because Physical is in
+# `_DAILY_ALWAYS` and shows every day: the run changes what the slot *contains*,
+# never whether it appears, so it can't drift out of sync the way an "every
+# Sunday" rule would against the 3-day rotation.
+#
+# The run replaces the day's rotating variant, not the floor — push-ups, plank and
+# tuck jumps still lead the card, so the non-negotiable stays non-negotiable.
+RUN_WEEKDAYS = (0, 2, 4)  # Mon, Wed, Fri
+ROADWORK: tuple[str, str, list[str]] = (
+    "Roadwork", "5 km on the road", [
+        "5 km run — conversational pace, then empty the tank over the last 500 m",
+        "Walk 5 min to come down, then stretch calves, quads and hip flexors while warm",
+    ],
+)
+
+
+def is_roadwork(quest_id: str, day: str) -> bool:
+    """Whether `quest_id` is Physical on one of its fixed running days — the day's
+    training is the 5 km rather than a pool variant. Both the content builder and
+    the generated-content guard in `state.resolve_content` ask this, so what counts
+    as a run day is decided in one place."""
+    return quest_id == "d-train" and date.fromisoformat(day).weekday() in RUN_WEEKDAYS
+
+
 def content_for(
     quest: QuestDef,
     day: str,
@@ -1586,6 +1635,9 @@ def content_for(
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
-    title, desc, steps = pool_variant(quest, day, progression.band_for(level), interview)
-    steps = floor_for(quest, book, level, craft_source, fuel) + steps  # non-negotiables first, then variety
+    if is_roadwork(quest.id, day):
+        title, desc, variant = ROADWORK  # the run is the day's training, floor unchanged
+    else:
+        title, desc, variant = pool_variant(quest, day, progression.band_for(level), interview)
+    steps = floor_for(quest, book, level, craft_source, fuel) + variant  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

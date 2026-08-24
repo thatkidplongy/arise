@@ -353,3 +353,80 @@ def test_no_focus_uses_pool():
     q = _q("s-drill", "STR", "side")
     title, desc, _, _ = quests.content_for(q, "2026-07-18", None)
     assert not desc.startswith("Your focus:")
+
+
+def _train_card(day: str, level: int = 1) -> tuple[str, list[str]]:
+    """What the Physical card actually shows on `day` — content plus the slot's cap,
+    the same pairing state.resolve_content applies."""
+    q = _q("d-train", "STR", "daily")
+    title, _, steps, _ = quests.content_for(q, day, level=level)
+    floor = quests.floor_for(q, level=level)
+    return title, quests.cap_steps(steps, len(floor), "d-train")
+
+
+def test_physical_shows_the_days_training_and_not_just_the_floor():
+    # The regression this guards: d-train's floor is three steps on its own, so at
+    # the default cap of 3 the floor ate the whole budget and every variant was
+    # built and then trimmed away — a rotating title over an identical checklist.
+    floor = quests.floor_for(_q("d-train", "STR", "daily"), level=1)
+    assert len(floor) == 3
+    checklists = set()
+    for i in range(21):
+        day = (date(2026, 8, 25) + timedelta(days=i)).isoformat()
+        _, steps = _train_card(day)
+        assert steps[: len(floor)] == floor  # non-negotiables still lead
+        assert len(steps) == 5  # floor + two steps of real work
+        assert steps[len(floor):] != []
+        checklists.add(tuple(steps))
+    assert len(checklists) > 1  # the work below the floor actually changes
+
+
+def test_roadwork_lands_on_every_mon_wed_fri_and_keeps_the_floor():
+    floor = quests.floor_for(_q("d-train", "STR", "daily"), level=1)
+    for i in range(60):
+        d = date(2026, 8, 24) + timedelta(days=i)
+        title, steps = _train_card(d.isoformat())
+        is_mwf = d.weekday() in (0, 2, 4)
+        assert (title == "Roadwork") is is_mwf
+        if is_mwf:
+            # The run replaces the rotating variant, never the floor.
+            assert steps[: len(floor)] == floor
+            assert any("5 km run" in s for s in steps)
+
+
+def test_other_slots_keep_the_lean_three_step_cap():
+    # Raising Physical's cap must not bloat the rest — Fuel is a plan, not a checklist.
+    steps = ["a", "b", "c", "d", "e", "f"]
+    assert len(quests.cap_steps(steps, 2, "d-fuel")) == 3
+    assert len(quests.cap_steps(steps, 1, "d-read")) == 3
+    assert len(quests.cap_steps(steps, 0, "d-sketch")) == 2  # floor-free slots stay at 2
+    assert len(quests.cap_steps(steps, 3, "d-train")) == 5
+
+
+def test_hips_and_hamstrings_complements_the_running_days():
+    # Running is quad/calf dominant in one plane; the complement is unilateral
+    # posterior-chain work, and it has to lead the variant to survive the cap.
+    variant = next(v for v in quests.POOLS["d-train"] if v[0] == "Hips & Hamstrings")
+    assert "single-leg RDL" in variant[2][0]
+    assert "split squat" in variant[2][1]
+
+
+def test_generated_content_cannot_replace_a_run_day():
+    """The guard `state.resolve_content` applies: on Mon/Wed/Fri the Physical slot
+    is a plan, so LLM-generated variety must not quietly swap the 5 km out. Any
+    other day, generated content wins as usual."""
+    from app import state
+
+    q = _q("d-train", "STR", "daily")
+    gen = {"title": "Invented Workout", "desc": "d", "steps": ["something else"], "resource": ""}
+
+    def resolve(day: str) -> str:
+        pk = quests.period_key("daily", day)
+        return state.resolve_content(
+            q, day, prefs={}, gen_by={("d-train", pk): gen}, level=1, book="",
+            interview=False, jp_week=0, craft_source="",
+        )[0]
+
+    assert resolve("2026-08-24") == "Roadwork"          # Monday — the plan holds
+    assert resolve("2026-08-26") == "Roadwork"          # Wednesday
+    assert resolve("2026-08-25") == "Invented Workout"  # Tuesday — generation still wins
