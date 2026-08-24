@@ -51,7 +51,7 @@ import hashlib
 
 from datetime import date
 
-from . import game, progression
+from . import game, japanese, progression
 from .models import QuestDef
 
 # slot id -> pool of (title, desc, steps) variants. The seeded content is the
@@ -285,14 +285,13 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Watch that topic's Khan Academy lesson",
             "Do 5 practice problems — redo any you miss",
         ]),
-        ("Kanji & Grammar", "15 min Japanese", [
-            "Learn 5 new kanji — write each one 3×",
-            "Study one Genki grammar point",
-            "Write 2 sentences that use it",
+        ("Japanese Deep Rep", "15 min on whatever the plan has you on", [
+            "Take the material the daily Japanese quest is on and push it one level harder",
+            "Produce it from memory — write it, say it — before you check anything",
         ]),
         ("Kana Drill", "10 min kana", [
-            "Drill one kana row (e.g. か き く け こ)",
-            "Write each character 5× from memory",
+            "Work the kana stack on Learn until the pile is done",
+            "Write out every character you missed, five times each",
         ]),
         ("Current Affairs", "15 min news", [
             "Read one local and one world story in full",
@@ -423,10 +422,10 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Score 80%+ on its unit quiz",
             "List the 2 ideas that were hardest",
         ]),
-        ("Japanese Checkpoint", "One Genki lesson", [
-            "Finish one Genki lesson (grammar + reading)",
-            "Learn its kanji and vocab — write each 3×",
-            "Review the set twice with flashcards (Anki)",
+        ("Japanese Checkpoint", "Prove the stage you're on", [
+            "Read something out loud using only what you have so far — no looking ahead",
+            "Write down every character or word you had to stop at",
+            "Drill just those, then read the same thing again",
         ]),
         ("Understand the World", "Go deep on one topic", [
             "Pick one topic (e.g. inflation, WWI, plate tectonics)",
@@ -590,9 +589,9 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Do 10 problems at your current level",
             "Time the last 5 — beat your first-half pace",
         ]),
-        ("Japanese Study", "20 min: grammar/kanji + flashcards", [
-            "15 min: one grammar point or 5 kanji (write each 3×)",
-            "5 min: flashcard review (Anki or WaniKani)",
+        ("Japanese Study", "20 min: the plan, then recall", [
+            "15 min on the step the daily Japanese quest is holding — write it out by hand",
+            "5 min clearing the kana stack on Learn, or your SRS reviews once you're past kana",
         ]),
         ("Read the Docs", "30 min in the docs for a tool you use", [
             "Pick a tool/language you use (e.g. Python, React, git)",
@@ -984,11 +983,11 @@ RESOURCES: dict[str, str] = {
     "Math Milestone": "🎥 Khan Academy",
     "Math Reps": "🎥 Khan Academy",
     "Problem Set": "🎥 Khan Academy",
-    "Kanji & Grammar": "🎥 Tokini Andy — Genki walkthroughs (YouTube)",
+    "Japanese Deep Rep": "🎥 Tokini Andy — Genki walkthroughs (YouTube)",
     "Kana Drill": "🌐 Tofugu — hiragana & katakana guides",
     "Japanese Study": "🌐 Tae Kim's Guide to Japanese (guidetojapanese.org)",
-    # (The daily Japanese plan, d-jp, carries its own resource per phase — see
-    # japanese_content — so it isn't listed here.)
+    # (The daily Japanese plan, d-jp, carries its own resource per step — see
+    # japanese.py — so it isn't listed here.)
     "Japanese Checkpoint": "📖 Genki: An Integrated Course in Elementary Japanese",
     "Into History": "🎥 Crash Course (YouTube)",
     "Understand the World": "🎥 Crash Course (YouTube)",
@@ -1047,7 +1046,7 @@ TIER: dict[str, int] = {
     "Reconnect": 1, "Listen Fully": 1, "New Ally": 2, "First Contact": 2,
     # INT — learn-how-to-learn (0) → apply to domains (1) → depth (2)
     "Growth Read": 1, "Code Kata": 1, "Math from Zero": 1, "Kana Drill": 1, "Current Affairs": 1,
-    "Kanji & Grammar": 2, "Into History": 2, "Map the World": 2, "Science Dive": 2, "Problem Set": 2,
+    "Japanese Deep Rep": 2, "Into History": 2, "Map the World": 2, "Science Dive": 2, "Problem Set": 2,
     "Math Milestone": 1, "Japanese Checkpoint": 1, "Ship Something": 2, "Understand the World": 2,
     "Arcane Study: Code": 1, "Math Reps": 1, "Japanese Study": 1,
     "Debug Something": 2, "Down the Rabbit Hole": 2,
@@ -1253,105 +1252,6 @@ def pool_variant(quest: QuestDef, day: str, band: int = 0, interview: bool = Fal
     pk = _period_key(quest.cadence, day)
     tag = f"{pk}|b{target}" + ("|iv" if interview else "")
     return chosen[_pick(quest.id, tag, len(chosen))]
-
-
-# ── Japanese: a phased learning plan (kana → grammar → kanji) ─────────────────
-# The daily Japanese quest follows a beginner's roadmap rather than rotating
-# randomly. Which phase you're in is set by how many weeks you've been studying
-# (see state._jp_week); within a phase, the task still varies day to day. Each
-# entry is (title, desc, steps, resource).
-# Hiragana comes first — it writes native words and every grammatical particle
-# (は, を, が…), so you can't read a real sentence without it. Katakana (loanwords)
-# follows once hiragana is comfortable. This is the standard Genki/Tofugu order.
-_JP_HIRAGANA: list[tuple[str, str, list[str], str]] = [
-    ("Hiragana Row", "10 min — the script for native words", [
-        "Learn one hiragana row (e.g. か き く け こ)",
-        "Trace each, then write it 5× from memory",
-        "Read 5 words that use today's row, out loud",
-    ], "🌐 Tofugu — hiragana guide (with mnemonics)"),
-    ("Hiragana Tracing", "10 min muscle memory", [
-        "Use a hiragana tracing worksheet for the rows you're on",
-        "Trace slowly, saying each sound as you write it",
-    ], "🌐 Tofugu — printable hiragana worksheets"),
-    ("Hiragana Reading", "10 min putting it together", [
-        "Read a short list of hiragana-only words aloud",
-        "Just decode the sounds smoothly — no katakana or kanji yet",
-    ], "🌐 Tofugu — hiragana reading practice"),
-]
-_JP_KATAKANA: list[tuple[str, str, list[str], str]] = [
-    ("Katakana Row", "10 min — the script for foreign words", [
-        "Learn one katakana row (e.g. カ キ ク ケ コ)",
-        "Write each 5×, then read 5 loanwords (コーヒー, テレビ…)",
-    ], "🌐 Tofugu — katakana guide"),
-    ("Kana Flashcards", "10 min recall", [
-        "Run a hiragana + katakana flashcard deck (Anki or an app)",
-        "Keep the ones you miss and drill just those again",
-    ], "🎧 Anki — kana deck (spaced repetition)"),
-    ("Kana Reading", "10 min putting it together", [
-        "Read a short mix of hiragana + katakana words aloud",
-        "No kanji yet — just decode the sounds smoothly",
-    ], "🌐 Tofugu — kana reading practice"),
-]
-_JP_GRAMMAR: list[tuple[str, str, list[str], str]] = [
-    ("Sentence Shape", "15 min — Subject–Object–Verb", [
-        "Learn the SOV order — Japanese puts the verb last",
-        "Turn 3 English sentences into JP order (私は寿司を食べる)",
-    ], "🌐 Tae Kim's Guide — sentence structure"),
-    ("Particle は (wa)", "15 min — the topic marker", [
-        "Study は — it marks the topic ('as for…')",
-        "Write 3 sentences using は and say them aloud",
-    ], "🌐 Tae Kim's Guide — the は particle"),
-    ("Particle を (wo)", "15 min — the object marker", [
-        "Study を — it marks the direct object of a verb",
-        "Write 3 sentences (パンを食べる) and say them aloud",
-    ], "🌐 Tae Kim's Guide — the を particle"),
-    ("Mini Sentences", "15 min — put the particles to work", [
-        "Build 5 simple SOV sentences using は and を",
-        "Check them against a grammar guide or a native example",
-    ], "🎥 Tokini Andy — Genki grammar (YouTube)"),
-]
-_JP_KANJI: list[tuple[str, str, list[str], str]] = [
-    ("Kanji Set", "15 min — common characters", [
-        "Learn 5 common kanji — meaning, reading, stroke order",
-        "Write each 3×, then use one in a short sentence",
-    ], "🎧 WaniKani — kanji & vocab SRS"),
-    ("Everyday Vocab", "10 min — words you'll actually use", [
-        "Clear today's SRS reviews (Anki / WaniKani)",
-        "Add 5 everyday words (food, travel, directions)",
-    ], "🎧 Anki / WaniKani — spaced repetition"),
-    ("Kanji in Context", "15 min — read the real thing", [
-        "Read 2–3 short sentences mixing kanji + grammar",
-        "Note any new kanji and one grammar point you spot",
-    ], "🌐 NHK Easy News (nhk.or.jp/news/easy)"),
-    ("Listening", "10 min — train your ears", [
-        "Listen to a short clip (Nihongo con Teppei, or a show scene)",
-        "Note 3 words or phrases you caught",
-    ], "🎧 Nihongo con Teppei (podcast)"),
-    ("Travel Phrases", "10 min — survival Japanese", [
-        "Pick a situation: train, restaurant, shop, directions",
-        "Learn 5 phrases for it and practise saying them",
-    ], "🌐 Tofugu — essential travel Japanese"),
-    ("Shadowing", "10 min — speaking", [
-        "Pick one or two lines of native audio",
-        "Shadow them 5× each — match the rhythm and pitch",
-    ], "🎥 Comprehensible Japanese (YouTube)"),
-]
-
-
-def japanese_content(week_num: int, day: str) -> tuple[str, str, list[str], str]:
-    """Today's Japanese task for a learner `week_num` weeks in, following the plan:
-    Week 1 hiragana → Week 2 katakana → Week 3 basic grammar → Week 4+ kanji &
-    everyday context. The phase is fixed by the week; the exact task rotates within
-    it, day to day. Hiragana precedes katakana on purpose (see the pools above)."""
-    if week_num <= 1:
-        pool = _JP_HIRAGANA
-    elif week_num == 2:
-        pool = _JP_KATAKANA
-    elif week_num == 3:
-        pool = _JP_GRAMMAR
-    else:
-        pool = _JP_KANJI
-    return pool[_pick("d-jp", f"jp:{day}", len(pool))]
 
 
 # ── Craft (CFT): the 12-week system-design plan ───────────────────────────────
@@ -1605,7 +1505,7 @@ def content_for(
     book: str | None = None,
     level: int = 0,
     interview: bool = False,
-    jp_week: int = 0,
+    jp_step: int = 0,
     craft_source: str | None = None,
     fuel: dict | None = None,
 ) -> tuple[str, str, list[str], str]:
@@ -1615,12 +1515,14 @@ def content_for(
     `focus` is the attribute's set of focuses; a side quest rotates through them
     day to day. `book` names the current read in the reading floor. `level` is the
     stat's progression level — it climbs the floor and picks the content band.
-    `interview` (Craft only) swaps in the interview-prep pool. `jp_week` drives the
-    Japanese plan; `craft_source` is the one thing Craft is studying; `fuel` is the
-    hunter's nutrition targets for the diet floor. `resource` points at a trusted
-    place to learn (empty when there isn't one)."""
+    `interview` (Craft only) swaps in the interview-prep pool. `jp_step` is how far
+    along the Japanese plan the hunter is; `craft_source` is the one thing Craft is
+    studying; `fuel` is the hunter's nutrition targets for the diet floor. `resource`
+    points at a trusted place to learn (empty when there isn't one)."""
     if quest.id == "d-jp":
-        return japanese_content(jp_week or 1, day)  # follows the kana→grammar→kanji plan
+        # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
+        # a position rather than paced by a calendar. See japanese.py.
+        return japanese.content(jp_step, day)
     if quest.id == "d-craft" and not interview:
         # Follows the system-design plan at whatever phase the hunter is holding.
         # Interview mode opts out — it has its own pool, and a next-week interview

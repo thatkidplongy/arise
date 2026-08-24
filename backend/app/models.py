@@ -36,9 +36,15 @@ class Player(Base):
     # Progression begins the week this is first set (see progression.py), so past
     # history never counts retroactively — everyone starts each attribute at Lv 0.
     progression_start_week: Mapped[str] = mapped_column(String, default="")
-    # The ISO week Japanese study began — anchors the phased learning plan
-    # (kana → grammar → kanji). Set the first time we see the player.
+    # The ISO week Japanese study began — kept for display, never to decide what to
+    # study. It used to drive the whole plan, which meant week three handed over kanji
+    # whether or not か had landed.
     japanese_started_week: Mapped[str] = mapped_column(String, default="")
+    # How far along the Japanese walk the hunter is (0-based; see japanese.PLAN):
+    # hiragana row by row, then katakana, then words and particles, then sentence
+    # shape, then kanji. It moves when a day that handed over new material is
+    # finished — never on a schedule.
+    japanese_step: Mapped[int] = mapped_column(Integer, default=0)
     # The ISO week the system-design plan began — kept for display ("started 3 weeks
     # ago"), never to decide what to study. The phase advances on reading, not time.
     craft_started_week: Mapped[str] = mapped_column(String, default="")

@@ -67,6 +67,11 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("reminders", "done", "BOOLEAN DEFAULT 0"),
     ("reminders", "done_at", "DATETIME"),
     ("players", "japanese_started_week", "VARCHAR DEFAULT ''"),
+    # Where the Japanese plan stands, replacing the week clock that used to decide it.
+    # Existing players start at the top of the hiragana chart rather than being
+    # guessed at from how long ago they began — the deck on Learn is one sitting away
+    # from telling them what they already know.
+    ("players", "japanese_step", "INTEGER DEFAULT 0"),
     ("insights", "kind", "VARCHAR DEFAULT 'motivation'"),
     ("quest_notes", "prompt", "VARCHAR DEFAULT ''"),
     ("quest_notes", "step_index", "INTEGER"),

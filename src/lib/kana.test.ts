@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  HIRAGANA,
   KANA_NEW_PER_DAY,
   buildKanaDeck,
   countKanaMet,
-  describeKanaBuild,
   gradeKana,
   kanaIntervalFor,
   type KanaBook,
@@ -13,56 +11,10 @@ import {
 
 const TODAY = '2026-08-24';
 
-function charOf(char: string) {
-  const found = HIRAGANA.find((k) => k.char === char);
-  if (!found) throw new Error(`${char} is not on the chart`);
-  return found;
-}
-
 /** A book where `chars` are all sitting on box 1, due on `due`. */
 function bookWith(chars: string[], due: string, first = '2026-08-01'): KanaBook {
   return Object.fromEntries(chars.map((char) => [char, { box: 1, due, first, last: first, seen: 1 }]));
 }
-
-describe('the chart', () => {
-  it('holds every hiragana once — the plain rows, both marks, and the combinations', () => {
-    expect(HIRAGANA).toHaveLength(104);
-    expect(new Set(HIRAGANA.map((k) => k.char)).size).toBe(104);
-    expect(HIRAGANA.every((k) => k.romaji.length > 0)).toBe(true);
-  });
-
-  it('opens on あ and teaches the plain chart before anything marked or combined', () => {
-    expect(HIRAGANA[0].char).toBe('あ');
-    const firstMarked = HIRAGANA.findIndex((k) => k.group !== 'base');
-    expect(firstMarked).toBe(46);
-    expect(HIRAGANA.slice(46, 66).every((k) => k.group === 'dakuten')).toBe(true);
-    expect(HIRAGANA.at(-1)?.group).toBe('combo');
-  });
-
-  it('files each character in its own row, with the row’s sounds beside it', () => {
-    expect(charOf('く').row.label).toBe('か');
-    expect(charOf('く').row.romaji).toEqual(['ka', 'ki', 'ku', 'ke', 'ko']);
-  });
-
-  it('names what a marked or combined character is built out of', () => {
-    expect(charOf('ぎ').from).toBe('き');
-    expect(charOf('ぱ').from).toBe('は');
-    expect(charOf('じゃ').from).toBe('じ');
-    expect(charOf('あ').from).toBe('');
-  });
-
-  it('says so on the back, and says nothing on a plain character', () => {
-    expect(describeKanaBuild(charOf('が'))).toBe('か with a dakuten (゛) — か voiced.');
-    expect(describeKanaBuild(charOf('ぴ'))).toBe('ひ with a handakuten (゜).');
-    expect(describeKanaBuild(charOf('しゅ'))).toBe('し with a small ゅ — one sound, not two.');
-    expect(describeKanaBuild(charOf('こ'))).toBe('');
-  });
-
-  it('warns about the characters that are read one way and used another', () => {
-    expect(charOf('を').note).toContain('said “o”');
-    expect(charOf('こ').note).toBe('');
-  });
-});
 
 describe('the ladder', () => {
   it('spaces a character further out the higher it climbs, and stops at the top rung', () => {

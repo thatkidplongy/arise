@@ -1,0 +1,127 @@
+import type { KanaWord } from '@/lib/kanaChart';
+
+/**
+ * One word per character, spelled in hiragana alone.
+ *
+ * A character on its own only ever teaches its sound. The rules that actually trip a
+ * beginner up — a small つ swallowing a beat, a う that lengthens the vowel before it
+ * rather than sounding, a small ゃ that fuses two characters into one syllable — are
+ * invisible until a character sits in a word, so every back carries one and takes it
+ * apart (see breakKanaWord).
+ *
+ * Kanji-free on purpose: a word written 学校 teaches nothing to someone who is three
+ * days into the chart, and がっこう teaches the sokuon.
+ */
+const WORDS: Record<string, [string, string, string]> = {
+  あ: ['あさ', 'asa', 'morning'],
+  い: ['いぬ', 'inu', 'dog'],
+  う: ['うみ', 'umi', 'the sea'],
+  え: ['えき', 'eki', 'train station'],
+  お: ['おかね', 'okane', 'money'],
+  か: ['かさ', 'kasa', 'umbrella'],
+  き: ['きのこ', 'kinoko', 'mushroom'],
+  く: ['くつ', 'kutsu', 'shoes'],
+  け: ['けむり', 'kemuri', 'smoke'],
+  こ: ['こども', 'kodomo', 'child'],
+  さ: ['さかな', 'sakana', 'fish'],
+  し: ['しま', 'shima', 'island'],
+  す: ['すし', 'sushi', 'sushi'],
+  せ: ['せかい', 'sekai', 'the world'],
+  そ: ['そら', 'sora', 'sky'],
+  た: ['たまご', 'tamago', 'egg'],
+  ち: ['ちかい', 'chikai', 'near'],
+  つ: ['つき', 'tsuki', 'the moon'],
+  て: ['てがみ', 'tegami', 'a letter'],
+  と: ['とり', 'tori', 'bird'],
+  な: ['なつ', 'natsu', 'summer'],
+  に: ['にわ', 'niwa', 'garden'],
+  ぬ: ['ぬの', 'nuno', 'cloth'],
+  ね: ['ねこ', 'neko', 'cat'],
+  の: ['のり', 'nori', 'dried seaweed'],
+  は: ['はな', 'hana', 'flower'],
+  ひ: ['ひかり', 'hikari', 'light'],
+  ふ: ['ふゆ', 'fuyu', 'winter'],
+  へ: ['へや', 'heya', 'room'],
+  ほ: ['ほし', 'hoshi', 'star'],
+  ま: ['まど', 'mado', 'window'],
+  み: ['みず', 'mizu', 'water'],
+  む: ['むし', 'mushi', 'insect'],
+  め: ['めがね', 'megane', 'glasses'],
+  も: ['もり', 'mori', 'forest'],
+  や: ['やま', 'yama', 'mountain'],
+  ゆ: ['ゆき', 'yuki', 'snow'],
+  よ: ['よる', 'yoru', 'night'],
+  ら: ['らいねん', 'rainen', 'next year'],
+  り: ['りんご', 'ringo', 'apple'],
+  る: ['るす', 'rusu', 'out, not at home'],
+  れ: ['れきし', 'rekishi', 'history'],
+  ろ: ['ろく', 'roku', 'six'],
+  わ: ['わたし', 'watashi', 'I, me'],
+  // A particle, so it only exists inside a sentence — the shortest honest one.
+  を: ['みずをのむ', 'mizu o nomu', 'to drink water'],
+  ん: ['にほん', 'nihon', 'Japan'],
+  が: ['がっこう', 'gakkō', 'school'],
+  ぎ: ['ぎんこう', 'ginkō', 'bank'],
+  ぐ: ['かぐ', 'kagu', 'furniture'],
+  げ: ['げんき', 'genki', 'well, full of energy'],
+  ご: ['ごはん', 'gohan', 'cooked rice, a meal'],
+  ざ: ['ざっし', 'zasshi', 'magazine'],
+  じ: ['じかん', 'jikan', 'time'],
+  ず: ['ちず', 'chizu', 'map'],
+  ぜ: ['ぜんぶ', 'zenbu', 'all of it'],
+  ぞ: ['ぞう', 'zō', 'elephant'],
+  だ: ['だいがく', 'daigaku', 'university'],
+  ぢ: ['はなぢ', 'hanaji', 'nosebleed'],
+  づ: ['つづく', 'tsuzuku', 'to continue'],
+  で: ['でんわ', 'denwa', 'telephone'],
+  ど: ['どうぶつ', 'dōbutsu', 'animal'],
+  ば: ['そば', 'soba', 'buckwheat noodles'],
+  び: ['えび', 'ebi', 'prawn'],
+  ぶ: ['ぶた', 'buta', 'pig'],
+  べ: ['べんとう', 'bentō', 'lunch box'],
+  ぼ: ['ぼうし', 'bōshi', 'hat'],
+  ぱ: ['いっぱい', 'ippai', 'full, a lot'],
+  ぴ: ['えんぴつ', 'enpitsu', 'pencil'],
+  ぷ: ['てんぷら', 'tenpura', 'tempura'],
+  ぺ: ['ぺらぺら', 'perapera', 'fluently'],
+  ぽ: ['さんぽ', 'sanpo', 'a walk'],
+  きゃ: ['きゃく', 'kyaku', 'guest'],
+  きゅ: ['きゅう', 'kyū', 'nine'],
+  きょ: ['きょう', 'kyō', 'today'],
+  しゃ: ['しゃしん', 'shashin', 'photograph'],
+  しゅ: ['しゅみ', 'shumi', 'a hobby'],
+  しょ: ['しょくじ', 'shokuji', 'a meal'],
+  ちゃ: ['おちゃ', 'ocha', 'tea'],
+  ちゅ: ['ちゅうい', 'chūi', 'caution'],
+  ちょ: ['ちょっと', 'chotto', 'a little'],
+  にゃ: ['こんにゃく', 'konnyaku', 'konjac'],
+  にゅ: ['にゅうがく', 'nyūgaku', 'starting school'],
+  にょ: ['にょうぼう', 'nyōbō', 'one’s wife (old-fashioned)'],
+  ひゃ: ['ひゃく', 'hyaku', 'a hundred'],
+  ひゅ: ['ひゅうひゅう', 'hyūhyū', 'a whistling wind'],
+  ひょ: ['ひょう', 'hyō', 'a table, a chart'],
+  みゃ: ['みゃく', 'myaku', 'pulse'],
+  みょ: ['みょうじ', 'myōji', 'surname'],
+  りゃ: ['りゃく', 'ryaku', 'an abbreviation'],
+  りゅ: ['りゅう', 'ryū', 'dragon'],
+  りょ: ['りょこう', 'ryokō', 'a trip'],
+  ぎゃ: ['ぎゃく', 'gyaku', 'the reverse'],
+  ぎゅ: ['ぎゅうにく', 'gyūniku', 'beef'],
+  ぎょ: ['ぎょうざ', 'gyōza', 'dumplings'],
+  じゃ: ['じゃがいも', 'jagaimo', 'potato'],
+  じゅ: ['じゅぎょう', 'jugyō', 'a class'],
+  じょ: ['じょうず', 'jōzu', 'good at something'],
+  びゃ: ['さんびゃく', 'sanbyaku', 'three hundred'],
+  びゅ: ['びゅうびゅう', 'byūbyū', 'a howling wind'],
+  びょ: ['びょういん', 'byōin', 'hospital'],
+  ぴゃ: ['ろっぴゃく', 'roppyaku', 'six hundred'],
+  ぴゅ: ['ぴゅうぴゅう', 'pyūpyū', 'a whistling wind'],
+  ぴょ: ['ぴょんぴょん', 'pyonpyon', 'hopping'],
+};
+
+/** The word for a character, or null where the chart has none. */
+export function wordFor(char: string): KanaWord | null {
+  const found = WORDS[char];
+  if (!found) return null;
+  return { word: found[0], romaji: found[1], gloss: found[2] };
+}

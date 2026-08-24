@@ -12,8 +12,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import (body, digest, game, insights, llm, mailer, progression, quests, reading,
-               recall, transcript)
+from . import (body, digest, game, insights, japanese, llm, mailer, progression, quests,
+               reading, recall, transcript)
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -47,7 +47,8 @@ def get_or_create_player(db: Session) -> Player:
         player.progression_start_week = game.week_key(date.today().isoformat())
         db.commit()
     if not player.japanese_started_week:
-        # Start the Japanese plan (kana → grammar → kanji) from this week.
+        # Stamped for display only ("started 5 weeks ago"). What to study comes from
+        # `japanese_step`, which moves when a step is finished (see japanese.py).
         player.japanese_started_week = game.week_key(date.today().isoformat())
         db.commit()
     if not player.craft_started_week:
@@ -182,10 +183,10 @@ def generated_by(db: Session, player: Player) -> dict[tuple[str, str], dict]:
     return out
 
 
-def _jp_week(player: Player, day: str) -> int:
-    """Which week of the Japanese plan the player is in (1-indexed; week 1 = the
-    anchor week). 0 when the anchor isn't set yet."""
-    return _weeks_since(player.japanese_started_week, day)
+def _jp_step(player: Player) -> int:
+    """How far along the Japanese plan the player is. Deliberately not derived from
+    the calendar — see japanese.py for why a week clock was the wrong shape."""
+    return max(0, min(player.japanese_step or 0, japanese.LAST_STEP))
 
 
 def _craft_phase_num(player: Player) -> int:
@@ -212,7 +213,7 @@ def resolve_content(
     level: int,
     book: str,
     interview: bool,
-    jp_week: int,
+    jp_step: int,
     craft_source: str,
     fuel: dict | None = None,
 ) -> tuple[str, str, list[str], str]:
@@ -231,7 +232,7 @@ def resolve_content(
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
-        interview=interview, jp_week=jp_week, craft_source=craft_source, fuel=fuel,
+        interview=interview, jp_step=jp_step, craft_source=craft_source, fuel=fuel,
     )
     return title, desc, quests.cap_steps(steps, len(floor), quest.id), resource
 
@@ -247,7 +248,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     prefs = preferences_of(db, player)
     gen_by = generated_by(db, player)
     levels = progression_levels(db, player, day)
-    jp_week = _jp_week(player, day)
+    jp_step = _jp_step(player)
     craft_source = player.craft_source
     fuel = body.targets_of(db, player.id)
     titles: dict[str, str] = {}
@@ -259,7 +260,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             level=levels.get(quest.stat, 0),
             book=player.current_book,
             interview=player.interview_mode,
-            jp_week=jp_week,
+            jp_step=jp_step,
             craft_source=craft_source,
             fuel=fuel,
         )
@@ -278,7 +279,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         level=progression_levels(db, player, day).get(quest.stat, 0),
         book=player.current_book,
         interview=player.interview_mode,
-        jp_week=_jp_week(player, day),
+        jp_step=_jp_step(player),
         craft_source=player.craft_source,
         fuel=body.targets_of(db, player.id),
     )
@@ -398,7 +399,7 @@ def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, interview=False, jp_week=0, craft_source="", notes_by=None,
+               levels=None, interview=False, jp_step=0, craft_source="", notes_by=None,
                fuel=None) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
@@ -408,7 +409,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         level=(levels or {}).get(q.stat, 0),
         book=book,
         interview=interview,
-        jp_week=jp_week,
+        jp_step=jp_step,
         craft_source=craft_source,
         fuel=fuel,
     )
@@ -938,7 +939,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "daily_quote": insights.daily_quote(db, player.id, day),
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
-                       prog_levels, player.interview_mode, _jp_week(player, day),
+                       prog_levels, player.interview_mode, _jp_step(player),
                        player.craft_source, notes_by, fuel)
             for q in defs
             if q.cadence != "daily" or q.id in active_ids  # only today's dailies show

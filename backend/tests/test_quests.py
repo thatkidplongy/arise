@@ -3,7 +3,7 @@
 import re
 from datetime import date, timedelta
 
-from app import quests
+from app import japanese, quests
 from app.models import QuestDef
 
 
@@ -331,22 +331,63 @@ def test_side_quest_focus_overrides_and_rotates():
     assert quests.content_for(q, "2026-07-13", focus)[1] == quests.content_for(q, "2026-07-17", focus)[1]
 
 
-def test_japanese_plan_advances_by_week():
-    hiragana = {t for (t, *_r) in quests._JP_HIRAGANA}
-    katakana = {t for (t, *_r) in quests._JP_KATAKANA}
-    grammar = {t for (t, *_r) in quests._JP_GRAMMAR}
-    kanji = {t for (t, *_r) in quests._JP_KANJI}
-    # Week 1 → hiragana (before katakana), week 2 → katakana, week 3 → grammar,
-    # week 4+ → kanji & context. Every week-1 pick is hiragana, never katakana.
-    for d in ("2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09"):
-        assert quests.japanese_content(1, d)[0] in hiragana
-    assert quests.japanese_content(2, "2026-07-06")[0] in katakana
-    assert quests.japanese_content(3, "2026-07-06")[0] in grammar
-    assert quests.japanese_content(9, "2026-07-06")[0] in kanji
-    # content_for routes the d-jp daily through the plan and carries a resource.
+def test_japanese_plan_is_held_at_a_position_not_a_date():
+    """The plan walks hiragana → katakana → words → sentences → kanji, and where you
+    are is a position you finished your way to — never how many weeks have passed."""
+    stages = [japanese.stage_at(n) for n in range(len(japanese.PLAN))]
+    assert stages[0] == japanese.HIRAGANA
+    assert stages[-1] == japanese.KANJI
+    # Each stage runs contiguously, in the beginner order, and none is skipped.
+    order = [s for n, s in enumerate(stages) if n == 0 or stages[n - 1] != s]
+    assert order == [japanese.HIRAGANA, japanese.KATAKANA, japanese.WORDS,
+                     japanese.SENTENCES, japanese.KANJI]
+    # Hiragana comes before katakana on purpose: every particle is written in it.
+    assert stages.index(japanese.KATAKANA) > stages.index(japanese.HIRAGANA)
+
+
+def test_japanese_days_alternate_between_new_material_and_recall():
+    """A row a day would be a chart you had been shown, not one you could read — so
+    every third day introduces, on a cadence you can plan a week around."""
+    days = [f"2026-08-{n:02d}" for n in range(1, 31)]  # 30 days = exactly ten rows
+    introducing = [d for d in days if japanese.introduces(d)]
+    assert len(introducing) == 10
+    # Never two new rows running, and never a long drought of drilling either.
+    gaps = {japanese._ordinal(b) - japanese._ordinal(a) for a, b in zip(introducing, introducing[1:])}
+    assert gaps == {3}
+
+    # The step's own title on a day that introduces it; a practice sitting otherwise.
+    step = japanese.step_at(5)
+    assert japanese.content(5, introducing[0])[0] == step["title"]
+    practice = [t for (t, *_r) in japanese._PRACTICE[step["stage"]]]
+    quiet = [d for d in days if not japanese.introduces(d)]
+    assert all(japanese.content(5, d)[0] in practice for d in quiet)
+
+    # The practice pool cycles rather than repeating — a rotating title over the same
+    # checklist two mornings running isn't variety.
+    shown = [japanese.content(5, d)[0] for d in quiet]
+    assert set(shown) == set(practice)
+    assert all(a != b for a, b in zip(shown, shown[1:]))
+
+    # A drilling day still says where the plan is; the step title only shows on a third
+    # of the days, so without this two mornings in three read as a plan-less drill.
+    assert japanese.content(5, quiet[0])[1].endswith("Hiragana 6/11")
+
+
+def test_only_a_day_that_taught_something_moves_the_plan():
+    day = next(f"2026-08-{n:02d}" for n in range(1, 32) if japanese.introduces(f"2026-08-{n:02d}"))
+    quiet = next(f"2026-08-{n:02d}" for n in range(1, 32) if not japanese.introduces(f"2026-08-{n:02d}"))
+    assert japanese.next_position(3, day) == 4
+    assert japanese.next_position(3, quiet) == 3
+    # The plan holds on its last step rather than running out.
+    assert japanese.next_position(japanese.LAST_STEP, day) == japanese.LAST_STEP
+
+
+def test_japanese_content_routes_through_content_for():
     q = _q("d-jp", "INT", "daily")
-    title, _desc, steps, res = quests.content_for(q, "2026-07-06", jp_week=1)
-    assert title in hiragana and steps and res
+    title, _desc, steps, res = quests.content_for(q, "2026-07-06", jp_step=5)
+    assert title and steps and res
+    # Position 5 is the H row — the step is named, and its own resource comes with it.
+    assert japanese.step_at(5)["title"].startswith("Hiragana:")
 
 
 def test_no_focus_uses_pool():
@@ -424,9 +465,35 @@ def test_generated_content_cannot_replace_a_run_day():
         pk = quests.period_key("daily", day)
         return state.resolve_content(
             q, day, prefs={}, gen_by={("d-train", pk): gen}, level=1, book="",
-            interview=False, jp_week=0, craft_source="",
+            interview=False, jp_step=0, craft_source="",
         )[0]
 
     assert resolve("2026-08-24") == "Roadwork"          # Monday — the plan holds
     assert resolve("2026-08-26") == "Roadwork"          # Wednesday
     assert resolve("2026-08-25") == "Invented Workout"  # Tuesday — generation still wins
+
+
+def test_finishing_a_japanese_day_moves_the_plan_and_undo_puts_it_back(db):
+    """The plan advances because a step got finished, not because a day passed — and a
+    mis-tap costs nothing, or a fumbled tick would eat a row of the chart."""
+    from app import service
+    from app.state import get_or_create_player
+
+    days = [f"2026-07-{n:02d}" for n in range(1, 29)]
+    teaching = next(d for d in days if japanese.introduces(d))
+    quiet = next(d for d in days if not japanese.introduces(d))
+
+    player = get_or_create_player(db)
+    player.japanese_step = 5
+    db.commit()
+
+    # A recall sitting is not a claim that a new row has landed.
+    service.complete_quest(db, player, "d-jp", quiet)
+    assert player.japanese_step == 5
+
+    service.complete_quest(db, player, "d-jp", teaching)
+    assert player.japanese_step == 6
+
+    done = [c for c in service.completions_of(db, player) if c.quest_id == "d-jp" and c.day == teaching]
+    service.undo_completion(db, player, done[-1].id, teaching)
+    assert player.japanese_step == 5
