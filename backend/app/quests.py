@@ -1392,23 +1392,23 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
     ("Causal Loop Map", "Draw the loops behind one outcome", [
         "Put one outcome you want to understand in the middle of a page, then ring it with what pushes it up or down",
         "Arrow the factors to each other (+ same direction, − opposite), trace the closed loops, and mark each reinforcing or balancing",
-    ], "🎥 Systems thinking — your Inspire capture (Tips)"),
+    ], "🎥 Systems thinking — your Ember capture (Tips)"),
     ("Stocks & Flows", "What accumulates, and what fills it", [
         "Pick one stock you care about (savings, energy, trust, tech debt) and name the flows in and out",
         "Write down which flow you'd change first, and why the stock lags behind it",
-    ], "🎥 Systems thinking — your Inspire capture (Tips)"),
+    ], "🎥 Systems thinking — your Ember capture (Tips)"),
     ("Loops in the Wild", "Reinforcing or balancing?", [
         "Find one runaway loop and one self-correcting loop in something you actually run",
         "Write down what would happen if the balancing loop broke",
-    ], "🎥 Systems thinking — your Inspire capture (Tips)"),
+    ], "🎥 Systems thinking — your Ember capture (Tips)"),
     ("Structure Over Blame", "Behaviour follows the system", [
         "Take one recurring frustration and assume everyone involved is doing their best",
         "Write down the structure that makes that behaviour the rational move, and the one change that would make it irrational",
-    ], "🎥 Systems thinking — your Inspire capture (Tips)"),
+    ], "🎥 Systems thinking — your Ember capture (Tips)"),
     ("Second-Order Effects", "There are no side effects", [
         "Take a decision you've already made and trace what it set in motion one and two steps out",
         "Write down the delayed effect you didn't anticipate at the time",
-    ], "🎥 Systems thinking — your Inspire capture (Tips)"),
+    ], "🎥 Systems thinking — your Ember capture (Tips)"),
 ]
 
 # How often the slot leaves the reading for a systems rep. Counted in days rather

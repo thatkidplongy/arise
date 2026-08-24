@@ -10,7 +10,7 @@ export default function InspireScreen() {
 
   return (
     <Screen>
-      <ScreenTitle>Fuel</ScreenTitle>
+      <ScreenTitle>Ember</ScreenTitle>
       <ScreenBlurb>Keep what moved you. No XP here — this one sits outside the game.</ScreenBlurb>
       {state ? <MotivationPanel /> : <ConnectionPanel />}
     </Screen>

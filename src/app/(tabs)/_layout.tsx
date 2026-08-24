@@ -39,7 +39,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Status' }} />
       <Tabs.Screen name="quests" options={{ title: 'Quests' }} />
       <Tabs.Screen name="learn" options={{ title: 'Learn' }} />
-      <Tabs.Screen name="inspire" options={{ title: 'Fuel' }} />
+      <Tabs.Screen name="inspire" options={{ title: 'Ember' }} />
       <Tabs.Screen name="you" options={{ title: 'You' }} />
 
       {/* Reachable from the You hub (and deep links), but kept off the tab bar so
