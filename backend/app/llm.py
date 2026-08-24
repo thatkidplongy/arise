@@ -448,8 +448,9 @@ _LEARNING_SCHEMA = {
                     "text": {"type": "string"},
                     "cue": {"type": "string"},
                     "hook": {"type": "string"},
+                    "entry": {"type": "integer"},
                 },
-                "required": ["text", "cue", "hook"],
+                "required": ["text", "cue", "hook", "entry"],
             },
         },
     },
@@ -479,6 +480,9 @@ _LEARNING_PROMPT = (
     "none. Made-up detail is worse than a short digest.\n"
     "• Merge duplicates across entries; drop admin, feelings and filler. No hype, no "
     "numbering, no markdown.\n"
+    "• An entry marked (reflection) is the person's own journal answer. Its SOURCE is "
+    "the name of the prompt they were answering, never a published work — work only "
+    "from their notes there, however familiar the name looks.\n"
     "If the entries are empty or have no real substance, return an empty array.\n"
     "\n"
     "Each highlight also carries a CUE and a HOOK.\n"
@@ -508,15 +512,31 @@ _LEARNING_PROMPT = (
     "with the understanding; an image the understanding hangs on does not.\n"
     "• Make it vivid and physical, and keep it to a dozen words or so. A picture you "
     "can see beats a clever phrase.\n"
-    'Return JSON only: {highlights:[{text, cue, hook}]}.'
+    "entry — the number of the ENTRY this highlight came from. Every highlight files "
+    "under its own source, so this must be the entry that actually carried the idea; "
+    "for one merged from several, name the entry that contributed most. Never guess: "
+    "a wrong number files the card under someone else's book.\n"
+    'Return JSON only: {highlights:[{text, cue, hook, entry}]}.'
 )
 
 
+def _entry_index(value: object) -> int | None:
+    """The model's 1-based ENTRY number as a 0-based index. None for anything that
+    isn't a positive whole number — a bool, a float, a name it wrote instead."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value - 1 if value >= 1 else None
+
+
 def _parse_learning(payload: dict) -> dict:
-    """Pure: Gemini response JSON → {highlights[{text,cue,hook}]}. Testable offline.
+    """Pure: Gemini response JSON → {highlights[{text,cue,hook,entry}]}. Testable offline.
 
     A highlight with no usable text is dropped; one with no cue is kept but simply
-    won't be quizzed, which beats inventing a question for it."""
+    won't be quizzed, which beats inventing a question for it.
+
+    `entry` is the 1-based ENTRY number the model attributed the line to, normalised
+    to a 0-based index, or None when it came back missing or unparseable — the caller
+    falls back to the day's own label rather than filing the card under a guess."""
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(text)
     out: list[dict] = []
@@ -530,6 +550,7 @@ def _parse_learning(payload: dict) -> dict:
             "text": _clip(body, 240),
             "cue": _clip(str(item.get("cue") or "").strip(), 200),
             "hook": _clip(str(item.get("hook") or "").strip(), 160),
+            "entry": _entry_index(item.get("entry")),
         })
     return {"highlights": out[:10]}
 
@@ -684,10 +705,14 @@ def _parse_thread(payload: dict) -> str:
 
 
 def _format_entries(entries: list[dict]) -> str:
-    """The day's entries as plain labelled text — one block per entry."""
+    """The day's entries as plain labelled text — one block per entry.
+
+    Numbered from 1, because each highlight comes back naming the entry it was drawn
+    from (see `entry` in _LEARNING_PROMPT) and that is what files it under the right
+    book. The numbers are the model's only handle on them."""
     blocks: list[str] = []
-    for e in entries:
-        parts = [f"SOURCE: {e.get('source') or 'unspecified'} ({e.get('kind') or 'other'})"]
+    for n, e in enumerate(entries, start=1):
+        parts = [f"ENTRY {n}", f"SOURCE: {e.get('source') or 'unspecified'} ({e.get('kind') or 'other'})"]
         note = (e.get("text") or "").strip()
         if note:
             parts.append(f"THEIR NOTES: {note}")

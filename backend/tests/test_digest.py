@@ -57,7 +57,27 @@ def test_parse_learning_trims_and_drops_blanks():
 def test_parse_learning_keeps_a_highlight_that_came_back_without_a_cue():
     """Better unquizzed than asked with a question invented after the fact."""
     out = llm._parse_learning(_payload({"highlights": [{"text": "Depth beats speed."}]}))
-    assert out["highlights"] == [{"text": "Depth beats speed.", "cue": "", "hook": ""}]
+    assert out["highlights"] == [
+        {"text": "Depth beats speed.", "cue": "", "hook": "", "entry": None},
+    ]
+
+
+def test_parse_learning_reads_the_entry_a_highlight_came_from():
+    """1-based in the prompt, 0-based coming out — the caller indexes `entries` with it."""
+    out = llm._parse_learning(_payload({"highlights": [
+        {"text": "Depth beats speed.", "cue": "q", "hook": "h", "entry": 2},
+    ]}))
+    assert out["highlights"][0]["entry"] == 1
+
+
+@pytest.mark.parametrize("value", [None, 0, -1, "two", 1.5, True, [1]])
+def test_parse_learning_refuses_an_entry_number_it_cannot_trust(value):
+    """Anything that isn't a positive whole number leaves the card unattributed, so
+    the caller falls back to the day's label rather than filing it under entries[0]."""
+    out = llm._parse_learning(_payload({"highlights": [
+        {"text": "Depth beats speed.", "cue": "q", "hook": "h", "entry": value},
+    ]}))
+    assert out["highlights"][0]["entry"] is None
 
 
 def test_parse_learning_ignores_non_objects():
@@ -87,6 +107,16 @@ def test_format_entries_omits_notes_when_empty():
     assert "SOURCE: Deep Work (book)" in text
     assert "THEIR NOTES: Write-through vs write-back." in text
     assert text.count("THEIR NOTES") == 1
+
+
+def test_format_entries_numbers_them_from_one():
+    """The numbers are the model's only handle for attributing a highlight."""
+    text = llm._format_entries([
+        {"kind": "book", "source": "Deep Work", "text": "a"},
+        {"kind": "notion", "source": "Caching notes", "text": "b"},
+    ])
+    assert "ENTRY 1" in text and "ENTRY 2" in text
+    assert text.index("ENTRY 1") < text.index("Deep Work") < text.index("ENTRY 2")
 
 
 # ── gather ────────────────────────────────────────────────────────────────────
@@ -209,6 +239,37 @@ def test_source_label_is_empty_with_nothing_to_name():
     assert digest.source_label([{"kind": "other", "source": "", "text": "x"}]) == ""
 
 
+# ── label_for ─────────────────────────────────────────────────────────────────
+
+
+ENTRIES = [
+    {"kind": "book", "source": "Thinking, fast and slow, ch 23-24", "text": "x"},
+    {"kind": "reflection", "source": "Ledger Study", "text": "y"},
+]
+
+
+def test_label_for_credits_the_entry_the_highlight_named():
+    assert digest.label_for(ENTRIES, {"text": "a", "entry": 1}) == "Ledger Study"
+    assert digest.label_for(ENTRIES, {"text": "a", "entry": 0}) == (
+        "Thinking, fast and slow, ch 23-24"
+    )
+
+
+@pytest.mark.parametrize("entry", [None, 2, -1])
+def test_label_for_falls_back_to_the_day_when_the_number_is_no_use(entry):
+    """Missing or out of range: the day's own label, which is what every highlight
+    used to get. Vague beats dropped."""
+    assert digest.label_for(ENTRIES, {"text": "a", "entry": entry}) == (
+        "Thinking, fast and slow, ch 23-24"
+    )
+
+
+def test_label_for_skips_an_entry_that_names_no_source():
+    """A reflection against a quest with no title still has nothing to credit."""
+    entries = [{"kind": "reflection", "source": "", "text": "y"}]
+    assert digest.label_for(entries, {"text": "a", "entry": 0}) == "From your reflections"
+
+
 # ── build_highlights ──────────────────────────────────────────────────────────
 
 
@@ -245,6 +306,61 @@ def test_build_highlights_persists_distilled_lines(db, monkeypatch):
     assert rows[0].source_label == "Deep Work, ch 2"
     stored = db.query(Highlight).filter_by(player_id=player.id, day=DAY).all()
     assert len(stored) == 1
+
+
+def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
+    """The bug this was written for: a day holding both a book and a money note used
+    to stamp the book's label on every card, so finance questions turned up inside the
+    book's stack on the Learn shelf wearing its chapter tag."""
+    from app.models import QuestNote
+
+    player = state.get_or_create_player(db)
+    player.current_book = "Thinking, fast and slow"
+    db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
+                      label="23-24", chapters=2))
+    db.add(QuestNote(player_id=player.id, quest_id="d-wealth", period_key=DAY, day=DAY,
+                     text="APR is the quoted rate; APY compounds.", prompt="Explain it"))
+    db.commit()
+
+    # Stands in for distill_learning's *parsed* output, so `entry` is 0-based here
+    # exactly as _parse_learning hands it over.
+    def _distil(entries):
+        wealth = next(n for n, e in enumerate(entries) if e["source"] == "Ledger Study")
+        book = next(n for n, e in enumerate(entries) if e["kind"] == "book")
+        return {"highlights": [
+            {"text": "APR is quoted, APY compounds.", "cue": "APR vs APY?",
+             "hook": "a ladder", "entry": wealth},
+            {"text": "Expert intuition needs regularity.", "cue": "When is it reliable?",
+             "hook": "a chess board", "entry": book},
+        ]}
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "distill_learning", _distil)
+    monkeypatch.setattr(llm, "thread_summary", lambda *a: "a sentence")
+
+    rows = digest.build_highlights(db, player, DAY)
+    labels = {r.text: r.source_label for r in rows}
+    assert labels["APR is quoted, APY compounds."] == "Ledger Study"
+    assert labels["Expert intuition needs regularity."] == "Thinking, fast and slow, ch 23-24"
+    # And the pile each lands in on the shelf — the field the app actually sorts by.
+    assert reading.book_name(labels["APR is quoted, APY compounds."]) == "Ledger Study"
+
+
+def test_a_reading_note_files_under_the_book_not_the_quest(db):
+    """The reading daily's own note is about the book, so it shares the book's label
+    — one pile per book, not a 'Grimoire Study' stack sitting beside it."""
+    from app.models import QuestNote
+
+    player = state.get_or_create_player(db)
+    player.current_book = "Thinking, fast and slow"
+    db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
+                      label="23-24", chapters=2))
+    db.add(QuestNote(player_id=player.id, quest_id="d-read", period_key=DAY, day=DAY,
+                     text="Base rates come first.", prompt="Explain it"))
+    db.commit()
+
+    note = next(e for e in digest.gather(db, player, DAY) if e["kind"] == "reflection")
+    assert note["source"] == "Thinking, fast and slow, ch 23-24"
 
 
 class _Exhausted(Exception):
@@ -697,6 +813,84 @@ def test_too_alike_ignores_shared_filler_words():
 
 
 # ── threads — the running summary (marginalia) ────────────────────────────────
+
+
+# ── thread_lines ──────────────────────────────────────────────────────────────
+
+
+class _Row:
+    """A distilled line as the thread folder sees it — text plus its attribution."""
+
+    def __init__(self, text: str, source_label: str = ""):
+        self.text = text
+        self.source_label = source_label
+
+
+THREAD_ENTRIES = [
+    {"kind": "book", "source": "Thinking, fast and slow, ch 29-30", "text": "x"},
+    {"kind": "reflection", "source": "Ledger Study", "text": "y"},
+]
+
+
+def test_thread_lines_keeps_only_the_book_s_own():
+    """The bug this was written for: the whole day was folded in, so a money quest's
+    notes ended up inside a book's running sentence — the Meditations thread came out
+    describing emergency funds and compounding."""
+    rows = [
+        _Row("Rare events are overweighted.", "Thinking, fast and slow, ch 29-30"),
+        _Row("An emergency fund covers 3-6 months.", "Ledger Study"),
+    ]
+    assert digest.thread_lines(THREAD_ENTRIES, rows) == ["Rare events are overweighted."]
+
+
+def test_thread_lines_matches_the_book_across_sittings():
+    """A line kept on an earlier sitting wears that sitting's chapters; it is still
+    the same book, and book_key is how a title is matched everywhere else."""
+    rows = [_Row("Bernoulli erred.", "Thinking, fast and slow, ch 25-26")]
+    assert digest.thread_lines(THREAD_ENTRIES, rows) == ["Bernoulli erred."]
+
+
+def test_thread_lines_folds_in_a_line_with_no_label():
+    """Unlabelled is ambiguous, not foreign — and it is what days distilled before
+    per-line labels look like, which the catch-up repair still has to fold."""
+    assert digest.thread_lines(THREAD_ENTRIES, [_Row("already kept")]) == ["already kept"]
+
+
+def test_thread_lines_is_empty_on_a_day_with_no_book():
+    rows = [_Row("An emergency fund covers 3-6 months.", "Ledger Study")]
+    assert digest.thread_lines([THREAD_ENTRIES[1]], rows) == []
+
+
+def test_a_mixed_day_keeps_the_other_source_out_of_the_thread(db, monkeypatch):
+    """End to end: the money card is written, and the book's sentence never sees it."""
+    from app.models import QuestNote
+
+    player = state.get_or_create_player(db)
+    player.current_book = "Thinking, fast and slow"
+    db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
+                      label="29-30", chapters=2))
+    db.add(QuestNote(player_id=player.id, quest_id="d-wealth", period_key=DAY, day=DAY,
+                     text="Compounding accelerates growth.", prompt="Explain it"))
+    db.commit()
+
+    def _distil(entries):
+        wealth = next(n for n, e in enumerate(entries) if e["source"] == "Ledger Study")
+        book = next(n for n, e in enumerate(entries) if e["kind"] == "book")
+        return {"highlights": [
+            {"text": "Compounding accelerates growth.", "cue": "c", "hook": "h",
+             "entry": wealth},
+            {"text": "Rare events are overweighted.", "cue": "c", "hook": "h",
+             "entry": book},
+        ]}
+
+    folded: list = []
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "distill_learning", _distil)
+    monkeypatch.setattr(digest, "update_thread",
+                        lambda _db, _p, _d, _e, lines: folded.append(lines))
+
+    digest.build_highlights(db, player, DAY)
+    assert folded == [["Rare events are overweighted."]]
 
 
 def test_update_thread_stores_the_book_without_the_chapters(db, monkeypatch):

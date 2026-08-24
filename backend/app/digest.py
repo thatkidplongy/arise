@@ -33,8 +33,8 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from . import digest_render, llm, mailer, reading, recall, recap
-from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
-                     Thread)
+from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestDef,
+                     QuestNote, Thread)
 
 READING_QUEST_ID = "d-read"
 
@@ -89,6 +89,7 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
         for r in db.query(Learning).filter_by(player_id=player.id, day=day).order_by(Learning.created_at)
     ]
 
+    titles = {d.id: d.title for d in db.query(QuestDef).all()}
     for note in (
         db.query(QuestNote)
         .filter_by(player_id=player.id, day=day)
@@ -96,9 +97,16 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
     ):
         # The prompt is useful context for the distiller (it's the question being
         # answered) but it's a paragraph, not a name — so it rides in the text and
-        # never becomes an attribution label.
+        # never becomes an attribution label. The quest it answers is the name: a
+        # note written against the reading daily is about the book, so it files with
+        # the book, and every other quest's notes file under the quest.
         body = f"(answering: {note.prompt})\n{note.text}" if note.prompt else note.text
-        entries.append({"kind": "reflection", "source": "", "text": body})
+        source = _book_label(db, player, day) if note.quest_id == READING_QUEST_ID else ""
+        entries.append({
+            "kind": "reflection",
+            "source": source or titles.get(note.quest_id, ""),
+            "text": body,
+        })
 
     # What they read today, from the reading log — real chapter numbers, so the
     # distiller can be specific. Skipped when they already logged the book on the
@@ -109,7 +117,7 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
         if chapters:
             entries.append({
                 "kind": "book",
-                "source": f"{player.current_book}, ch {chapters}",
+                "source": _book_label(db, player, day),
                 "text": f"Read chapters {chapters} — no notes were taken, so stay close to the source.",
             })
         elif _read_today(db, player, day):
@@ -122,6 +130,17 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
             })
 
     return entries
+
+
+def _book_label(db: Session, player: Player, day: str) -> str:
+    """The book being read, carrying today's chapters when the log named any — the
+    attribution a highlight drawn from today's reading wears. Empty with no book on
+    the go. Shared by the reading entry and the reading daily's own note, so both
+    land on one pile rather than two spellings of the same book."""
+    if not player.current_book:
+        return ""
+    chapters = _chapters_today(db, player, day)
+    return f"{player.current_book}, ch {chapters}" if chapters else player.current_book
 
 
 def _chapters_today(db: Session, player: Player, day: str) -> str:
@@ -148,10 +167,13 @@ MAX_SOURCE_CHARS = 60
 
 
 def source_label(entries: list[dict]) -> str:
-    """A short line crediting where a day's highlights came from. The whole day is
-    distilled in one pass, so a highlight can't be traced to one entry — this names
-    the day's sources instead, and keeps it to a couple so it stays readable under
-    a bullet. Empty when there's nothing worth naming."""
+    """A short line crediting where a day's highlights came from, naming a couple of
+    the day's sources so it stays readable under a bullet. Empty when there's nothing
+    worth naming.
+
+    The fallback, not the rule: a highlight that named its own entry wears that entry's
+    source (see `label_for`). This is what's left for one that didn't, and it is
+    deliberately a day-level guess — which is why it must never be the normal path."""
     named: list[str] = []
     for e in entries:
         src = (e.get("source") or "").strip()
@@ -162,6 +184,25 @@ def source_label(entries: list[dict]) -> str:
     if any(e.get("kind") == "reflection" for e in entries):
         return "From your reflections"
     return ""
+
+
+def label_for(entries: list[dict], item: dict) -> str:
+    """Where one distilled line came from: the source of the entry it named.
+
+    A day is distilled in one pass across every entry, so the attribution has to come
+    back from the model with the line — a single label per day credits a book with
+    whatever else was learned that day, and the app sorts cards into piles by this
+    field, so the miscredited ones land in the wrong book's stack.
+
+    Falls back to the day's own label when the model named no entry or named one that
+    doesn't exist. That's the old behaviour, and it's wrong in the same way — but a
+    card with a vague label beats one dropped for want of a number."""
+    index = item.get("entry")
+    if isinstance(index, int) and 0 <= index < len(entries):
+        source = (entries[index].get("source") or "").strip()
+        if source:
+            return source
+    return source_label(entries)
 
 
 def build_highlights(db: Session, player: Player, day: str,
@@ -199,33 +240,68 @@ def build_highlights(db: Session, player: Player, day: str,
     if not items:
         return []
 
-    label = source_label(entries)
     rows = [
         Highlight(
             player_id=player.id, day=day, text=it["text"],
-            cue=it.get("cue", ""), hook=it.get("hook", ""), source_label=label,
+            cue=it.get("cue", ""), hook=it.get("hook", ""),
+            source_label=label_for(entries, it),
             box=0, due=recall.due_after(day, 0),
         )
         for it in items
     ]
     db.add_all(rows)
     db.commit()
-    update_thread(db, player, day, entries, [it["text"] for it in items])
+    update_thread(db, player, day, entries, thread_lines(entries, rows))
     return rows
 
 
 # ── Threads — the running summary per book ───────────────────────────────────
+
+
+def day_book(entries: list[dict]) -> dict | None:
+    """The book a day's thread is about. A day with several picks the first —
+    threads are per source, and one sentence spanning two books would describe
+    neither."""
+    return next((e for e in entries if e["kind"] == "book" and e.get("source")), None)
+
+
+def thread_lines(entries: list[dict], rows: list) -> list[str]:
+    """Of a day's distilled lines, the ones that belong to the book — matched on the
+    label each carries, the way a title is matched anywhere else (reading.book_key).
+
+    The thread is a running summary of one text read across many sittings, so a line
+    that came from somewhere else has no business in it. Folding the whole day in put
+    a money quest's notes into a book's sentence: the Meditations thread came out
+    describing emergency funds and compounding, which is not a summary of Meditations.
+
+    An unlabelled line still folds in: it is ambiguous, not foreign. Only a line
+    labelled as something *else* is demonstrably not the book's, and that is the one
+    the contamination came from. Ruling out the ambiguous ones too would leave the
+    catch-up repair (which re-folds days distilled before labels were per-line) with
+    nothing to fold."""
+    book = day_book(entries)
+    if book is None:
+        return []
+    key = reading.book_key(book["source"])
+    if not key:
+        return []
+    return [
+        r.text for r in rows
+        if reading.book_key(getattr(r, "source_label", "") or "") in (key, "")
+    ]
+
 
 def update_thread(db: Session, player: Player, day: str, entries: list[dict],
                   lines: list[str]) -> Thread | None:
     """Fold the day's ideas into the running summary of the book they came from.
 
     Only books get a thread: the point is a text read across many sittings, which is
-    what the recondensing has to work on. A day with several books picks the first —
-    threads are per source, and one sentence spanning two books would describe
-    neither. A failure here leaves the previous sentence untouched; losing a morning
-    is fine, losing the thread is not."""
-    book = next((e for e in entries if e["kind"] == "book" and e.get("source")), None)
+    what the recondensing has to work on. A failure here leaves the previous sentence
+    untouched; losing a morning is fine, losing the thread is not.
+
+    `lines` must already be the book's own — see `thread_lines`, which is how both
+    callers narrow a mixed day down before folding."""
+    book = day_book(entries)
     if book is None or not lines:
         return None
 
@@ -349,7 +425,7 @@ def catch_up(db: Session, player: Player, day: str) -> list[str]:
             # call that fails on its own — and a day with highlights was never asked
             # about again, so a sentence stuck on an old sitting stayed stuck. Retry
             # that call alone, from the lines already kept: no second distillation.
-            update_thread(db, player, past, entries, [h.text for h in kept])
+            update_thread(db, player, past, entries, thread_lines(entries, kept))
             continue
         if build_highlights(db, player, past):
             repaired.append(past)

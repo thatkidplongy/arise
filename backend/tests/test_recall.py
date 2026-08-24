@@ -143,6 +143,23 @@ def test_recall_items_carry_the_material_they_file_under(db):
     assert out[0]["material"] == "Thinking, fast and slow"
 
 
+def test_two_sources_on_one_day_file_under_two_materials(db):
+    """The shape the Learn shelf sorts by. A day distilled in one pass covers whatever
+    was learned that day, so its cards must not share a pile: a money question stamped
+    with the book's label turned up inside the book's stack wearing its chapter tag."""
+    player = state.get_or_create_player(db)
+    book = _highlight(db, player, _back(5), "Rare events are overweighted.")
+    book.source_label = "Thinking, fast and slow, ch 29-30"
+    money = _highlight(db, player, _back(5), "An emergency fund covers 3-6 months.")
+    money.source_label = "Ledger Study"
+    db.commit()
+
+    piles = {r["text"]: r["material"] for r in recall.library(db, player, DAY)}
+    assert piles["Rare events are overweighted."] == "Thinking, fast and slow"
+    assert piles["An emergency fund covers 3-6 months."] == "Ledger Study"
+    assert len(set(piles.values())) == 2
+
+
 def test_library_is_a_pure_read(db):
     player = state.get_or_create_player(db)
     row = _highlight(db, player, _back(5), "on the shelf")
