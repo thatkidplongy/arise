@@ -2,13 +2,12 @@
 
 Non-obvious things about this repo, kept short.
 
-- **`scripts/deploy.sh` won't restart the backend for a commit made locally.** Its
-  restart check compares the commit before the `git pull` with the one after, so a
-  change you committed on this machine has `OLD == NEW` and the backend-changed
-  branch never runs — it prints "nothing to do" and keeps serving the old Python.
-  (The frontend is fine: that check reads the `dist/.built-from` stamp instead.)
-  After a local backend commit, restart it by hand:
-  `launchctl kickstart -k "gui/$(id -u)/com.arise.backend"`.
+- **Both of `scripts/deploy.sh`'s stamps must stay gitignored** — `dist/.built-from`
+  and `backend/.served-from`. They're how it tells done from outstanding, and it
+  rewrites them on almost every run: track either one and the script's own writes
+  make the tree dirty, after which it refuses to do anything at all. (`.served-from`
+  also sits under `backend/`, so tracking it would make every deploy look like a
+  backend change.)
 
 - **A quest with no mandatory floor is capped at two steps** (`quests.cap_steps`).
   If a slot's steps *are* the material rather than variety on top of it, it needs an

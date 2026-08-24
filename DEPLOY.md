@@ -83,6 +83,7 @@ It's deliberately timid — it refuses to act and says why, rather than guessing
 | Local branch diverged from origin | skips (`--ff-only`, so it can never invent a merge) |
 | Build fails | keeps serving the previous build, logs the failure |
 | Backend-only commit | restarts, doesn't rebuild |
+| Commit made on this Mac (nothing to pull) | still builds and restarts — it compares `HEAD` against what was last built and last served, not against the last pull |
 
 The build runs beside the live one and is swapped in when it's finished, so the
 phone is never served a half-written app.

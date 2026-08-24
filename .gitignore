@@ -64,3 +64,6 @@ backend/logs/
 
 # scripts/deploy.sh single-run lock
 .deploy.lock/
+
+# scripts/deploy.sh: the commit the running backend was last started from
+backend/.served-from
