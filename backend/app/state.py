@@ -317,8 +317,8 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 _DAILY_ALWAYS = ("d-train", "d-fuel", "d-read")
 _DAILY_ROTATION: list[list[str]] = [
     ["d-wealth", "d-craft"],       # build & money
-    ["d-sketch", "d-jp"],          # create & language
-    ["d-meditate", "d-connect"],   # inner & social
+    ["d-connect", "d-jp"],         # social & language
+    ["d-meditate", "d-sketch"],    # inner & create
 ]
 
 

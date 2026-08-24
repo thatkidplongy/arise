@@ -60,7 +60,7 @@ def test_state_shape(client):
     assert len(q["steps"]) == 5
     assert q["steps"][3:] != []  # the variant, below the floor
     # A non-floored daily (Creativity) caps at 2 — checked on a day it's in rotation.
-    sketch = _quest(client.get("/state?day=2026-07-19").json(), "d-sketch")
+    sketch = _quest(client.get("/state?day=2026-07-20").json(), "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
