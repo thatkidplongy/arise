@@ -500,6 +500,39 @@ def test_quiz_items_asks_yesterday_first():
     assert items[0]["fresh"] and not items[1]["fresh"]
 
 
+# Deliberately unrelated to each other: shared phrasing would trip the duplicate
+# filter and the cap would never be what the count was testing.
+_TEN_UNRELATED = [
+    "Sleep consolidates what was learned during waking hours.",
+    "Compound interest rewards patience more than timing.",
+    "Mitochondria turn glucose into cellular fuel.",
+    "A retry without jitter synchronises every client into one spike.",
+    "Vinegar deglazes a pan because acid dissolves fond.",
+    "The pentatonic scale drops the two semitones from the major.",
+    "Roman concrete cured underwater thanks to volcanic ash.",
+    "Negotiators who name their price first anchor the range.",
+    "Ligaments join bone to bone; tendons join muscle to bone.",
+    "Monsoon winds reverse when the landmass heats faster than the ocean.",
+]
+_FIVE_UNRELATED = [
+    "Kanji readings split into on'yomi and kun'yomi.",
+    "An index makes reads cheap and writes dearer.",
+    "Espresso needs a finer grind than filter because contact time is short.",
+    "Deadlift form fails at the hips before it fails at the back.",
+    "Franking credits refund tax the company already paid.",
+]
+
+
+def test_quiz_items_asks_at_most_eight():
+    """Fifteen is homework. Ten fresh and five spaced can't all be asked in one email."""
+    fresh = [(text, f"cue {i}?") for i, text in enumerate(_TEN_UNRELATED)]
+    older = [_recalled(text, f"old cue {i}?") for i, text in enumerate(_FIVE_UNRELATED)]
+    items = digest_render.quiz_items(_ctx(fresh, older))
+
+    assert len(items) == digest_render.QUIZ_CAP == 8
+    assert digest_render.subject_for(_ctx(fresh, older)).startswith("Recall · 8 questions")
+
+
 def test_subject_counts_the_questions():
     assert digest_render.subject_for(_ctx([("a", "a?"), ("b", "b?")])).startswith("Recall · 2 questions")
     assert digest_render.subject_for(_ctx([("a", "a?")])).startswith("Recall · 1 question from")
@@ -643,6 +676,26 @@ def test_a_failed_send_does_not_burn_a_rung(db, monkeypatch):
 
     db.refresh(row)
     assert row.box == 0 and row.due == DAY  # asked again tomorrow, same rung
+
+
+def test_a_card_the_cap_cut_does_not_burn_a_rung(db, monkeypatch):
+    """The email advances exactly what it asked. A due card pushed out by QUIZ_CAP was
+    never asked, so it stays due and comes back tomorrow instead of climbing unseen."""
+    player = state.get_or_create_player(db)
+    for i, text in enumerate(_TEN_UNRELATED[:digest_render.QUIZ_CAP]):
+        row = _highlight(db, player, DAY, text)
+        row.cue = f"cue {i}?"
+    older = _older(db, player, _FIVE_UNRELATED[0], "old cue?")
+    db.commit()
+
+    sent = []
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.append(t) or {"id": "1"})
+    assert digest.send_daily(db, player, DAY)["status"] == "sent"
+
+    db.refresh(older)
+    assert "old cue?" not in sent[0]
+    assert older.box == 0 and older.due == DAY
 
 
 # ── hooks on every answer ─────────────────────────────────────────────────────

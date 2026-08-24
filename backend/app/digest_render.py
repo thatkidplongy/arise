@@ -101,6 +101,13 @@ RECALL_INSTRUCTION = (
 # still counts as a repeat.
 DUPE_OVERLAP = 0.6
 
+# The most one email will ever ask. Fresh highlights (up to ten) and the spaced picks
+# (up to PER_DIGEST) could otherwise total fifteen, which is homework — and homework is
+# what stops getting done. What doesn't fit is not lost: a spaced card that misses the
+# cut is never advanced (send_daily advances exactly what was asked), so it stays due
+# and comes back tomorrow.
+QUIZ_CAP = 8
+
 _WORD = re.compile(r"[a-z][a-z']+")
 
 # Long enough to survive the length filter, but carrying no topic. Two unrelated
@@ -134,7 +141,11 @@ def quiz_items(ctx: dict) -> list[dict]:
 
     Each day is distilled on its own, so two days on the same book can land on the
     same idea. Asking it twice in one email wastes a rung of the ladder and reads as
-    a bug, so a repeat is dropped in favour of the earlier one."""
+    a bug, so a repeat is dropped in favour of the earlier one.
+
+    QUIZ_CAP is the last word: this is the one list the whole send reads from — the
+    subject's count, both bodies, the hooks it backfills and the rungs it advances —
+    so capping here caps all of them together."""
     candidates = [
         {**h, "days_ago": 1, "fresh": True} for h in ctx["highlights"] if h.get("cue")
     ]
@@ -145,7 +156,7 @@ def quiz_items(ctx: dict) -> list[dict]:
         if any(_too_alike(c["text"], kept["text"]) for kept in items):
             continue
         items.append(c)
-    return items
+    return items[:QUIZ_CAP]
 
 
 def _uncued(ctx: dict) -> list[dict]:
