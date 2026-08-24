@@ -22,21 +22,21 @@ from .models import Player, ReadingLog
 # 'Deep Work, ch 2', 'Deep Work ch. 2-3', 'Deep Work pp 40-52' → all the same book.
 # The marker must follow a separator, or the 'ch' inside a title like 'Catch 22'
 # would be read as a chapter and the book would become 'Cat'.
-_CHAPTER_MARKER = re.compile(
-    r"(?:[,;:]\s*|\s+)(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*\d.*$", re.I
-)
+# The words that introduce a marker, and the numbering that can follow one — a
+# chapter, a range, or a list of either ('ch 2', 'pp 40-52', 'ch 33, 34-35, 36-37').
+_MARKER_WORDS = r"(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*"
+_MARKER_RANGE = r"\d+(?:\s*[-–—]\s*\d+)?"
+
+_CHAPTER_MARKER = re.compile(rf"(?:[,;:]\s*|\s+){_MARKER_WORDS}\d.*$", re.I)
 
 _CHAPTER_NUMBER = re.compile(r"\d+")
 
-# Inside a marker, the part that actually names chapters: the keyword and the numbers
-# it introduces, as a range or a list of them ('ch 2', 'pp 40-52', 'ch 33, 34-35').
-# Prose after the numbers is not part of it — a Notion page called
-# 'DDIA ch 1 — Reliable, Scalable and Maintainable Applications' names one chapter
-# and then titles it, and the title is neither the book's name nor the marker's.
+# Inside a marker, the part that actually names chapters. Prose after the numbers is
+# not part of it — a Notion page called 'DDIA ch 1 — Reliable, Scalable and
+# Maintainable Applications' names one chapter and then titles it, and the title is
+# neither the book's name nor the marker's.
 _MARKER_NUMBERS = re.compile(
-    r"(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*"
-    r"\d+(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+(?:\s*[-–—]\s*\d+)?)*",
-    re.I,
+    rf"{_MARKER_WORDS}{_MARKER_RANGE}(?:\s*,\s*{_MARKER_RANGE})*", re.I
 )
 
 

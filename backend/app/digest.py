@@ -89,6 +89,11 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
         for r in db.query(Learning).filter_by(player_id=player.id, day=day).order_by(Learning.created_at)
     ]
 
+    # Both of the places below attribute to the book, so the log is read once here
+    # rather than per note.
+    chapters = _chapters_today(db, player, day)
+    book_label = _book_label(player.current_book, chapters)
+
     titles = {d.id: d.title for d in db.query(QuestDef).all()}
     for note in (
         db.query(QuestNote)
@@ -101,7 +106,7 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
         # note written against the reading daily is about the book, so it files with
         # the book, and every other quest's notes file under the quest.
         body = f"(answering: {note.prompt})\n{note.text}" if note.prompt else note.text
-        source = _book_label(db, player, day) if note.quest_id == READING_QUEST_ID else ""
+        source = book_label if note.quest_id == READING_QUEST_ID else ""
         entries.append({
             "kind": "reflection",
             "source": source or titles.get(note.quest_id, ""),
@@ -113,11 +118,10 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
     # Learn screen, where they'd have written actual notes.
     logged_a_book = any(e["kind"] == "book" for e in entries)
     if player.current_book and not logged_a_book:
-        chapters = _chapters_today(db, player, day)
         if chapters:
             entries.append({
                 "kind": "book",
-                "source": _book_label(db, player, day),
+                "source": book_label,
                 "text": f"Read chapters {chapters} — no notes were taken, so stay close to the source.",
             })
         elif _read_today(db, player, day):
@@ -125,22 +129,21 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
             # but there's no telling which chapters, so it can't be specific.
             entries.append({
                 "kind": "book",
-                "source": player.current_book,
+                "source": book_label,
                 "text": "Read today's chapters (which ones wasn't recorded, so stay general).",
             })
 
     return entries
 
 
-def _book_label(db: Session, player: Player, day: str) -> str:
+def _book_label(book: str, chapters: str) -> str:
     """The book being read, carrying today's chapters when the log named any — the
     attribution a highlight drawn from today's reading wears. Empty with no book on
     the go. Shared by the reading entry and the reading daily's own note, so both
     land on one pile rather than two spellings of the same book."""
-    if not player.current_book:
+    if not book:
         return ""
-    chapters = _chapters_today(db, player, day)
-    return f"{player.current_book}, ch {chapters}" if chapters else player.current_book
+    return f"{book}, ch {chapters}" if chapters else book
 
 
 def _chapters_today(db: Session, player: Player, day: str) -> str:

@@ -67,16 +67,20 @@ PLAN = {
 }
 
 
-def _own_lines(db, thread: Thread) -> list[str]:
-    """The book's own distilled lines, oldest first — matched on the label each card
-    carries, the way a title is matched everywhere else."""
-    rows = (
-        db.query(Highlight)
-        .filter_by(player_id=thread.player_id)
-        .order_by(Highlight.day, Highlight.created_at)
-        .all()
-    )
-    return [r.text for r in rows if reading.book_key(r.source_label or "") == thread.key]
+def _lines_by_book(db) -> dict[tuple[str, str], list[str]]:
+    """Every distilled line, oldest first, grouped by (player, book) — the book matched
+    on the label each card carries, the way a title is matched everywhere else.
+
+    Built once for the whole run: a per-thread query would re-read the same table for
+    each thread, and the grouping is the same work either way. Keyed by player as well
+    as book because a thread belongs to one, and feeding it someone else's lines is the
+    same kind of mistake this script exists to repair."""
+    out: dict[tuple[str, str], list[str]] = {}
+    rows = db.query(Highlight).order_by(Highlight.day, Highlight.created_at).all()
+    for row in rows:
+        key = (row.player_id, reading.book_key(row.source_label or ""))
+        out.setdefault(key, []).append(row.text)
+    return out
 
 
 def main() -> int:
@@ -87,10 +91,11 @@ def main() -> int:
         print("No model key — a rebuild needs one. Nothing written.")
         return 1
 
+    by_book = _lines_by_book(db)
     changed = 0
     for row in threads:
         action, why = PLAN.get(row.key, ("keep", "not implicated"))
-        lines = _own_lines(db, row)
+        lines = by_book.get((row.player_id, row.key), [])
         print(f"\n{row.key!r} — {len(lines)} of its own lines, {row.days} sitting(s)")
         print(f"  {action.upper()}: {why}")
 

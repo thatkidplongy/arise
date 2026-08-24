@@ -308,42 +308,54 @@ def test_build_highlights_persists_distilled_lines(db, monkeypatch):
     assert len(stored) == 1
 
 
-def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
-    """The bug this was written for: a day holding both a book and a money note used
-    to stamp the book's label on every card, so finance questions turned up inside the
-    book's stack on the Learn shelf wearing its chapter tag."""
+MONEY_LINE = "APR is quoted, APY compounds."
+BOOK_LINE = "Expert intuition needs regularity."
+
+
+def _mixed_day(db, monkeypatch, chapters: str = "23-24"):
+    """A day holding both a reading sitting and a money note — the shape that used to
+    stamp the book's label on everything. The distiller is stubbed to attribute each
+    line correctly, so what's under test is where the labels land, not the model.
+
+    The stub stands in for distill_learning's *parsed* output, so `entry` is 0-based
+    here exactly as _parse_learning hands it over."""
     from app.models import QuestNote
 
     player = state.get_or_create_player(db)
     player.current_book = "Thinking, fast and slow"
     db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
-                      label="23-24", chapters=2))
+                      label=chapters, chapters=2))
     db.add(QuestNote(player_id=player.id, quest_id="d-wealth", period_key=DAY, day=DAY,
                      text="APR is the quoted rate; APY compounds.", prompt="Explain it"))
     db.commit()
 
-    # Stands in for distill_learning's *parsed* output, so `entry` is 0-based here
-    # exactly as _parse_learning hands it over.
     def _distil(entries):
         wealth = next(n for n, e in enumerate(entries) if e["source"] == "Ledger Study")
         book = next(n for n, e in enumerate(entries) if e["kind"] == "book")
         return {"highlights": [
-            {"text": "APR is quoted, APY compounds.", "cue": "APR vs APY?",
-             "hook": "a ladder", "entry": wealth},
-            {"text": "Expert intuition needs regularity.", "cue": "When is it reliable?",
-             "hook": "a chess board", "entry": book},
+            {"text": MONEY_LINE, "cue": "APR vs APY?", "hook": "a ladder", "entry": wealth},
+            {"text": BOOK_LINE, "cue": "When is it reliable?", "hook": "a chess board",
+             "entry": book},
         ]}
 
     monkeypatch.setattr(llm, "enabled", lambda: True)
     monkeypatch.setattr(llm, "distill_learning", _distil)
     monkeypatch.setattr(llm, "thread_summary", lambda *a: "a sentence")
+    return player
+
+
+def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
+    """The bug this was written for: a day holding both a book and a money note used
+    to stamp the book's label on every card, so finance questions turned up inside the
+    book's stack on the Learn shelf wearing its chapter tag."""
+    player = _mixed_day(db, monkeypatch)
 
     rows = digest.build_highlights(db, player, DAY)
     labels = {r.text: r.source_label for r in rows}
-    assert labels["APR is quoted, APY compounds."] == "Ledger Study"
-    assert labels["Expert intuition needs regularity."] == "Thinking, fast and slow, ch 23-24"
+    assert labels[MONEY_LINE] == "Ledger Study"
+    assert labels[BOOK_LINE] == "Thinking, fast and slow, ch 23-24"
     # And the pile each lands in on the shelf — the field the app actually sorts by.
-    assert reading.book_name(labels["APR is quoted, APY compounds."]) == "Ledger Study"
+    assert reading.book_name(labels[MONEY_LINE]) == "Ledger Study"
 
 
 def test_a_reading_note_files_under_the_book_not_the_quest(db):
@@ -863,34 +875,13 @@ def test_thread_lines_is_empty_on_a_day_with_no_book():
 
 def test_a_mixed_day_keeps_the_other_source_out_of_the_thread(db, monkeypatch):
     """End to end: the money card is written, and the book's sentence never sees it."""
-    from app.models import QuestNote
-
-    player = state.get_or_create_player(db)
-    player.current_book = "Thinking, fast and slow"
-    db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
-                      label="29-30", chapters=2))
-    db.add(QuestNote(player_id=player.id, quest_id="d-wealth", period_key=DAY, day=DAY,
-                     text="Compounding accelerates growth.", prompt="Explain it"))
-    db.commit()
-
-    def _distil(entries):
-        wealth = next(n for n, e in enumerate(entries) if e["source"] == "Ledger Study")
-        book = next(n for n, e in enumerate(entries) if e["kind"] == "book")
-        return {"highlights": [
-            {"text": "Compounding accelerates growth.", "cue": "c", "hook": "h",
-             "entry": wealth},
-            {"text": "Rare events are overweighted.", "cue": "c", "hook": "h",
-             "entry": book},
-        ]}
-
+    player = _mixed_day(db, monkeypatch)
     folded: list = []
-    monkeypatch.setattr(llm, "enabled", lambda: True)
-    monkeypatch.setattr(llm, "distill_learning", _distil)
     monkeypatch.setattr(digest, "update_thread",
                         lambda _db, _p, _d, _e, lines: folded.append(lines))
 
     digest.build_highlights(db, player, DAY)
-    assert folded == [["Rare events are overweighted."]]
+    assert folded == [[BOOK_LINE]]
 
 
 def test_update_thread_stores_the_book_without_the_chapters(db, monkeypatch):
