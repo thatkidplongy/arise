@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FlashCard } from '@/components/Recall/FlashCard';
+import { KanaCard } from '@/components/Recall/KanaCard';
 import { TipCard } from '@/components/Recall/TipCard';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +17,7 @@ import { ALL_PILE, currentEntry, stackOf, type DeckState, type Stack } from '@/l
 import { dateKey } from '@/lib/dates';
 import { qk } from '@/query/keys';
 import { queryClient } from '@/query/client';
+import { useKanaBook } from '@/store/useKanaBook';
 import { useRecallDeck } from '@/store/useRecallDeck';
 import { useSystem } from '@/store/useSystem';
 import { font, neutral, sage, surface, text } from '@/theme';
@@ -61,7 +63,7 @@ function PileDone({ total, onAgain }: { total: number; onAgain: () => void }) {
   );
 }
 
-/** What the sitting is showing: the pile's end, a tip, or a card to try. */
+/** What the sitting is showing: the pile's end, a tip, a character, or a card to try. */
 function SessionBody({
   current,
   total,
@@ -79,6 +81,7 @@ function SessionBody({
 }) {
   if (!current) return <PileDone total={total} onAgain={onAgain} />;
   if (current.kind === 'tip') return <TipCard tip={current} onNext={onNext} />;
+  if (current.kind === 'kana') return <KanaCard item={current.item} onGrade={onGrade} />;
   return <FlashCard item={current.item} onGrade={onGrade} onEdit={onEdit} />;
 }
 
@@ -100,6 +103,7 @@ export function RecallSession({
   dueIds: string[];
 }) {
   const deck = useRecallDeck();
+  const gradeKana = useKanaBook((s) => s.grade);
   const gradeRecall = useSystem((s) => s.gradeRecall);
   const editRecall = useSystem((s) => s.editRecall);
   const [editing, setEditing] = useState(false);
@@ -108,10 +112,13 @@ export function RecallSession({
   const current = currentEntry(items, pile, state);
   const currentIsDue = current !== null && dueIds.includes(current.id);
 
-  const grade = (id: string) => (value: RecallGrade) => {
-    void gradeRecall(id, value);
-    if (value === 'missed') deck.miss(id);
-    else deck.meet(id);
+  // Two ladders, one gesture: a highlight's rung lives on the server, a character's
+  // in the kana book on this phone. Either way the card also leaves today's pile.
+  const grade = (entry: BringBack) => (value: RecallGrade) => {
+    if (entry.kind === 'kana') gradeKana(entry.item.char, value);
+    else void gradeRecall(entry.id, value);
+    if (value === 'missed') deck.miss(entry.id);
+    else deck.meet(entry.id);
   };
 
   const saveEdit = async (id: string, value: string) => {
@@ -151,7 +158,7 @@ export function RecallSession({
         total={stack.total}
         onAgain={() => deck.restart(items, pile)}
         onNext={() => (current ? deck.meet(current.id) : undefined)}
-        onGrade={current ? grade(current.id) : () => undefined}
+        onGrade={current ? grade(current) : () => undefined}
         onEdit={() => setEditing(true)}
       />
 

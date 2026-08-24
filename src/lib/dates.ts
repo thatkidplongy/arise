@@ -132,6 +132,15 @@ export function monthToDate(today: string): string[] {
   return recentDays(today, dayOfMonth);
 }
 
+/** `day` shifted by `n` calendar days — 'YYYY-MM-DD' in, 'YYYY-MM-DD' out. Walks a
+ * UTC epoch rather than mutating a local Date, so crossing a month or year boundary
+ * can't land on a date that doesn't exist and DST can't shift the result. */
+export function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  if (!y || !m || !d) return day;
+  return new Date(Date.UTC(y, m - 1, d) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
 export function recentDays(today: string, count: number): string[] {
   const [y, m, d] = today.split('-').map(Number);
   if (!y || !m || !d || count < 1) return [];

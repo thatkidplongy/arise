@@ -1,14 +1,16 @@
 import type { ApiInsight, ApiRecall } from '@/lib/api';
+import { kanaId, type KanaItem } from '@/lib/kana';
 
 /**
- * One thing to meet again: a highlight the schedule says is due, or a line from a
- * tips capture.
+ * One thing to meet again: a highlight the schedule says is due, a line from a tips
+ * capture, or a character off the hiragana chart.
  *
- * One flat sequence rather than two piles, because the screen shows one at a time
+ * One flat sequence rather than three piles, because the screen shows one at a time
  * and taps through them — cycling wants an order, not categories.
  */
 export type BringBack =
   | { kind: 'recall'; id: string; item: ApiRecall }
+  | { kind: 'kana'; id: string; item: KanaItem }
   | {
       kind: 'tip';
       id: string;
@@ -99,12 +101,14 @@ function tipEntry(insight: ApiInsight, id: string, text: string, action: boolean
 }
 
 /**
- * Everything due, then the tips library, then the whole shelf of past highlights.
+ * Everything due, then the tips library, then the whole shelf of past highlights and
+ * the rest of the kana chart.
  *
- * The order is the point: a due highlight is due today and grading it is what moves
- * the schedule, where a tip is only ever there to be read again. Tips first would let
- * browsing quietly replace the work. The shelf comes last because it can be hundreds
- * long — anywhere earlier and tapping would never reach what follows it.
+ * The order is the point: a due highlight or a kana the ladder owes is due today and
+ * grading it is what moves the schedule, where a tip is only ever there to be read
+ * again. Tips first would let browsing quietly replace the work. The two tails come
+ * last because they can be hundreds long — anywhere earlier and tapping would never
+ * reach what follows them.
  *
  * The shelf is deduped against the due set, so a highlight owed today is asked once
  * up front rather than met again mid-browse.
@@ -117,8 +121,12 @@ export function buildBringBack(
   recall: ApiRecall[],
   insights: ApiInsight[],
   library: ApiRecall[] = [],
+  kana: KanaItem[] = [],
 ): BringBack[] {
   const out: BringBack[] = recall.map((item) => ({ kind: 'recall', id: item.id, item }));
+  for (const item of kana) {
+    if (item.due) out.push({ kind: 'kana', id: kanaId(item.char), item });
+  }
   for (const i of insights) {
     if (i.kind !== 'tips') continue;
     // Takeaways are the ideas, steps are what to do about them — both worth meeting
@@ -131,6 +139,9 @@ export function buildBringBack(
   for (const item of library) {
     if (due.has(item.id)) continue;
     out.push({ kind: 'recall', id: item.id, item });
+  }
+  for (const item of kana) {
+    if (!item.due) out.push({ kind: 'kana', id: kanaId(item.char), item });
   }
   return out;
 }

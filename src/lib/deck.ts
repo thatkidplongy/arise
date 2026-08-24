@@ -1,4 +1,5 @@
 import type { BringBack } from '@/lib/bringBack';
+import { HIRAGANA_PILE, KANA_VIA } from '@/lib/kana';
 import { chapterSpan } from '@/lib/reading';
 
 /**
@@ -40,10 +41,11 @@ export function deckFor(day: string, stored: { day: string } & DeckState): DeckS
 }
 
 /** The material an entry files under: the book (chapter markers already stripped
- * by the server), or the capture a tip came from. Empty means unlabeled — those
- * cards live only in the all-pile. */
+ * by the server), the capture a tip came from, or the script a character belongs
+ * to. Empty means unlabeled — those cards live only in the all-pile. */
 export function materialOf(entry: BringBack): string {
   if (entry.kind === 'tip') return entry.source;
+  if (entry.kind === 'kana') return HIRAGANA_PILE;
   return entry.item.material;
 }
 
@@ -84,10 +86,19 @@ export interface ShelfStack extends Stack {
  *
  * The platform is dropped when the stack is already named after it — a capture
  * titled "YouTube" would otherwise read 'Tips · YouTube' over 'YouTube · 17 cards'. */
-function bylineOf(stack: Stack, via: string, markers: string[]): string {
+function bylineOf(stack: Stack, via: string, markers: string[], learned: number): string {
   const cards = `${stack.total} ${stack.total === 1 ? 'card' : 'cards'}`;
   const named = via && stack.name.toLocaleLowerCase().includes(via.toLocaleLowerCase());
-  return [named ? '' : via, cards, chapterSpan(markers)].filter(Boolean).join(' · ');
+  const progress = learned > 0 ? `${learned} learned` : '';
+  return [named ? '' : via, cards, chapterSpan(markers), progress].filter(Boolean).join(' · ');
+}
+
+/** What a stack's byline leads with — where its cards were captured from, or the
+ * track a script belongs to. A book says it with its chapters instead. */
+function viaOf(entry: BringBack): string {
+  if (entry.kind === 'tip') return entry.platform;
+  if (entry.kind === 'kana') return KANA_VIA;
+  return '';
 }
 
 /** Every material in the deck as a pickable stack, in first-appearance order —
@@ -99,6 +110,11 @@ export function listStacks(items: BringBack[], met: string[], dueIds: string[]):
   const at = new Map<string, number>();
   const vias: string[] = [];
   const markers: string[][] = [];
+  // How many of a stack's cards have been met at least once. Only the kana chart
+  // reports it: a chart is a fixed set you work through, so how far along you are is
+  // the useful thing to say, where a book's stack is a pile of notes you wrote and
+  // its size already says as much as there is to say.
+  const learned: number[] = [];
   for (const entry of items) {
     const name = materialOf(entry);
     if (!name) continue;
@@ -109,12 +125,15 @@ export function listStacks(items: BringBack[], met: string[], dueIds: string[]):
       out.push({ name, total: 0, left: 0, due: 0, dueLeft: 0, byline: '' });
       vias.push('');
       markers.push([]);
+      learned.push(0);
     }
     countInto(out[found], entry.id, metSet, dueSet);
-    if (entry.kind === 'tip') vias[found] = vias[found] || entry.platform;
-    else markers[found].push(entry.item.chapter);
+    const via = viaOf(entry);
+    if (via) vias[found] = vias[found] || via;
+    if (entry.kind === 'recall') markers[found].push(entry.item.chapter);
+    if (entry.kind === 'kana' && !entry.item.fresh) learned[found] += 1;
   }
-  out.forEach((stack, n) => (stack.byline = bylineOf(stack, vias[n], markers[n])));
+  out.forEach((stack, n) => (stack.byline = bylineOf(stack, vias[n], markers[n], learned[n])));
   return out;
 }
 

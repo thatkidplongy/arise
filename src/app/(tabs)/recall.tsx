@@ -3,12 +3,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { RecallSession } from '@/components/Recall/RecallSession';
 import { Screen } from '@/components/Screen';
-import { buildBringBack } from '@/lib/bringBack';
-import { deckFor } from '@/lib/deck';
-import { dateKey } from '@/lib/dates';
-import { useInsights } from '@/query/useInsights';
-import { useRecallLibrary } from '@/query/useRecallLibrary';
-import { useRecallDeck } from '@/store/useRecallDeck';
+import { useRecallCards } from '@/hooks/useRecallCards';
 import { useSystem } from '@/store/useSystem';
 
 /**
@@ -18,9 +13,7 @@ import { useSystem } from '@/store/useSystem';
  */
 export default function RecallScreen() {
   const state = useSystem((s) => s.state);
-  const { insights } = useInsights();
-  const library = useRecallLibrary();
-  const deck = useRecallDeck();
+  const { items, dueIds, state: deck } = useRecallCards();
   const params = useLocalSearchParams<{ pile?: string }>();
 
   // A bare /recall names no stack — that choice belongs to the shelf on Learn.
@@ -34,17 +27,9 @@ export default function RecallScreen() {
     );
   }
 
-  const recall = state.recall ?? [];
-  const items = buildBringBack(recall, insights, library);
-
   return (
     <Screen>
-      <RecallSession
-        items={items}
-        state={deckFor(dateKey(), deck)}
-        pile={params.pile}
-        dueIds={recall.map((r) => r.id)}
-      />
+      <RecallSession items={items} state={deck} pile={params.pile} dueIds={dueIds} />
     </Screen>
   );
 }

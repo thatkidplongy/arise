@@ -192,6 +192,19 @@ export const font = {
   mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace' }) as string,
 } as const;
 
+/**
+ * The face that draws kana and kanji. Neither Bricolage nor Figtree ships a Japanese
+ * glyph, so a character left to the app's own stack is substituted one glyph at a
+ * time by the platform — fine at 12pt inside a sentence, visibly wrong at the size a
+ * flash card shows a character. Naming the platform's own Japanese face gets the
+ * stroke shapes a learner is copying.
+ */
+export const kanaFont = Platform.select({
+  ios: 'Hiragino Sans',
+  android: 'sans-serif',
+  default: 'sans-serif',
+}) as string;
+
 /** Weight -> the Figtree cut that carries it. Three cuts ship, matching the design
  * system's own set, so 500 rounds up to SemiBold rather than pointing at nothing. */
 export const FIGTREE_BY_WEIGHT: Record<string, string> = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  addDays,
   dayMonth,
   formatClock,
   formatDayBand,
@@ -138,5 +139,22 @@ describe('monthToDate', () => {
 
   it('is empty for a day it cannot read', () => {
     expect(monthToDate('nonsense')).toEqual([]);
+  });
+});
+
+describe('addDays', () => {
+  it('walks forward and back without inventing a date', () => {
+    expect(addDays('2026-08-24', 3)).toBe('2026-08-27');
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-09-01', -1)).toBe('2026-08-31');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('crosses a leap day', () => {
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+  });
+
+  it('hands back a day it cannot read, unshifted', () => {
+    expect(addDays('nonsense', 3)).toBe('nonsense');
   });
 });
