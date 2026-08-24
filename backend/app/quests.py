@@ -115,7 +115,7 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Eat one meal with no screen, putting the spoon down between bites",
         ]),
         ("Stock the Arsenal", "Make the good choice the easy one", [
-            "Restock lean protein and veg — the Body tab suggests picks you can actually buy",
+            "Restock lean protein and veg — the Food screen suggests picks you can actually buy",
         ]),
     ],
     "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
@@ -1104,12 +1104,12 @@ def fuel_floor(targets: dict | None, level: int) -> list[str]:
     send you to set one up."""
     if not targets:
         return [
-            "Set your body profile (Body tab) so your targets are real numbers",
-            "Log everything you eat today in the Body tab",
+            "Set your body profile (You → Food) so your targets are real numbers",
+            "Log everything you eat today on the Food screen",
         ]
     protein, lo, hi, fibre = (targets["protein_g"], targets["target_low"],
                               targets["target_high"], targets["fibre_g"])
-    log = "Log everything you eat today in the Body tab — every meal counted"
+    log = "Log everything you eat today on the Food screen — every meal counted"
     plan = "Log each meal before you eat it — decide, then eat"
     tiers = [
         [log, f"Protein ≥ {protein} g — muscle is built from it"],

@@ -71,7 +71,7 @@ def test_fuel_floor_is_written_from_the_hunters_own_targets():
     # body profile computed. Logging is always step one.
     floor = quests.fuel_floor(_fuel_targets(), 0)
     assert len(floor) == 2
-    assert "Log" in floor[0] and "Body tab" in floor[0]
+    assert "Log" in floor[0] and "Food screen" in floor[0]
     assert "137 g" in floor[1]
 
 
