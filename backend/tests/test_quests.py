@@ -483,3 +483,18 @@ def test_finishing_a_japanese_day_moves_the_plan_and_undo_puts_it_back(db):
     done = [c for c in service.completions_of(db, player) if c.quest_id == "d-jp"]
     service.undo_completion(db, player, done[-1].id, "2026-07-06")
     assert player.japanese_step == 5
+
+
+def test_a_kana_row_is_served_whole():
+    """The two-step cap keeps a quest glanceable, and a kana row is the one shape where
+    the steps *are* the material — the H row trimmed to two loses its handakuten, which
+    is a chart with five characters missing rather than a lean quest."""
+    row = japanese.step_at(6)
+    assert row["title"] == "Hiragana: H row"
+    assert len(row["steps"]) == 5
+    # No floor on d-jp, so this is the bare path — the per-slot exception has to apply
+    # there too, or the cap silently eats the row.
+    assert quests.cap_steps(list(row["steps"]), 0, "d-jp") == list(row["steps"])
+    assert any("ぱ" in s for s in quests.cap_steps(list(row["steps"]), 0, "d-jp"))
+    # Everything else still gets the lean two.
+    assert len(quests.cap_steps(["a", "b", "c"], 0, "d-sketch")) == 2

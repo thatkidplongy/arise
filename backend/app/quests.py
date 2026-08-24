@@ -1198,18 +1198,22 @@ def priority_content(focus: str) -> tuple[str, str, list[str]]:
 # ate the whole budget and every rotating variant was built and then trimmed away
 # — the card read "Legs & Lunges" while listing push-ups, identically, every day.
 # Five leaves room for the floor plus the two steps of the day's actual training.
-STEP_CAPS: dict[str, int] = {"d-train": 5}
+# Slots whose steps are the material rather than variety on top of it: a workout is
+# a list of sets, and a kana row is three lines of a chart plus what to do with them.
+# Trimming those to two isn't leanness, it's a row of hiragana served without its
+# handakuten.
+STEP_CAPS: dict[str, int] = {"d-train": 5, "d-jp": 5}
 _STEP_CAP_WITH_FLOOR = 3
 _STEP_CAP_BARE = 2
 
 
 def cap_steps(steps: list[str], floor_len: int, slot_id: str = "") -> list[str]:
     """Keep a quest lean and glanceable: at most 2 steps, or 3 when it carries a
-    mandatory floor (per-slot exceptions in STEP_CAPS). Floor steps come first, so
-    they're the ones kept up to the cap; extra variety beyond that is trimmed —
-    which is why every variant leads with the step that matters most."""
+    mandatory floor (per-slot exceptions in STEP_CAPS, which apply either way). Floor
+    steps come first, so they're the ones kept up to the cap; extra variety beyond that
+    is trimmed — which is why every variant leads with the step that matters most."""
     if floor_len <= 0:
-        return steps[:_STEP_CAP_BARE]
+        return steps[: STEP_CAPS.get(slot_id, _STEP_CAP_BARE)]
     return steps[: STEP_CAPS.get(slot_id, _STEP_CAP_WITH_FLOOR)]
 
 
