@@ -83,31 +83,30 @@ def _apply_completion(db: Session, player: Player, quest: QuestDef, day: str, ro
     if after_rank != before_rank:
         events.append({"type": "rank_up", "data": {"from": before_rank, "to": after_rank}})
 
-    _advance_japanese(db, player, quest, day)
+    _advance_japanese(db, player, quest)
 
     events += unlock_achievements(db, player, after)
     return events
 
 
-def _retreat_japanese(db: Session, player: Player, quest: QuestDef, day: str) -> None:
-    """Undoing a Japanese day puts the plan back where it was, so a mis-tap doesn't
-    cost a row of the chart. Same rule as advancing: only the days that handed over
-    new material ever moved it."""
-    if quest.id != "d-jp" or not japanese.introduces(day):
+def _retreat_japanese(db: Session, player: Player, quest: QuestDef) -> None:
+    """Undoing a Japanese quest puts the plan back where it was, so a mis-tap doesn't
+    cost a step. A row that wants a second sitting is what 'Undo last' is for."""
+    if quest.id != "d-jp":
         return
     player.japanese_step = max(0, (player.japanese_step or 0) - 1)
 
 
-def _advance_japanese(db: Session, player: Player, quest: QuestDef, day: str) -> None:
-    """Finishing a Japanese day that handed over new material moves the plan on.
+def _advance_japanese(db: Session, player: Player, quest: QuestDef) -> None:
+    """Finishing the Japanese quest moves the plan on one step.
 
-    Only those days: a recall sitting is not a claim that a new row has landed, and a
-    plan that advanced on every completion would walk the hunter off the end of the
-    hiragana chart in a fortnight of days they mostly spent drilling. Which kind of
-    day it was is derived from the date, so this and the card agree."""
+    Every appearance, because the quest is already on the three-day rotation — the
+    spacing is the rotation's, and consolidation is a step in the plan rather than a
+    day the plan skips. It used to advance only on dates it judged to be teaching days,
+    which put two three-day cycles out of phase and meant the plan never moved."""
     if quest.id != "d-jp":
         return
-    player.japanese_step = japanese.next_position(player.japanese_step or 0, day)
+    player.japanese_step = japanese.next_position(player.japanese_step or 0)
 
 
 def unlock_achievements(db: Session, player: Player, agg: dict) -> list[dict]:
@@ -155,7 +154,7 @@ def _remove_one_completion(db: Session, player: Player, quest: QuestDef, day: st
     row_day = row.day
     db.delete(row)
     db.flush()
-    _retreat_japanese(db, player, quest, row_day)
+    _retreat_japanese(db, player, quest)
     _revoke_bonus_if_needed(db, player, row_day)
     return True
 
@@ -218,7 +217,7 @@ def undo_completion(db: Session, player: Player, completion_id: str, day: str) -
         pk = quests.period_key(quest.cadence, row_day)
         _clear_step_checks(db, player, quest_id, pk)
         _clear_quest_notes(db, player, quest_id, pk)
-        _retreat_japanese(db, player, quest, row_day)
+        _retreat_japanese(db, player, quest)
 
     db.commit()
     return {"events": [], "state": build_state(db, player, day)}

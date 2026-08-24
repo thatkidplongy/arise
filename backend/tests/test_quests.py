@@ -345,49 +345,43 @@ def test_japanese_plan_is_held_at_a_position_not_a_date():
     assert stages.index(japanese.KATAKANA) > stages.index(japanese.HIRAGANA)
 
 
-def test_japanese_days_alternate_between_new_material_and_recall():
-    """A row a day would be a chart you had been shown, not one you could read — so
-    every third day introduces, on a cadence you can plan a week around."""
-    days = [f"2026-08-{n:02d}" for n in range(1, 31)]  # 30 days = exactly ten rows
-    introducing = [d for d in days if japanese.introduces(d)]
-    assert len(introducing) == 10
-    # Never two new rows running, and never a long drought of drilling either.
-    gaps = {japanese._ordinal(b) - japanese._ordinal(a) for a, b in zip(introducing, introducing[1:])}
-    assert gaps == {3}
-
-    # The step's own title on a day that introduces it; a practice sitting otherwise.
-    step = japanese.step_at(5)
-    assert japanese.content(5, introducing[0])[0] == step["title"]
-    practice = [t for (t, *_r) in japanese._PRACTICE[step["stage"]]]
-    quiet = [d for d in days if not japanese.introduces(d)]
-    assert all(japanese.content(5, d)[0] in practice for d in quiet)
-
-    # The practice pool cycles rather than repeating — a rotating title over the same
-    # checklist two mornings running isn't variety.
-    shown = [japanese.content(5, d)[0] for d in quiet]
-    assert set(shown) == set(practice)
-    assert all(a != b for a, b in zip(shown, shown[1:]))
-
-    # A drilling day still says where the plan is; the step title only shows on a third
-    # of the days, so without this two mornings in three read as a plan-less drill.
-    assert japanese.content(5, quiet[0])[1].endswith("Hiragana 6/11")
+def test_japanese_stops_to_read_back_every_few_rows():
+    """A chart shown one row at a time is not a chart you can read straight through,
+    and reading it straight through is the only thing that proves the early rows stuck.
+    So consolidation is a step in the plan, not a mood the plan is sometimes in."""
+    kana = [n for n, s in enumerate(japanese.PLAN) if s["stage"] == japanese.HIRAGANA]
+    holds = [n for n in kana if "read" in japanese.PLAN[n]["title"].lower()
+             or "chart" in japanese.PLAN[n]["title"].lower()]
+    assert len(holds) == 3
+    # Never two holds running, and never more than five new rows without one.
+    runs = []
+    since = 0
+    for n in kana:
+        if n in holds:
+            runs.append(since)
+            since = 0
+        else:
+            since += 1
+    assert all(0 < r <= 6 for r in runs)
 
 
-def test_only_a_day_that_taught_something_moves_the_plan():
-    day = next(f"2026-08-{n:02d}" for n in range(1, 32) if japanese.introduces(f"2026-08-{n:02d}"))
-    quiet = next(f"2026-08-{n:02d}" for n in range(1, 32) if not japanese.introduces(f"2026-08-{n:02d}"))
-    assert japanese.next_position(3, day) == 4
-    assert japanese.next_position(3, quiet) == 3
-    # The plan holds on its last step rather than running out.
-    assert japanese.next_position(japanese.LAST_STEP, day) == japanese.LAST_STEP
+def test_every_appearance_of_the_quest_moves_the_plan():
+    """The quest is already on the three-day rotation, so its own spacing is the
+    rotation's. A second cadence on top put the two cycles permanently out of phase —
+    the quest only came up on days the plan had set aside for drilling."""
+    assert japanese.next_position(3) == 4
+    assert japanese.next_position(0) == 1
+    # Held at the last step rather than running out: the tail is reading real Japanese.
+    assert japanese.next_position(japanese.LAST_STEP) == japanese.LAST_STEP
 
 
 def test_japanese_content_routes_through_content_for():
     q = _q("d-jp", "INT", "daily")
-    title, _desc, steps, res = quests.content_for(q, "2026-07-06", jp_step=5)
-    assert title and steps and res
-    # Position 5 is the H row — the step is named, and its own resource comes with it.
-    assert japanese.step_at(5)["title"].startswith("Hiragana:")
+    title, desc, steps, res = quests.content_for(q, "2026-07-06", jp_step=6)
+    assert title == japanese.step_at(6)["title"] and steps and res
+    # The card always says where the plan is, so a hold day doesn't read as a
+    # plan-less drill and a row day doesn't read as the whole of Japanese.
+    assert desc.endswith("Hiragana 7/14")
 
 
 def test_no_focus_uses_pool():
@@ -479,21 +473,13 @@ def test_finishing_a_japanese_day_moves_the_plan_and_undo_puts_it_back(db):
     from app import service
     from app.state import get_or_create_player
 
-    days = [f"2026-07-{n:02d}" for n in range(1, 29)]
-    teaching = next(d for d in days if japanese.introduces(d))
-    quiet = next(d for d in days if not japanese.introduces(d))
-
     player = get_or_create_player(db)
     player.japanese_step = 5
     db.commit()
 
-    # A recall sitting is not a claim that a new row has landed.
-    service.complete_quest(db, player, "d-jp", quiet)
-    assert player.japanese_step == 5
-
-    service.complete_quest(db, player, "d-jp", teaching)
+    service.complete_quest(db, player, "d-jp", "2026-07-06")
     assert player.japanese_step == 6
 
-    done = [c for c in service.completions_of(db, player) if c.quest_id == "d-jp" and c.day == teaching]
-    service.undo_completion(db, player, done[-1].id, teaching)
+    done = [c for c in service.completions_of(db, player) if c.quest_id == "d-jp"]
+    service.undo_completion(db, player, done[-1].id, "2026-07-06")
     assert player.japanese_step == 5

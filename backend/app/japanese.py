@@ -15,10 +15,16 @@ the one after it:
   4. sentences  — subject–object–verb, and the endings that make it a sentence
   5. kanji      — slowly, starting with numbers, days, directions, simple nouns
 
-Inside a stage the daily quest alternates between the step's own new material and
-practising what you already hold, because a plan that introduced new characters every
-single day would be a chart you had read rather than a chart you knew. Only a day that
-introduces something moves the position (see `introduces`).
+Every appearance of the quest works the step being held, and finishing it moves the
+position on by one. The spacing is already there and did not need inventing: `d-jp` is
+on the three-day daily rotation, so a step is a step every third morning, and the kana
+stack on Learn is there to drill on the mornings between. A second cadence on top of
+that one silently locked the two out of phase — the quest only ever came up on the days
+the plan had decided were for drilling, so it never advanced at all.
+
+Consolidation is a step rather than a mood: every few rows the plan stops adding and
+asks you to read back everything you have. That way it sits in the same list as the
+rows, advances the same way, and can't be skipped by a cadence.
 
 The kana rows pair each plain row with its dakuten and handakuten. They are the same
 shapes with a mark on them, and learning さ a fortnight before ざ means meeting ざ as
@@ -26,8 +32,6 @@ something new rather than as さ voiced.
 """
 
 from __future__ import annotations
-
-from datetime import date
 
 # ── The stages, and the steps inside them ────────────────────────────────────
 
@@ -327,100 +331,70 @@ _KANJI_STEPS: list[dict] = [
     },
 ]
 
+def _hold(stage: str, title: str, desc: str, steps: list[str], resource: str) -> dict:
+    """A step that adds nothing new and asks you to read back what you have.
+
+    Every few rows, because a chart you have been shown one row at a time is not a
+    chart you can read straight through — and reading it straight through is the only
+    thing that proves the earlier rows are still there.
+    """
+    return {"stage": stage, "title": title, "desc": desc, "steps": steps, "resource": resource}
+
+
+_HIRAGANA_HOLDS: dict[int, dict] = {
+    5: _hold(HIRAGANA, "Hiragana: read it back", "10 min — nothing new today", [
+        "Read a list of hiragana-only words out loud, using only the rows you have",
+        "Write out any character you had to stop and think about, five times each",
+        "Then clear the Hiragana stack on Learn",
+    ], "🌐 Tofugu — hiragana reading practice"),
+    11: _hold(HIRAGANA, "Hiragana: the whole plain chart", "15 min — the chart end to end", [
+        "Write the chart out from memory, row by row, without looking",
+        "Check it against the real one and mark every gap",
+        "Trace a worksheet for whatever you got wrong",
+    ], "🌐 Tofugu — printable hiragana worksheets"),
+    13: _hold(HIRAGANA, "Hiragana: read something real", "15 min — you can read now", [
+        "Find a few hiragana-only sentences and read them out loud, all the way through",
+        "Don't translate — just decode the sounds smoothly",
+    ], "🌐 Tofugu — hiragana reading practice"),
+}
+
+_KATAKANA_HOLDS: dict[int, dict] = {
+    5: _hold(KATAKANA, "Katakana: read it back", "10 min — nothing new today", [
+        "Read ten loanwords out loud: コーヒー, テレビ, パン, タクシー, ホテル",
+        "Say what each one is in English before you check",
+    ], _TOFUGU_KATAKANA),
+    11: _hold(KATAKANA, "Katakana: both charts, mixed", "15 min — the two scripts together", [
+        "Read a mix of hiragana and katakana words out loud",
+        "Write out every character you hesitated on, five times each",
+    ], _TOFUGU_KATAKANA),
+    13: _hold(KATAKANA, "Katakana: in the wild", "15 min — a real menu or label", [
+        "Find a Japanese menu or product label and read the katakana on it",
+        "Note two words you worked out with no help at all",
+    ], _TOFUGU_KATAKANA),
+}
+
+
+def _with_holds(steps: list[dict], holds: dict[int, dict]) -> list[dict]:
+    """A stage's rows with its consolidation steps slotted in at their positions."""
+    out: list[dict] = []
+    for step in steps:
+        if len(out) in holds:
+            out.append(holds[len(out)])
+        out.append(step)
+    while len(out) in holds:
+        out.append(holds[len(out)])
+    return out
+
+
 PLAN: list[dict] = [
-    *_kana_plan(_HIRAGANA_ROWS, HIRAGANA, "Hiragana", "Hiragana", _TOFUGU_HIRAGANA),
-    *_kana_plan(_KATAKANA_ROWS, KATAKANA, "Katakana", "Hiragana", _TOFUGU_KATAKANA),
+    *_with_holds(_kana_plan(_HIRAGANA_ROWS, HIRAGANA, "Hiragana", "Hiragana", _TOFUGU_HIRAGANA), _HIRAGANA_HOLDS),
+    *_with_holds(_kana_plan(_KATAKANA_ROWS, KATAKANA, "Katakana", "Hiragana", _TOFUGU_KATAKANA), _KATAKANA_HOLDS),
     *_WORD_STEPS,
     *_SENTENCE_STEPS,
     *_KANJI_STEPS,
 ]
 
 LAST_STEP = len(PLAN) - 1
-
-
-# ── Practice: what the other days of a stage do ──────────────────────────────
-#
-# Every stage needs days that add nothing. Recall is what turns a row you have read
-# into a row you know, and a plan that introduced five new characters every morning
-# would be a chart you had been shown rather than one you could read.
-
-_PRACTICE: dict[str, list[tuple[str, str, list[str], str]]] = {
-    HIRAGANA: [
-        ("Hiragana Recall", "10 min — the stack, not the chart", [
-            "Work the Hiragana stack on Learn until the pile is done",
-            "Anything you miss comes back in a few cards — say the sound before you turn it",
-        ], ""),
-        ("Hiragana Tracing", "10 min muscle memory", [
-            "Trace a worksheet for the rows you have so far",
-            "Say each sound as you write it — the hand and the mouth learn together",
-        ], "🌐 Tofugu — printable hiragana worksheets"),
-        ("Hiragana Reading", "10 min putting it together", [
-            "Read a list of hiragana-only words out loud",
-            "Decode the sounds smoothly — no katakana or kanji yet",
-        ], "🌐 Tofugu — hiragana reading practice"),
-    ],
-    KATAKANA: [
-        ("Kana Recall", "10 min — both scripts, mixed", [
-            "Work the Hiragana stack on Learn, then run today's katakana rows from memory",
-            "Write out any character you had to think about",
-        ], ""),
-        ("Loanword Reading", "10 min — the words katakana is for", [
-            "Read ten loanwords out loud: コーヒー, テレビ, パン, タクシー, ホテル",
-            "Say what each one is in English before you check",
-        ], _TOFUGU_KATAKANA),
-        ("Menu Reading", "10 min — katakana in the wild", [
-            "Find a Japanese menu or product label and read the katakana on it",
-            "Note two words you worked out without help",
-        ], _TOFUGU_KATAKANA),
-    ],
-    WORDS: [
-        ("Word Reps", "10 min — the words you have so far", [
-            "Review every word and particle from this stage",
-            "Use three of them in sentences about right now",
-        ], _TAE_KIM),
-        ("Say It Out Loud", "10 min — from your own head", [
-            "Describe what you can see, in whatever Japanese you have",
-            "Note the one word you wanted and didn't have — then look it up",
-        ], ""),
-        ("Listen In", "10 min — train your ears", [
-            "Listen to one short clip and catch the particles you know",
-            "Note three words you recognised",
-        ], "🎧 Nihongo con Teppei (podcast)"),
-    ],
-    SENTENCES: [
-        ("Flip Five", "10 min — English into Japanese order", [
-            "Take five English sentences and put the verb last",
-            "Read each Japanese one aloud before you check it",
-        ], _TAE_KIM),
-        ("Sentence Reps", "10 min — your own, not a textbook's", [
-            "Write five sentences about your day using は, を and a verb",
-            "Say each one out loud, then fix what sounded wrong",
-        ], _GENKI),
-        ("Shadowing", "10 min — speaking", [
-            "Pick one or two lines of native audio",
-            "Shadow them 5× each — match the rhythm, not just the words",
-        ], "🎥 Comprehensible Japanese (YouTube)"),
-    ],
-    KANJI: [
-        ("Kanji Reps", "10 min — clear the reviews", [
-            "Clear today's SRS reviews (Anki or WaniKani)",
-            "Write out any character you failed, three times each",
-        ], "🎧 WaniKani — kanji & vocab SRS"),
-        ("Kanji in Context", "15 min — read the real thing", [
-            "Read two or three sentences mixing kanji and the grammar you have",
-            "Note one new kanji and one grammar point you spotted",
-        ], _NHK_EASY),
-        ("Everyday Vocab", "10 min — words you'll actually use", [
-            "Add five everyday words — food, travel, directions",
-            "Use two of them in a sentence out loud",
-        ], "🎧 Anki / WaniKani — spaced repetition"),
-    ],
-}
-
-# How often a day introduces new material rather than practising. One in three: two
-# days of recall behind every row is roughly what it takes for a row to stop being
-# something you look up, and it puts the whole chart inside a month either way.
-_INTRODUCE_EVERY = 3
 
 
 def step_at(position: int) -> dict:
@@ -433,26 +407,6 @@ def stage_at(position: int) -> str:
     """Which stage a position falls in — derived, never stored, so the two can't
     disagree about where you are."""
     return step_at(position)["stage"]
-
-
-def _ordinal(day: str) -> int:
-    return date.fromisoformat(day).toordinal()
-
-
-def introduces(day: str) -> bool:
-    """Whether today's Japanese quest hands over new material, or drills what you
-    already have.
-
-    Counted off the calendar rather than hashed from it. The rest of the app picks pool
-    variants by hashing a period key, which is right when all you want is "don't show
-    the same one twice running" — but here the ratio is the promise. A hash gave runs
-    of five drilling days and then two new rows back to back, which is a cadence you
-    can't plan a week around.
-
-    Deterministic either way, so the card and the completion hook agree about what
-    today was.
-    """
-    return _ordinal(day) % _INTRODUCE_EVERY == 0
 
 
 def progress(position: int) -> dict:
@@ -472,35 +426,28 @@ def progress(position: int) -> dict:
     }
 
 
-def content(position: int, day: str) -> tuple[str, str, list[str], str]:
-    """Today's Japanese task: the step you're holding on the days that introduce it,
-    and one of its stage's practice sittings on the days between.
+def content(position: int) -> tuple[str, str, list[str], str]:
+    """The step being held, as the quest card shows it.
 
-    A practice day carries where you are in its description. Without it two days out
-    of three read as a drill with no plan behind them — the step's own title is the
-    only thing that ever says which stage this is, and it only shows every third day.
+    No day in the signature: the quest is on the three-day rotation, so every morning
+    it appears is a morning to work the step, and the plan advances when that step is
+    finished. Consolidation is already in the plan (see `_with_holds`), so there is
+    nothing left for a date to decide.
     """
     step = step_at(position)
-    if introduces(day):
-        return step["title"], step["desc"], list(step["steps"]), step["resource"]
-    pool = _PRACTICE[step["stage"]]
-    # Counted in practice days, not calendar days: a plain `ordinal % len(pool)` would
-    # only ever land on the residues that aren't introducing days, so a third of every
-    # pool would never be shown at all.
-    at = _ordinal(day)
-    title, desc, steps, resource = pool[(at - at // _INTRODUCE_EVERY) % len(pool)]
     at = progress(position)
-    return title, f"{desc} · {at['stage_label']} {at['done'] + 1}/{at['steps']}", list(steps), resource
+    return (
+        step["title"],
+        f"{step['desc']} · {at['stage_label']} {at['done'] + 1}/{at['steps']}",
+        list(step["steps"]),
+        step["resource"],
+    )
 
 
-def next_position(position: int, day: str) -> int:
+def next_position(position: int) -> int:
     """Where the plan stands after finishing today's Japanese quest.
 
-    Only a day that introduced something moves it: ticking off a recall sitting is not
-    a claim that you have learned a new row, and a plan that advanced on every
-    completion would run the hunter through the whole chart in a fortnight of days
-    they mostly spent drilling.
+    Held at the last step rather than running out: the tail of the plan is reading real
+    Japanese, and there is no morning on which that is finished.
     """
-    if not introduces(day):
-        return position
-    return min(position + 1, LAST_STEP)
+    return min(max(0, position) + 1, LAST_STEP)

@@ -1522,7 +1522,7 @@ def content_for(
     if quest.id == "d-jp":
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
-        return japanese.content(jp_step, day)
+        return japanese.content(jp_step)
     if quest.id == "d-craft" and not interview:
         # Follows the system-design plan at whatever phase the hunter is holding.
         # Interview mode opts out — it has its own pool, and a next-week interview
