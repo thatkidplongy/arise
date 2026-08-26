@@ -103,6 +103,16 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # Pieces ticked off in the current phase. Existing rows start at 0: what was
     # logged before this column existed was sittings, which is not the same claim.
     ("players", "craft_piece", "INTEGER DEFAULT 0"),
+    # Plates. Food logged before the hand-portion rewrite has no portions and keeps
+    # its calorie figures — the weekly estimate reads whichever one a row carries,
+    # so old days stay honest rather than being re-measured into hands they never had.
+    ("food_entries", "slot", "VARCHAR DEFAULT ''"),
+    ("food_entries", "place", "VARCHAR DEFAULT ''"),
+    ("food_entries", "protein_p", "INTEGER DEFAULT 0"),
+    ("food_entries", "veg_p", "INTEGER DEFAULT 0"),
+    ("food_entries", "carb_p", "INTEGER DEFAULT 0"),
+    ("food_entries", "extra_p", "INTEGER DEFAULT 0"),
+    ("food_entries", "at_time", "VARCHAR DEFAULT ''"),
 ]
 
 

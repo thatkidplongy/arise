@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from . import (body, books, digest, digest_render, insights, llm, mailer, nutrition,
-               recall, service, skincare, state, transcript)
+               recall, service, skincare, state)
 from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
-                      BookIn, BookReviewIn, BookOut, BookShelfOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
+                      BookIn, BookReviewIn, BookOut, BookShelfOut, CaptureFailureOut,
+                      CaptureSweepOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
                       CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
@@ -297,10 +298,13 @@ def analyze_food(shot: FoodAnalyzeIn, db: Session = Depends(get_db)):
 
 @router.post("/food/log", response_model=BodyOut)
 def log_food(entry: FoodLogIn, day: str | None = Query(None), db: Session = Depends(get_db)):
-    """Add one food to the day's log."""
+    """Add one plate to the day's log."""
     player = state.get_or_create_player(db)
     body.log_food(db, player.id, _valid_day(day), entry.name, entry.grams,
-                  entry.kcal, entry.protein_g, entry.fibre_g)
+                  entry.kcal, entry.protein_g, entry.fibre_g,
+                  slot=entry.slot, place=entry.place, at_time=entry.at_time,
+                  protein_p=entry.protein_p, veg_p=entry.veg_p,
+                  carb_p=entry.carb_p, extra_p=entry.extra_p)
     return body.build_body(db, player.id, _valid_day(day))
 
 
@@ -357,18 +361,52 @@ def list_insights(db: Session = Depends(get_db)):
 def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
     """Capture a video: fetch its spoken transcript (Supadata) and distil it (Gemini)
     into takeaways + pull-quotes. Needs a Supadata key; distilling needs the Gemini key.
-    A rough, editable capture by nature — never logged silently anywhere else."""
+    A rough, editable capture by nature — never logged silently anywhere else.
+
+    A link that doesn't make it lands in the failure ledger on the way out
+    (`GET /insights/failed`), so the error response is a report rather than the only
+    record of what was pasted."""
     player = state.get_or_create_player(db)
-    if not transcript.enabled():
-        raise HTTPException(503, "Capturing videos needs a Supadata key (set ARISE_SUPADATA_API_KEY).")
-    if not llm.enabled():
-        raise HTTPException(503, "Distilling needs a Gemini key (set ARISE_LLM_API_KEY).")
     try:
-        return insights.add_insight(db, player.id, body_in.url, body_in.kind)
-    except insights.NoTranscript:
-        raise HTTPException(422, "No speech found in that video — it may be music- or text-only.")
-    except Exception:
-        raise HTTPException(502, "Couldn't fetch that transcript — check the link, or try another.")
+        return insights.capture(db, player.id, body_in.url, body_in.kind)
+    except insights.CaptureError as e:
+        raise HTTPException(e.status, e.message)
+
+
+@router.get("/insights/failed", response_model=list[CaptureFailureOut])
+def list_failed_captures(db: Session = Depends(get_db)):
+    """Links that never distilled, newest first — the ones still worth another go."""
+    player = state.get_or_create_player(db)
+    return insights.list_failures(db, player.id)
+
+
+@router.post("/insights/failed/retry", response_model=CaptureSweepOut)
+def retry_failed_captures(db: Session = Depends(get_db)):
+    """Try the kept links again — for once the key is set or the day's quota has
+    rolled. Bounded (see insights.retry_failures); `untried` says what's left."""
+    player = state.get_or_create_player(db)
+    return insights.retry_failures(db, player.id)
+
+
+@router.post("/insights/failed/{failure_id}/retry", response_model=InsightOut)
+def retry_failed_capture(failure_id: str, db: Session = Depends(get_db)):
+    """Try one kept link again. Fails the same way a fresh paste would, and the
+    ledger entry survives with one more attempt on it."""
+    player = state.get_or_create_player(db)
+    try:
+        return insights.retry_failure(db, player.id, failure_id)
+    except LookupError:
+        raise HTTPException(404, "That link isn't in the list any more.")
+    except insights.CaptureError as e:
+        raise HTTPException(e.status, e.message)
+
+
+@router.delete("/insights/failed/{failure_id}", response_model=list[CaptureFailureOut])
+def forget_failed_capture(failure_id: str, db: Session = Depends(get_db)):
+    """Give up on a link. Returns what's still kept."""
+    player = state.get_or_create_player(db)
+    insights.forget_failure(db, player.id, failure_id)
+    return insights.list_failures(db, player.id)
 
 
 @router.delete("/insights/{insight_id}", response_model=list[InsightOut])

@@ -64,7 +64,7 @@ keeps working** — the app is designed so an outside service can never take it 
 
 | Slot | Hobby | Stat | Notes |
 |---|---|---|---|
-| Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank + explosive-core floor that *climbs with your level* (see Progression) at real training volume — sets × reps that force adaptation, not a warm-up. A second always-on daily, **Fuel**, carries the diet plan: its floor is written from your own body-profile targets (protein, calorie band, fibre), because the physique the training asks for is written in the kitchen |
+| Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank + explosive-core floor that *climbs with your level* (see Progression) at real training volume — sets × reps that force adaptation, not a warm-up. A second always-on daily, **Fuel**, carries the diet plan: its floor is written from your own body-profile targets, in **hand portions** (palms of protein, fists of veg, cupped hands of starch) rather than grams — most meals here are bought, and a gram target on a restaurant plate is a number you'd invent. The physique the training asks for is written in the kitchen |
 | Creative | Drawing, dance, singing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
 | Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |
@@ -223,24 +223,51 @@ by a plain tool than by a scored quest — so this is its own small subsystem
 (`body.py` + `nutrition.py` + `skincare.py`, tables `body_profiles`,
 `food_entries`, `skincare_steps`, `skincare_checks`), reached via `/body`.
 
-- **Nutrition — gentle by design.** A one-time profile (sex, age, height, weight,
-  activity, **goal weight**) yields a calorie / **protein** (1.8 g/kg) / **fibre**
-  (14 g per 1000 kcal) *target range* via Mifflin–St Jeor (`nutrition.targets`,
-  derived on read), alongside your **BMI** and the healthy-BMI weight range for
-  your height. The goal weight drives the direction (a gentle deficit above it, a
-  gentle surplus below, maintenance within ~1 kg). It is a **range, never a hard
-  number**, going over is never a "failure", the deficit is floored at BMR so it
-  can't go dangerously low, and it's an estimate — not medical/nutrition advice. A
-  rotating **"what to eat"** list (`nutrition.SUGGESTIONS` → `daily_suggestions`,
-  protein/fibre/meal, deterministic per day) gives concrete, tap-to-log ideas.
-  Food is logged precisely against **Open Food Facts** (`nutrition.search`, free,
-  no API key, server-side) — one of the app's free external services; any
-  lookup failure falls back to logging by hand. You can also **snap a photo**:
-  `POST /food/analyze` sends it to **Gemini vision** (`llm.analyze_food`) which
-  returns an estimated name + calories/protein/fibre. It's on-demand only (one
-  call per photo, never in the background), needs the Gemini key, and — being a
-  guess from a picture — is returned as an **editable** estimate, not logged
-  automatically.
+- **The day is logged in hands, not grams.** Most meals here are bought, and a
+  bought plate can't be weighed: asking for "128 g of protein" off a carinderia
+  plate asks for a number that would be invented three times a day, and inventing
+  numbers is what makes people quit a food log. So a plate is logged in **hand
+  portions** — a palm of protein, a fist of vegetables, a cupped hand of rice, and
+  sweet drinks & fried things *counted, not banned* (`nutrition.PORTION`, stored
+  on `food_entries.*_p`). "Was there a palm of protein on that plate" is
+  answerable at any table in two seconds, and every figure in the logging sheet is
+  a tap rather than a keyboard.
+- **The daily screen shows no calories at all.** A single day's estimate off
+  bought food is out by a few hundred either way, and a figure that wrong shown
+  three times a day becomes a score to play rather than a measurement. Food shows
+  the day's plates against the day's portion targets and nothing else.
+- **The calorie band moved to the week** (`/trend`, `body._food_week`). Portions
+  become a calorie *range* (`nutrition.estimate`), and the week's range is
+  computed across every portion at once before being divided by the days logged —
+  independent errors partly cancel, which is exactly why this figure is weekly and
+  not daily. The range is compared against your band by **overlap**, never by a
+  line you cross; the verdict is worded "probably", because that's all portions
+  can support.
+- **The targets behind both are still yours.** A one-time profile (sex, age,
+  height, weight, activity, **goal weight**) yields a calorie / **protein**
+  (1.8 g/kg) / **fibre** (14 g per 1000 kcal) *target range* via Mifflin–St Jeor
+  (`nutrition.targets`, derived on read), alongside your **BMI** and the
+  healthy-BMI weight range for your height. `nutrition.plate_targets` converts
+  that one band into palms and fists — one module owns the conversion, so the Food
+  screen and the Fuel quest can never disagree about what today is asking for. The
+  goal weight drives the direction (a gentle deficit above it, a gentle surplus
+  below, maintenance within ~1 kg); the deficit is floored at BMR so it can't go
+  dangerously low, and it's an estimate — not medical/nutrition advice.
+- **Repeat meals cost one tap.** Eating out means the same eight places, so
+  **Your usuals** (`nutrition.usuals`) offers the plates you've logged before,
+  already measured — the chip still opens the sheet, because today's serving may
+  not be last week's.
+- **The two things that genuinely come with numbers keep them.** A packaged food
+  looked up in **Open Food Facts** (`nutrition.search`, free, no API key,
+  server-side) is logged with its own grams and calories, and feeds the week's
+  trend with a much tighter spread than a plate can. A **photo** (`POST
+  /food/analyze` → **Gemini vision**, `llm.analyze_food`) comes back in *portions*
+  for a plated meal and in *printed numbers* for a nutrition label — a model can
+  see two cupped hands of rice far more reliably than it can price the oil they
+  were fried in. Either way it arrives as an **editable draft**: nothing an
+  estimate produced lands in the day behind your back. A rotating **"what to eat"**
+  list (`nutrition.SUGGESTIONS` → `daily_suggestions`, deterministic per day) still
+  gives concrete, locally-buyable ideas.
 - **Skincare — consistency is the whole game.** An editable AM/PM checklist
   (`skincare.TEMPLATE`, seeded once per player, pigmentation/pores-tuned:
   SPF-first, one active at a time). It ships a *framework* + trusted resources and
@@ -249,7 +276,8 @@ by a plain tool than by a scored quest — so this is its own small subsystem
 
 Why standalone (not a stat): calorie tracking is the single feature most able to
 turn a gentle app anxious, so it's kept off the leveling/streak machinery on
-purpose — it informs, it never punishes.
+purpose — it informs, it never punishes. The hand-portion rewrite is the same
+principle one level down: the day asks only questions you can answer honestly.
 
 ## Inspire — capture what moved you (standalone tools)
 
@@ -282,6 +310,29 @@ beside the North Star; any quote can *become* the North Star in a tap. A video
 with no speech (music- or text-only) has nothing to transcribe and says so
 cleanly (422). Like the LLM and the food database, this touchpoint can never
 break the rest of Arise — every failure is caught and surfaced, never fatal.
+
+**A capture that fails keeps its link.** Almost nothing that stops a capture is
+about the link: the Gemini day-quota is spent, a key isn't set yet, Supadata has a
+bad minute. Those used to cost you the link — the failure lived only in the
+client's in-flight list, so a reload lost it and you had to remember what you'd
+pasted. Now every way a capture can fail is a `CaptureError` subclass carrying the
+stage that stopped it (`no_key`, `fetch_failed`, `distill_failed`, `no_speech`),
+and `insights.capture` — the single write path, shared by a fresh paste and a
+retry — writes the link to the **`capture_failures`** table on the way out and
+deletes the row the moment it does distil. One row per `(source_url, kind)`, the
+same identity `insights` uses, so it's a to-do list rather than a log: five tries
+leave one entry reading *Tried 5×*.
+
+The Ember tab shows them in a **"Not distilled yet"** shelf between the capture
+card and the library (`FailedCaptures.tsx`), each with a **Distil now** and a
+**Forget**, plus a **Try N again** sweep for once the key is in or the quota has
+rolled. The sweep is bounded on purpose — two small free tiers, so `SWEEP_MAX`
+links per run, least-tried first (a stubborn link can't sit at the front eating
+the budget), and it stops after `SWEEP_GIVE_UP` consecutive misses because the
+blocker plainly hasn't cleared. Whatever the bounds left is returned as `untried`
+and said out loud in the UI; a long list must never read as finished. `no_speech`
+rows stay listed but aren't swept: there was never anything in that video to
+distil, and it's the one failure a retry can't fix.
 
 ## Learning resources (citations)
 
@@ -407,7 +458,10 @@ sequenceDiagram
   refetched when a screen regains focus. Writes return the fresh payload and write
   it into the cache, so the server stays the single source of truth. Genuinely
   client-only state (connection settings, toasts, notices, in-flight captures)
-  stays in small Zustand stores. Rule of thumb: **server data → React Query,
+  stays in small Zustand stores. A capture the server *refused* crosses that line
+  on purpose: the server wrote it to the failure ledger, so the pending card is
+  dropped and the ledger's query owns it from there — only a capture that never got
+  an answer stays local, because then nothing else knows the link exists. Rule of thumb: **server data → React Query,
   UI state → Zustand.**
 - **Served same-origin, refresh-safe.** The web app is exported and served by the
   backend itself, so it auto-connects with no setup. A hard refresh or deep link

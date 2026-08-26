@@ -217,7 +217,16 @@ class BodyProfileIn(BaseModel):
 
 
 class FoodLogIn(BaseModel):
+    """One plate. Portions are the normal case; the gram/calorie fields are only
+    filled in for a food that genuinely came with numbers (a label, a lookup)."""
     name: str
+    slot: str = ""  # breakfast | lunch | dinner | snack; "" = unsaid
+    place: str = ""  # where it was eaten; "" = unsaid
+    at_time: str = ""  # the clock the hunter saw, 'HH:MM' — `at` is UTC
+    protein_p: int = Field(0, ge=0, le=12)  # palms
+    veg_p: int = Field(0, ge=0, le=12)      # fists
+    carb_p: int = Field(0, ge=0, le=12)     # cupped hands
+    extra_p: int = Field(0, ge=0, le=12)    # sweet drinks & fried
     grams: int = Field(0, ge=0)  # 0 = a serving / unspecified
     kcal: int = Field(0, ge=0)
     protein_g: int = Field(0, ge=0)
@@ -268,17 +277,66 @@ class TargetsOut(BaseModel):
 class FoodEntryOut(BaseModel):
     id: str
     name: str
+    slot: str  # breakfast | lunch | dinner | snack; "" = unsaid
+    place: str  # where it was eaten; "" = unsaid
+    at_time: str  # 'HH:MM' as the hunter's own clock read it; "" on older rows
+    protein_p: int
+    veg_p: int
+    carb_p: int
+    extra_p: int
     grams: int
     kcal: int
     protein_g: int
     fibre_g: int
 
 
+class PlateOut(BaseModel):
+    """A day in hands — as a tally, as a target, or as one saved plate."""
+    protein: int  # palms
+    veg: int      # fists
+    carb: int     # cupped hands
+    extra: int    # sweet drinks & fried
+
+
 class FoodDayOut(BaseModel):
     entries: list[FoodEntryOut]
+    plate: PlateOut  # what the day's plates added up to, in hands
+    # Only what was logged with real numbers; zero on a day logged entirely in
+    # hands. The day's calorie *range* lives on the week, never here.
     total_kcal: int
     total_protein: int
     total_fibre: int
+
+
+class UsualOut(PlateOut):
+    """A plate logged before — one tap to log it again."""
+    name: str
+    count: int  # times it's been logged inside the window
+
+
+class FoodWeekDayOut(PlateOut):
+    day: str
+    logged: int  # plates logged that day
+    kcal_low: int
+    kcal_high: int
+    in_band: bool  # the day's range overlaps the target band
+
+
+class FoodWeekOut(BaseModel):
+    """The rolling seven days as a calorie range against the band — the one place
+    calories are shown, because a week's estimate error averages out."""
+    days: list[FoodWeekDayOut]
+    logged_days: int
+    in_band_days: int
+    band_low: int   # 0 until the profile has real numbers
+    band_high: int
+    # Per logged day, estimated across the whole week at once.
+    kcal_low: int
+    kcal_high: int
+    protein_low: int
+    protein_high: int
+    fibre_low: int
+    fibre_high: int
 
 
 class FoodSearchItemOut(BaseModel):
@@ -300,8 +358,14 @@ class SuggestionOut(BaseModel):
 
 
 class FoodEstimateOut(BaseModel):
-    """An AI estimate from a photo — shown for the user to edit before logging."""
+    """An AI estimate from a photo — shown for the user to edit before logging.
+    A plated meal comes back in hand portions (what the app logs); a packaged
+    label comes back in the numbers it printed."""
     name: str
+    protein_p: int = 0
+    veg_p: int = 0
+    carb_p: int = 0
+    extra_p: int = 0
     kcal: int
     protein_g: int
     fibre_g: int
@@ -356,7 +420,10 @@ class BodyOut(BaseModel):
     day: str
     profile: BodyProfileOut | None  # null until set
     targets: TargetsOut | None  # null until the profile has real numbers
+    plate_targets: PlateOut | None  # the same targets in hands; null without a profile
     food: FoodDayOut
+    usuals: list[UsualOut]  # plates logged before, most-repeated first
+    week: FoodWeekOut  # the rolling seven days, for the trend screen
     suggestions: list[SuggestionOut]  # today's protein/fibre-forward "what to eat"
     skincare_am: list[SkincareStepOut]
     skincare_pm: list[SkincareStepOut]
@@ -517,6 +584,30 @@ class InsightOut(BaseModel):
     steps: list[str] = []  # optional actions (tips only; empty for motivation)
     quotes: list[str]
     created_at: datetime
+
+
+class CaptureFailureOut(BaseModel):
+    """A link that never distilled, kept so it can be tried again."""
+    id: str
+    source_url: str
+    source: str  # tiktok | instagram | youtube | web
+    kind: str  # motivation | tips
+    title: str
+    reason: str  # no_key | no_speech | fetch_failed | distill_failed | failed
+    detail: str  # the line the card shows
+    attempts: int
+    retryable: bool  # false only for no_speech — nothing there to distil
+    last_tried_at: datetime
+    created_at: datetime
+
+
+class CaptureSweepOut(BaseModel):
+    """The result of retrying the kept links: what landed, what didn't, and what the
+    sweep's bounds left for next time (never silently dropped)."""
+    captured: list[InsightOut]
+    failed: int  # tried again and failed again
+    untried: int  # retryable links the sweep's bounds didn't reach
+    remaining: list[CaptureFailureOut]
 
 
 class LearningOut(BaseModel):

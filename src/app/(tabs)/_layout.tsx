@@ -46,6 +46,9 @@ export default function TabsLayout() {
           it stays at a clean five. `href: null` hides the button, not the route —
           Food still works, and everything logged there is untouched. */}
       <Tabs.Screen name="body" options={{ href: null, title: 'Food' }} />
+      {/* Food's weekly view — the only screen that talks in calories, kept off the
+          daily one on purpose (see components/Food/PlateCard). */}
+      <Tabs.Screen name="trend" options={{ href: null, title: 'Food trend' }} />
       <Tabs.Screen name="focus" options={{ href: null, title: 'Focus' }} />
       <Tabs.Screen name="achievements" options={{ href: null, title: 'Achievements' }} />
       <Tabs.Screen name="bosses" options={{ href: null, title: 'Boss fights' }} />

@@ -22,7 +22,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from . import game, reading as reading_lib
+from . import game, nutrition, reading as reading_lib
 from .models import (
     AchievementUnlock,
     Completion,
@@ -116,7 +116,7 @@ def empty(day: str) -> dict:
         "todos": [],
         "money": {"in": 0.0, "out": 0.0, "lines": []},
         "reading": {"chapters": [], "count": 0, "book": ""},
-        "food": {"kcal": 0, "protein_g": 0, "items": 0},
+        "food": {"plate": "", "kcal": 0, "protein_g": 0, "items": 0},
         "groceries": [],
         "skincare": {"done": 0, "total": 0},
         "journal": 0,
@@ -184,6 +184,13 @@ def of(db: Session, player: Player, day: str) -> dict:
         # A day with two books would otherwise read as one long sitting on the first.
         "reading": _reading_recap(reading),
         "food": {
+            # What was on the plates, in hands. Calories stay for the foods that
+            # actually came with numbers — a plate logged by hand has none, and a
+            # recap that made one up would be inventing the day's headline figure.
+            "plate": nutrition.plate_line(nutrition.plate_totals([
+                {"protein_p": f.protein_p, "veg_p": f.veg_p,
+                 "carb_p": f.carb_p, "extra_p": f.extra_p} for f in food
+            ])),
             "kcal": sum(f.kcal for f in food),
             "protein_g": sum(f.protein_g for f in food),
             "items": len(food),
@@ -299,9 +306,10 @@ def lines(recap: dict) -> list[dict]:
 
     food = recap["food"]
     if food["items"]:
+        plates = f"{food['items']} {_plural(food['items'], 'plate')} logged"
         out.append({
-            "label": f"{food['kcal']:,} kcal · {food['protein_g']}g protein",
-            "detail": f"{food['items']} {_plural(food['items'], 'item')} logged",
+            "label": food.get("plate") or f"{food['kcal']:,} kcal · {food['protein_g']}g protein",
+            "detail": plates if food.get("plate") else f"{food['items']} {_plural(food['items'], 'item')} logged",
         })
 
     groceries = recap["groceries"]

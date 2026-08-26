@@ -546,6 +546,12 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
             # invented here would send them somewhere that doesn't exist. Interview
             # mode isn't phase-bound, so it keeps its generated variety.
             continue
+        if q.id == "d-read":
+            # Grow is one sitting on the book the hunter is actually holding, and the
+            # LLM has never seen it. Anything it invented would put a second source on
+            # a card whose one Learn: chip already names the book — the exact split
+            # this slot was just corrected for.
+            continue
         pk = quests.period_key(q.cadence, day)
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue

@@ -1,15 +1,21 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { FoodPanel } from '@/components/Food/FoodPanel';
 import { GroceryPanel } from '@/components/GroceryPanel';
-import { NutritionPanel } from '@/components/NutritionPanel';
 import { Screen } from '@/components/Screen';
 import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
+import { dateKey } from '@/lib/dates';
 import { useBody } from '@/query/useBody';
 
 export default function FoodScreen() {
-  const { body, refetch } = useBody();
+  const today = dateKey();
+  // The day being looked at. A plate you forgot at lunch is still worth logging
+  // at midnight, so the screen can walk back — the log day, not the clock, is
+  // what everything here is keyed on.
+  const [day, setDay] = useState(today);
+  const { body, refetch } = useBody(day);
 
   // Refetch whenever the tab comes into focus, so it's fresh without a manual pull.
   useFocusEffect(
@@ -21,10 +27,10 @@ export default function FoodScreen() {
   return (
     <Screen>
       <ScreenTitle>Food</ScreenTitle>
-      <ScreenBlurb>Eat with intention — nourish, don’t punish.</ScreenBlurb>
+      <ScreenBlurb>Hands, not grams — eat with intention, don’t punish.</ScreenBlurb>
       {body ? (
         <>
-          <NutritionPanel />
+          <FoodPanel day={day} today={today} onDay={setDay} />
           <GroceryPanel />
         </>
       ) : (
@@ -33,4 +39,3 @@ export default function FoodScreen() {
     </Screen>
   );
 }
-

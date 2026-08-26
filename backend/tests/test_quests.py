@@ -62,27 +62,42 @@ def test_floor_climbs_with_level():
 
 
 def _fuel_targets() -> dict:
-    # The shape nutrition.targets returns, with easy-to-spot numbers.
-    return {"protein_g": 137, "target_low": 2066, "target_high": 2266, "fibre_g": 30}
+    # The shape nutrition.targets returns, with easy-to-spot numbers. 137 g of
+    # protein is 5 palms; what the band has left over is 3 cupped hands of starch.
+    return {"protein_g": 137, "target": 2166, "target_low": 2066,
+            "target_high": 2266, "fibre_g": 30}
 
 
 def test_fuel_floor_is_written_from_the_hunters_own_targets():
-    # The diet quest is *my* plan, not advice: the floor carries the numbers the
-    # body profile computed. Logging is always step one.
+    # The diet quest is *my* plan, not advice: the floor carries the hunter's own
+    # numbers, converted to portions they can check without a scale. Logging is
+    # always step one.
     floor = quests.fuel_floor(_fuel_targets(), 0)
     assert len(floor) == 2
     assert "Log" in floor[0] and "Food screen" in floor[0]
-    assert "137 g" in floor[1]
+    assert "5 palms of protein" in floor[1]
+
+
+def test_fuel_floor_asks_in_hands_never_in_grams():
+    # A gram target is unanswerable on a bought plate, so it would get invented —
+    # and a quest you can't honestly complete corrodes the whole system.
+    t = _fuel_targets()
+    for level in range(6):
+        marks = quests.fuel_floor(t, level)[1]
+        assert " g" not in marks and "kcal" not in marks
 
 
 def test_fuel_floor_climbs_by_adding_marks_not_harshness():
-    # Protein first; the calorie band joins mid-climb; fibre at the top. The band
-    # stays a range to land inside, never a single number to fail at.
+    # Protein first; vegetables next; the starch ceiling mid-climb; the extras at
+    # the top. Every tier keeps the protein ask — the climb widens the day, it
+    # never trades one mark away for another.
     t = _fuel_targets()
-    lv0, lv2, lv3 = quests.fuel_floor(t, 0), quests.fuel_floor(t, 2), quests.fuel_floor(t, 3)
-    assert "kcal" not in lv0[1]
-    assert "2066–2266 kcal" in lv2[1]
-    assert "fibre ≥ 30 g" in lv3[1]
+    lv0, lv1, lv2, lv3 = (quests.fuel_floor(t, n) for n in range(4))
+    assert "fists" not in lv0[1]
+    assert "3 fists of vegetables" in lv1[1]
+    assert "3 cupped hands" in lv2[1]
+    assert "at most 2 sweet-or-fried extras" in lv3[1]
+    assert all("5 palms of protein" in lv[1] for lv in (lv0, lv1, lv2, lv3))
     # Beyond the cap it holds at the top tier.
     assert quests.fuel_floor(t, 99) == quests.fuel_floor(t, 5)
 
@@ -125,19 +140,57 @@ def test_reading_floor_is_the_same_at_every_level():
 
 
 def test_content_band_shifts_with_level():
-    # INT variety is banded: foundation (learn-how-to-learn) at low levels,
-    # domain/depth work higher up. Titles seen should differ across the range.
+    # Grow's method deepens with the level rather than changing subject: read it and
+    # take the line away at the bottom, produce and challenge it in the middle, set it
+    # against what you already know at the top.
     q = _q("d-read", "INT", "daily")
     low = {quests.content_for(q, f"2026-07-{d:02d}", level=0)[0] for d in range(1, 28)}
     high = {quests.content_for(q, f"2026-07-{d:02d}", level=5)[0] for d in range(1, 28)}
-    foundation = {"Active Recall", "Mind Map", "Feynman It", "Learn How to Learn"}
-    assert low & foundation  # beginners get the fundamentals
-    assert high - foundation - {"Grimoire Study", "Deep Page"}  # advanced get domain/depth work
+    foundation = {"Deep Page", "One Line That Stuck", "Active Recall"}
+    assert low <= foundation  # beginners only ever get the fundamentals
+    assert high and not (high & foundation)  # the top band has left them behind
+
+
+def test_grow_names_one_source_and_only_that():
+    """The correction: the card read "Learn How to Learn" over a Coursera chip while
+    its first step sent you into a different book entirely — three sittings under one
+    title, and one chip that could name only one of them. Craft was fixed this way
+    first; Grow now matches it."""
+    q = _q("d-read", "INT", "daily")
+    book = "Empower Your Momentum — Scott Allan"
+    for d in range(1, 29):
+        for level in (0, 3, 5):
+            day = f"2026-07-{d:02d}"
+            _, _, steps, resource = quests.content_for(q, day, book=book, level=level)
+            assert book in steps[0]  # the floor names the one source
+            assert resource == f"📖 {book}"  # and the chip points at it, not elsewhere
+            # No step may send you to a second source.
+            for other in ("Coursera", "Khan", "YouTube", "freeCodeCamp", "kana", "Atomic Habits"):
+                assert not any(other in st for st in steps[1:]), (other, steps)
+
+
+def test_grow_methods_never_name_a_source():
+    """Same rule as Craft's: a method has to compose with whatever book is in hand,
+    so it may point at the hunter's own shelf but never at a title, site or course."""
+    named_source = re.compile(r"\b(Coursera|Khan|YouTube|Oakley|Atomic|chapters?|ch)\b", re.I)
+    for title, _, steps in quests._READ_METHODS:
+        joined = " ".join(steps)
+        hit = named_source.search(joined)
+        assert hit is None, (title, hit.group(0))
+        assert len(steps) == 1  # floor + one method = a sitting, not a checklist
+        assert not any(ch.isdigit() for ch in joined), title  # no quota of its own
+
+
+def test_grow_chip_is_empty_until_there_is_a_book():
+    # A chip reading "your current book" points nowhere, so there simply isn't one.
+    q = _q("d-read", "INT", "daily")
+    assert quests.content_for(q, "2026-07-18")[3] == ""
+    assert quests.reading_resource("  ") == ""
 
 
 def test_resource_matches_variant_title():
-    # A learning quest surfaces its trusted source, keyed by the day's variant.
-    q = _q("d-read", "INT", "daily")
+    # A learning quest surfaces its trusted source, keyed by the week's variant.
+    q = _q("w-tome", "INT", "weekly")
     for d in range(10, 25):
         title, _, _, resource = quests.content_for(q, f"2026-07-{d:02d}")
         assert resource == quests.RESOURCES.get(title, "")

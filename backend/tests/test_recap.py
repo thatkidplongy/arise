@@ -134,7 +134,9 @@ def test_the_rest_of_the_surfaces_are_gathered(db):
 
     r = recap.of(db, player, DAY)
     assert r["reading"] == {"chapters": ["21-22"], "count": 2, "book": "Thinking, Fast and Slow"}
-    assert r["food"] == {"kcal": 850, "protein_g": 44, "items": 2}
+    # Logged before plates existed, so it keeps the numbers it was logged with
+    # and has no hands to show.
+    assert r["food"] == {"plate": "", "kcal": 850, "protein_g": 44, "items": 2}
     assert r["groceries"] == ["Oats"] and r["journal"] == 1 and r["learnings"] == 1
     assert r["captures"] == ["@someone"]
 

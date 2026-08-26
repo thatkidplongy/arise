@@ -17,7 +17,10 @@ push-ups + plank + an explosive core rep on the physical daily). The floor is
 so there's no stagnation. Most floors start gentle so you can begin at zero; the
 physical floor is the exception on purpose — it starts at working volume (sets ×
 reps), because a floor too light to adapt to trains the habit but not the body. Where a quest is about learning, it points at a trusted
-source (see RESOURCES), matched to the variant.
+source (see RESOURCES), matched to the variant. Grow and Craft are the exception:
+their source is the hunter's own book or notes, which no static table can know, so
+the card names that instead (see reading_resource and craft_floor) — one card, one
+source, always.
 
 Progression also shapes the *variety* where "harder" isn't a number: each level
 maps to a content band (0 foundation → 1 building → 2 depth, see TIER), and the
@@ -28,15 +31,17 @@ tactics.
 The pools are tuned to the hunter's real interests:
   STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor,
        plus a daily *fuel* slot (d-fuel) — the diet plan, because a physique is
-       written in the kitchen: its floor carries the hunter's own protein/calorie
-       targets from the body profile (see fuel_floor)
+       written in the kitchen: its floor carries the hunter's own targets from the
+       body profile, in hand portions you can check at a restaurant table rather
+       than grams you'd have to invent (see fuel_floor)
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
-  INT  learn-how-to-learn first, then math from scratch, Japanese, and the wider
-       world (politics, history, geography, science); reading is the daily floor
-       (at your own pace — the floor asks you to log what you read, not to hit a
-       chapter quota)
+  INT  the daily is one sitting on one book: the floor names it and asks you to log
+       what you read (at your own pace, never a chapter quota), and the day's method
+       varies what you do with it, deepening with the band (see _READ_METHODS). Math
+       from scratch, Japanese and the wider world are the weekly and side slots,
+       where a subject is the whole sitting
   WLT  making money: money psychology & fundamentals first, then managing, then
        earning — side income, monetising skills
   CFT  the engineering craft, toward Senior: fluency & fundamentals → patterns &
@@ -51,7 +56,7 @@ import hashlib
 
 from datetime import date
 
-from . import game, japanese, progression
+from . import game, japanese, nutrition, progression
 from .models import QuestDef
 
 # slot id -> pool of (title, desc, steps) variants. The seeded content is the
@@ -105,8 +110,8 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     "d-fuel": [  # STR — the diet plan. The floor (fuel_floor) carries the hunter's own
         # targets; these variants rotate one habit on top. Only the first step survives
         # the cap, so each variant leads with the one that matters.
-        ("Fuel Discipline", "Eat to your targets", [
-            "Build each plate: a palm of protein, a fist of veg, a cupped hand of carbs",
+        ("Fuel Discipline", "Veg before starch", [
+            "Serve the vegetables onto the plate before the rice goes on",
         ]),
         ("Protein First", "Order of eating matters", [
             "Eat the protein on your plate first — it protects muscle and blunts cravings",
@@ -246,79 +251,9 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "A song, meme, or link that made you think of them",
         ]),
     ],
-    "d-read": [  # INT — learn-how-to-learn → domains → the world (reading is the floor)
-        # Foundation: the craft of learning itself, before any hard domain.
-        ("Active Recall", "Learn by testing yourself, not re-reading", [
-            "Read or skim one short piece (or yesterday's notes) for 5 min",
-            "Close it and write everything you remember, from memory",
-            "Open it back up and fill the gaps you missed",
-        ]),
-        ("Mind Map", "Connect a new idea to what you already know", [
-            "Take one thing you learned recently; write it in the centre of a page",
-            "Branch out the ideas it connects to",
-            "Draw one line to something you already knew — that link is the memory",
-        ]),
-        ("Feynman It", "Explain it simply to find the gaps", [
-            "Pick a concept you only half-understand",
-            "Explain it out loud in plain words, like teaching a 12-year-old",
-            "Notice where you stumble — that's the gap; go relearn just that bit",
-        ]),
-        ("Learn How to Learn", "10 min on the craft itself", [
-            "Watch or read one lesson on a learning technique (spacing, chunking, interleaving)",
-            "Try it once, today, on something small you're studying",
-        ]),
-        ("Grimoire Study", "20 min in your current book", [
-            "Read your current book for 20 minutes",
-            "Write one sentence on the idea that stuck",
-        ]),
-        ("Growth Read", "20 min, a book that grows you", [
-            "Read 20 min of a self-help / growth book (e.g. Atomic Habits)",
-            "Write the one idea + the single action you'll try today",
-        ]),
-        ("Code Kata", "20 min hands-on coding", [
-            "Pick one small problem: FizzBuzz, reverse a string, or sum a list",
-            "Write it from scratch and run it",
-            "Refactor it once to read cleaner",
-        ]),
-        ("Math from Zero", "20 min rebuilding fundamentals", [
-            "Pick today's topic: times tables, fractions, %, or basic algebra",
-            "Watch that topic's Khan Academy lesson",
-            "Do 5 practice problems — redo any you miss",
-        ]),
-        ("Japanese Deep Rep", "15 min on whatever the plan has you on", [
-            "Take the material the daily Japanese quest is on and push it one level harder",
-            "Produce it from memory — write it, say it — before you check anything",
-        ]),
-        ("Kana Drill", "10 min kana", [
-            "Work the kana stack on Learn until the pile is done",
-            "Write out every character you missed, five times each",
-        ]),
-        ("Current Affairs", "15 min news", [
-            "Read one local and one world story in full",
-            "Write one line: who's affected, and why it matters",
-        ]),
-        ("Into History", "20 min history", [
-            "Pick one event or figure (e.g. WWII, the fall of Rome, Rizal)",
-            "Read about it, then note one cause and one consequence",
-        ]),
-        ("Map the World", "15 min geography", [
-            "Pick one country",
-            "Learn its capital, its neighbours, and one fact",
-            "Place it on a map from memory",
-        ]),
-        ("Science Dive", "20 min science", [
-            "Pick one 'how does X work?' (e.g. vaccines, black holes, Wi-Fi)",
-            "Read or watch until you can explain it in 2 sentences",
-        ]),
-        ("Deep Page", "20 min deep reading", [
-            "Phone in another room",
-            "Read your book for 20 min with no stopping",
-        ]),
-        ("Problem Set", "20 min practice", [
-            "Do 5 problems at your level (math or code)",
-            "Redo every one you got wrong until it clicks",
-        ]),
-    ],
+    # (INT's daily, d-read, has no pool by design: Grow is one sitting on the
+    #  hunter's own book — the reading floor names it, _READ_METHODS varies what
+    #  you do with it, and the domain work lives in w-tome and s-code.)
     # ── Weekly ───────────────────────────────────────────────────────────────
     "w-badminton": [  # STR — the badminton raid (kept on-theme for the achievement)
         ("Dungeon Raid: Badminton", "A full badminton session", [
@@ -431,6 +366,14 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Pick one topic (e.g. inflation, WWI, plate tectonics)",
             "Read 3 sources on it",
             "Explain it out loud to someone in your own words",
+        ]),
+        ("Learn How to Learn", "One lesson on the craft itself, then use it", [
+            "Watch or read one lesson on a learning technique (spacing, chunking, interleaving)",
+            "Use it on this week's reading, then write whether it actually helped",
+        ]),
+        ("Current Affairs", "The week in the world, read properly", [
+            "Read one local and one world story in full",
+            "Write one line each: who's affected, and why it matters",
         ]),
         ("Deep Study", "One course section, start to finish", [
             "Finish one full section of a course you're taking",
@@ -970,29 +913,18 @@ RESOURCES: dict[str, str] = {
     "Good Question": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Listen Fully": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Deep Talk": "🎥 Charisma on Command (YouTube)",
-    # INT — learn how to learn (foundation), then code, math, Japanese, the world
-    "Active Recall": "📖 Make It Stick — Brown, Roediger & McDaniel",
-    "Mind Map": "🎥 Justin Sung (YouTube)",
-    "Feynman It": "🎥 Ali Abdaal — the Feynman Technique (YouTube)",
+    # INT — the weekly and side learning. Grow's daily isn't here: its source is
+    # the hunter's own book, which no static table can know (see reading_resource).
     "Learn How to Learn": "🌐 Learning How to Learn — Barbara Oakley (Coursera)",
-    "Growth Read": "📖 Atomic Habits — James Clear",
-    "Code Kata": "📖 Automate the Boring Stuff with Python — Al Sweigart",
     "Arcane Study: Code": "🎥 freeCodeCamp (YouTube)",
     "Ship Something": "🌐 The Odin Project (theodinproject.com)",
-    "Math from Zero": "🎥 Khan Academy",
     "Math Milestone": "🎥 Khan Academy",
     "Math Reps": "🎥 Khan Academy",
-    "Problem Set": "🎥 Khan Academy",
-    "Japanese Deep Rep": "🎥 Tokini Andy — Genki walkthroughs (YouTube)",
-    "Kana Drill": "🌐 Tofugu — hiragana & katakana guides",
     "Japanese Study": "🌐 Tae Kim's Guide to Japanese (guidetojapanese.org)",
     # (The daily Japanese plan, d-jp, carries its own resource per step — see
     # japanese.py — so it isn't listed here.)
     "Japanese Checkpoint": "📖 Genki: An Integrated Course in Elementary Japanese",
-    "Into History": "🎥 Crash Course (YouTube)",
     "Understand the World": "🎥 Crash Course (YouTube)",
-    "Map the World": "🎥 Geography Now (YouTube)",
-    "Science Dive": "🎥 Veritasium (YouTube)",
     # WLT — money
     "Money Class": "📖 The Psychology of Money — Morgan Housel",
     "Ledger Study": "📖 I Will Teach You to Be Rich — Ramit Sethi",
@@ -1044,9 +976,11 @@ TIER: dict[str, int] = {
     "Check In": 1, "Voice, Not Text": 1, "Good Question": 1, "Make Plans": 2,
     "Guild Night": 1, "Party Gathering": 1, "Deep Talk": 2, "New Table": 2,
     "Reconnect": 1, "Listen Fully": 1, "New Ally": 2, "First Contact": 2,
-    # INT — learn-how-to-learn (0) → apply to domains (1) → depth (2)
-    "Growth Read": 1, "Code Kata": 1, "Math from Zero": 1, "Kana Drill": 1, "Current Affairs": 1,
-    "Japanese Deep Rep": 2, "Into History": 2, "Map the World": 2, "Science Dive": 2, "Problem Set": 2,
+    # INT — Grow reads one book: understand it (0) → produce it from memory (1) →
+    # set it against what you already know (2). Domain work is weekly/side.
+    "Feynman It": 1, "Mind Map": 1, "Argue With It": 1,
+    "Where It Lands": 2, "Against the Shelf": 2, "Keep One Idea": 2,
+    "Current Affairs": 1,
     "Math Milestone": 1, "Japanese Checkpoint": 1, "Ship Something": 2, "Understand the World": 2,
     "Arcane Study: Code": 1, "Math Reps": 1, "Japanese Study": 1,
     "Debug Something": 2, "Down the Rabbit Hole": 2,
@@ -1100,32 +1034,104 @@ def reading_floor(book: str | None) -> str:
     return f"Read {what} at your pace, then log which chapters"
 
 
+def reading_resource(book: str | None) -> str:
+    """Grow's one source: the book in hand. Empty until there is one — a chip that
+    says "your current book" points nowhere."""
+    what = (book or "").strip()
+    return f"📖 {what}" if what else ""
+
+
+# ── Grow: one book, many methods ─────────────────────────────────────────────
+# The same shape as _CRAFT_METHODS, for the same reason. A Grow card carries one
+# title, one description and one Learn: chip, so it has to be one sitting — and a
+# card that asked for a chapter of the hunter's own book AND a Coursera lesson AND
+# a kata was three sittings under one title, with the chip able to name only one of
+# them. The source is whatever book they're holding, named once by the reading
+# floor; these vary what you do with it, and the domain work moved to w-tome and
+# s-code where a subject is the whole sitting.
+#
+# So no step here may name a source. They all say "it": whatever you're reading.
+# Banded through TIER: understand it (0) → produce it from memory (1) → set it
+# against what you already know (2).
+_READ_METHODS: list[tuple[str, str, list[str]]] = [
+    ("Deep Page", "No phone, no stopping", [
+        "Phone in another room for the sitting — no tab-switching, no looking anything up until you stop",
+    ]),
+    ("One Line That Stuck", "The takeaway, in your words", [
+        "Write the one idea from today's pages as a single sentence you'd say out loud",
+    ]),
+    ("Active Recall", "Close it, then say it back", [
+        "Close the book, write down everything you remember from today's pages, then reopen and fill the gaps",
+    ]),
+    ("Feynman It", "Explain it like they're twelve", [
+        "Explain today's idea out loud in plain words — where you stumble is the gap, so reread just that bit",
+    ]),
+    ("Mind Map", "Branch it out from the middle", [
+        "Put today's idea in the centre of a page, branch what it connects to, then draw one line to something you already knew",
+    ]),
+    ("Argue With It", "Read like a sceptic", [
+        "Write down the one claim you don't buy, and what the author would have to show you to change your mind",
+    ]),
+    ("Where It Lands", "Onto something you actually do", [
+        "Write down where today's idea applies to something you're doing this week, and the one thing you'll change",
+    ]),
+    ("Against the Shelf", "Set it beside another book", [
+        "Write down where today's idea agrees with another book you've read and where they contradict — and which one you believe",
+    ]),
+    ("Keep One Idea", "One atomic note, in your words", [
+        "Rephrase one idea in your own words — never copy-pasted — as a single Evergreen note (🌱, linked to the book)",
+    ]),
+]
+
+
+def read_content(day: str, band: int, book: str | None) -> tuple[str, str, list[str], str]:
+    """What today's Grow sitting does with the book the reading floor already named.
+
+    Never *which* book — that's the hunter's, held in `Player.current_book`. Only the
+    method rotates, and it deepens with the band rather than changing subject, so the
+    card stays one sitting on one source at every level."""
+    eligible = narrow_to_band(_READ_METHODS, band)
+    title, desc, steps = eligible[_pick("d-read", f"read:{day}|b{max(0, min(band, 2))}", len(eligible))]
+    return title, desc, list(steps), reading_resource(book)
+
+
 def fuel_floor(targets: dict | None, level: int) -> list[str]:
-    """The diet non-negotiable — the numbers are the hunter's own, computed from
-    their body profile (nutrition.targets), so the quest reads as *my* diet plan
-    rather than generic advice. Two steps at every level: log it, and hit today's
-    marks. What climbs with level is how many marks a day carries — protein first,
-    then the calorie band, then fibre — never how harshly they're judged: the band
-    stays a range to land inside, not a line to fail at.
+    """The diet non-negotiable, in hand portions — sized from the hunter's own body
+    profile (nutrition.plate_targets), so the quest reads as *my* diet plan rather
+    than generic advice.
+
+    The marks are deliberately answerable at a restaurant table: "was there a palm
+    of protein on that plate" takes two seconds and no scale, where "128 g of
+    protein" off a bought plate is a number you'd be inventing. The ask is the same
+    size — a palm is about 28 g of it — but this one you can complete honestly, and
+    a quest you can't honestly complete corrodes the whole system.
+
+    Two steps at every level: log the plates, and hit today's marks. What climbs
+    with level is how many marks the day carries — protein first, then vegetables,
+    then the starch ceiling, then the extras — never how harshly they're judged.
 
     Without a profile there are no real numbers, so the floor's first job is to
     send you to set one up."""
-    if not targets:
+    plate = nutrition.plate_targets(targets)
+    if not plate:
         return [
             "Set your body profile (You → Food) so your targets are real numbers",
-            "Log everything you eat today on the Food screen",
+            "Log every plate today on the Food screen — in palms and fists",
         ]
-    protein, lo, hi, fibre = (targets["protein_g"], targets["target_low"],
-                              targets["target_high"], targets["fibre_g"])
-    log = "Log everything you eat today on the Food screen — every meal counted"
-    plan = "Log each meal before you eat it — decide, then eat"
+    palms, fists, hands, extras = (plate["protein"], plate["veg"],
+                                   plate["carb"], plate["extra"])
+    log = "Log every plate today on the Food screen — what was on it, in hands"
+    plan = "Decide each plate before you eat it — protein first, then the rest"
+    protein = f"{palms} palms of protein"
+    veg = f"{fists} fists of vegetables"
+    starch = f"starch at {hands} cupped hands or under"
     tiers = [
-        [log, f"Protein ≥ {protein} g — muscle is built from it"],
-        [log, f"Protein ≥ {protein} g · nothing sugary to drink"],
-        [log, f"Protein ≥ {protein} g · finish inside {lo}–{hi} kcal"],
-        [log, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g"],
-        [plan, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g"],
-        [plan, f"Protein ≥ {protein} g · {lo}–{hi} kcal · fibre ≥ {fibre} g · nothing sugary to drink"],  # cap
+        [log, f"{protein} across the day — muscle is built from it"],
+        [log, f"{protein} · {veg}"],
+        [log, f"{protein} · {veg} · {starch}"],
+        [log, f"{protein} · {veg} · {starch} · at most {extras} sweet-or-fried extras"],
+        [plan, f"{protein} · {veg} · {starch} · at most {extras} sweet-or-fried extras"],
+        [plan, f"{protein} · {veg} · {starch} · nothing sugary to drink"],  # cap
     ]
     return tiers[max(0, min(level, len(tiers) - 1))]
 
@@ -1237,6 +1243,18 @@ def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
     return []
 
 
+def narrow_to_band(pool: list[tuple[str, str, list[str]]], band: int) -> list[tuple[str, str, list[str]]]:
+    """The variants that fit where the hunter is (0 foundation → 2 depth, see TIER),
+    stepping down until a band is stocked, and the whole pool if none is. Shared so
+    the pools and Grow's method rotation can never disagree about what a band means."""
+    target = max(0, min(band, 2))
+    for b in range(target, -1, -1):
+        eligible = [v for v in pool if TIER.get(v[0], 0) == b]
+        if eligible:
+            return eligible
+    return pool
+
+
 def pool_variant(quest: QuestDef, day: str, band: int = 0, interview: bool = False) -> tuple[str, str, list[str]]:
     """The raw (title, desc, steps) picked from the handcrafted pool for the
     period — no floor applied. `band` (0 foundation → 2 depth) narrows the pool to
@@ -1247,12 +1265,7 @@ def pool_variant(quest: QuestDef, day: str, band: int = 0, interview: bool = Fal
     if not pool:
         return quest.title, quest.desc, []  # unknown slot → seeded fallback
     target = max(0, min(band, 2))
-    chosen = pool
-    for b in range(target, -1, -1):
-        eligible = [v for v in pool if TIER.get(v[0], 0) == b]
-        if eligible:
-            chosen = eligible
-            break
+    chosen = narrow_to_band(pool, target)
     pk = _period_key(quest.cadence, day)
     tag = f"{pk}|b{target}" + ("|iv" if interview else "")
     return chosen[_pick(quest.id, tag, len(chosen))]
@@ -1527,6 +1540,12 @@ def content_for(
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
         return japanese.content(jp_step)
+    if quest.id == "d-read":
+        # One sitting on one source: the floor names the book, the method is what you
+        # do with it, and the chip points at the book rather than a fourth place to be.
+        title, desc, steps, resource = read_content(day, progression.band_for(level), book)
+        floor = floor_for(quest, book, level)
+        return title, desc, cap_steps(floor + steps, len(floor), quest.id), resource
     if quest.id == "d-craft" and not interview:
         # Follows the system-design plan at whatever phase the hunter is holding.
         # Interview mode opts out — it has its own pool, and a next-week interview

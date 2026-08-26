@@ -12,10 +12,15 @@ import { qk } from './keys';
  * and writes it straight into the cache — server-authoritative, like the rest of
  * the app. One-shot lookups (food/product search, photo analysis) don't change
  * server state, so they stay plain calls rather than queries.
+ *
+ * `on` names the day being read and written, for the Food screen's back-arrow: a
+ * plate you forgot to log yesterday has to be able to land on yesterday. It has to
+ * be threaded through anything that logs from inside that screen — a mutation on
+ * the default day would write today's cache while the screen shows another.
  */
-export function useBody() {
+export function useBody(on?: string) {
   const qc = useQueryClient();
-  const day = dateKey();
+  const day = on ?? dateKey();
 
   const query = useQuery({
     queryKey: qk.body(day),

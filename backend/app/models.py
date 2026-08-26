@@ -171,8 +171,14 @@ class BodyProfile(Base):
 
 
 class FoodEntry(Base):
-    """One logged food for a day. The daily total is summed from these rows; there
-    is no 'budget exceeded' state — the tracker informs, it never punishes."""
+    """One logged plate for a day. The daily tally is summed from these rows; there
+    is no 'budget exceeded' state — the tracker informs, it never punishes.
+
+    A plate is logged in hand portions (`*_p`), which is what you can answer at a
+    restaurant table without a scale. The gram/calorie columns stay for the foods
+    that genuinely come with numbers — a packaged label, a database lookup — and
+    are zero on a plate logged by hand. Either way the calories are only ever
+    *derived* into a range, on the weekly trend (see nutrition.day_estimate)."""
 
     __tablename__ = "food_entries"
 
@@ -180,10 +186,19 @@ class FoodEntry(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     day: Mapped[str] = mapped_column(String, index=True)  # client-local 'YYYY-MM-DD'
     name: Mapped[str] = mapped_column(String)
+    slot: Mapped[str] = mapped_column(String, default="")  # breakfast|lunch|dinner|snack
+    place: Mapped[str] = mapped_column(String, default="")  # where it was eaten; '' = unsaid
+    protein_p: Mapped[int] = mapped_column(Integer, default=0)  # palms
+    veg_p: Mapped[int] = mapped_column(Integer, default=0)      # fists
+    carb_p: Mapped[int] = mapped_column(Integer, default=0)     # cupped hands
+    extra_p: Mapped[int] = mapped_column(Integer, default=0)    # sweet drinks & fried
     grams: Mapped[int] = mapped_column(Integer, default=0)  # 0 = a serving / unspecified
     kcal: Mapped[int] = mapped_column(Integer, default=0)
     protein_g: Mapped[int] = mapped_column(Integer, default=0)
     fibre_g: Mapped[int] = mapped_column(Integer, default=0)
+    # The clock the hunter saw when they ate, 'HH:MM'. Sent by the client because
+    # `at` is UTC and a meal remembered as 7am must not read as 11pm on the timeline.
+    at_time: Mapped[str] = mapped_column(String, default="")
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -249,6 +264,35 @@ class Insight(Base):
     takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list: the kept lessons
     steps: Mapped[str] = mapped_column(String, default="[]")  # JSON list: optional actions (tips)
     quotes: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CaptureFailure(Base):
+    """A link pasted on Ember that never became an insight — kept so it can be
+    distilled later, when whatever blocked it has cleared.
+
+    Most of what stops a capture is temporary and not about the link: a spent
+    Gemini day-quota, a Supadata key that isn't set yet, the transcript service
+    having a bad minute. Before this table those links lived only in the client's
+    in-flight list, so a reload lost them and the hunter had to remember what
+    they'd pasted. One row per (source_url, kind) — the same identity `insights`
+    uses — so a retry that lands deletes the record instead of sitting beside it.
+    """
+
+    __tablename__ = "capture_failures"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    source_url: Mapped[str] = mapped_column(String)  # canonical (transcript.clean_url)
+    source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
+    kind: Mapped[str] = mapped_column(String, default="motivation")  # motivation|tips
+    title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
+    # Which stage stopped it, from insights.REASONS — decides whether a retry is
+    # worth spending an API call on (no_speech never is).
+    reason: Mapped[str] = mapped_column(String, default="failed")
+    detail: Mapped[str] = mapped_column(String, default="")  # what to show on the card
+    attempts: Mapped[int] = mapped_column(Integer, default=1)  # first try included
+    last_tried_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

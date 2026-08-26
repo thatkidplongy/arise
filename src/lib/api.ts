@@ -363,23 +363,73 @@ export interface ApiTargets {
   goal_weight: number; // 0 when not set
 }
 
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+/** A plate in hand portions — the unit the Food screen logs and tallies in. */
+export interface ApiPlate {
+  protein: number; // palms
+  veg: number; // fists
+  carb: number; // cupped hands
+  extra: number; // sweet drinks & fried
+}
+
 export interface ApiFoodEntry {
   id: string;
   name: string;
+  slot: MealSlot | '';
+  place: string; // where it was eaten; '' = unsaid
+  at_time: string; // 'HH:MM' on the hunter's own clock; '' on rows logged before plates
+  protein_p: number;
+  veg_p: number;
+  carb_p: number;
+  extra_p: number;
+  // Only filled in for a food that genuinely came with numbers — a packaged
+  // label, a database lookup. Zero on a plate logged in hands, which is the norm.
   grams: number;
   kcal: number;
   protein_g: number;
   fibre_g: number;
 }
 
-/** The fields sent when logging food — a food entry without its server id. */
+/** The fields sent when logging a plate — an entry without its server id. */
 export type FoodEntry = Omit<ApiFoodEntry, 'id'>;
 
 export interface ApiFoodDay {
   entries: ApiFoodEntry[];
+  plate: ApiPlate; // what the day's plates added up to, in hands
   total_kcal: number;
   total_protein: number;
   total_fibre: number;
+}
+
+/** A plate logged before — one tap to log it again. */
+export interface ApiUsual extends ApiPlate {
+  name: string;
+  count: number;
+}
+
+export interface ApiFoodWeekDay extends ApiPlate {
+  day: string;
+  logged: number; // plates logged that day
+  kcal_low: number;
+  kcal_high: number;
+  in_band: boolean; // the day's range overlaps the target band
+}
+
+/** The rolling seven days as a calorie range against the band — the one place
+ * calories appear, because a week's estimate error averages out. */
+export interface ApiFoodWeek {
+  days: ApiFoodWeekDay[];
+  logged_days: number;
+  in_band_days: number;
+  band_low: number; // 0 until the profile has real numbers
+  band_high: number;
+  kcal_low: number; // per logged day
+  kcal_high: number;
+  protein_low: number;
+  protein_high: number;
+  fibre_low: number;
+  fibre_high: number;
 }
 
 export interface ApiFoodSearchItem {
@@ -400,9 +450,14 @@ export interface ApiSuggestion {
   tag: 'protein' | 'fibre' | 'meal';
 }
 
-/** An AI estimate from a food photo — the user edits it before logging. */
+/** An AI estimate from a food photo — the user edits it before logging. A plated
+ * meal comes back in hand portions; a packaged label in the numbers it printed. */
 export interface ApiFoodEstimate {
   name: string;
+  protein_p: number;
+  veg_p: number;
+  carb_p: number;
+  extra_p: number;
   kcal: number;
   protein_g: number;
   fibre_g: number;
@@ -444,7 +499,10 @@ export interface ApiBody {
   day: string;
   profile: ApiBodyProfile | null;
   targets: ApiTargets | null;
+  plate_targets: ApiPlate | null; // the same targets in hands; null without a profile
   food: ApiFoodDay;
+  usuals: ApiUsual[]; // plates logged before, most-repeated first
+  week: ApiFoodWeek; // the rolling seven days, for the trend screen
   suggestions: ApiSuggestion[];
   skincare_am: ApiSkincareStep[];
   skincare_pm: ApiSkincareStep[];
@@ -500,6 +558,34 @@ export interface ApiInsight {
   created_at: string;
 }
 
+/** Why a capture never became an insight. Only `no_speech` is final — the rest
+ * describe something outside the link that can clear (a key, a quota, a service). */
+export type CaptureFailReason = 'no_key' | 'no_speech' | 'fetch_failed' | 'distill_failed' | 'failed';
+
+/** A pasted link that didn't distil, kept so it can be tried again later. */
+export interface ApiCaptureFailure {
+  id: string;
+  source_url: string;
+  source: string; // tiktok | instagram | youtube | web
+  kind: InsightKind;
+  title: string; // @handle / short label
+  reason: CaptureFailReason;
+  detail: string; // the line to show on the card
+  attempts: number;
+  retryable: boolean; // false only for no_speech — nothing there to distil
+  last_tried_at: string;
+  created_at: string;
+}
+
+/** What one sweep of the kept links managed. `untried` is what the server's own
+ * bounds left for next time — reported, so a long list can't look finished. */
+export interface ApiCaptureSweep {
+  captured: ApiInsight[];
+  failed: number;
+  untried: number;
+  remaining: ApiCaptureFailure[];
+}
+
 /** One pull-quote surfaced on Status today, rotating by the date. */
 export interface ApiDailyQuote {
   text: string;
@@ -534,6 +620,18 @@ export interface StepResult {
 /** Thrown for a 401 so the store can show a distinct "access denied" notice. */
 export class UnauthorizedError extends Error {}
 
+/** Thrown when the server answered and refused. Carrying the status is what lets a
+ * caller tell that apart from never having reached the server at all — which
+ * matters for anything the server records on our behalf (see useCaptures). */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function request<T>(
   baseUrl: string,
   path: string,
@@ -556,7 +654,7 @@ async function request<T>(
     if (res.status === 401) throw new UnauthorizedError('Invalid or missing API token');
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`API ${res.status}: ${body}`);
+      throw new ApiError(res.status, `API ${res.status}: ${body}`);
     }
     return (await res.json()) as T;
   } finally {
@@ -737,6 +835,22 @@ export const api = {
 
   removeInsight: (base: string, token: string, insightId: string) =>
     request<ApiInsight[]>(base, `/insights/${insightId}`, token, { method: 'DELETE' }),
+
+  getFailedCaptures: (base: string, token: string) =>
+    request<ApiCaptureFailure[]>(base, '/insights/failed', token),
+
+  // A retry does the same work a fresh capture does, so it gets the same long
+  // window rather than the default 8s.
+  retryFailedCapture: (base: string, token: string, failureId: string) =>
+    request<ApiInsight>(base, `/insights/failed/${failureId}/retry`, token, { method: 'POST' }, 60000),
+
+  // A sweep is several of those back to back (bounded server-side by SWEEP_MAX), so
+  // it needs the longest window in the app.
+  retryFailedCaptures: (base: string, token: string) =>
+    request<ApiCaptureSweep>(base, '/insights/failed/retry', token, { method: 'POST' }, 180000),
+
+  forgetFailedCapture: (base: string, token: string, failureId: string) =>
+    request<ApiCaptureFailure[]>(base, `/insights/failed/${failureId}`, token, { method: 'DELETE' }),
 
   // ── Profile avatar (kept out of /state) ───────────────────────────────────
   getAvatar: (base: string, token: string) =>

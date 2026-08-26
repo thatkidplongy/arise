@@ -91,16 +91,20 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   generated and sequenced to your level; unset, it uses the handcrafted pools.
   Mandatory floors (reading, push-ups…) are always enforced regardless. See
   [DEPLOY.md](./DEPLOY.md).
-- **Body — nutrition & skincare (standalone)** — a separate **Body** tab that
-  isn't a stat and doesn't touch XP/streaks. Nutrition is a gentle
-  calorie/protein/**fibre** target (Mifflin–St Jeor — a *range*, never a hard
-  number or a "failure" state) driven by a **goal weight** with your BMI + healthy
-  range shown; a **"what to eat"** list of protein- and fibre-forward foods/meals
-  you can tap to log; a food log with **Open Food Facts** lookup; and a **photo
-  estimate** — snap a meal and Gemini vision estimates its calories/protein/fibre
-  for you to edit before logging (on-demand, needs the Gemini key). Skincare is
-  an editable AM/PM **routine** seeded with a pigmentation/pores-tuned template
-  plus trusted resources.
+- **Body — food & skincare (standalone)** — a separate **Food** tab that isn't a
+  stat and doesn't touch XP/streaks. A day is logged in **hand portions** — a palm
+  of protein, a fist of vegetables, a cupped hand of rice, sweet drinks and fried
+  things *counted, not banned* — because most meals here are bought and a bought
+  plate can't be weighed; "was there a palm of protein on that plate" is
+  answerable at any table in two seconds. The daily screen shows **no calories at
+  all**: they live one tap away on **the week**, where a range is compared against
+  your band (Mifflin–St Jeor, driven by a **goal weight**, with your BMI + healthy
+  range) and the estimate error has had a week to average out. **Your usuals**
+  make a repeat meal one tap; a **photo** comes back in palms and fists for you to
+  correct (on-demand Gemini vision, needs the key); and a packaged food looked up
+  in **Open Food Facts** keeps the real numbers off its label. Skincare is an
+  editable AM/PM **routine** seeded with a pigmentation/pores-tuned template plus
+  trusted resources.
 - **Inspire — capture what moved you** — a separate **Inspire** tab that turns
   motivational videos into something you keep. Paste a **TikTok, Reel, Short or
   YouTube** link and Arise fetches what was actually said (via [Supadata](https://supadata.ai) —
@@ -275,7 +279,7 @@ backend/
     progression.py earned difficulty: per-attribute levels that climb/ease
     llm.py        optional Gemini personalisation (off without a key)
     body.py       standalone Body tools: nutrition + skincare (read + write)
-    nutrition.py  calorie/protein targets (pure) + Open Food Facts lookup
+    nutrition.py  hand portions + calorie targets (pure) + Open Food Facts lookup
     skincare.py   the seeded AM/PM routine template + resources
     books.py      book search + themed shelves via Open Library
     transcript.py video transcripts via Supadata (TikTok/Reels/Shorts)

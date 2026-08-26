@@ -17,6 +17,7 @@ extra dependencies.
 """
 
 import hashlib
+import math
 
 from . import net
 
@@ -126,6 +127,224 @@ def targets(sex: str, age: int, height_cm: float, weight_kg: float,
         "healthy_high": high,
         "goal_weight": round(goal_weight_kg, 1) if goal_weight_kg else 0,
     }
+
+
+# ── Plates: hand portions, the method that survives eating out ────────────────
+#
+# Most meals here are bought, and a bought plate cannot be weighed. Asking for
+# "96 g of protein" off a carinderia plate is asking for a number that would be
+# invented three times a day, and inventing numbers is what makes people quit a
+# food log. So the daily unit is the hand: a palm of protein, a fist of veg, a
+# cupped hand of rice, and extras counted rather than banned. A hand scales with
+# the body that owns it, which is why it needs no scale — but it cannot know how
+# the food was cooked, so every calorie figure derived from it is a *range*, and
+# that range only ever surfaces on the weekly trend, where the error averages out.
+
+PORTION_UNITS = ("protein", "veg", "carb", "extra")
+
+# One portion of each kind as (mid, half-spread) per nutrient. The spreads are
+# real: a palm of grilled fish and a palm of crispy pata are the same gesture.
+PORTION: dict[str, dict] = {
+    "protein": {
+        "label": "Protein", "measure": "a palm", "one": "palm", "many": "palms",
+        "kcal": (195.0, 40.0), "protein_g": (28.0, 7.0), "fibre_g": (0.0, 0.5),
+    },
+    "veg": {
+        "label": "Vegetables", "measure": "a fist", "one": "fist", "many": "fists",
+        "kcal": (48.0, 20.0), "protein_g": (2.5, 1.5), "fibre_g": (4.0, 1.5),
+    },
+    "carb": {
+        "label": "Rice & starch", "measure": "a cupped hand", "one": "cupped hand",
+        "many": "cupped hands",
+        "kcal": (205.0, 40.0), "protein_g": (5.0, 2.0), "fibre_g": (2.0, 1.5),
+    },
+    "extra": {
+        "label": "Sweet drinks & fried", "measure": "one of them", "one": "extra",
+        "many": "extras",
+        "kcal": (240.0, 80.0), "protein_g": (2.0, 2.0), "fibre_g": (0.5, 0.5),
+    },
+}
+
+# Oil, butter, sauce and the sugar in the coffee: real calories that no hand
+# measures, and the main reason a bought plate runs higher than it looks. Counted
+# once per cooked plate (one carrying protein or starch), never on a lone snack.
+MEAL_FAT: dict[str, tuple[float, float]] = {
+    "kcal": (85.0, 35.0), "protein_g": (0.5, 0.5), "fibre_g": (0.0, 0.2),
+}
+
+# How wrong a figure that came with actual numbers still is. A packaged food
+# weighed off its own label is close; a photo estimate or a typed guess is not.
+WEIGHED_SPREAD = 0.08
+GUESSED_SPREAD = 0.20
+
+# Spreads that are independent partly cancel, so they add in quadrature rather
+# than end to end — assuming every portion was simultaneously the largest one is
+# not honesty, it is a band so wide it says nothing. What does *not* cancel is a
+# person who consistently eats bigger or smaller than the middle, so a flat share
+# of the total is added back on top of the quadrature.
+SYSTEMATIC = 0.10
+
+# A range printed to the last digit claims a precision hand portions don't have,
+# so each figure is rounded outwards to a step its own size. Grams get a finer one
+# than calories: rounding a fibre range to the nearest 50 would round most honest
+# days to "0–50", which says nothing at all.
+_ROUND_TO: dict[str, int] = {"kcal": 50, "protein_g": 5, "fibre_g": 5}
+
+# A palm is worth about this much protein — the divisor that turns a gram target
+# into a number of palms.
+PALM_PROTEIN_G = 28.0
+
+# The share of the day's calories that hands never see (cooking fat, sauces,
+# dressings, milk in coffee). Held back before starch is sized, or the starch
+# target absorbs it and reads far too generous.
+UNSEEN_SHARE = 0.20
+
+# Vegetables aren't sized off the calorie band — three fists is the guideline
+# floor for everyone, and more is never counted against you.
+VEG_FISTS = 3
+
+# Extras are counted, not banned. This is the point past which the day is worth
+# a mention, never a failure.
+EXTRA_CAP = 2
+
+
+def _combine(parts: list[tuple[float, float]], step: int = 50) -> tuple[int, int]:
+    """A list of (mid, half-spread) contributions → one (low, high) range, rounded
+    outwards so the number on screen never claims more precision than it has."""
+    if not parts:
+        return (0, 0)
+    mid = sum(m for m, _ in parts)
+    spread = math.sqrt(sum(h * h for _, h in parts)) + SYSTEMATIC * mid
+    low = max(0.0, mid - spread)
+    return (int(low // step) * step, -(-int(mid + spread) // step) * step)
+
+
+def portions_of(entry: dict) -> dict[str, int]:
+    """The hand portions on one logged plate, defaulted to none."""
+    return {u: max(0, int(entry.get(f"{u}_p") or 0)) for u in PORTION_UNITS}
+
+
+def _entry_parts(entry: dict, nutrient: str) -> list[tuple[float, float]]:
+    """One entry's (mid, spread) contributions to a nutrient.
+
+    A plate logged in hands is built up from its portions; anything logged with
+    real numbers (a label read, a database lookup, a typed guess) keeps them and
+    carries the spread its source deserves."""
+    portions = portions_of(entry)
+    if any(portions.values()):
+        parts = [PORTION[u][nutrient] for u, n in portions.items() for _ in range(n)]
+        if portions["protein"] or portions["carb"]:
+            parts.append(MEAL_FAT[nutrient])
+        return [(m, h) for m, h in parts]
+    value = float(entry.get(nutrient) or 0)
+    if value <= 0:
+        return []
+    spread = WEIGHED_SPREAD if (entry.get("grams") or 0) > 0 else GUESSED_SPREAD
+    return [(value, value * spread)]
+
+
+def estimate(entries: list[dict], nutrient: str = "kcal") -> tuple[int, int]:
+    """The honest range for a nutrient across a set of logged entries."""
+    parts: list[tuple[float, float]] = []
+    for e in entries:
+        parts.extend(_entry_parts(e, nutrient))
+    return _combine(parts, _ROUND_TO[nutrient])
+
+
+def day_estimate(entries: list[dict]) -> dict:
+    """Every nutrient's range for a day of logging — the figures the weekly trend
+    is built from, and deliberately never shown on the daily screen."""
+    lo_k, hi_k = estimate(entries, "kcal")
+    lo_p, hi_p = estimate(entries, "protein_g")
+    lo_f, hi_f = estimate(entries, "fibre_g")
+    return {
+        "kcal_low": lo_k, "kcal_high": hi_k,
+        "protein_low": lo_p, "protein_high": hi_p,
+        "fibre_low": lo_f, "fibre_high": hi_f,
+    }
+
+
+# Which nutrient each figure of a day_estimate belongs to, so a figure divided
+# down to a per-day share rounds at that nutrient's own step.
+_NUTRIENT: dict[str, str] = {
+    "kcal_low": "kcal", "kcal_high": "kcal",
+    "protein_low": "protein_g", "protein_high": "protein_g",
+    "fibre_low": "fibre_g", "fibre_high": "fibre_g",
+}
+
+
+def per_day(week: dict, days: int) -> dict:
+    """A week's ranges divided by the days logged, each figure rounded outwards at
+    its own step — a per-day number printed to the last digit would claim a
+    precision the week it came from never had."""
+    if days <= 0:
+        return dict.fromkeys(week, 0)
+    out: dict[str, int] = {}
+    for key, value in week.items():
+        step = _ROUND_TO[_NUTRIENT[key]]
+        share = value / days
+        out[key] = int(share // step) * step if key.endswith("_low") else -(-int(share) // step) * step
+    return out
+
+
+def plate_totals(entries: list[dict]) -> dict[str, int]:
+    """How many palms, fists, cupped hands and extras a day added up to."""
+    totals = dict.fromkeys(PORTION_UNITS, 0)
+    for e in entries:
+        for unit, n in portions_of(e).items():
+            totals[unit] += n
+    return totals
+
+
+def plate_targets(targets: dict | None) -> dict[str, int]:
+    """The day in hands, sized from the hunter's own numbers rather than a chart:
+    protein palms from the gram target, starch from whatever calories the band has
+    left once protein, vegetables and the unseen fat are paid for.
+
+    Vegetables and extras are fixed — three fists is the floor for any body, and
+    the extras line is a mention, not a limit. Empty until the profile is real."""
+    if not targets:
+        return {}
+    palms = min(6, max(3, int(targets["protein_g"] / PALM_PROTEIN_G + 0.5)))
+    band_mid = targets["target"]
+    spent = (palms * PORTION["protein"]["kcal"][0]
+             + VEG_FISTS * PORTION["veg"]["kcal"][0]
+             + UNSEEN_SHARE * band_mid)
+    hands = min(6, max(2, int((band_mid - spent) / PORTION["carb"]["kcal"][0] + 0.5)))
+    return {"protein": palms, "veg": VEG_FISTS, "carb": hands, "extra": EXTRA_CAP}
+
+
+def usuals(entries: list[dict], limit: int = 6) -> list[dict]:
+    """Plates logged before, most-repeated first — eating out means the same eight
+    places, so a repeat should be one tap rather than a fresh estimate.
+
+    Only plates logged in hands qualify: a one-off packaged food carries its own
+    exact numbers and has nothing to repeat."""
+    seen: dict[str, dict] = {}
+    for e in entries:
+        name = (e.get("name") or "").strip()
+        portions = portions_of(e)
+        if not name or not any(portions.values()):
+            continue
+        key = name.lower()
+        row = seen.get(key)
+        if row is None:
+            seen[key] = {"name": name, "count": 1, **portions}
+        else:
+            # The latest logging wins the portions — what you order there now beats
+            # what you ordered in March — but the name keeps the spelling it was
+            # first given, so a chip doesn't change shape under a stray lowercase.
+            row["count"] += 1
+            row.update(portions)
+    ranked = sorted(seen.values(), key=lambda r: -r["count"])
+    return ranked[:limit]
+
+
+def plate_line(totals: dict[str, int]) -> str:
+    """A day's plates as one readable line, for the recap and the digest."""
+    said = [f"{totals[u]} {PORTION[u]['one' if totals[u] == 1 else 'many']}"
+            for u in PORTION_UNITS if totals.get(u)]
+    return " · ".join(said)
 
 
 # ── Food lookup (Open Food Facts) ───────────────────────────────────────────────

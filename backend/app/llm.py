@@ -268,6 +268,10 @@ _ESTIMATE_SCHEMA = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
+        "protein_p": {"type": "integer"},
+        "veg_p": {"type": "integer"},
+        "carb_p": {"type": "integer"},
+        "extra_p": {"type": "integer"},
         "kcal": {"type": "integer"},
         "protein_g": {"type": "integer"},
         "fibre_g": {"type": "integer"},
@@ -277,18 +281,27 @@ _ESTIMATE_SCHEMA = {
     "required": ["name", "kcal", "protein_g", "fibre_g"],
 }
 
+# A plate comes back in hands, not calories. The person eating it can check a
+# palm against their own hand and correct it in a second; they cannot check
+# "620 kcal" against anything, so a wrong number there would just be logged.
 _ESTIMATE_PROMPT = (
-    "You read nutrition from a photo for a personal wellness app. The photo is EITHER "
-    "a packaged food's Nutrition Facts label OR a plated meal.\n"
+    "You read a photo for a personal food log that measures plates in HAND PORTIONS. "
+    "The photo is EITHER a packaged food's Nutrition Facts label OR a plated meal.\n"
+    "• If it is a plated meal: count the portions visible, using the eater's own hand "
+    "as the ruler. protein_p = palms of meat/fish/egg/tofu/beans (a palm ≈ the size and "
+    "thickness of their palm). veg_p = fists of non-starchy vegetables. carb_p = cupped "
+    "hands of rice, noodles, bread, potato or other starch. extra_p = sweet drinks, "
+    "desserts and deep-fried sides, counted one per item. Round to whole portions, and "
+    "use 0 for anything not on the plate. Leave kcal, protein_g and fibre_g at 0 — this "
+    "app does not want a calorie guess off a photo. Put the key assumption (how big the "
+    "serving looks, oil you can see) in 'note'. Set source='food'.\n"
     "• If it is a nutrition label: READ the printed numbers exactly — do NOT guess. Use "
-    "the PER-SERVING column, and put the serving size and servings-per-container in "
-    "'note' (e.g. 'per serving (30 g); 4 servings per pack'). Set source='label'.\n"
-    "• If it is a plated meal: estimate calories, protein and fibre for the portion "
-    "actually visible, assuming typical preparation; put the key assumption (portion "
-    "size, hidden oil) in 'note'. Set source='food'.\n"
-    "• If it is neither: name 'Not food', zeros, source='none'.\n"
-    "Give calories (kcal), protein (g) and fibre (g) as numbers. Return JSON only: "
-    "{name, kcal, protein_g, fibre_g, note, source}."
+    "the PER-SERVING column for kcal, protein_g and fibre_g, leave every *_p at 0, and "
+    "put the serving size and servings-per-container in 'note' (e.g. 'per serving "
+    "(30 g); 4 servings per pack'). Set source='label'.\n"
+    "• If it is neither: name 'Not food', zeros throughout, source='none'.\n"
+    "Return JSON only: {name, protein_p, veg_p, carb_p, extra_p, kcal, protein_g, "
+    "fibre_g, note, source}."
 )
 
 
@@ -305,6 +318,10 @@ def _parse_estimate(payload: dict) -> dict:
     data = json.loads(text)
     return {
         "name": str(data.get("name", "")).strip() or "Meal",
+        "protein_p": _to_int(data.get("protein_p")),
+        "veg_p": _to_int(data.get("veg_p")),
+        "carb_p": _to_int(data.get("carb_p")),
+        "extra_p": _to_int(data.get("extra_p")),
         "kcal": _to_int(data.get("kcal")),
         "protein_g": _to_int(data.get("protein_g")),
         "fibre_g": _to_int(data.get("fibre_g")),
@@ -314,7 +331,8 @@ def _parse_estimate(payload: dict) -> dict:
 
 
 def analyze_food(image_b64: str, mime: str = "image/jpeg", timeout: float = 25.0) -> dict:
-    """One Gemini vision call → {name, kcal, protein_g, fibre_g, note} for a photo.
+    """One Gemini vision call → a plate in hand portions (a meal) or the printed
+    numbers (a label), for the user to correct before anything is logged.
 
     Raises on any transport/parse error; the route turns that into a clean message.
     Only called on demand (when the user snaps a photo), never in the background."""
