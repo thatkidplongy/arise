@@ -381,9 +381,18 @@ _DISTIL_PROMPT = (
 
 
 def _clip(s, n: int) -> str:
-    """Collapse whitespace and cap length — keeps stored lines tidy for display."""
+    """Collapse whitespace and cap length — keeps stored lines tidy for display.
+
+    Backs off to the last word boundary when the cap lands mid-word: "you only need
+    to access or updat…" reads as a broken app, where a clean word plus an ellipsis
+    reads as a line that ran long."""
     s = " ".join(str(s).split())
-    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+    if len(s) <= n:
+        return s
+    head = s[: n - 1]
+    if not s[n - 1].isspace() and " " in head:
+        head = head[: head.rindex(" ")]
+    return head.rstrip(" ,;:·—-") + "…"
 
 
 def _parse_distillation(payload: dict) -> dict:
@@ -453,6 +462,17 @@ def distill_tips(transcript: str, timeout: float = 25.0) -> dict:
     """Like distill_motivation, but for a how-to video: takeaways are practical steps
     and quotes come back empty (nothing to resurface as a daily nudge)."""
     return _distill(_TIPS_PROMPT, transcript, timeout)
+
+
+# Stored lengths for a distilled highlight. These are runaway guards, not display
+# budgets: `text` IS the answer the morning email asks for and the card reread weeks
+# later, so a cap tight enough to fire on an ordinary two-sentence idea silently ate
+# the thing being recalled — the reader saw the question, guessed, and then couldn't
+# tell whether they'd got it right. Sized so the model's own "one self-contained
+# idea" always fits whole, and only genuinely runaway output is cut.
+_MAX_HIGHLIGHT_TEXT = 700
+_MAX_HIGHLIGHT_CUE = 300
+_MAX_HOOK = 160
 
 
 _LEARNING_SCHEMA = {
@@ -565,9 +585,9 @@ def _parse_learning(payload: dict) -> dict:
         if not body:
             continue
         out.append({
-            "text": _clip(body, 240),
-            "cue": _clip(str(item.get("cue") or "").strip(), 200),
-            "hook": _clip(str(item.get("hook") or "").strip(), 160),
+            "text": _clip(body, _MAX_HIGHLIGHT_TEXT),
+            "cue": _clip(str(item.get("cue") or "").strip(), _MAX_HIGHLIGHT_CUE),
+            "hook": _clip(str(item.get("hook") or "").strip(), _MAX_HOOK),
             "entry": _entry_index(item.get("entry")),
         })
     return {"highlights": out[:10]}
@@ -628,7 +648,7 @@ def _parse_hooks(payload: dict) -> dict[int, str]:
             n = int(item.get("n"))
         except (TypeError, ValueError):
             continue
-        hook = _clip(str(item.get("hook") or "").strip(), 160)
+        hook = _clip(str(item.get("hook") or "").strip(), _MAX_HOOK)
         if hook:
             out[n] = hook
     return out

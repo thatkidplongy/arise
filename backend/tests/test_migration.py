@@ -25,3 +25,23 @@ def test_ensure_schema_adds_north_star_and_keeps_rows():
         assert conn.execute(text("SELECT name FROM players WHERE id='p1'")).scalar() == "Old Hunter"
 
     Base.metadata.drop_all(engine)
+
+
+def test_new_tables_appear_on_an_existing_database():
+    """A table added after first release is built by create_all, not ensure_schema
+    (which only ever adds columns). The failure ledger is one of those, so an
+    existing arise.db grows it on the next boot rather than 500ing on first read."""
+    Base.metadata.drop_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE players (id VARCHAR PRIMARY KEY, name VARCHAR)"))
+        conn.execute(text("INSERT INTO players (id, name) VALUES ('p1', 'Old Hunter')"))
+
+    # What app startup does, in order.
+    Base.metadata.create_all(engine)
+    ensure_schema()
+
+    assert "capture_failures" in set(inspect(engine).get_table_names())
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT name FROM players WHERE id='p1'")).scalar() == "Old Hunter"
+
+    Base.metadata.drop_all(engine)

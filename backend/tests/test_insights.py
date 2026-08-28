@@ -247,3 +247,209 @@ def test_same_url_can_be_both_motivation_and_tips(db, monkeypatch):
     b = insights.add_insight(db, player.id, url, kind="tips")
     assert a["id"] != b["id"]
     assert {i["kind"] for i in insights.list_insights(db, player.id)} == {"motivation", "tips"}
+
+
+# ── The failure ledger (links kept for a later go) ────────────────────────────
+
+
+def _no_speech_stub(monkeypatch):
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {"lang": "", "text": "", "source": "tiktok"})
+
+
+def test_failed_capture_is_kept_with_its_reason(db, monkeypatch):
+    _enable(monkeypatch)
+
+    def boom(url, **kw):
+        raise OSError("supadata unreachable")
+
+    monkeypatch.setattr(transcript, "fetch", boom)
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.TranscriptFailed):
+        insights.capture(db, player.id, "https://www.tiktok.com/@a/video/1?utm_source=copy")
+
+    kept = insights.list_failures(db, player.id)
+    assert len(kept) == 1
+    # Stored canonically, like an insight, so a retry and a re-paste are the same link.
+    assert kept[0]["source_url"] == "https://www.tiktok.com/@a/video/1"
+    assert kept[0]["reason"] == "fetch_failed" and kept[0]["retryable"] is True
+    assert kept[0]["title"] == "@a" and kept[0]["attempts"] == 1
+    # Nothing was distilled, so nothing landed in the library.
+    assert insights.list_insights(db, player.id) == []
+
+
+def test_missing_key_is_kept_rather_than_lost(db, monkeypatch):
+    # No keys at all (the conftest default) — the most retryable failure there is.
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.NoKey):
+        insights.capture(db, player.id, "https://youtu.be/nokey")
+    assert insights.list_failures(db, player.id)[0]["reason"] == "no_key"
+
+
+def test_no_speech_is_kept_but_not_retryable(db, monkeypatch):
+    _enable(monkeypatch)
+    _no_speech_stub(monkeypatch)
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.NoTranscript):
+        insights.capture(db, player.id, "https://www.tiktok.com/@x/video/9")
+    kept = insights.list_failures(db, player.id)
+    # Still listed (so you can see why it never landed), but a sweep won't spend a
+    # call on it — there was never anything in that video to distil.
+    assert kept[0]["reason"] == "no_speech" and kept[0]["retryable"] is False
+    assert insights.retry_failures(db, player.id)["untried"] == 0
+
+
+def test_retrying_the_same_link_bumps_one_row(db, monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: (_ for _ in ()).throw(OSError("down")))
+    player = state.get_or_create_player(db)
+    url = "https://www.tiktok.com/@a/video/1"
+    for _ in range(3):
+        with pytest.raises(insights.CaptureError):
+            insights.capture(db, player.id, url)
+    # A to-do list, not a log: one entry, three attempts.
+    kept = insights.list_failures(db, player.id)
+    assert len(kept) == 1 and kept[0]["attempts"] == 3
+
+
+def test_a_landed_retry_clears_the_record(db, monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: (_ for _ in ()).throw(OSError("down")))
+    player = state.get_or_create_player(db)
+    url = "https://www.tiktok.com/@a/video/1"
+    with pytest.raises(insights.TranscriptFailed):
+        insights.capture(db, player.id, url)
+    failure_id = insights.list_failures(db, player.id)[0]["id"]
+
+    _stub(monkeypatch)  # the service comes back
+    out = insights.retry_failure(db, player.id, failure_id)
+    assert out["quotes"] == ["Lower the floor, not the ceiling."]
+    assert insights.list_failures(db, player.id) == []  # nothing left to come back to
+    assert len(insights.list_insights(db, player.id)) == 1
+
+
+def test_forget_failure_drops_it(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.NoKey):
+        insights.capture(db, player.id, "https://youtu.be/dead")
+    failure_id = insights.list_failures(db, player.id)[0]["id"]
+    insights.forget_failure(db, player.id, failure_id)
+    assert insights.list_failures(db, player.id) == []
+
+
+def test_retry_failure_404s_on_an_unknown_id(db):
+    player = state.get_or_create_player(db)
+    with pytest.raises(LookupError):
+        insights.retry_failure(db, player.id, "nope")
+
+
+def _fail_n_links(db, monkeypatch, n: int, prefix: str = "a"):
+    """n kept links, each having failed once on a service that was down."""
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: (_ for _ in ()).throw(OSError("down")))
+    player = state.get_or_create_player(db)
+    for i in range(n):
+        with pytest.raises(insights.CaptureError):
+            insights.capture(db, player.id, f"https://www.tiktok.com/@{prefix}/video/{i}")
+    return player
+
+
+def test_sweep_distils_everything_once_the_service_is_back(db, monkeypatch):
+    player = _fail_n_links(db, monkeypatch, 3)
+    _stub(monkeypatch)
+    out = insights.retry_failures(db, player.id)
+    assert len(out["captured"]) == 3 and out["failed"] == 0
+    assert out["untried"] == 0 and out["remaining"] == []
+
+
+def test_sweep_is_bounded_and_says_what_it_left(db, monkeypatch):
+    player = _fail_n_links(db, monkeypatch, insights.SWEEP_MAX + 2)
+    _stub(monkeypatch)
+    out = insights.retry_failures(db, player.id)
+    # Two small free tiers: a long ledger is walked over several sweeps, and what
+    # was left is reported rather than quietly dropped.
+    assert len(out["captured"]) == insights.SWEEP_MAX
+    assert out["untried"] == 2 and len(out["remaining"]) == 2
+
+    # A second sweep picks up exactly what the first one left.
+    again = insights.retry_failures(db, player.id)
+    assert len(again["captured"]) == 2 and again["remaining"] == []
+
+
+def test_sweep_gives_up_while_the_blocker_is_still_there(db, monkeypatch):
+    player = _fail_n_links(db, monkeypatch, insights.SWEEP_MAX)
+    calls = {"n": 0}
+
+    def still_down(url, **kw):
+        calls["n"] += 1
+        raise OSError("still down")
+
+    monkeypatch.setattr(transcript, "fetch", still_down)
+    out = insights.retry_failures(db, player.id)
+    # Two misses is enough to know the key isn't in / the quota hasn't rolled —
+    # spending the rest of the allowance would only re-learn the same thing.
+    assert calls["n"] == insights.SWEEP_GIVE_UP
+    assert out["captured"] == [] and out["failed"] == insights.SWEEP_GIVE_UP
+    assert out["untried"] == insights.SWEEP_MAX - insights.SWEEP_GIVE_UP
+
+
+def test_sweep_puts_the_least_tried_first(db, monkeypatch):
+    """A link that keeps failing must not sit at the front of the queue eating the
+    sweep's budget — the fresher ones are the ones likely to come good."""
+    player = _fail_n_links(db, monkeypatch, 1, prefix="stale")
+    stale_url = insights.list_failures(db, player.id)[0]["source_url"]
+    for _ in range(4):  # four more attempts on the same stubborn link
+        with pytest.raises(insights.CaptureError):
+            insights.capture(db, player.id, stale_url)
+    _fail_n_links(db, monkeypatch, insights.SWEEP_MAX, prefix="fresh")
+
+    _stub(monkeypatch)
+    out = insights.retry_failures(db, player.id)
+    landed = {i["source_url"] for i in out["captured"]}
+    assert len(landed) == insights.SWEEP_MAX
+    assert stale_url not in landed
+    assert insights.list_failures(db, player.id)[0]["source_url"] == stale_url
+
+
+# ── The failure ledger over HTTP ──────────────────────────────────────────────
+
+
+def test_failed_capture_surfaces_over_http(client, monkeypatch):
+    # No Supadata key: the request still 503s, but the link is now kept.
+    r = client.post("/insights", json={"url": "https://www.tiktok.com/@x/video/1"})
+    assert r.status_code == 503
+    kept = client.get("/insights/failed").json()
+    assert len(kept) == 1 and kept[0]["reason"] == "no_key" and kept[0]["retryable"] is True
+
+    # Retrying while it's still unavailable fails the same way, on the same one row.
+    fid = kept[0]["id"]
+    assert client.post(f"/insights/failed/{fid}/retry").status_code == 503
+    assert client.get("/insights/failed").json()[0]["attempts"] == 2
+
+    # Keys in place, the link distils and drops off the kept list.
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {
+        "lang": "en", "text": "Stay consistent even when life gets messy.", "source": "tiktok"})
+    monkeypatch.setattr(llm, "distill_motivation", lambda t, **kw: {
+        "summary": "Show up anyway.", "takeaways": ["Lower the floor."], "quotes": ["Show up."]})
+    assert client.post(f"/insights/failed/{fid}/retry").status_code == 200
+    assert client.get("/insights/failed").json() == []
+    assert len(client.get("/insights").json()) == 1
+
+
+def test_sweep_and_forget_over_http(client, monkeypatch):
+    for i in range(2):
+        client.post("/insights", json={"url": f"https://www.tiktok.com/@x/video/{i}"})
+    assert len(client.get("/insights/failed").json()) == 2
+
+    # Give up on one by hand; the response is what's still kept.
+    fid = client.get("/insights/failed").json()[0]["id"]
+    assert len(client.request("DELETE", f"/insights/failed/{fid}").json()) == 1
+
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {
+        "lang": "en", "text": "How to meal prep in one hour flat.", "source": "tiktok"})
+    monkeypatch.setattr(llm, "distill_motivation", lambda t, **kw: {
+        "summary": "s", "takeaways": ["t"], "quotes": ["Q"]})
+    out = client.post("/insights/failed/retry").json()
+    assert len(out["captured"]) == 1 and out["failed"] == 0
+    assert out["untried"] == 0 and out["remaining"] == []

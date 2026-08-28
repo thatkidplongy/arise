@@ -54,6 +54,28 @@ def test_parse_learning_trims_and_drops_blanks():
     assert out["highlights"][0]["cue"] == "What are the four stages of a habit?"
 
 
+def test_parse_learning_keeps_a_whole_answer():
+    """The answer is the thing being recalled — a cap that fires on an ordinary
+    two-sentence idea leaves the reader unable to tell if they guessed right."""
+    body = (
+        "The document model offers data locality because an entire document is stored as a "
+        "single continuous string. This makes reads highly efficient if you need the entire "
+        "record at once, but highly inefficient if you only need to access or update a small "
+        "part of it."
+    )
+    out = llm._parse_learning(_payload({"highlights": [{"text": body, "cue": "Why?"}]}))
+    assert out["highlights"][0]["text"] == body
+
+
+def test_clip_never_cuts_mid_word():
+    """A line ending "or updat…" reads as a bug; one ending on a whole word reads as
+    a line that ran long."""
+    clipped = llm._clip("alpha beta gamma delta epsilon", 20)
+    assert clipped.endswith("…")
+    assert clipped[:-1].split()[-1] in {"alpha", "beta", "gamma", "delta"}
+    assert len(clipped) <= 20
+
+
 def test_parse_learning_keeps_a_highlight_that_came_back_without_a_cue():
     """Better unquizzed than asked with a question invented after the fact."""
     out = llm._parse_learning(_payload({"highlights": [{"text": "Depth beats speed."}]}))

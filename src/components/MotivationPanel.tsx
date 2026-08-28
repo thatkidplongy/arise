@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { FailedCaptures } from '@/components/FailedCaptures';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -291,7 +292,11 @@ function TipsCard({
 /** The Inspire tab body: paste a video link, keep its distilled wisdom, and let a
  * quote resurface on Status. Captures run in the background (see useCaptures).
  * The library collapses to slim, tappable rows with a search filter so it stays
- * scannable at any size. Standalone — never touches XP. */
+ * scannable at any size. Standalone — never touches XP.
+ *
+ * A link that didn't distil isn't dropped: the server keeps it, and FailedCaptures
+ * sits between the capture card and the library so it's the first thing you see —
+ * a shelf of things to try again, not an error you already missed. */
 export function MotivationPanel() {
   const state = useSystem((s) => s.state);
   const { insights, loaded, remove } = useInsights();
@@ -360,6 +365,8 @@ export function MotivationPanel() {
       {shownPending.map((p) => (
         <PendingCard key={p.tempId} item={p} onRetry={retry} onDismiss={dismiss} />
       ))}
+
+      <FailedCaptures kind={mode} />
 
       {shown.length > 3 ? (
         <View style={styles.searchRow}>
