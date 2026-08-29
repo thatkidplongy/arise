@@ -548,6 +548,7 @@ class QuestOut(BaseModel):
     steps: list[str]
     steps_done: list[bool]  # aligned with steps; which are ticked this period
     stat: str
+    home: str  # the tab the quest lives on: "board" | "learn" — see state.LEARN_STATS
     xp: int
     cadence: str
     target: int

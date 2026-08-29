@@ -52,6 +52,11 @@ def test_state_shape(client):
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
+    # Every quest is stamped with the tab it lives on: study inside Learn, body &
+    # life on the board — the client filters on this, never re-deriving the split.
+    assert q["home"] == "board"
+    assert _quest(s, "d-read")["home"] == "learn"
+    assert _quest(s, "w-wealth")["home"] == "learn"
     # The physical daily always carries its non-negotiable floor (Lv0 → 3 × 10 push-ups).
     assert "push-ups" in q["steps"][0]
     # …and an explosive (plyometric) core rep is always on top, whatever the workout.
