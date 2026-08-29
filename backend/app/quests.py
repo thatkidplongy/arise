@@ -1351,12 +1351,15 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
 ]
 
 # How often the slot leaves the reading for a systems rep. Counted in days rather
-# than weekdays because Craft isn't a daily: the rotation in `state.active_daily_ids`
-# shows it every 3rd day, so an "every Sunday" rule would land about monthly. A stride
-# of 9 is a multiple of that 3, making this every 3rd Craft day — roughly weekly.
+# than weekdays because Craft isn't a daily: `state.active_daily_ids` seats it on
+# a 4-day wheel, so an "every Sunday" rule would land about monthly. A stride of 8
+# with the phase matching Craft's wheel seat makes this every 2nd Craft day —
+# roughly weekly. The phase must equal that seat's offset, or systems days stop
+# landing on Craft days at all.
 # `test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown` checks it
 # against the real rotation, so a rotation change fails loudly instead of drifting.
-_SYSTEMS_STRIDE = 9
+_SYSTEMS_STRIDE = 8
+_SYSTEMS_PHASE = 1  # d-craft's seat on state._LIFE_WHEEL
 
 
 # The stretches of the plan, in order — guidance for what to pick as your next
@@ -1470,7 +1473,7 @@ def craft_floor(source: str | None, level: int) -> str:
 
 def is_systems_day(day: str) -> bool:
     """Whether today's Craft slot is a systems-thinking rep rather than reading."""
-    return date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == 0
+    return date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == _SYSTEMS_PHASE
 
 
 def craft_content(day: str) -> tuple[str, str, list[str], str]:
@@ -1494,7 +1497,7 @@ def craft_content(day: str) -> tuple[str, str, list[str], str]:
 # `is_systems_day`. A weekday rule is only safe because Physical is in
 # `_DAILY_ALWAYS` and shows every day: the run changes what the slot *contains*,
 # never whether it appears, so it can't drift out of sync the way an "every
-# Sunday" rule would against the 3-day rotation.
+# Sunday" rule would against the daily wheel.
 #
 # The run replaces the day's rotating variant, not the floor — push-ups, plank and
 # tuck jumps still lead the card, so the non-negotiable stays non-negotiable.

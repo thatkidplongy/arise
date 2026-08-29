@@ -3,7 +3,9 @@
 from app import quests
 
 DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-fuel", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
+CRAFT_DAY = "2026-07-24"  # Craft's seat on the 4-day wheel, and not a systems day
+# Every daily the seed defines minus the ones state.HIDDEN_QUEST_IDS parks.
+DAILY_IDS = ["d-train", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
 
 
 def _state(client):
@@ -59,14 +61,15 @@ def test_state_shape(client):
     # day's actual training survives instead of being trimmed away (STEP_CAPS).
     assert len(q["steps"]) == 5
     assert q["steps"][3:] != []  # the variant, below the floor
-    # A non-floored daily (Creativity) caps at 2 — checked on a day it's in rotation.
-    sketch = _quest(client.get("/state?day=2026-07-20").json(), "d-sketch")
-    assert sketch and len(sketch["steps"]) <= 2
+    # A non-floored daily (Connection) caps at 2 — checked on a day it's in rotation.
+    connect = _quest(client.get("/state?day=2026-07-19").json(), "d-connect")
+    assert connect and len(connect["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
     # Craft names the one thing you're studying. Nothing set yet → it asks you to
     # pick rather than picking for you, and it's never a coding drill.
-    assert _quest(s, "d-craft")["steps"][0].startswith("Pick what you're studying")
+    craft = _quest(client.get(f"/state?day={CRAFT_DAY}").json(), "d-craft")
+    assert craft["steps"][0].startswith("Pick what you're studying")
     assert s["craft"]["source"] == ""
     assert s["player"]["interview_mode"] is False
     assert s["player"]["total_xp"] == 0
@@ -208,7 +211,8 @@ def test_interview_mode_toggles_craft_quests(client):
     interview_titles = {"Behavioural Prep", "Mock Interview", "Mock System Design"}
     assert _quest(s, "w-craft")["title"] not in interview_titles  # pools are disjoint
     # Turn it on → the player flag flips and Craft shifts to interview prep.
-    body = client.put(f"/interview?day={DAY}", json={"enabled": True}).json()
+    # (Asked on a Craft wheel day, so the daily is actually on the board.)
+    body = client.put(f"/interview?day={CRAFT_DAY}", json={"enabled": True}).json()
     assert body["player"]["interview_mode"] is True
     assert _quest(body, "w-craft")["title"] in interview_titles
     # The daily still opens with its floor, then an interview drill — and interview
@@ -308,16 +312,18 @@ def test_step_checklist_autocompletes_and_reverses(client):
 
 
 def test_daily_rotation(client):
-    from app.state import active_daily_ids
+    from app.state import HIDDEN_QUEST_IDS, active_daily_ids
 
-    # Physical and Fuel show every day; the other dailies rotate over a 3-day cycle.
+    # Physical and Reading show every day; a retention skill swaps every 2nd day
+    # and a coverage area rides a 4-day wheel. Hidden slots are never dealt.
     seen = []
-    for d in ("2026-07-18", "2026-07-19", "2026-07-20"):
+    for d in ("2026-07-18", "2026-07-19", "2026-07-20", "2026-07-21"):
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
-        assert {"d-train", "d-fuel"} <= shown and shown == active_daily_ids(d)
+        assert {"d-train", "d-read"} <= shown and shown == active_daily_ids(d)
+        assert not shown & HIDDEN_QUEST_IDS
         seen.append(shown)
-    assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
-    # Across the full cycle every daily comes around.
+    assert seen[0] != seen[1] != seen[2] != seen[3]  # the daily set changes day to day
+    # Across the full cycle every unhidden daily comes around.
     assert set().union(*seen) == set(DAILY_IDS)
 
 
@@ -346,12 +352,17 @@ def test_badminton_weekly_is_single_checklist(client):
 
 
 def test_daily_clear_bonus(client):
+    from app.state import active_daily_ids
+
+    # Only the dailies actually dealt today gate the clear — hidden and off-cycle
+    # slots never hold the bonus hostage.
+    active = sorted(active_daily_ids(DAY))
     events = []
-    for qid in DAILY_IDS:
+    for qid in active:
         events = client.post("/completions", json={"quest_id": qid, "day": DAY}).json()["events"]
     assert any(e["type"] == "daily_clear" for e in events)
-    # every daily × 10 + 15 clear bonus
-    assert _state(client)["player"]["total_xp"] == len(DAILY_IDS) * 10 + 15
+    # every active daily × 10 + 15 clear bonus
+    assert _state(client)["player"]["total_xp"] == len(active) * 10 + 15
     assert _state(client)["today"]["cleared"] is True
 
 
