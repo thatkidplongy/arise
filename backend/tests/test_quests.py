@@ -271,7 +271,7 @@ def test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown():
     """Architecture is only half of 'system thinking'. The other half needs a real
     system rather than a page, so the slot leaves the reading regularly.
 
-    Craft is not a daily — `active_daily_ids` seats it on the 4-day wheel — so this
+    Craft is not a daily — `active_daily_ids` rotates it in every 3rd day — so this
     counts only the days it's actually on the board. If that rotation ever changes,
     this is the test that notices."""
     from app import state
@@ -288,8 +288,8 @@ def test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown():
         if quests.content_for(q, day, craft_source="X")[0] in systems:
             systems_days += 1
 
-    assert shown >= 20, shown
-    assert systems_days == shown // 2
+    assert shown > 20, shown
+    assert systems_days == shown // 3
     assert 8 <= systems_days <= 12
 
 

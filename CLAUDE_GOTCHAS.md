@@ -13,12 +13,10 @@ Non-obvious things about this repo, kept short.
   If a slot's steps *are* the material rather than variety on top of it, it needs an
   entry in `STEP_CAPS` — otherwise content silently disappears off the card.
 
-- **`d-jp` only appears every other day**, on the retention swap in
-  `state.active_daily_ids` (coverage areas ride a 4-day wheel instead). Anything that
-  paces the Japanese plan by date will fight that rotation; the plan is held at
-  `Player.japanese_step` and moves on completion for exactly this reason. Craft's
-  wheel seat is mirrored by `quests._SYSTEMS_PHASE` — move one without the other and
-  systems reps stop landing on Craft days (a test guards it).
+- **`d-jp` only appears every third day**, like every rotating daily (see
+  `state.active_daily_ids`). Anything that paces the Japanese plan by date will fight
+  that rotation; the plan is held at `Player.japanese_step` and moves on completion
+  for exactly this reason.
 
 - **`d-read` has no `POOLS` entry, on purpose.** Grow is one sitting on the hunter's
   own book: the reading floor names it and `_READ_METHODS` varies what you do with

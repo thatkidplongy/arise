@@ -6,7 +6,6 @@ import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
-import { QuestCard } from '@/components/QuestCard';
 import { ReadingCard } from '@/components/ReadingCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { RecallBlock } from '@/components/Recall/RecallBlock';
@@ -16,7 +15,6 @@ import { Button } from '@/components/ui/Button';
 import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { ChoiceChip, Tag } from '@/components/ui/Tag';
-import { SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { useSaveState, saveLabel } from '@/hooks/useSaveState';
 import { LEARNING_NOTE_MAX } from '@/consts';
@@ -185,53 +183,6 @@ function ThreadPanel() {
   );
 }
 
-/** Today's study sittings — the quests that used to crowd the board (reading,
- * Japanese, money study, craft). Same cards as the board, same tick paths. */
-function StudySittings() {
-  const quests = useSystem((s) => s.state?.quests);
-  const daily = (quests ?? []).filter((q) => q.home === 'learn' && q.cadence === 'daily');
-  if (!daily.length) return null;
-  return (
-    <View style={styles.questList}>
-      {daily.map((q) => (
-        <QuestCard key={q.id} quest={q} />
-      ))}
-    </View>
-  );
-}
-
-/** The week's study gates and optional extras, below the day-to-day furniture —
- * mirrors the board's weekly section and collapsed side panel. */
-function StudyGates() {
-  const quests = useSystem((s) => s.state?.quests);
-  const weekly = (quests ?? []).filter((q) => q.home === 'learn' && q.cadence === 'weekly');
-  const side = (quests ?? []).filter((q) => q.home === 'learn' && q.cadence === 'side');
-  if (!weekly.length && !side.length) return null;
-  return (
-    <>
-      {weekly.length ? (
-        <>
-          <SectionRule label="Gates open this week" trailing="New set each Monday" />
-          <View style={styles.questList}>
-            {weekly.map((q) => (
-              <QuestCard key={q.id} quest={q} />
-            ))}
-          </View>
-        </>
-      ) : null}
-      {side.length ? (
-        <SystemPanel title="Side quests" sub="Optional · whenever" collapsible style={styles.sidePanel}>
-          <View style={styles.questList}>
-            {side.map((q) => (
-              <QuestCard key={q.id} quest={q} />
-            ))}
-          </View>
-        </SystemPanel>
-      ) : null}
-    </>
-  );
-}
-
 export default function LearnScreen() {
   const state = useSystem((s) => s.state);
   const removeLearning = useSystem((s) => s.removeLearning);
@@ -250,9 +201,6 @@ export default function LearnScreen() {
               Pick a stack, then work it like a pile of index cards. */}
           <RecallBlock />
 
-          {/* Then the day's sittings — the study quests moved off the board. */}
-          <StudySittings />
-
           {/* The two things being worked through, then everything else you read.
               Both are paced by what you log, never by a schedule. */}
           <ReadingCard />
@@ -264,8 +212,6 @@ export default function LearnScreen() {
           <ReadingReview />
 
           <CraftPhaseCard />
-
-          <StudyGates />
 
           <Capture />
 
@@ -327,10 +273,6 @@ const styles = StyleSheet.create({
   rowSource: { ...typography.cardTitle, color: neutral[900] },
   remove: { color: text.faint, fontSize: 20, fontWeight: '700', marginTop: -2 },
   empty: { ...typography.body, color: text.secondary },
-  questList: { gap: 14 },
-  // Each quest is its own window, so the side panel is a heading and nothing more —
-  // a card around the cards would double-frame them (same move as the board).
-  sidePanel: { backgroundColor: 'transparent', paddingHorizontal: 2, paddingTop: 4, paddingBottom: 0 },
   threadText: { ...typography.body, fontSize: 14, lineHeight: 22, color: neutral[900] },
   footer: { ...typography.small, color: text.faint, lineHeight: 18 },
 });

@@ -93,11 +93,9 @@ export default function QuestsScreen() {
     );
   }
 
-  // Study quests live on the Learn tab now; the board keeps body & life.
-  const boardQuests = state.quests.filter((q) => q.home !== 'learn');
-  const daily = boardQuests.filter((q) => q.cadence === 'daily');
-  const weekly = boardQuests.filter((q) => q.cadence === 'weekly');
-  const side = boardQuests.filter((q) => q.cadence === 'side');
+  const daily = state.quests.filter((q) => q.cadence === 'daily');
+  const weekly = state.quests.filter((q) => q.cadence === 'weekly');
+  const side = state.quests.filter((q) => q.cadence === 'side');
   const isResting = state.today.resting;
 
   const nowKey = currentBlockKey(new Date().getHours());

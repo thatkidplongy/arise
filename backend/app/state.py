@@ -309,38 +309,24 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
     return _count(rows, quest.id, week=game.week_key(day))
 
 
-# Quests hidden from every surface for now (Aug 2026: the board had grown too
-# dense to face). The def, its history and its XP all stay; the slot just stops
-# being dealt — d-sketch even keeps its seat on the skill swap below, so Japanese
-# holds its every-2nd-day cadence and unhiding restores the full design. Remove
-# an id here to bring one back.
-HIDDEN_QUEST_IDS = frozenset({"d-fuel", "d-sketch"})
-
-# Which tab a quest lives on. Study sittings (reading, Japanese, money study,
-# craft) render inside Learn beside the reading and recall cards; body & life
-# quests keep the Quest board. Decided here once — surfaces read `home`, never
-# re-derive it.
-LEARN_STATS = frozenset({"INT", "WLT", "CFT"})
-
-# Physical and Reading show every day. The rest are split by how fast they decay:
-# skills that fade without reps (Japanese, drawing) swap every other day, while
-# the coverage areas ride a 4-day wheel — each of those has a weekly raid backing
-# it up. The two cycles are aligned on purpose: Japanese (even ordinals) lands
-# with the life quests (wheel seats 0 and 2), sketching with the study sittings
-# (seats 1 and 3), so no day ever holds three study sittings. d-craft's seat is
-# mirrored by quests._SYSTEMS_PHASE — move it and the systems reps stop landing
-# on Craft days (a test guards this).
-_DAILY_ALWAYS = ("d-train", "d-read")
-_SKILL_SWAP = ("d-jp", "d-sketch")                                # every 2nd day
-_LIFE_WHEEL = ("d-connect", "d-craft", "d-meditate", "d-wealth")  # every 4th day
+# Physical, Fuel and Reading show every day; the other dailies rotate over a 3-day
+# cycle, so each day is a lighter set (the mandatories + one group). Every area
+# still comes around within three days. Keyed on the date's ordinal so it advances
+# daily. Fuel is always-on for the same reason Physical is: a body changes on what
+# it does — and eats — every day, not on rotation days.
+_DAILY_ALWAYS = ("d-train", "d-fuel", "d-read")
+_DAILY_ROTATION: list[list[str]] = [
+    ["d-wealth", "d-craft"],       # build & money
+    ["d-connect", "d-jp"],         # social & language
+    ["d-meditate", "d-sketch"],    # inner & create
+]
 
 
 def active_daily_ids(day: str) -> set[str]:
-    """The daily quests shown on `day`: the always-on pair, one retention skill and
-    one wheel area — four a day, never more than two study sittings, every area
-    back within four days. Non-daily quests are unaffected."""
-    o = date.fromisoformat(day).toordinal()
-    return {*_DAILY_ALWAYS, _SKILL_SWAP[o % 2], _LIFE_WHEEL[o % 4]} - HIDDEN_QUEST_IDS
+    """The daily quests shown on `day`: Physical + Reading always, plus one rotating
+    group so the daily load stays light. Non-daily quests are unaffected."""
+    idx = date.fromisoformat(day).toordinal() % len(_DAILY_ROTATION)
+    return {*_DAILY_ALWAYS, *_DAILY_ROTATION[idx]}
 
 
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
@@ -436,7 +422,6 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         "steps": steps,
         "steps_done": [i in checked for i in range(len(steps))],
         "stat": q.stat,
-        "home": "learn" if q.stat in LEARN_STATS else "board",
         "xp": q.xp,
         "cadence": q.cadence,
         "target": q.target,
@@ -957,8 +942,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
                        prog_levels, player.interview_mode, _jp_step(player),
                        player.craft_source, notes_by, fuel)
             for q in defs
-            # Only today's dailies show, and a hidden slot shows on no cadence.
-            if q.id not in HIDDEN_QUEST_IDS and (q.cadence != "daily" or q.id in active_ids)
+            if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],
         "achievements": _achievements_of(db, player),
         "record": {

@@ -44,7 +44,6 @@ export interface ApiQuest {
   steps: string[];
   steps_done: boolean[];
   stat: StatKey;
-  home: 'board' | 'learn'; // the tab the quest lives on — stamped by the backend
   xp: number;
   cadence: 'daily' | 'weekly' | 'side';
   target: number;
