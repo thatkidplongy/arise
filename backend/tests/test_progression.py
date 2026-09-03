@@ -110,16 +110,18 @@ def test_the_bar_never_exceeds_the_days_the_week_actually_offers():
     assert progression.replay(weeks, real, {}, cap=4, available=7) == (0, 0)
 
 
-def test_an_attribute_with_no_daily_freezes_rather_than_decaying():
+def test_a_retired_attribute_keeps_what_it_earned_instead_of_decaying():
     """Charisma and Wealth have no daily any more. Nothing to clear is not the same
-    as failing — a stat with no floor to meet must not be settled at all."""
+    as failing: the weeks it cleared still count, and the empty weeks after it left
+    the board must not ease it back down — peak is permanent."""
     weeks = [f"w{i}" for i in range(20)]
+    # Cleared its bar for the first three weeks, then the quest was retired.
+    real = {"w0": 6, "w1": 6, "w2": 6}
+    assert progression.replay(weeks, real, {}, cap=4, available=0) == (3, 3)
+    # Still dealt, the same record would be eased down to nothing by 17 empty weeks.
+    assert progression.replay(weeks, real, {}, cap=4, available=7) == (0, 3)
+    # A stat that never cleared anything simply stays at zero.
     assert progression.replay(weeks, {}, {}, cap=4, available=0) == (0, 0)
-    # And a level already earned is held, not walked back to zero.
-    level = 3
-    for wk in weeks:
-        level = progression._settle_week(level, 0, 0, cap=4, available=0)
-    assert level == 3
 
 
 def test_availability_is_derived_from_the_schedule_itself():
@@ -129,12 +131,13 @@ def test_availability_is_derived_from_the_schedule_itself():
     assert days["STR"] == days["INT"] == days["SPI"] == 7  # the always-on three
     assert days["CFT"] == 4  # Mon/Wed/Fri/Sun
     assert days["CRE"] == 1  # Saturday
-    assert days["CHA"] == days["WLT"] == 0  # no daily at all
-    # Every anchor with days on the clock is one the board actually deals. (Not the
-    # converse: Intelligence has two dailies and only Grow anchors its progression.)
+    assert days["CHA"] == days["WLT"] == 0  # retired — no daily dealt at all
+    # Every anchor with days on the clock is one the board actually deals, and every
+    # anchor on zero is one it doesn't. (Not the converse of the first: Intelligence
+    # has two dailies and only Grow anchors its progression.)
     dealt = {q for slots in state._DAILY_BY_WEEKDAY for q in slots} | set(state._DAILY_ALWAYS)
     assert {progression.DAILY_BY_STAT[s] for s, n in days.items() if n} <= dealt
-    assert all(progression.DAILY_BY_STAT.get(s) not in dealt for s, n in days.items() if not n)
+    assert all(progression.DAILY_BY_STAT[s] not in dealt for s, n in days.items() if not n)
 
 
 def test_required_is_reported_as_what_the_week_can_actually_offer():

@@ -29,14 +29,18 @@ from datetime import date, timedelta
 from . import game
 
 # Each attribute's daily quest — clearing its floor is what "showing up" means.
-# Charisma and Wealth are absent on purpose: neither has a daily any more (Charisma
-# is weekly and side only; Wealth's study moved to the Learn tab), and an attribute
-# with nothing to clear must not be settled at all — see `_settle_week`.
+# `d-connect` and `d-wealth` are *retired*: the board no longer deals either (see
+# `state._DAILY_BY_WEEKDAY`), so their weeks come back with 0 days available and
+# `replay` freezes them. They stay listed anyway, because the completions they
+# earned are still in the history and peak is permanent — drop the anchor and the
+# attribute forgets what it did instead of holding it.
 DAILY_BY_STAT: dict[str, str] = {
     "STR": "d-train",
     "CRE": "d-sketch",
     "SPI": "d-meditate",
+    "CHA": "d-connect",   # retired
     "INT": "d-read",
+    "WLT": "d-wealth",    # retired
     "CFT": "d-craft",
 }
 
@@ -49,6 +53,8 @@ FLOOR_LEN: dict[str, int] = {
     "d-read": 1,    # read your chapter(s)
     "d-craft": 1,   # read the one source you're studying, and log it
     "d-sketch": 0,
+    "d-wealth": 1,   # retired, kept for the history it already wrote
+    "d-connect": 0,  # retired
 }
 
 # The ceiling per attribute — "you've built a strong habit, now maintain it".
@@ -129,7 +135,16 @@ def replay(weeks: list[str], real_by_week: dict[str, int], rest_by_week: dict[st
 
     real_by_week / rest_by_week are day counts per ISO week: `real` = days the
     floor was actually met, `rest` = intentional rest days (disjoint from real).
-    `available` is how many days a week the attribute's daily is dealt."""
+    `available` is how many days a week the attribute's daily is dealt.
+
+    A retired attribute (`available` 0) replays only as far as the last week it
+    actually cleared anything, then freezes. Settling its empty weeks would ease it
+    down to zero for the crime of having been taken off the board — and peak is
+    supposed to be permanent."""
+    if available <= 0:
+        cleared = [i for i, wk in enumerate(weeks) if real_by_week.get(wk, 0)]
+        weeks = weeks[: cleared[-1] + 1] if cleared else []
+        available = 7  # the bar it was held to while it was still being dealt
     level = peak = 0
     for wk in weeks:
         level = _settle_week(level, real_by_week.get(wk, 0), rest_by_week.get(wk, 0), cap, available)
