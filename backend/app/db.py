@@ -61,6 +61,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("players", "progression_start_week", "VARCHAR DEFAULT ''"),
     ("players", "interview_mode", "BOOLEAN DEFAULT 0"),
     ("food_entries", "fibre_g", "INTEGER DEFAULT 0"),
+    # Plates logged before provenance existed stay untagged rather than being
+    # retro-labelled as hand-counted — '' reads as "unsaid", not as a claim.
+    ("food_entries", "source", "VARCHAR DEFAULT ''"),
     ("body_profiles", "goal_weight_kg", "FLOAT DEFAULT 0"),
     ("players", "avatar", "VARCHAR DEFAULT ''"),
     ("body_profiles", "country", "VARCHAR DEFAULT ''"),

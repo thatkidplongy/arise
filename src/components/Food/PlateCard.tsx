@@ -9,12 +9,13 @@ import { PORTION, PORTION_ORDER, plateNudge, sayRange } from '@/lib/plate';
 import { clay, neutral, radius, sage, shadow, space, surface, text, typography } from '@/theme';
 
 /**
- * The day in hands — the only summary the Food screen shows.
+ * The day in hands — what the plates actually held.
  *
- * There is deliberately no calorie figure here. On bought food a day's estimate is
- * out by a few hundred either way, and a number that wrong shown three times a day
- * is a score people learn to play rather than a measurement. The range lives one
- * tap away on the week, where the error averages out (see the trend screen).
+ * Still no calorie figure here, and for the original reason: a number is not the
+ * answer to "did today have enough protein on it", and a count of palms is. What
+ * the day adds up to is answered above this card instead, as a range against the
+ * band (see `DayRange`) — a span rather than a figure, because that is all a
+ * plate of hands can honestly support.
  */
 export function PlateCard({
   plate,

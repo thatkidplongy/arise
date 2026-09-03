@@ -62,7 +62,8 @@ def test_a_plate_is_logged_in_hands_and_tallied(client):
     assert entry["slot"] == "lunch" and entry["place"] == "Aling Nena's"
     assert entry["at_time"] == "12:15"
     assert b["food"]["plate"] == {"protein": 1, "veg": 0, "carb": 2, "extra": 0}
-    # A plate logged in hands carries no calories at all — they're only ever derived.
+    # A plate logged in hands carries no calorie *figure* — those are only ever
+    # derived, and only ever into a range.
     assert entry["kcal"] == 0 and b["food"]["total_kcal"] == 0
 
     # A second plate adds to the tally.
@@ -74,8 +75,9 @@ def test_a_plate_is_logged_in_hands_and_tallied(client):
     assert b["plate_targets"] == {"protein": 5, "veg": 3, "carb": 5, "extra": 2}
 
 
-def test_the_week_carries_the_calorie_range_the_day_refuses_to(client):
-    # 15a's band, moved to where the estimate error averages out.
+def test_the_week_carries_the_calorie_range_per_logged_day(client):
+    # 15a's band. The day carries a range of its own too (see the test below);
+    # the week's is the one divided down per logged day, where the error cancels.
     client.put(f"/body/profile?day={DAY}", json={"sex": "male", "age": 30, "height_cm": 175,
                                                  "weight_kg": 78, "activity": "moderate",
                                                  "goal": "maintain"})
@@ -96,6 +98,69 @@ def test_the_week_carries_the_calorie_range_the_day_refuses_to(client):
     today = next(d for d in week["days"] if d["day"] == DAY)
     assert today["logged"] == 1 and today["protein"] == 3
     assert week["days"][-1]["day"] == DAY and len(week["days"]) == 7
+
+
+def test_the_day_is_a_range_against_the_band_never_a_figure(client):
+    # 16 settles 15 in favour of the range-native model: the day shows what it
+    # adds up to, as a span. A point figure here would still be a lie — the span
+    # is what portion-derived calories can honestly support.
+    client.put(f"/body/profile?day={DAY}", json={"sex": "male", "age": 30, "height_cm": 175,
+                                                 "weight_kg": 78, "activity": "moderate",
+                                                 "goal": "maintain"})
+    empty = client.get(f"/body/state?day={DAY}").json()["food"]
+    # Nothing logged is not a zero-calorie day.
+    assert empty["kcal_low"] == 0 and empty["kcal_high"] == 0 and empty["in_band"] is False
+
+    food = client.post(f"/food/log?day={DAY}", json={
+        "name": "Miso ramen", "slot": "lunch", "protein_p": 2, "veg_p": 1,
+        "carb_p": 2, "extra_p": 1,
+    }).json()["food"]
+    assert 0 < food["kcal_low"] < food["kcal_high"]
+    assert food["band_low"] and food["band_high"]
+    # Rounded at the nutrient's own step, so the day reads no more precise than
+    # the estimate behind it.
+    assert food["kcal_low"] % 50 == 0 and food["kcal_high"] % 50 == 0
+    # The day and the week are the same estimate, so they cannot disagree: one
+    # logged day's range is exactly the week's per-day range.
+    week = client.get(f"/body/state?day={DAY}").json()["week"]
+    assert (week["kcal_low"], week["kcal_high"]) == (food["kcal_low"], food["kcal_high"])
+
+
+def test_a_row_says_where_its_figures_came_from(client):
+    # An imported estimate must never read as a measurement, so provenance rides
+    # along with the plate and the row carries its own honest span.
+    client.post(f"/food/log?day={DAY}", json={
+        "name": "Miso ramen", "slot": "lunch", "protein_p": 2, "carb_p": 2,
+        "source": "claude",
+    })
+    client.post(f"/food/log?day={DAY}", json={
+        "name": "Skyflakes", "slot": "snack", "grams": 75, "kcal": 330,
+        "protein_g": 6, "source": "label",
+    })
+    # A plate tapped out by hand claims nothing about where it came from.
+    entries = client.post(f"/food/log?day={DAY}", json={
+        "name": "Tinola", "slot": "dinner", "protein_p": 1, "veg_p": 2,
+    }).json()["food"]["entries"]
+
+    by_name = {e["name"]: e for e in entries}
+    assert by_name["Miso ramen"]["source"] == "claude"
+    assert by_name["Skyflakes"]["source"] == "label"
+    assert by_name["Tinola"]["source"] == ""
+
+    # A plate of hands comes back wide; a label read with grams behind it comes
+    # back tight. That difference is the whole point of showing the span.
+    plate = by_name["Miso ramen"]
+    label = by_name["Skyflakes"]
+    assert plate["kcal_high"] - plate["kcal_low"] > label["kcal_high"] - label["kcal_low"]
+    assert label["kcal_low"] <= 330 <= label["kcal_high"]
+
+
+def test_an_unrecognised_provenance_is_stored_as_none(client):
+    # A source the app doesn't hand out is not a claim it will repeat back.
+    entry = client.post(f"/food/log?day={DAY}", json={
+        "name": "Lunch", "protein_p": 1, "source": "measured",
+    }).json()["food"]["entries"][0]
+    assert entry["source"] == ""
 
 
 def test_usuals_are_the_plates_youve_logged_before(client):

@@ -7,6 +7,7 @@ import { ChoiceChip, ChoiceRow } from '@/components/ui/ChoiceChip';
 import { Field } from '@/components/ui/Field';
 import { Text } from '@/components/ui/Text';
 import {
+  MAX_PER_PLATE,
   PORTION,
   PORTION_ORDER,
   SLOTS,
@@ -16,10 +17,6 @@ import {
   type PortionKey,
 } from '@/lib/plate';
 import { TAP_MIN, clay, neutral, radius, shadow, space, surface, text, typography } from '@/theme';
-
-/** Nobody eats twelve palms at one sitting, and a stepper that runs away puts a
- * day's tally somewhere it can't come back from. */
-const MAX_PER_PLATE = 8;
 
 /**
  * The whole logging flow: what it was, where, and how many hands of each thing.

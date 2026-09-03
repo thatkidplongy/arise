@@ -16,6 +16,7 @@ import type {
   ApiFoodWeek,
   ApiPlate,
   ApiUsual,
+  EntrySource,
   FoodEntry,
   MealSlot,
 } from '@/lib/api';
@@ -124,6 +125,11 @@ const SLOT_LABEL: Record<MealSlot, string> = {
 /** The order a day is eaten in — how the "what's still open" question is answered. */
 export const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
+/** Nobody eats twelve palms at one sitting, and a stepper that runs away puts a
+ * day's tally somewhere it can't come back from. Shared with the handoff parser
+ * so an imported plate can never hold a count you couldn't have tapped. */
+export const MAX_PER_PLATE = 8;
+
 /** 'Lunch · Aling Nena's' — the slot leads, because that's what you're looking for
  * when you scan the day. A plate with no slot is named by what it was. */
 export function mealTitle(entry: Pick<ApiFoodEntry, 'slot' | 'name' | 'place'>): string {
@@ -205,10 +211,24 @@ export interface PlateDraft {
   fibre_g: number;
   /** Where the draft came from, in one line — "Best guess from the photo". */
   note: string;
+  /** Provenance, carried through to the logged row so the timeline can badge it.
+   * '' means hand-counted: the draft claims nothing about where it came from. */
+  source: EntrySource;
 }
 
 export function emptyDraft(slot: MealSlot): PlateDraft {
-  return { slot, name: '', place: '', plate: { ...EMPTY_PLATE }, grams: 0, kcal: 0, protein_g: 0, fibre_g: 0, note: '' };
+  return {
+    slot,
+    name: '',
+    place: '',
+    plate: { ...EMPTY_PLATE },
+    grams: 0,
+    kcal: 0,
+    protein_g: 0,
+    fibre_g: 0,
+    note: '',
+    source: '',
+  };
 }
 
 /** One of your usuals, ready to log again — the portions you had there last time. */
@@ -236,6 +256,7 @@ export function draftFromEstimate(estimate: ApiFoodEstimate, slot: MealSlot): Pl
     protein_g: estimate.protein_g,
     fibre_g: estimate.fibre_g,
     note: estimate.note,
+    source: estimate.source === 'label' ? 'label' : 'photo',
   };
 }
 
@@ -260,6 +281,7 @@ export function draftToEntry(draft: PlateDraft, at: string): FoodEntry {
     kcal: draft.kcal,
     protein_g: draft.protein_g,
     fibre_g: draft.fibre_g,
+    source: draft.source,
   };
 }
 
