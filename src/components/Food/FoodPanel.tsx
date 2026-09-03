@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { DayNav } from '@/components/Food/DayNav';
-import { FuelQuestCard } from '@/components/Food/FuelQuestCard';
 import { LogPlateSheet } from '@/components/Food/LogPlateSheet';
 import { MealTimeline } from '@/components/Food/MealTimeline';
 import { PackagedSearch } from '@/components/Food/PackagedSearch';
@@ -24,7 +23,6 @@ import {
   type PlateDraft,
 } from '@/lib/plate';
 import { useBody } from '@/query/useBody';
-import { useSystem } from '@/store/useSystem';
 import { space } from '@/theme';
 
 /**
@@ -47,7 +45,6 @@ export function FoodPanel({
   onDay: (next: string) => void;
 }) {
   const { body, logFood, removeFood, search, analyzePhoto } = useBody(day);
-  const fuelQuest = useSystem((s) => s.state?.quests.find((q) => q.id === 'd-fuel')) ?? null;
 
   const [editingProfile, setEditingProfile] = useState(false);
   const [draft, setDraft] = useState<PlateDraft | null>(null);
@@ -85,7 +82,6 @@ export function FoodPanel({
     <View style={styles.wrap}>
       <DayNav day={day} today={today} onChange={onDay} />
       <PlateCard plate={food.plate} targets={targets} week={week} />
-      {isToday && fuelQuest ? <FuelQuestCard quest={fuelQuest} /> : null}
 
       <MealTimeline
         entries={food.entries}

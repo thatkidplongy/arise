@@ -1,9 +1,14 @@
 """Integration tests: the HTTP API end to end, against a throwaway database."""
 
+from datetime import date, timedelta
+
 from app import quests
 
-DAY = "2026-07-18"
-DAILY_IDS = ["d-train", "d-fuel", "d-sketch", "d-meditate", "d-connect", "d-read", "d-jp", "d-wealth", "d-craft"]
+DAY = "2026-07-18"       # a Saturday — Sit, Physical, Grow, Japanese and Creativity
+CRAFT_DAY = "2026-07-20"  # the Monday after, the week's first Craft day
+# The dailies dealt on DAY. The board is a fixed weekly schedule, so this is a
+# property of the weekday, not of the whole deck (see state._DAILY_BY_WEEKDAY).
+DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-jp", "d-sketch"]
 
 
 def _state(client):
@@ -41,11 +46,11 @@ def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
         assert key in s
-    # Dailies rotate — Physical every day plus one group — so not all 8 show at once.
+    # The board deals this weekday's dailies, not the whole deck.
     from app.state import active_daily_ids
 
     shown_daily = {q["id"] for q in s["quests"] if q["cadence"] == "daily"}
-    assert shown_daily == active_daily_ids(DAY) and "d-train" in shown_daily
+    assert shown_daily == active_daily_ids(DAY) == set(DAILY_IDS)
     assert {st["key"] for st in s["stats"]} == {"STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"}
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
@@ -59,14 +64,16 @@ def test_state_shape(client):
     # day's actual training survives instead of being trimmed away (STEP_CAPS).
     assert len(q["steps"]) == 5
     assert q["steps"][3:] != []  # the variant, below the floor
-    # A non-floored daily (Creativity) caps at 2 — checked on a day it's in rotation.
-    sketch = _quest(client.get("/state?day=2026-07-20").json(), "d-sketch")
+    # A non-floored daily (Creativity) caps at 2 — Saturday is the day it's dealt.
+    sketch = _quest(s, "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")
     # Craft names the one thing you're studying. Nothing set yet → it asks you to
-    # pick rather than picking for you, and it's never a coding drill.
-    assert _quest(s, "d-craft")["steps"][0].startswith("Pick what you're studying")
+    # pick rather than picking for you, and it's never a coding drill. Craft isn't
+    # dealt on a Saturday, so this is asked on one of its own weekdays.
+    craft_day = client.get(f"/state?day={CRAFT_DAY}").json()
+    assert _quest(craft_day, "d-craft")["steps"][0].startswith("Pick what you're studying")
     assert s["craft"]["source"] == ""
     assert s["player"]["interview_mode"] is False
     assert s["player"]["total_xp"] == 0
@@ -203,12 +210,13 @@ def test_the_last_craft_phase_never_asks_to_move_on(client):
 
 
 def test_interview_mode_toggles_craft_quests(client):
-    s = _state(client)
+    # Asked on a Craft weekday, since the daily is only dealt on those.
+    s = client.get(f"/state?day={CRAFT_DAY}").json()
     assert s["player"]["interview_mode"] is False
     interview_titles = {"Behavioural Prep", "Mock Interview", "Mock System Design"}
     assert _quest(s, "w-craft")["title"] not in interview_titles  # pools are disjoint
     # Turn it on → the player flag flips and Craft shifts to interview prep.
-    body = client.put(f"/interview?day={DAY}", json={"enabled": True}).json()
+    body = client.put(f"/interview?day={CRAFT_DAY}", json={"enabled": True}).json()
     assert body["player"]["interview_mode"] is True
     assert _quest(body, "w-craft")["title"] in interview_titles
     # The daily still opens with its floor, then an interview drill — and interview
@@ -216,7 +224,7 @@ def test_interview_mode_toggles_craft_quests(client):
     assert _quest(body, "d-craft")["steps"][0].startswith("Pick what you're studying")
     assert _quest(body, "d-craft")["title"] in {v[0] for v in quests.INTERVIEW_POOLS["d-craft"]}
     # Turning it off restores steady craft growth.
-    off = client.put(f"/interview?day={DAY}", json={"enabled": False}).json()
+    off = client.put(f"/interview?day={CRAFT_DAY}", json={"enabled": False}).json()
     assert off["player"]["interview_mode"] is False
     assert _quest(off, "w-craft")["title"] not in interview_titles
 
@@ -307,18 +315,31 @@ def test_step_checklist_autocompletes_and_reverses(client):
     assert r["state"]["player"]["total_xp"] == 0
 
 
-def test_daily_rotation(client):
+def test_the_daily_schedule_is_fixed_to_the_weekday(client):
+    """The board used to rotate on the date's ordinal, so no weekday meant anything
+    and the whole thing only repeated every 21 days. It's a weekly schedule now:
+    the same Monday every Monday, which is the point of it."""
     from app.state import active_daily_ids
 
-    # Physical and Fuel show every day; the other dailies rotate over a 3-day cycle.
-    seen = []
-    for d in ("2026-07-18", "2026-07-19", "2026-07-20"):
+    week, next_week = [], []
+    for offset in range(7):
+        d = (date.fromisoformat("2026-07-20") + timedelta(days=offset)).isoformat()
+        nxt = (date.fromisoformat("2026-07-27") + timedelta(days=offset)).isoformat()
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
-        assert {"d-train", "d-fuel"} <= shown and shown == active_daily_ids(d)
-        seen.append(shown)
-    assert seen[0] != seen[1] != seen[2]  # the daily set changes day to day
-    # Across the full cycle every daily comes around.
-    assert set().union(*seen) == set(DAILY_IDS)
+        assert shown == active_daily_ids(d)
+        assert {"d-meditate", "d-train", "d-read"} <= shown  # the always-on three
+        week.append(shown)
+        next_week.append(active_daily_ids(nxt))
+
+    assert week == next_week  # the same week, every week
+    # Every daily still comes around inside one week.
+    assert set().union(*week) == set(quests_dealt_in_a_week())
+
+
+def quests_dealt_in_a_week() -> set[str]:
+    from app.state import _DAILY_ALWAYS, _DAILY_BY_WEEKDAY
+
+    return {*_DAILY_ALWAYS, *(q for slots in _DAILY_BY_WEEKDAY for q in slots)}
 
 
 def test_step_toggle_rejected_for_multi_target(client):

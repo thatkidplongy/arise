@@ -61,69 +61,6 @@ def test_floor_climbs_with_level():
     assert quests.content_for(q, "2026-07-18", level=99)[2][: len(floors[-1])] == floors[-1]
 
 
-def _fuel_targets() -> dict:
-    # The shape nutrition.targets returns, with easy-to-spot numbers. 137 g of
-    # protein is 5 palms; what the band has left over is 3 cupped hands of starch.
-    return {"protein_g": 137, "target": 2166, "target_low": 2066,
-            "target_high": 2266, "fibre_g": 30}
-
-
-def test_fuel_floor_is_written_from_the_hunters_own_targets():
-    # The diet quest is *my* plan, not advice: the floor carries the hunter's own
-    # numbers, converted to portions they can check without a scale. Logging is
-    # always step one.
-    floor = quests.fuel_floor(_fuel_targets(), 0)
-    assert len(floor) == 2
-    assert "Log" in floor[0] and "Food screen" in floor[0]
-    assert "5 palms of protein" in floor[1]
-
-
-def test_fuel_floor_asks_in_hands_never_in_grams():
-    # A gram target is unanswerable on a bought plate, so it would get invented —
-    # and a quest you can't honestly complete corrodes the whole system.
-    t = _fuel_targets()
-    for level in range(6):
-        marks = quests.fuel_floor(t, level)[1]
-        assert " g" not in marks and "kcal" not in marks
-
-
-def test_fuel_floor_climbs_by_adding_marks_not_harshness():
-    # Protein first; vegetables next; the starch ceiling mid-climb; the extras at
-    # the top. Every tier keeps the protein ask — the climb widens the day, it
-    # never trades one mark away for another.
-    t = _fuel_targets()
-    lv0, lv1, lv2, lv3 = (quests.fuel_floor(t, n) for n in range(4))
-    assert "fists" not in lv0[1]
-    assert "3 fists of vegetables" in lv1[1]
-    assert "3 cupped hands" in lv2[1]
-    assert "at most 2 sweet-or-fried extras" in lv3[1]
-    assert all("5 palms of protein" in lv[1] for lv in (lv0, lv1, lv2, lv3))
-    # Beyond the cap it holds at the top tier.
-    assert quests.fuel_floor(t, 99) == quests.fuel_floor(t, 5)
-
-
-def test_fuel_floor_without_a_profile_asks_for_one():
-    # No profile → no real numbers, so the floor's first job is to send you to set
-    # one up rather than inventing targets.
-    floor = quests.fuel_floor(None, 3)
-    assert "body profile" in floor[0]
-    assert not any(ch.isdigit() for ch in floor[0])
-
-
-def test_fuel_daily_is_floor_plus_one_rotating_habit():
-    # Two floor steps + at most one variant step — a plan, not a checklist.
-    q = _q("d-fuel", "STR", "daily")
-    floor = quests.fuel_floor(_fuel_targets(), 0)
-    titles = set()
-    for d in range(10, 25):
-        title, _, steps, _ = quests.content_for(q, f"2026-07-{d:02d}", fuel=_fuel_targets())
-        steps = quests.cap_steps(steps, len(floor))
-        assert steps[: len(floor)] == floor  # the targets lead every day
-        assert len(steps) == 3
-        titles.add(title)
-    assert len(titles) > 1  # the habit on top still rotates
-
-
 def test_reading_floor_asks_rather_than_setting_a_quota():
     # No number the app picked: the floor is to read and then record what you read.
     floor = quests.reading_floor("A Book")
@@ -267,18 +204,18 @@ def test_craft_rotates_the_method_day_to_day():
     assert len(seen) > 1
 
 
-def test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown():
+def test_systems_reps_land_exactly_once_a_week_on_a_day_craft_is_shown():
     """Architecture is only half of 'system thinking'. The other half needs a real
     system rather than a page, so the slot leaves the reading regularly.
 
-    Craft is not a daily — `active_daily_ids` rotates it in every 3rd day — so this
-    counts only the days it's actually on the board. If that rotation ever changes,
-    this is the test that notices."""
+    The rep sits on a weekday Craft is actually dealt, so it lands once every week
+    — no stride to keep in step with a rotation. If Craft's weekdays ever stop
+    including the systems weekday, this is the test that notices."""
     from app import state
 
     q = _q("d-craft", "CFT", "daily")
     systems = {v[0] for v in quests._CRAFT_SYSTEMS}
-    start = date(2026, 8, 1)
+    start = date(2026, 8, 3)  # a Monday, so the 12 weeks are whole
     shown = systems_days = 0
     for offset in range(84):  # 12 weeks
         day = (start + timedelta(days=offset)).isoformat()
@@ -289,8 +226,7 @@ def test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown():
             systems_days += 1
 
     assert shown > 20, shown
-    assert systems_days == shown // 3
-    assert 8 <= systems_days <= 12
+    assert systems_days == 12  # exactly one a week, every week
 
 
 def test_a_systems_day_is_the_whole_sitting():
@@ -483,9 +419,10 @@ def test_roadwork_lands_on_every_mon_wed_fri_and_keeps_the_floor():
 
 
 def test_other_slots_keep_the_lean_three_step_cap():
-    # Raising Physical's cap must not bloat the rest — Fuel is a plan, not a checklist.
+    # Raising Physical's cap must not bloat the rest — a floored slot is a plan,
+    # not a checklist.
     steps = ["a", "b", "c", "d", "e", "f"]
-    assert len(quests.cap_steps(steps, 2, "d-fuel")) == 3
+    assert len(quests.cap_steps(steps, 2, "d-craft")) == 3
     assert len(quests.cap_steps(steps, 1, "d-read")) == 3
     assert len(quests.cap_steps(steps, 0, "d-sketch")) == 2  # floor-free slots stay at 2
     assert len(quests.cap_steps(steps, 3, "d-train")) == 5

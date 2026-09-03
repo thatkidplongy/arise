@@ -30,20 +30,21 @@ tactics.
 
 The pools are tuned to the hunter's real interests:
   STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor,
-       plus a daily *fuel* slot (d-fuel) — the diet plan, because a physique is
-       written in the kitchen: its floor carries the hunter's own targets from the
-       body profile, in hand portions you can check at a restaurant table rather
-       than grams you'd have to invent (see fuel_floor)
+       and a fixed 5 km on Mon/Wed/Fri (see ROADWORK). Diet is no longer a quest:
+       it's tracked on the Food screen, not asked about on the board
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
-  SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone
-  CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone
+  SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone,
+       and the one daily that opens every morning
+  CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone —
+       weekly and side only, with no daily slot
   INT  the daily is one sitting on one book: the floor names it and asks you to log
        what you read (at your own pace, never a chapter quota), and the day's method
        varies what you do with it, deepening with the band (see _READ_METHODS). Math
        from scratch, Japanese and the wider world are the weekly and side slots,
        where a subject is the whole sitting
   WLT  making money: money psychology & fundamentals first, then managing, then
-       earning — side income, monetising skills
+       earning — side income, monetising skills. Weekly and side only; the daily
+       study moved to a phased card in the Learn tab
   CFT  the engineering craft, toward Senior: fluency & fundamentals → patterns &
        problem-solving → system design & architecture; a small deep-work floor
        daily, and an interview-mode toggle (INTERVIEW_POOLS) for DSA/mock prep
@@ -56,7 +57,7 @@ import hashlib
 
 from datetime import date
 
-from . import game, japanese, nutrition, progression
+from . import game, japanese, progression
 from .models import QuestDef
 
 # slot id -> pool of (title, desc, steps) variants. The seeded content is the
@@ -105,31 +106,6 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ("Jump Rope", "Rope conditioning intervals", [
             "12 rounds: 45s skipping, 15s rest",
             "Mix in high knees or double-unders if you can",
-        ]),
-    ],
-    "d-fuel": [  # STR — the diet plan. The floor (fuel_floor) carries the hunter's own
-        # targets; these variants rotate one habit on top. Only the first step survives
-        # the cap, so each variant leads with the one that matters.
-        ("Fuel Discipline", "Veg before starch", [
-            "Serve the vegetables onto the plate before the rice goes on",
-        ]),
-        ("Protein First", "Order of eating matters", [
-            "Eat the protein on your plate first — it protects muscle and blunts cravings",
-        ]),
-        ("Hunter's Rations", "Prep beats willpower", [
-            "Cook or portion tomorrow's protein in advance — decided food doesn't get debated",
-        ]),
-        ("Water Discipline", "Thirst reads as hunger", [
-            "A glass of water before every meal, and 2L across the day",
-        ]),
-        ("Clean Sweep", "Cut the liquid calories", [
-            "No soft drinks, milk tea or juice today — water, black coffee, or plain tea",
-        ]),
-        ("Slow Eater", "Give fullness time to land", [
-            "Eat one meal with no screen, putting the spoon down between bites",
-        ]),
-        ("Stock the Arsenal", "Make the good choice the easy one", [
-            "Restock lean protein and veg — the Food screen suggests picks you can actually buy",
         ]),
     ],
     "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
@@ -225,30 +201,6 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
             "Ask: how do I feel right now?",
             "Name it, and where you feel it",
             "Let it be — don't try to fix it",
-        ]),
-    ],
-    "d-connect": [  # CHA — ambivert, mostly meaningful connection
-        ("Send a Signal", "Reach out to someone", [
-            "A quick 'thinking of you' counts",
-        ]),
-        ("Check In", "Message someone", [
-            "Ask how they really are — no agenda",
-        ]),
-        ("Voice, Not Text", "Call someone", [
-            "Actually call — 5 minutes is enough",
-        ]),
-        ("Say Thanks", "Appreciate someone", [
-            "Be specific about what they did",
-        ]),
-        ("Good Question", "Go past small talk", [
-            "Ask about something that matters to them",
-            "Follow up on their answer",
-        ]),
-        ("Make Plans", "Set up seeing someone", [
-            "Suggest a day and a thing to do",
-        ]),
-        ("Share Something", "Send a thing that fits them", [
-            "A song, meme, or link that made you think of them",
         ]),
     ],
     # (INT's daily, d-read, has no pool by design: Grow is one sitting on the
@@ -551,40 +503,6 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
         ]),
     ],
     # ── Wealth (WLT) ──────────────────────────────────────────────────────────
-    "d-wealth": [  # daily — money that matters: dodge debt, save with diskarte, build passive income
-        ("Ledger Study", "Track today's money", [
-            "Log today's money in and out in the tracker (You tab)",
-            "Spot one leak — a fee, subscription, or interest — and plan to kill it",
-        ]),
-        ("Money Class", "10 min learning", [
-            "Read or watch one lesson on getting out of debt, saving, or passive income",
-            "Write the single idea you'll actually use in a sentence",
-        ]),
-        ("Skill to Sell", "Sharpen an earning skill", [
-            "15 min improving a skill people pay for",
-            "Note who'd pay for it — and how it could earn without your hours later",
-        ]),
-        ("Offer Draft", "Package something that can earn again", [
-            "Describe one thing you could sell more than once — a beat, preset, template, or bit of code",
-            "Put a price on it, and note where it could sell on autopilot",
-        ]),
-        ("Market Watch", "Learn how money makes money", [
-            "Read one thing on a passive-income vehicle — dividends, index funds, high-yield savings, rent",
-            "Note how it would pay you without trading your time",
-        ]),
-        ("Budget Tune", "Save with diskarte", [
-            "Pick one saving move: pay yourself first, auto-transfer, envelope, or an ipon challenge",
-            "Move a set amount to savings before you spend a peso",
-        ]),
-        ("Value Reps", "Learn the language of money", [
-            "Learn one term that protects you — interest, APR, compounding, emergency fund, dividend",
-            "Explain it in your own words",
-        ]),
-        ("Micro-Hustle", "One small income action", [
-            "Pick one thing you can offer today",
-            "List it, pitch it, or post it — actually send it",
-        ]),
-    ],
     "w-wealth": [  # weekly — one real milestone toward earning
         ("Ship an Offer", "Put something up for sale", [
             "Pick one skill or product (beat, edit, art, code, service)",
@@ -851,14 +769,6 @@ FLOORS: dict[str, list[list[str]]] = {
         ["Settle for 3 minutes before you begin"],
         ["Settle for 5 minutes before you begin"],  # cap
     ],
-    "d-wealth": [  # WLT — awareness deepening into management (logs in the You-tab tracker)
-        ["Log today's money in the tracker (You tab) — everything in and out"],
-        ["Log today's money in the tracker; watch what leaks to fees or interest"],
-        ["Log today's money in the tracker; name one expense to trim, and pay yourself first"],
-        ["Log today's money in the tracker; keep the gap positive — save before you spend"],
-        ["Log today's money in the tracker; nudge toward this week's saving target"],
-        ["Money check-in in the tracker (You): today's in/out, the week's gap, and no new debt"],  # cap
-    ],
 }
 
 
@@ -867,9 +777,6 @@ FLOORS: dict[str, list[list[str]]] = {
 # The emoji signals the medium: 📖 book · 🎥 YouTube · 🎧 audio/app · 🌐 site.
 RESOURCES: dict[str, str] = {
     # STR — technique worth studying, and how to eat for the body you're training
-    "Fuel Discipline": "🌐 Precision Nutrition — hand-portion guide",
-    "Protein First": "🎥 Jeff Nippard — nutrition science (YouTube)",
-    "Hunter's Rations": "🎥 Joshua Weissman — meal prep (YouTube)",
     "Explosive Footwork": "🎥 Badminton Insight (YouTube)",
     "Dungeon Raid: Badminton": "🎥 Badminton Insight (YouTube)",
     "Doubles Raid": "🎥 Badminton Insight (YouTube)",
@@ -910,7 +817,6 @@ RESOURCES: dict[str, str] = {
     "Deep Stillness": "🎧 Waking Up — Sam Harris",
     "Box Breathing": "🎥 Huberman Lab (YouTube)",
     # CHA — people skills
-    "Good Question": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Listen Fully": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Deep Talk": "🎥 Charisma on Command (YouTube)",
     # INT — the weekly and side learning. Grow's daily isn't here: its source is
@@ -926,17 +832,9 @@ RESOURCES: dict[str, str] = {
     "Japanese Checkpoint": "📖 Genki: An Integrated Course in Elementary Japanese",
     "Understand the World": "🎥 Crash Course (YouTube)",
     # WLT — money
-    "Money Class": "📖 The Psychology of Money — Morgan Housel",
-    "Ledger Study": "📖 I Will Teach You to Be Rich — Ramit Sethi",
-    "Budget Tune": "📖 I Will Teach You to Be Rich — Ramit Sethi",
     "Money Review": "📖 I Will Teach You to Be Rich — Ramit Sethi",
     "Learn a System": "📖 The Simple Path to Wealth — JL Collins",
     "Invest Plan": "📖 The Simple Path to Wealth — JL Collins",
-    "Value Reps": "🌐 Investopedia",
-    "Market Watch": "🌐 Investopedia",
-    "Skill to Sell": "🎥 Ali Abdaal (YouTube)",
-    "Offer Draft": "🎥 Ali Abdaal (YouTube)",
-    "Micro-Hustle": "🎥 Ali Abdaal (YouTube)",
     "Ship an Offer": "🎥 Ali Abdaal (YouTube)",
     "Build the Funnel": "🎥 Ali Abdaal (YouTube)",
     "Learn & Earn": "🎥 Ali Abdaal (YouTube)",
@@ -973,7 +871,6 @@ TIER: dict[str, int] = {
     "Beyond the Comfort Zone": 2, "Cover It": 2, "From Imagination": 2, "Poem from a Prompt": 2, "New Style": 2,
     "Pitch & Control": 1, "Perform a Song": 2, "Sing Outside Your Lane": 2,  # singing (Sing Practice = band 0)
     # CHA — show up → quality → depth & reach
-    "Check In": 1, "Voice, Not Text": 1, "Good Question": 1, "Make Plans": 2,
     "Guild Night": 1, "Party Gathering": 1, "Deep Talk": 2, "New Table": 2,
     "Reconnect": 1, "Listen Fully": 1, "New Ally": 2, "First Contact": 2,
     # INT — Grow reads one book: understand it (0) → produce it from memory (1) →
@@ -985,7 +882,6 @@ TIER: dict[str, int] = {
     "Arcane Study: Code": 1, "Math Reps": 1, "Japanese Study": 1,
     "Debug Something": 2, "Down the Rabbit Hole": 2,
     # WLT — money psychology/principles (0) → manage (1) → earn (2)
-    "Ledger Study": 1, "Budget Tune": 1, "Skill to Sell": 2, "Offer Draft": 2, "Micro-Hustle": 2,
     "Money Review": 1, "Invest Plan": 1, "Ship an Offer": 2, "Chase a Lead": 2, "Build the Funnel": 2,
     "Price It Right": 1, "Extra Coin": 2, "Declutter for Cash": 2, "Network Node": 2,
     # CFT — fluency/fundamentals (0) → patterns & problem-solving (1) → system design (2)
@@ -1095,47 +991,6 @@ def read_content(day: str, band: int, book: str | None) -> tuple[str, str, list[
     return title, desc, list(steps), reading_resource(book)
 
 
-def fuel_floor(targets: dict | None, level: int) -> list[str]:
-    """The diet non-negotiable, in hand portions — sized from the hunter's own body
-    profile (nutrition.plate_targets), so the quest reads as *my* diet plan rather
-    than generic advice.
-
-    The marks are deliberately answerable at a restaurant table: "was there a palm
-    of protein on that plate" takes two seconds and no scale, where "128 g of
-    protein" off a bought plate is a number you'd be inventing. The ask is the same
-    size — a palm is about 28 g of it — but this one you can complete honestly, and
-    a quest you can't honestly complete corrodes the whole system.
-
-    Two steps at every level: log the plates, and hit today's marks. What climbs
-    with level is how many marks the day carries — protein first, then vegetables,
-    then the starch ceiling, then the extras — never how harshly they're judged.
-
-    Without a profile there are no real numbers, so the floor's first job is to
-    send you to set one up."""
-    plate = nutrition.plate_targets(targets)
-    if not plate:
-        return [
-            "Set your body profile (You → Food) so your targets are real numbers",
-            "Log every plate today on the Food screen — in palms and fists",
-        ]
-    palms, fists, hands, extras = (plate["protein"], plate["veg"],
-                                   plate["carb"], plate["extra"])
-    log = "Log every plate today on the Food screen — what was on it, in hands"
-    plan = "Decide each plate before you eat it — protein first, then the rest"
-    protein = f"{palms} palms of protein"
-    veg = f"{fists} fists of vegetables"
-    starch = f"starch at {hands} cupped hands or under"
-    tiers = [
-        [log, f"{protein} across the day — muscle is built from it"],
-        [log, f"{protein} · {veg}"],
-        [log, f"{protein} · {veg} · {starch}"],
-        [log, f"{protein} · {veg} · {starch} · at most {extras} sweet-or-fried extras"],
-        [plan, f"{protein} · {veg} · {starch} · at most {extras} sweet-or-fried extras"],
-        [plan, f"{protein} · {veg} · {starch} · nothing sugary to drink"],  # cap
-    ]
-    return tiers[max(0, min(level, len(tiers) - 1))]
-
-
 # A self-set priority that sits on top of the plan (e.g. "abs this week"). Common
 # asks get a handcrafted frame; anything else gets a clean generic one. Matched by
 # keyword substring on the lowercased focus — no LLM, always free.
@@ -1224,13 +1079,12 @@ def cap_steps(steps: list[str], floor_len: int, slot_id: str = "") -> list[str]:
 
 
 def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
-              craft_source: str | None = None, fuel: dict | None = None) -> list[str]:
+              craft_source: str | None = None) -> list[str]:
     """The mandatory non-negotiable steps for a slot at the given progression
     `level` — the floor met every day regardless of the day's variant or whether
-    an LLM wrote it. Leveled floors (STR/SPI/WLT) climb through FLOORS; Grow opens
-    with the reading floor, which is level-independent by design; Fuel's floor is
-    built from the hunter's own nutrition targets (`fuel`). Empty for slots with
-    no floor (Creativity, Connection, and all non-daily slots)."""
+    an LLM wrote it. Leveled floors (STR/SPI) climb through FLOORS; Grow opens
+    with the reading floor, which is level-independent by design. Empty for slots
+    with no floor (Creativity and all non-daily slots)."""
     tiers = FLOORS.get(quest.id)
     if tiers is not None:
         return list(tiers[max(0, min(level, len(tiers) - 1))])
@@ -1238,8 +1092,6 @@ def floor_for(quest: QuestDef, book: str | None = None, level: int = 0,
         return [reading_floor(book)]
     if quest.id == "d-craft":
         return [craft_floor(craft_source, level)]
-    if quest.id == "d-fuel":
-        return fuel_floor(fuel, level)
     return []
 
 
@@ -1350,13 +1202,12 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
     ], "🎥 Systems thinking — your Ember capture (Tips)"),
 ]
 
-# How often the slot leaves the reading for a systems rep. Counted in days rather
-# than weekdays because Craft isn't a daily: the rotation in `state.active_daily_ids`
-# shows it every 3rd day, so an "every Sunday" rule would land about monthly. A stride
-# of 9 is a multiple of that 3, making this every 3rd Craft day — roughly weekly.
-# `test_systems_reps_land_about_weekly_on_days_craft_is_actually_shown` checks it
-# against the real rotation, so a rotation change fails loudly instead of drifting.
-_SYSTEMS_STRIDE = 9
+# The day the slot leaves the reading for a systems rep. Craft sits on a fixed set
+# of weekdays now (see `state._DAILY_BY_WEEKDAY`), so this is simply one of them —
+# weekly by construction. It used to be a stride of 9 days, chosen as a multiple of
+# the old 3-day rotation; a weekday rule needed the rotation gone first, because
+# against it "every Sunday" would have landed about monthly.
+SYSTEMS_WEEKDAY = 6  # Sunday — the last of Craft's four days in the week
 
 
 # The stretches of the plan, in order — guidance for what to pick as your next
@@ -1469,8 +1320,10 @@ def craft_floor(source: str | None, level: int) -> str:
 
 
 def is_systems_day(day: str) -> bool:
-    """Whether today's Craft slot is a systems-thinking rep rather than reading."""
-    return date.fromisoformat(day).toordinal() % _SYSTEMS_STRIDE == 0
+    """Whether today's Craft slot is a systems-thinking rep rather than reading.
+    Sunday, which is one of Craft's weekdays — so this lands once a week, every
+    week, without having to be kept in step with anything."""
+    return date.fromisoformat(day).weekday() == SYSTEMS_WEEKDAY
 
 
 def craft_content(day: str) -> tuple[str, str, list[str], str]:
@@ -1490,14 +1343,11 @@ def craft_content(day: str) -> tuple[str, str, list[str], str]:
 
 # ── Roadwork: the fixed running days ─────────────────────────────────────────
 # Mon/Wed/Fri, with a rest day between each — the standard spacing for building
-# distance, and the reason this is a weekday rule rather than a stride like
-# `is_systems_day`. A weekday rule is only safe because Physical is in
-# `_DAILY_ALWAYS` and shows every day: the run changes what the slot *contains*,
-# never whether it appears, so it can't drift out of sync the way an "every
-# Sunday" rule would against the 3-day rotation.
+# distance. Safe as a weekday rule because Physical is in `_DAILY_ALWAYS` and shows
+# every day: the run changes what the slot *contains*, never whether it appears.
 #
-# The run replaces the day's rotating variant, not the floor — push-ups, plank and
-# tuck jumps still lead the card, so the non-negotiable stays non-negotiable.
+# The run replaces the day's variant, not the floor — push-ups, plank and tuck
+# jumps still lead the card, so the non-negotiable stays non-negotiable.
 RUN_WEEKDAYS = (0, 2, 4)  # Mon, Wed, Fri
 ROADWORK: tuple[str, str, list[str]] = (
     "Roadwork", "5 km on the road", [
@@ -1524,7 +1374,6 @@ def content_for(
     interview: bool = False,
     jp_step: int = 0,
     craft_source: str | None = None,
-    fuel: dict | None = None,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1534,8 +1383,8 @@ def content_for(
     stat's progression level — it climbs the floor and picks the content band.
     `interview` (Craft only) swaps in the interview-prep pool. `jp_step` is how far
     along the Japanese plan the hunter is; `craft_source` is the one thing Craft is
-    studying; `fuel` is the hunter's nutrition targets for the diet floor. `resource`
-    points at a trusted place to learn (empty when there isn't one)."""
+    studying. `resource` points at a trusted place to learn (empty when there
+    isn't one)."""
     if quest.id == "d-jp":
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
@@ -1564,5 +1413,5 @@ def content_for(
         title, desc, variant = ROADWORK  # the run is the day's training, floor unchanged
     else:
         title, desc, variant = pool_variant(quest, day, progression.band_for(level), interview)
-    steps = floor_for(quest, book, level, craft_source, fuel) + variant  # non-negotiables first, then variety
+    steps = floor_for(quest, book, level, craft_source) + variant  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

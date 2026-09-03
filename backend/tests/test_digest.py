@@ -6,8 +6,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from app import digest, digest_render, llm, reading, state
-from app.models import Completion, Highlight, Learning, ReadingLog, Thread
+from app import digest, digest_render, game, llm, reading, state
+from app.models import Completion, Highlight, Learning, QuestDef, ReadingLog, Thread
 
 DAY = "2026-07-18"
 
@@ -347,12 +347,14 @@ def _mixed_day(db, monkeypatch, chapters: str = "23-24"):
     player.current_book = "Thinking, fast and slow"
     db.add(ReadingLog(player_id=player.id, day=DAY, book=player.current_book,
                       label=chapters, chapters=2))
-    db.add(QuestNote(player_id=player.id, quest_id="d-wealth", period_key=DAY, day=DAY,
-                     text="APR is the quoted rate; APY compounds.", prompt="Explain it"))
+    db.add(QuestNote(player_id=player.id, quest_id="w-wealth", period_key=game.week_key(DAY),
+                     day=DAY, text="APR is the quoted rate; APY compounds.", prompt="Explain it"))
     db.commit()
 
     def _distil(entries):
-        wealth = next(n for n, e in enumerate(entries) if e["source"] == "Ledger Study")
+        # Matched on kind, not on a title: the wealth slot's title comes from a
+        # rotating pool, so pinning the string here would pin the week too.
+        wealth = next(n for n, e in enumerate(entries) if e["kind"] == "reflection")
         book = next(n for n, e in enumerate(entries) if e["kind"] == "book")
         return {"highlights": [
             {"text": MONEY_LINE, "cue": "APR vs APY?", "hook": "a ladder", "entry": wealth},
@@ -371,13 +373,17 @@ def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
     to stamp the book's label on every card, so finance questions turned up inside the
     book's stack on the Learn shelf wearing its chapter tag."""
     player = _mixed_day(db, monkeypatch)
+    # The digest labels a quest note from the stored QuestDef title (digest.gather),
+    # not from the title the card displayed that period — so this reads the same
+    # place it does rather than pinning a rotating pool variant.
+    wealth_title = db.get(QuestDef, "w-wealth").title
 
     rows = digest.build_highlights(db, player, DAY)
     labels = {r.text: r.source_label for r in rows}
-    assert labels[MONEY_LINE] == "Ledger Study"
+    assert labels[MONEY_LINE] == wealth_title
     assert labels[BOOK_LINE] == "Thinking, fast and slow, ch 23-24"
     # And the pile each lands in on the shelf — the field the app actually sorts by.
-    assert reading.book_name(labels[MONEY_LINE]) == "Ledger Study"
+    assert reading.book_name(labels[MONEY_LINE]) == wealth_title
 
 
 def test_a_reading_note_files_under_the_book_not_the_quest(db):

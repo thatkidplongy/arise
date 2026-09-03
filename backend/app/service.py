@@ -33,6 +33,7 @@ from .models import (
 )
 from .state import (
     _parse_focus,
+    active_daily_ids,
     aggregate,
     build_state,
     completions_of,
@@ -537,7 +538,13 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
     defs = quest_defs(db)
     prog = progression_of(db, player, day)
     slots = []
+    active = active_daily_ids(day)
     for q in defs:
+        if q.cadence == "daily" and q.id not in active:
+            # A retired daily keeps its QuestDef row — completions, streaks and
+            # achievements key on it — but it never reaches the board, so
+            # generating content for it spends budget on a card no one sees.
+            continue
         if q.id == "d-jp":
             continue  # Japanese follows a fixed phased plan, not the LLM
         if q.id == "d-craft" and not player.interview_mode:

@@ -13,10 +13,18 @@ Non-obvious things about this repo, kept short.
   If a slot's steps *are* the material rather than variety on top of it, it needs an
   entry in `STEP_CAPS` — otherwise content silently disappears off the card.
 
-- **`d-jp` only appears every third day**, like every rotating daily (see
-  `state.active_daily_ids`). Anything that paces the Japanese plan by date will fight
-  that rotation; the plan is held at `Player.japanese_step` and moves on completion
-  for exactly this reason.
+- **The board is a fixed weekly schedule, not a rotation** (`state._DAILY_ALWAYS` +
+  `_DAILY_BY_WEEKDAY`). The same Monday every Monday. `d-jp` lands Tue/Thu/Sat and
+  `d-craft` Mon/Wed/Fri/Sun, so neither is on every day — anything that paces the
+  Japanese plan by date will fight that; the plan is held at `Player.japanese_step`
+  and moves on completion for exactly this reason.
+
+- **Progression asks only for the days the schedule deals.** `_settle_week` caps the
+  weekly bar at `state.daily_days_per_week()[stat]`, and freezes a stat whose daily
+  is never dealt. Without it, Creativity (one weekday) and Charisma and Wealth (no
+  daily at all) would ease down a level every week however faithfully they were
+  cleared. Retiring a daily therefore means checking `progression.DAILY_BY_STAT` —
+  an anchor pointing at a quest the board never deals rots that attribute to zero.
 
 - **`d-read` has no `POOLS` entry, on purpose.** Grow is one sitting on the hunter's
   own book: the reading floor names it and `_READ_METHODS` varies what you do with
@@ -47,3 +55,17 @@ Non-obvious things about this repo, kept short.
   is out by a few hundred, so the daily figure was removed rather than hidden. Any
   new surface that wants "today's kcal" is asking for a number the app decided not
   to claim.
+
+- **A retired daily keeps its `QuestDef` row.** Removing a quest means dropping it
+  from `SEED_QUESTS` and from the schedule — never deleting the row, which
+  completions, streaks and achievements all key on. The row then exists but is never
+  dealt, so `service.generate_quests` skips undealt dailies (otherwise the LLM
+  budget is spent writing cards nobody sees) and `quests.pool_variant` falls back to
+  the seeded title for any slot with no pool.
+
+- **The digest labels a quest note with the stored `QuestDef.title`**, not the title
+  the card actually displayed that period (`digest.gather`, vs `state.displayed_titles`).
+  For a slot whose pool rotates, the note is filed under a name that was never on
+  screen. This was invisible while `d-wealth`'s seed title matched its first pool
+  variant, and `test_a_mixed_day_files_each_card_under_its_own_source` now reads the
+  stored title deliberately rather than papering over it.

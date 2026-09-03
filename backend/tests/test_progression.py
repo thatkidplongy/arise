@@ -93,3 +93,55 @@ def test_progression_of_levels_up_from_completions(db):
     assert prog["STR"]["level"] == 1  # 5 ≥ 3 → leveled up
     assert prog["STR"]["peak"] == 1
     assert prog["SPI"]["level"] == 0  # untouched attribute stays at zero
+
+
+# ── Availability: the bar can never exceed the days the schedule offers ───────
+
+
+def test_the_bar_never_exceeds_the_days_the_week_actually_offers():
+    """Creativity sits on one weekday. Asking it for three cleared days would ratchet
+    it down every week however faithfully it was cleared — so the ask is capped at
+    what the schedule deals."""
+    weeks = [f"w{i}" for i in range(6)]
+    real = {w: 1 for w in weeks}  # cleared its one day, every week
+    level, peak = progression.replay(weeks, real, {}, cap=4, available=1)
+    assert level == 4 and peak == 4
+    # Without the cap the same faithful record reads as failure.
+    assert progression.replay(weeks, real, {}, cap=4, available=7) == (0, 0)
+
+
+def test_an_attribute_with_no_daily_freezes_rather_than_decaying():
+    """Charisma and Wealth have no daily any more. Nothing to clear is not the same
+    as failing — a stat with no floor to meet must not be settled at all."""
+    weeks = [f"w{i}" for i in range(20)]
+    assert progression.replay(weeks, {}, {}, cap=4, available=0) == (0, 0)
+    # And a level already earned is held, not walked back to zero.
+    level = 3
+    for wk in weeks:
+        level = progression._settle_week(level, 0, 0, cap=4, available=0)
+    assert level == 3
+
+
+def test_availability_is_derived_from_the_schedule_itself():
+    """The two must not be able to drift: the days-per-week count is read off the
+    same tables the board deals from."""
+    days = state.daily_days_per_week()
+    assert days["STR"] == days["INT"] == days["SPI"] == 7  # the always-on three
+    assert days["CFT"] == 4  # Mon/Wed/Fri/Sun
+    assert days["CRE"] == 1  # Saturday
+    assert days["CHA"] == days["WLT"] == 0  # no daily at all
+    # Every anchor with days on the clock is one the board actually deals. (Not the
+    # converse: Intelligence has two dailies and only Grow anchors its progression.)
+    dealt = {q for slots in state._DAILY_BY_WEEKDAY for q in slots} | set(state._DAILY_ALWAYS)
+    assert {progression.DAILY_BY_STAT[s] for s, n in days.items() if n} <= dealt
+    assert all(progression.DAILY_BY_STAT.get(s) not in dealt for s, n in days.items() if not n)
+
+
+def test_required_is_reported_as_what_the_week_can_actually_offer():
+    """The number shown on the attribute card has to be reachable — a '3 days' ask
+    on a one-day attribute is a bar you can see and never touch."""
+    out = progression.compute({}, {}, date(2026, 7, 20), date(2026, 8, 3),
+                              available={"CRE": 1, "CHA": 0})
+    assert out["CRE"]["required"] == 1
+    assert out["CHA"]["required"] == 0
+    assert out["STR"]["required"] == 3  # unspecified → fully available

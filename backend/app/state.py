@@ -132,7 +132,9 @@ def _progression_inputs(db: Session, player: Player) -> tuple[dict[str, set[str]
     real_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
     rest_days: dict[str, set[str]] = {stat: set() for stat in game.STAT_KEYS}
     for stat in game.STAT_KEYS:
-        qid = progression.DAILY_BY_STAT[stat]
+        qid = progression.DAILY_BY_STAT.get(stat)
+        if qid is None:
+            continue  # no daily to clear — progression freezes this attribute
         flen = progression.FLOOR_LEN.get(qid, 0)
         candidate_days = {d for (q, d) in completed if q == qid} | {d for (q, d) in checks if q == qid}
         for d in candidate_days:
@@ -153,7 +155,9 @@ def progression_of(db: Session, player: Player, day: str) -> dict[str, dict]:
     real_days, rest_days = _progression_inputs(db, player)
     start_wk = player.progression_start_week or game.week_key(day)
     start = progression.week_start(start_wk)
-    return progression.compute(real_days, rest_days, start, date.fromisoformat(day))
+    return progression.compute(
+        real_days, rest_days, start, date.fromisoformat(day), daily_days_per_week()
+    )
 
 
 def progression_levels(db: Session, player: Player, day: str) -> dict[str, int]:
@@ -215,7 +219,6 @@ def resolve_content(
     interview: bool,
     jp_step: int,
     craft_source: str,
-    fuel: dict | None = None,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a quest shows today: LLM-generated
     content if present (with the mandatory leveled floor re-applied), else the
@@ -223,7 +226,7 @@ def resolve_content(
     the step-toggle write path (`resolve_steps`) use, so a ticked step index and
     the displayed steps can never drift apart. Pure — inputs are pre-resolved."""
     pk = quests.period_key(quest.cadence, day)
-    floor = quests.floor_for(quest, book, level, craft_source, fuel)
+    floor = quests.floor_for(quest, book, level, craft_source)
     gen = gen_by.get((quest.id, pk))
     # A run day is a plan, not a prompt for variety: generated content would quietly
     # swap out the 5 km, and "every Mon/Wed/Fri" has to mean every Mon/Wed/Fri.
@@ -232,7 +235,7 @@ def resolve_content(
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
-        interview=interview, jp_step=jp_step, craft_source=craft_source, fuel=fuel,
+        interview=interview, jp_step=jp_step, craft_source=craft_source,
     )
     return title, desc, quests.cap_steps(steps, len(floor), quest.id), resource
 
@@ -250,7 +253,6 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     levels = progression_levels(db, player, day)
     jp_step = _jp_step(player)
     craft_source = player.craft_source
-    fuel = body.targets_of(db, player.id)
     titles: dict[str, str] = {}
     for quest in quest_defs(db):
         title, _, _, _ = resolve_content(
@@ -262,7 +264,6 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             interview=player.interview_mode,
             jp_step=jp_step,
             craft_source=craft_source,
-            fuel=fuel,
         )
         titles[quest.id] = title
     return titles
@@ -281,7 +282,6 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         interview=player.interview_mode,
         jp_step=_jp_step(player),
         craft_source=player.craft_source,
-        fuel=body.targets_of(db, player.id),
     )
     return steps
 
@@ -309,24 +309,49 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
     return _count(rows, quest.id, week=game.week_key(day))
 
 
-# Physical, Fuel and Reading show every day; the other dailies rotate over a 3-day
-# cycle, so each day is a lighter set (the mandatories + one group). Every area
-# still comes around within three days. Keyed on the date's ordinal so it advances
-# daily. Fuel is always-on for the same reason Physical is: a body changes on what
-# it does — and eats — every day, not on rotation days.
-_DAILY_ALWAYS = ("d-train", "d-fuel", "d-read")
-_DAILY_ROTATION: list[list[str]] = [
-    ["d-wealth", "d-craft"],       # build & money
-    ["d-connect", "d-jp"],         # social & language
-    ["d-meditate", "d-sketch"],    # inner & create
-]
+# A fixed weekly schedule, not a rotation. The old 3-day cycle was keyed on the
+# date's ordinal, so no weekday meant anything: "Wednesday is my sit" was never
+# true two weeks running, and the whole board only repeated every 21 days. A week
+# you can plan a life around is worth more than an evenly-spaced one.
+#
+# Sit, Physical and Grow run every day. Craft and Japanese alternate through the
+# week — seven is odd, so one of them takes the extra day and Craft has it (which
+# is also what makes Sunday the systems rep, see `quests.is_systems_day`).
+# Creativity holds Saturday, the one day that carries three evening cards.
+_DAILY_ALWAYS = ("d-meditate", "d-train", "d-read")
+_DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
+    ("d-craft",),              # Mon
+    ("d-jp",),                 # Tue
+    ("d-craft",),              # Wed
+    ("d-jp",),                 # Thu
+    ("d-craft",),              # Fri
+    ("d-jp", "d-sketch"),      # Sat
+    ("d-craft",),              # Sun
+)
 
 
 def active_daily_ids(day: str) -> set[str]:
-    """The daily quests shown on `day`: Physical + Reading always, plus one rotating
-    group so the daily load stays light. Non-daily quests are unaffected."""
-    idx = date.fromisoformat(day).toordinal() % len(_DAILY_ROTATION)
-    return {*_DAILY_ALWAYS, *_DAILY_ROTATION[idx]}
+    """The daily quests shown on `day`: the always-on three plus whatever that
+    weekday carries. The same every week — Monday is always Monday. Non-daily
+    quests are unaffected."""
+    return {*_DAILY_ALWAYS, *_DAILY_BY_WEEKDAY[date.fromisoformat(day).weekday()]}
+
+
+def daily_days_per_week() -> dict[str, int]:
+    """How many days a week each attribute's daily is actually dealt.
+
+    Progression asks for a number of cleared days per week, and that ask has to be
+    answerable: Creativity sits on one weekday and Craft on four, so a flat "three
+    days" would ratchet them down every week however faithfully they were cleared.
+    Attributes with no daily at all (Charisma, Wealth) come back 0 and are frozen
+    rather than settled. Derived from the schedule itself so the two can't drift."""
+    out: dict[str, int] = {}
+    for stat, qid in progression.DAILY_BY_STAT.items():
+        if qid in _DAILY_ALWAYS:
+            out[stat] = 7
+        else:
+            out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots)
+    return {stat: out.get(stat, 0) for stat in game.STAT_KEYS}
 
 
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
@@ -399,8 +424,7 @@ def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, interview=False, jp_step=0, craft_source="", notes_by=None,
-               fuel=None) -> dict:
+               levels=None, interview=False, jp_step=0, craft_source="", notes_by=None) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -411,7 +435,6 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         interview=interview,
         jp_step=jp_step,
         craft_source=craft_source,
-        fuel=fuel,
     )
     checked = checks_by.get((q.id, pk), set())
     return {
@@ -868,7 +891,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    active_ids = active_daily_ids(day)  # Physical + today's rotating group
+    active_ids = active_daily_ids(day)  # the always-on three + this weekday's
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
@@ -890,7 +913,6 @@ def build_state(db: Session, player: Player, day: str) -> dict:
 
     checks_by = _step_checks_by(db, player)
     notes_by, reflections = _reflections_and_notes(db, player, defs)
-    fuel = body.targets_of(db, player.id)  # the diet floor's numbers, once for all quests
 
     def undoable_id(quest: QuestDef) -> str | None:
         todays = [r for r in rows if r.quest_id == quest.id and r.day == day]
@@ -940,7 +962,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.interview_mode, _jp_step(player),
-                       player.craft_source, notes_by, fuel)
+                       player.craft_source, notes_by)
             for q in defs
             if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
         ],

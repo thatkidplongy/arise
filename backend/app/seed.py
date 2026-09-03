@@ -7,10 +7,8 @@ from .models import QuestDef
 SEED_QUESTS = [
     # Daily quests — the non-negotiable core loop
     dict(id="d-train", title="Hunter Conditioning", desc="15 min of footwork, jump rope, or strength work", stat="STR", xp=10, cadence="daily", target=1),
-    dict(id="d-fuel", title="Fuel Discipline", desc="Eat to your targets — protein up, calories in the band", stat="STR", xp=10, cadence="daily", target=1),
     dict(id="d-sketch", title="Daily Sketch", desc="Draw for 20 minutes — anything counts", stat="CRE", xp=10, cadence="daily", target=1),
     dict(id="d-meditate", title="Inner Gate", desc="Meditate for 10 minutes", stat="SPI", xp=10, cadence="daily", target=1),
-    dict(id="d-connect", title="Send a Signal", desc="Reach out to a friend or family member", stat="CHA", xp=10, cadence="daily", target=1),
     dict(id="d-read", title="Grimoire Study", desc="Read for 20 minutes", stat="INT", xp=10, cadence="daily", target=1),
     dict(id="d-jp", title="Japanese", desc="Study Japanese — kana, kanji, grammar or vocab", stat="INT", xp=10, cadence="daily", target=1),
     # Weekly quests — the raids
@@ -27,7 +25,6 @@ SEED_QUESTS = [
     dict(id="s-code", title="Arcane Study: Code", desc="30 minutes learning to code (building this app counts)", stat="INT", xp=15, cadence="side", target=1),
     # Wealth — learning to make money: fundamentals, side income, monetising your
     # skills, and managing/growing what you have.
-    dict(id="d-wealth", title="Ledger Study", desc="10 min toward earning or managing money", stat="WLT", xp=10, cadence="daily", target=1),
     dict(id="w-wealth", title="Wealth Milestone", desc="One real step toward making money this week", stat="WLT", xp=40, cadence="weekly", target=1),
     dict(id="s-wealth", title="Extra Coin", desc="A quick money-making action", stat="WLT", xp=15, cadence="side", target=1),
     # Craft (CFT) — deliberate engineering practice toward Senior: fluency →
