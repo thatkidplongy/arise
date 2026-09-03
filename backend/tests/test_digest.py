@@ -373,10 +373,11 @@ def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
     to stamp the book's label on every card, so finance questions turned up inside the
     book's stack on the Learn shelf wearing its chapter tag."""
     player = _mixed_day(db, monkeypatch)
-    # The digest labels a quest note from the stored QuestDef title (digest.gather),
-    # not from the title the card displayed that period — so this reads the same
-    # place it does rather than pinning a rotating pool variant.
-    wealth_title = db.get(QuestDef, "w-wealth").title
+    # The name the card actually carried that week, not the seeded slot name: the
+    # wealth pool rotates, so a note filed under "Wealth Milestone" is filed under
+    # something the hunter never saw.
+    wealth_title = state.displayed_titles(db, player, DAY)["w-wealth"]
+    assert wealth_title != db.get(QuestDef, "w-wealth").title
 
     rows = digest.build_highlights(db, player, DAY)
     labels = {r.text: r.source_label for r in rows}
@@ -384,6 +385,47 @@ def test_a_mixed_day_files_each_card_under_its_own_source(db, monkeypatch):
     assert labels[BOOK_LINE] == "Thinking, fast and slow, ch 23-24"
     # And the pile each lands in on the shelf — the field the app actually sorts by.
     assert reading.book_name(labels[MONEY_LINE]) == wealth_title
+
+
+def test_a_note_wears_the_generated_title_the_card_showed(db):
+    """A slot the LLM wrote that period was called *that* on the card, so the note
+    files under it — the same title the recap names, from the one resolver."""
+    from app.models import GeneratedQuest, QuestNote
+
+    player = state.get_or_create_player(db)
+    db.add(GeneratedQuest(
+        player_id=player.id, quest_id="w-wealth", period_key=game.week_key(DAY),
+        title="Price Your Skill", desc="Put a number on it", steps="[]", resource="",
+    ))
+    db.add(QuestNote(player_id=player.id, quest_id="w-wealth",
+                     period_key=game.week_key(DAY), day=DAY, text="Charge for outcomes."))
+    db.commit()
+
+    note = next(e for e in digest.gather(db, player, DAY) if e["kind"] == "reflection")
+    assert note["source"] == "Price Your Skill"
+
+
+def test_a_note_older_than_the_cache_still_gets_the_period_it_was_written_in(db):
+    """Generated content is wiped wholesale when the profile changes
+    (`service._clear_generated`), and `catch_up` distils up to a week back — so a
+    note can outlive the row that titled its card. The resolver then falls back to
+    the handcrafted variant for *that* period, which is stable per period and is
+    what the recap for that day names too: a past morning reads the same either way,
+    and never reads the seeded slot name."""
+    from app.models import QuestNote
+
+    player = state.get_or_create_player(db)
+    past = _back(5)
+    db.add(QuestNote(player_id=player.id, quest_id="w-wealth",
+                     period_key=game.week_key(past), day=past, text="APY compounds."))
+    db.commit()
+
+    note = next(e for e in digest.gather(db, player, past) if e["kind"] == "reflection")
+    shown = state.displayed_titles(db, player, past)["w-wealth"]
+    assert note["source"] == shown
+    assert note["source"] != db.get(QuestDef, "w-wealth").title
+    # Stable across re-reads: nothing about the fallback depends on when it's asked.
+    assert digest.gather(db, player, past)[0]["source"] == shown
 
 
 def test_a_reading_note_files_under_the_book_not_the_quest(db):

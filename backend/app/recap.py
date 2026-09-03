@@ -86,8 +86,20 @@ def _reading_recap(logs: list[ReadingLog]) -> dict:
     }
 
 
-def _quest_titles(db: Session, player: Player, day: str) -> dict[str, str]:
+def quest_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     """Slot id → the title that slot showed on `day`, as the card showed it.
+
+    Read by both surfaces that name a quest after the fact: the recap lines below,
+    and the attribution `digest.gather` puts on a quest note. A slot whose content
+    comes from a rotating pool is called something different every period, so
+    anything reading `QuestDef.title` instead names what was never on screen —
+    which is how a note written under "Learn a System" came to be filed under
+    "Wealth Milestone". One resolver, so they can't drift.
+
+    Seeded titles underneath, so a note against a slot the board no longer deals
+    still gets a name. `day` is enough to pin the period: a note's `period_key` is
+    the period containing its own day (see `service.add_quest_note`), and callers
+    resolve the day the note was written.
 
     `state` is imported here rather than at the top because it imports the digest,
     which imports this module — a module-level import would close that loop.
@@ -129,7 +141,7 @@ def empty(day: str) -> dict:
 
 def of(db: Session, player: Player, day: str) -> dict:
     """Everything the hunter did on `day`, counted from every surface that logs it."""
-    titles = _quest_titles(db, player, day)
+    titles = quest_titles(db, player, day)
 
     quests: list[dict] = []
     cleared = rested = False

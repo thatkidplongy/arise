@@ -33,8 +33,8 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from . import digest_render, llm, mailer, reading, recall, recap
-from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestDef,
-                     QuestNote, Thread)
+from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
+                     Thread)
 
 READING_QUEST_ID = "d-read"
 
@@ -94,7 +94,10 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
     chapters = _chapters_today(db, player, day)
     book_label = _book_label(player.current_book, chapters)
 
-    titles = {d.id: d.title for d in db.query(QuestDef).all()}
+    # As the card was titled that day, not as the slot is seeded: a pool slot is
+    # called something different every period, and a note filed under a name the
+    # hunter never saw reads as someone else's note (see `recap.quest_titles`).
+    titles = recap.quest_titles(db, player, day)
     for note in (
         db.query(QuestNote)
         .filter_by(player_id=player.id, day=day)

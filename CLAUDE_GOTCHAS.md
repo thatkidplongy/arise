@@ -62,10 +62,3 @@ Non-obvious things about this repo, kept short.
   dealt, so `service.generate_quests` skips undealt dailies (otherwise the LLM
   budget is spent writing cards nobody sees) and `quests.pool_variant` falls back to
   the seeded title for any slot with no pool.
-
-- **The digest labels a quest note with the stored `QuestDef.title`**, not the title
-  the card actually displayed that period (`digest.gather`, vs `state.displayed_titles`).
-  For a slot whose pool rotates, the note is filed under a name that was never on
-  screen. This was invisible while `d-wealth`'s seed title matched its first pool
-  variant, and `test_a_mixed_day_files_each_card_under_its_own_source` now reads the
-  stored title deliberately rather than papering over it.
