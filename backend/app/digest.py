@@ -17,11 +17,12 @@ the picks span an expanding ladder of past days. Three things drive that shape:
   last moment the surrounding detail can still be dredged up and written down —
   hence digest_render.FLESH_NUDGE at the foot of every email.
 
-Every highlight carries a hook — the vivid third thing that holds a fact and its
-question together (see llm._LEARNING_PROMPT). Arbitrary material gets a mnemonic;
-an idea you could re-derive gets the picture it lives in instead, which is an aid
-to the understanding rather than a rival to it. Highlights distilled before that
-was true are hooked a morning at a time by `backfill_hooks`.
+Every highlight carries a hook — an analogy that explains the answer in terms of
+something ordinary, so reading it makes the idea land (see llm._LEARNING_PROMPT).
+It is deliberately not a mnemonic: a device built from the letters of a term helps
+you recite a phrase you still do not understand, which is the opposite of the job.
+Highlights distilled before hooks existed are hooked a morning at a time by
+`backfill_hooks`.
 
 Distilling is idempotent — a day already distilled is never paid for twice — so a
 preview costs nothing and `send_daily` is the only step with a side effect.

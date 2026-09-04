@@ -499,11 +499,17 @@ def test_a_clean_send_records_no_note(db, monkeypatch):
 
 
 def _ctx(highlights=(), recall=()):
-    """`highlights` items are (text, cue) pairs, or bare text for the cueless case."""
+    """`highlights` items are (text, cue) pairs — or (text, cue, source) to give one a
+    source label, or bare text for the cueless case."""
     rows = []
     for h in highlights:
-        text, cue = h if isinstance(h, tuple) else (h, "")
-        rows.append({"text": text, "cue": cue, "hook": "", "source_label": ""})
+        if not isinstance(h, tuple):
+            text, cue, source = h, "", ""
+        elif len(h) == 3:
+            text, cue, source = h
+        else:
+            (text, cue), source = h, ""
+        rows.append({"text": text, "cue": cue, "hook": "", "source_label": source})
     return {"day": DAY, "name": "Hunter", "highlights": rows, "recall": list(recall)}
 
 
@@ -1226,3 +1232,53 @@ def test_the_email_warns_against_recognising_instead_of_recalling():
     ctx = _ctx([("Depth beats speed.", "What beats speed?")])
     for rendered in (digest_render.render_text(ctx), digest_render.render_html(ctx)):
         assert digest_render.RECALL_INSTRUCTION in rendered
+
+
+def test_both_the_question_and_the_answer_name_where_they_came_from():
+    """A cue met weeks later is unanswerable without knowing what it is about, and an
+    answer is only useful if you can get back to the chapter it came from."""
+    ctx = _ctx([("Base rates come first.", "What comes first?",
+                 "Thinking, fast and slow, ch 23-24")])
+
+    text = digest_render.render_text(ctx)
+    # On the question, alongside how long ago it was.
+    assert "(yesterday · Thinking, fast and slow, ch 23-24)" in text
+    # And again on the answer.
+    assert "from Thinking, fast and slow, ch 23-24" in text
+    assert text.count("Thinking, fast and slow, ch 23-24") == 2
+
+    html = digest_render.render_html(ctx)
+    assert html.count("Thinking, fast and slow, ch 23-24") == 2
+
+
+def test_a_line_with_no_source_gets_no_empty_subtext():
+    """Rows stored before source labels existed must read as having no line at all,
+    not as a stray 'from' with nothing after it."""
+    ctx = _ctx([("Depth beats speed.", "What beats speed?")])
+    text = digest_render.render_text(ctx)
+    assert "from " not in text
+    assert "(yesterday)" in text  # the how-long-ago line survives on its own
+    assert "yesterday ·" not in text
+
+
+def test_the_source_line_survives_on_a_spaced_repeat():
+    """The label matters most weeks later, which is exactly when it comes from the
+    recall set rather than from yesterday's highlights."""
+    ctx = _ctx(recall=[_recalled("Start small.", "How big should a new habit be?",
+                                 days_ago=21, source="Atomic Habits, ch 4")])
+    text = digest_render.render_text(ctx)
+    assert "(3 weeks ago · Atomic Habits, ch 4)" in text  # _ago rounds to weeks
+    assert "from Atomic Habits, ch 4" in text
+
+
+def test_hooks_are_asked_for_an_analogy_and_never_a_mnemonic():
+    """The hook exists to make the answer understandable, not memorisable. A mnemonic
+    built from the letters of a term helps you recite a phrase you don't understand,
+    which is the failure this prompt was rewritten to stop."""
+    for prompt in (llm._LEARNING_PROMPT, llm._HOOKS_PROMPT):
+        lowered = prompt.lower()
+        assert "analogy" in lowered or "comparison" in lowered
+        assert "never a mnemonic" in lowered
+        assert "twelve-year-old" in lowered
+        # The old instruction that produced wordplay must be gone.
+        assert "make it a mnemonic" not in lowered

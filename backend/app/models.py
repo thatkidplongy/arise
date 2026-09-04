@@ -476,10 +476,10 @@ class Highlight(Base):
     # The question whose answer is `text`. Being asked and briefly failing beats being
     # told — so the email leads with this and keeps `text` below the fold.
     cue: Mapped[str] = mapped_column(String, default="")
-    # A memory hook — the vivid third thing that holds `text` and `cue` together. On
-    # every highlight: a mnemonic for arbitrary material (names, ordered lists,
-    # numbers), and the picture the idea lives in for anything re-derivable. Empty only
-    # on rows distilled before that, until `digest.backfill_hooks` reaches them.
+    # An analogy that explains `text` in terms of something ordinary — printed under
+    # the answer, never beside the question. Comprehension, not recall: explicitly not
+    # a mnemonic, which would help recite a phrase without understanding it. Empty only
+    # on rows distilled before hooks existed, until `digest.backfill_hooks` reaches them.
     hook: Mapped[str] = mapped_column(String, default="")
     source_label: Mapped[str] = mapped_column(String, default="")  # where it came from, for display
     # Leitner: which rung of the ladder this sits on, and the day it comes back.

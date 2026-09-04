@@ -181,20 +181,22 @@ def render_text(ctx: dict) -> str:
     if items:
         out += ["TRY TO RECALL", "", f"  {RECALL_INSTRUCTION}", ""]
         for i, it in enumerate(items, 1):
-            when = "yesterday" if it["fresh"] else _ago(it["days_ago"])
             out.append(f"  {i}. {it['cue']}")
-            out.append(f"     ({when})")
+            for line in _sub_lines(it, answers=False):
+                out.append(f"     ({line})")
         out += ["", "─" * 40, "", "ANSWERS", ""]
         for i, it in enumerate(items, 1):
             out.append(f"  {i}. {it['text']}")
-            if it.get("hook"):
-                out.append(f"     hook: {it['hook']}")
+            for line in _sub_lines(it, answers=True):
+                out.append(f"     {line}")
 
     extra = _uncued(ctx)
     if extra:
         out += ["", "Also from yesterday", ""]
         for h in extra:
             out.append(f"  - {h['text']}")
+            if source_of(h):
+                out.append(f"    from {source_of(h)}")
 
     if rows:
         xp = (ctx.get("recap") or {}).get("xp", 0)
@@ -232,21 +234,38 @@ def _h2(label: str) -> str:
     )
 
 
+def source_of(item: dict) -> str:
+    """Where a quizzed line came from — the book and chapter, or the quest that
+    carried it. Empty for anything stored before labels existed, which reads as no
+    line at all rather than as a blank one."""
+    return (item.get("source_label") or "").strip()
+
+
+def _sub_lines(item: dict, answers: bool) -> list[str]:
+    """The quiet lines under a quiz row. Both halves name the source: seeing it on
+    the question is the context that makes a months-old cue answerable, and seeing it
+    on the answer is what sends you back to the right chapter."""
+    source = source_of(item)
+    if not answers:
+        when = "yesterday" if item["fresh"] else _ago(item["days_ago"])
+        return [f"{when} · {source}" if source else when]
+    lines = []
+    if item.get("hook"):
+        lines.append(f"hook: {item['hook']}")
+    if source:
+        lines.append(f"from {source}")
+    return lines
+
+
 def _numbered(items: list[dict], answers: bool) -> str:
     """The quiz, either as questions or as the answers to them. Same numbering both
     times — the number is the only thing tying an answer back to its question."""
     rows = []
     for i, it in enumerate(items, 1):
-        if answers:
-            body, sub = it["text"], it.get("hook") or ""
-            if sub:
-                sub = f"hook: {sub}"
-        else:
-            body = it["cue"]
-            sub = "yesterday" if it["fresh"] else _ago(it["days_ago"])
-        note = (
-            f'<div style="color:{_MUTED};font-size:12px;margin-top:4px">{sub}</div>'
-            if sub else ""
+        body = it["text"] if answers else it["cue"]
+        note = "".join(
+            f'<div style="color:{_MUTED};font-size:12px;margin-top:4px">{line}</div>'
+            for line in _sub_lines(it, answers)
         )
         rows.append(
             f'<tr><td style="vertical-align:top;color:{_MUTED};font-size:15px;'
@@ -347,7 +366,8 @@ def render_html(ctx: dict, avatar_src: str | None = None) -> str:
         if extra:
             body += _h2("Also from yesterday")
             body += f'<ul style="margin:0;padding-left:18px">' + "".join(
-                _li(h["text"]) for h in extra
+                _li(h["text"], f"from {source_of(h)}" if source_of(h) else "")
+                for h in extra
             ) + "</ul>"
         if rows:
             body += _recap_html(ctx, rows, divider=bool(items or extra))
