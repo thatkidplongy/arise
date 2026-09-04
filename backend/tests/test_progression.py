@@ -129,8 +129,8 @@ def test_availability_is_derived_from_the_schedule_itself():
     same tables the board deals from."""
     days = state.daily_days_per_week()
     assert days["STR"] == days["INT"] == days["SPI"] == 7  # the always-on three
-    assert days["CFT"] == 4  # Mon/Wed/Fri/Sun
-    assert days["CRE"] == 1  # Saturday
+    assert days["CFT"] == 3  # Mon/Wed/Fri
+    assert days["CRE"] == 2  # Thu/Sun, alternating with Japanese
     assert days["CHA"] == days["WLT"] == 0  # retired — no daily dealt at all
     # Every anchor with days on the clock is one the board actually deals, and every
     # anchor on zero is one it doesn't. (Not the converse of the first: Intelligence

@@ -314,19 +314,19 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # true two weeks running, and the whole board only repeated every 21 days. A week
 # you can plan a life around is worth more than an evenly-spaced one.
 #
-# Sit, Physical and Grow run every day. Craft and Japanese alternate through the
-# week — seven is odd, so one of them takes the extra day and Craft has it (which
-# is also what makes Sunday the systems rep, see `quests.is_systems_day`).
-# Creativity holds Saturday, the one day that carries three evening cards.
+# Sit, Physical and Grow run every day. Craft takes Mon/Wed/Fri — the same days as
+# the run, which is fine: one is the day block and the other the evening. Creativity
+# and Japanese alternate across the four days Craft leaves, two each. Every day
+# carries exactly four cards, so no day is the heavy one.
 _DAILY_ALWAYS = ("d-meditate", "d-train", "d-read")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
-    ("d-craft",),              # Mon
-    ("d-jp",),                 # Tue
-    ("d-craft",),              # Wed
-    ("d-jp",),                 # Thu
-    ("d-craft",),              # Fri
-    ("d-jp", "d-sketch"),      # Sat
-    ("d-craft",),              # Sun
+    ("d-craft",),   # Mon
+    ("d-jp",),      # Tue
+    ("d-craft",),   # Wed
+    ("d-sketch",),  # Thu
+    ("d-craft",),   # Fri
+    ("d-jp",),      # Sat
+    ("d-sketch",),  # Sun
 )
 
 
@@ -341,8 +341,8 @@ def daily_days_per_week() -> dict[str, int]:
     """How many days a week each attribute's daily is actually dealt.
 
     Progression asks for a number of cleared days per week, and that ask has to be
-    answerable: Creativity sits on one weekday and Craft on four, so a flat "three
-    days" would ratchet them down every week however faithfully they were cleared.
+    answerable: Creativity is dealt twice a week and Craft three times, so a flat
+    "three days" would ratchet them down however faithfully they were cleared.
     Attributes with no daily at all (Charisma, Wealth) come back 0 and are frozen
     rather than settled. Derived from the schedule itself so the two can't drift."""
     out: dict[str, int] = {}

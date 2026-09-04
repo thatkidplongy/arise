@@ -14,10 +14,13 @@ Non-obvious things about this repo, kept short.
   entry in `STEP_CAPS` — otherwise content silently disappears off the card.
 
 - **The board is a fixed weekly schedule, not a rotation** (`state._DAILY_ALWAYS` +
-  `_DAILY_BY_WEEKDAY`). The same Monday every Monday. `d-jp` lands Tue/Thu/Sat and
-  `d-craft` Mon/Wed/Fri/Sun, so neither is on every day — anything that paces the
-  Japanese plan by date will fight that; the plan is held at `Player.japanese_step`
-  and moves on completion for exactly this reason.
+  `_DAILY_BY_WEEKDAY`). The same Monday every Monday. `d-craft` lands Mon/Wed/Fri,
+  and `d-jp` and `d-sketch` alternate across the other four (Tue/Sat and Thu/Sun) —
+  so none of them is on every day. Anything that paces the Japanese plan by date
+  will fight that; the plan is held at `Player.japanese_step` and moves on
+  completion for exactly this reason. `quests.SYSTEMS_WEEKDAY` has the same
+  constraint from the other side: it must name a day Craft is actually dealt, or
+  the systems-thinking rep silently never happens.
 
 - **Progression asks only for the days the schedule deals.** `_settle_week` caps the
   weekly bar at `state.daily_days_per_week()[stat]`, and freezes a stat whose daily

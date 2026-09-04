@@ -4,11 +4,12 @@ from datetime import date, timedelta
 
 from app import quests
 
-DAY = "2026-07-18"       # a Saturday — Sit, Physical, Grow, Japanese and Creativity
-CRAFT_DAY = "2026-07-20"  # the Monday after, the week's first Craft day
+DAY = "2026-07-18"         # a Saturday — Sit, Physical, Grow and Japanese
+SKETCH_DAY = "2026-07-19"  # the Sunday after, one of Creativity's two days
+CRAFT_DAY = "2026-07-20"   # the Monday after, the week's first Craft day
 # The dailies dealt on DAY. The board is a fixed weekly schedule, so this is a
 # property of the weekday, not of the whole deck (see state._DAILY_BY_WEEKDAY).
-DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-jp", "d-sketch"]
+DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-jp"]
 
 
 def _state(client):
@@ -64,8 +65,8 @@ def test_state_shape(client):
     # day's actual training survives instead of being trimmed away (STEP_CAPS).
     assert len(q["steps"]) == 5
     assert q["steps"][3:] != []  # the variant, below the floor
-    # A non-floored daily (Creativity) caps at 2 — Saturday is the day it's dealt.
-    sketch = _quest(s, "d-sketch")
+    # A non-floored daily (Creativity) caps at 2 — asked on one of its own days.
+    sketch = _quest(client.get(f"/state?day={SKETCH_DAY}").json(), "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2
     # The Grow daily always opens with reading (the mandatory floor).
     assert _quest(s, "d-read")["steps"][0].startswith("Read your current book")

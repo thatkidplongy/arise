@@ -1207,7 +1207,11 @@ _CRAFT_SYSTEMS: list[tuple[str, str, list[str], str]] = [
 # weekly by construction. It used to be a stride of 9 days, chosen as a multiple of
 # the old 3-day rotation; a weekday rule needed the rotation gone first, because
 # against it "every Sunday" would have landed about monthly.
-SYSTEMS_WEEKDAY = 6  # Sunday — the last of Craft's four days in the week
+#
+# It has to *be* one of Craft's weekdays or the rep never happens at all —
+# `test_systems_reps_land_exactly_once_a_week_on_a_day_craft_is_shown` is what
+# catches that if the schedule moves again.
+SYSTEMS_WEEKDAY = 4  # Friday — the last of Craft's three days in the week
 
 
 # The stretches of the plan, in order — guidance for what to pick as your next
@@ -1321,7 +1325,7 @@ def craft_floor(source: str | None, level: int) -> str:
 
 def is_systems_day(day: str) -> bool:
     """Whether today's Craft slot is a systems-thinking rep rather than reading.
-    Sunday, which is one of Craft's weekdays — so this lands once a week, every
+    Friday, which is one of Craft's weekdays — so this lands once a week, every
     week, without having to be kept in step with anything."""
     return date.fromisoformat(day).weekday() == SYSTEMS_WEEKDAY
 

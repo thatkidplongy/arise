@@ -117,7 +117,7 @@ def _settle_week(level: int, real: int, rest: int, cap: int, available: int) -> 
 
     `available` is how many days of that week the attribute's daily was actually
     dealt. You can only be asked for days you were given, so the bar never exceeds
-    it — Creativity sits on one weekday, and asking it for three would ratchet the
+    it — Creativity is dealt twice a week, and asking it for three would ratchet the
     level down every week no matter how faithfully it was cleared. An attribute
     with no daily at all freezes: nothing to clear is not the same as failing."""
     if available <= 0:
