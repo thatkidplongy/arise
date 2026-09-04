@@ -4,7 +4,10 @@ from datetime import date, timedelta
 
 STAT_KEYS = ["STR", "CRE", "SPI", "CHA", "INT", "WLT", "CFT"]
 
-DAILY_CLEAR_BONUS = 15
+# Clearing every area in a day is worth more than any single card on it — at a
+# daily's 25 that means comfortably above 25, not the 15 it sat at when a daily
+# was 10 and the bonus was the biggest thing you could earn in a day.
+DAILY_CLEAR_BONUS = 30
 DAILY_CLEAR_ID = "daily-clear"
 
 # An intentional rest day. Keeps the streak alive (rest is part of the path) but

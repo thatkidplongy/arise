@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from app import quests
+from app import game, quests
 
 DAY = "2026-07-18"         # a Saturday — Sit, Physical, Grow and Japanese
 SKETCH_DAY = "2026-07-19"  # the Sunday after, one of Creativity's two days
@@ -282,7 +282,8 @@ def test_levels_roundtrip_and_survive_focus_clear(client):
 def test_complete_then_conflict(client):
     r = client.post("/completions", json={"quest_id": "d-train", "day": DAY})
     assert r.status_code == 200, r.text
-    assert r.json()["state"]["player"]["total_xp"] == 10
+    state = r.json()["state"]
+    assert state["player"]["total_xp"] == _quest(state, "d-train")["xp"]
     # Completing again in the same period is rejected.
     r2 = client.post("/completions", json={"quest_id": "d-train", "day": DAY})
     assert r2.status_code == 409
@@ -308,7 +309,7 @@ def test_step_checklist_autocompletes_and_reverses(client):
         assert last["completed"] is expected
     st = _quest(last["state"], "d-train")
     assert st["done"] == 1
-    assert last["state"]["player"]["total_xp"] == 10
+    assert last["state"]["player"]["total_xp"] == st["xp"]
     # Unticking the last step reverses the completion.
     r = client.post("/steps", json={"quest_id": "d-train", "step_index": n - 1, "day": DAY}).json()
     assert r["completed"] is False
@@ -372,8 +373,9 @@ def test_daily_clear_bonus(client):
     for qid in DAILY_IDS:
         events = client.post("/completions", json={"quest_id": qid, "day": DAY}).json()["events"]
     assert any(e["type"] == "daily_clear" for e in events)
-    # every daily × 10 + 15 clear bonus
-    assert _state(client)["player"]["total_xp"] == len(DAILY_IDS) * 10 + 15
+    # every daily at its seeded XP, plus the clear bonus on top
+    daily_xp = sum(_quest(_state(client), qid)["xp"] for qid in DAILY_IDS)
+    assert _state(client)["player"]["total_xp"] == daily_xp + game.DAILY_CLEAR_BONUS
     assert _state(client)["today"]["cleared"] is True
 
 

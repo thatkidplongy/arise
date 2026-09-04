@@ -1,7 +1,10 @@
 """Rotating quest content — free, offline, deterministic.
 
-The quests are stable *slots*: their id, stat, xp, cadence and target never
-change (so completions, streaks and achievements keep counting). What rotates is
+The quests are stable *slots*: their id, stat, cadence and target never change
+(so completions, streaks and achievements keep counting). XP is the exception —
+it's tiered by cadence in `seed.py` and can be rescaled, because a completion
+stores the XP it was awarded, so a rescale only ever changes what the next one
+is worth. What rotates is
 each slot's title + description + steps, picked from a hand-written pool by a
 hash of the period — the day for daily quests, the ISO week for weekly and side.
 Same board all day, a fresh one tomorrow. No storage, no external service, no cost.
