@@ -304,7 +304,8 @@ def log_food(entry: FoodLogIn, day: str | None = Query(None), db: Session = Depe
                   entry.kcal, entry.protein_g, entry.fibre_g,
                   slot=entry.slot, place=entry.place, at_time=entry.at_time,
                   protein_p=entry.protein_p, veg_p=entry.veg_p,
-                  carb_p=entry.carb_p, extra_p=entry.extra_p)
+                  carb_p=entry.carb_p, extra_p=entry.extra_p,
+                  source=entry.source)
     return body.build_body(db, player.id, _valid_day(day))
 
 

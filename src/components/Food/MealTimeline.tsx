@@ -4,16 +4,19 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { PlateDots } from '@/components/Food/PlateDots';
 import { SectionTitle } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import type { ApiFoodEntry, MealSlot } from '@/lib/api';
+import type { ApiFoodEntry, EntrySource, MealSlot } from '@/lib/api';
 import { clockLabel, isPlate, mealTitle, plateOf, slotLabel } from '@/lib/plate';
 import { TAP_MIN, clay, neutral, radius, sage, space, surface, text, typography } from '@/theme';
 
 /**
  * The day as it was eaten, in order, with an open row for the meal still ahead.
  *
- * A row says what was on the plate and draws its portions; the numbers only appear
- * on the one kind of row that genuinely has them — a packaged food logged off its
- * own label.
+ * A row says what was on the plate, draws its portions, and — since a plate may
+ * now arrive already priced by something outside the app — says where its figures
+ * came from. Provenance is not decoration: a badge is the difference between a
+ * number the app read off a printed panel and one a model guessed from a photo,
+ * and a row that hides that difference is a row that lies by omission. Hand-counted
+ * plates carry no badge at all, because claiming nothing is the honest default.
  */
 export function MealTimeline({
   entries,
@@ -58,20 +61,29 @@ export function MealTimeline({
 function MealRow({ entry, first, onRemove }: { entry: ApiFoodEntry; first: boolean; onRemove: () => void }) {
   const plate = plateOf(entry);
   const clock = clockLabel(entry.at_time);
+  const badge = SOURCE_BADGE[entry.source];
   return (
     <View style={styles.row}>
       <View style={[styles.rail, { backgroundColor: sage[300] }]} />
       <View style={[styles.body, first ? null : styles.divided]}>
         <Text style={styles.clock}>{clock}</Text>
         <View style={styles.main}>
-          <Text style={styles.title} numberOfLines={1}>
-            {mealTitle(entry)}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1}>
+              {mealTitle(entry)}
+            </Text>
+            {badge ? (
+              <View style={[styles.badge, { backgroundColor: badge.fill }]}>
+                <Text style={[styles.badgeText, { color: badge.ink }]}>{badge.label}</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.detail} numberOfLines={1}>
             {rowDetail(entry)}
           </Text>
         </View>
         {isPlate(plate) ? <PlateDots plate={plate} /> : null}
+        <RowFigure entry={entry} />
         <Pressable
           onPress={onRemove}
           hitSlop={10}
@@ -86,12 +98,56 @@ function MealRow({ entry, first, onRemove }: { entry: ApiFoodEntry; first: boole
   );
 }
 
+/** How each provenance reads on a row. Clay for an estimate, sage for a printed
+ * label — the same division the rest of the app uses between what is being counted
+ * and what is being relied on. A hand-counted plate ('') has no entry here: it
+ * gets no badge, because it makes no claim. */
+const SOURCE_BADGE: Record<EntrySource, { label: string; fill: string; ink: string } | null> = {
+  claude: { label: 'PHOTO', fill: surface.clayFill, ink: clay[800] },
+  photo: { label: 'PHOTO', fill: surface.clayFill, ink: clay[800] },
+  label: { label: 'LABEL', fill: surface.sageFill, ink: sage[900] },
+  '': null,
+};
+
+/**
+ * The row's own figure, as a range.
+ *
+ * Never a bare number on an estimated plate: `kcal_low`–`kcal_high` comes from the
+ * server's portion table, and on a plate of hands that span is several hundred
+ * kcal wide. Printing its midpoint alone would turn an honest guess into a false
+ * measurement, which is the one thing this screen must not do. A label-read row
+ * has grams behind it, so its span collapses and it reads as the single figure it
+ * genuinely is.
+ */
+function RowFigure({ entry }: { entry: ApiFoodEntry }) {
+  if (!entry.kcal_high) return null;
+  const exact = entry.kcal_low === entry.kcal_high;
+  return (
+    <View style={styles.figure}>
+      <Text style={styles.figureMain}>
+        {exact
+          ? entry.kcal_high.toLocaleString()
+          : `~${Math.round((entry.kcal_low + entry.kcal_high) / 2).toLocaleString()}`}
+      </Text>
+      <Text style={styles.figureSpan}>
+        {exact
+          ? 'kcal'
+          : `${entry.kcal_low.toLocaleString()}–${entry.kcal_high.toLocaleString()}`}
+      </Text>
+    </View>
+  );
+}
+
 /** What sits under a meal's title: the plate's own words, or — for a packaged food
- * that came with real numbers — the numbers it came with. */
+ * that came with real numbers — the numbers it came with. A plate handed over from
+ * Claude says so, because "who estimated this" is part of reading the row. */
 function rowDetail(entry: ApiFoodEntry): string {
-  if (isPlate(plateOf(entry))) return entry.slot ? entry.name : entry.place || entry.name;
-  if (entry.kcal) return `${entry.kcal.toLocaleString()} kcal · ${entry.protein_g}g protein`;
-  return entry.name;
+  const via = entry.source === 'claude' ? ' · via Claude' : '';
+  if (isPlate(plateOf(entry))) {
+    return `${entry.slot ? entry.name : entry.place || entry.name}${via}`;
+  }
+  if (entry.kcal) return `${entry.protein_g}g protein${via}`;
+  return `${entry.name}${via}`;
 }
 
 function OpenRow({
@@ -155,7 +211,13 @@ const styles = StyleSheet.create({
     color: text.secondary,
   },
   main: { flex: 1, gap: 2 },
-  title: { ...typography.cardTitle, color: neutral[900] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  title: { ...typography.cardTitle, color: neutral[900], flexShrink: 1 },
   detail: { ...typography.small, color: text.secondary },
+  badge: { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { ...typography.kicker, fontSize: 8.5, lineHeight: 12, letterSpacing: 0.9 },
+  figure: { alignItems: 'flex-end', gap: 1 },
+  figureMain: { ...typography.numeral, fontSize: 13, lineHeight: 15, color: neutral[900] },
+  figureSpan: { ...typography.tiny, color: text.secondary },
   remove: { paddingLeft: 2 },
 });

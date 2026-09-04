@@ -253,7 +253,7 @@ def estimate(entries: list[dict], nutrient: str = "kcal") -> tuple[int, int]:
 
 def day_estimate(entries: list[dict]) -> dict:
     """Every nutrient's range for a day of logging — the figures the weekly trend
-    is built from, and deliberately never shown on the daily screen."""
+    is built from, and the same ones the day itself shows as a span."""
     lo_k, hi_k = estimate(entries, "kcal")
     lo_p, hi_p = estimate(entries, "protein_g")
     lo_f, hi_f = estimate(entries, "fibre_g")

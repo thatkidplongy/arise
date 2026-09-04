@@ -44,14 +44,21 @@ def targets_of(db: Session, player_id: str) -> dict | None:
 
 def _entry(r: FoodEntry) -> dict:
     """One logged plate, as the app reads it."""
-    return {
+    row = {
         "id": r.id, "name": r.name, "slot": r.slot or "", "place": r.place or "",
         "at_time": r.at_time or "",
         "protein_p": r.protein_p, "veg_p": r.veg_p, "carb_p": r.carb_p,
         "extra_p": r.extra_p,
         "grams": r.grams, "kcal": r.kcal, "protein_g": r.protein_g,
         "fibre_g": r.fibre_g,
+        "source": r.source or "",
     }
+    # The row's own range, from the same table the week is built from — so a
+    # plate never shows one figure here and a different one in the trend. A
+    # label-read row (grams known) comes back tight; a plate of hands comes back
+    # wide, which is the honest difference the screen is meant to show.
+    low, high = nutrition.estimate([row], "kcal")
+    return {**row, "kcal_low": low, "kcal_high": high}
 
 
 def _rows_for(db: Session, player_id: str, days: list[str]) -> list[FoodEntry]:
@@ -63,14 +70,18 @@ def _rows_for(db: Session, player_id: str, days: list[str]) -> list[FoodEntry]:
     )
 
 
-def _food_day(db: Session, player_id: str, day: str) -> dict:
-    """The day's plates and what they added up to, in hands.
+def _food_day(db: Session, player_id: str, day: str, targets: dict | None = None) -> dict:
+    """The day's plates, what they added up to in hands, and the day's own range.
 
-    No calorie figure is derived here on purpose: a single day's estimate off
-    bought food carries an error of a few hundred kcal, and a number that wrong
-    presented daily is a score people learn to game. The range lives on the week
-    (see `_food_week`), where the error averages out and it means something."""
+    The range is a *range*, never a point: a single day's estimate off bought food
+    carries an error of a few hundred kcal, and a bare figure that wrong is a score
+    people learn to game. Shown as a span against the band it is the comparison
+    that was always meant — and it is the same estimate the week is built from
+    (see `_food_week`), so the two can never disagree."""
     entries = [_entry(r) for r in _rows_for(db, player_id, [day])]
+    low, high = nutrition.estimate(entries, "kcal")
+    band_low = targets["target_low"] if targets else 0
+    band_high = targets["target_high"] if targets else 0
     return {
         "entries": entries,
         "plate": nutrition.plate_totals(entries),
@@ -79,6 +90,13 @@ def _food_day(db: Session, player_id: str, day: str) -> dict:
         "total_kcal": sum(e["kcal"] for e in entries),
         "total_protein": sum(e["protein_g"] for e in entries),
         "total_fibre": sum(e["fibre_g"] for e in entries),
+        "kcal_low": low,
+        "kcal_high": high,
+        # Overlapping the band is the honest test: a range that spans it cannot be
+        # called a miss in either direction.
+        "in_band": bool(entries and band_high and low <= band_high and high >= band_low),
+        "band_low": band_low,
+        "band_high": band_high,
     }
 
 
@@ -229,7 +247,7 @@ def build_body(db: Session, player_id: str, day: str) -> dict:
         # conversion (nutrition.plate_targets) so the screen and the Fuel quest
         # can never disagree about how many palms today is asking for.
         "plate_targets": nutrition.plate_targets(targets) or None,
-        "food": _food_day(db, player_id, day),
+        "food": _food_day(db, player_id, day, targets),
         "usuals": _usuals(db, player_id, day),
         "week": _food_week(db, player_id, day, targets),
         "suggestions": nutrition.daily_suggestions(day, p.country if p else ""),
@@ -265,6 +283,9 @@ def set_profile(db: Session, player_id: str, *, sex: str, age: int, height_cm: i
 
 # What a plate can be called. Anything else is stored as a plain plate with no slot.
 _SLOTS = {"breakfast", "lunch", "dinner", "snack"}
+# Where a plate's figures came from. '' is the default and means hand-counted —
+# an absent claim rather than a claim of having been measured.
+_SOURCES = {"claude", "photo", "label"}
 
 # A hand can't reasonably be raised more times than this for one plate; a stray
 # extra zero would otherwise put a day's tally somewhere it can never come back from.
@@ -279,7 +300,7 @@ def log_food(db: Session, player_id: str, day: str, name: str, grams: int = 0,
              kcal: int = 0, protein_g: int = 0, fibre_g: int = 0, *,
              slot: str = "", place: str = "", at_time: str = "",
              protein_p: int = 0, veg_p: int = 0, carb_p: int = 0,
-             extra_p: int = 0) -> dict:
+             extra_p: int = 0, source: str = "") -> dict:
     """Log one plate. Portions are the normal case; the gram/calorie figures are
     only filled in when the food actually came with numbers."""
     name = (name or "").strip() or "Food"
@@ -293,6 +314,7 @@ def log_food(db: Session, player_id: str, day: str, name: str, grams: int = 0,
         carb_p=_clamp_portion(carb_p), extra_p=_clamp_portion(extra_p),
         grams=max(0, grams), kcal=max(0, kcal), protein_g=max(0, protein_g),
         fibre_g=max(0, fibre_g),
+        source=source if source in _SOURCES else "",
     )
     db.add(entry)
     db.commit()

@@ -389,10 +389,24 @@ export interface ApiFoodEntry {
   kcal: number;
   protein_g: number;
   fibre_g: number;
+  /** Where the figures came from: 'claude' (handed over from the Claude app),
+   * 'photo' (read in app), 'label' (off a nutrition panel), '' (hand-counted).
+   * The timeline badges the row from this, so an estimate never reads as a
+   * measurement. */
+  source: EntrySource;
+  /** This row's own honest range, from the same portion table the week uses —
+   * wide on a plate of hands, tight on a label read. */
+  kcal_low: number;
+  kcal_high: number;
 }
 
-/** The fields sent when logging a plate — an entry without its server id. */
-export type FoodEntry = Omit<ApiFoodEntry, 'id'>;
+/** Where a plate's figures came from. '' is hand-counted: an absent claim of
+ * provenance rather than a claim of having been measured. */
+export type EntrySource = 'claude' | 'photo' | 'label' | '';
+
+/** The fields sent when logging a plate — an entry without its server id, and
+ * without the range the server derives for itself. */
+export type FoodEntry = Omit<ApiFoodEntry, 'id' | 'kcal_low' | 'kcal_high'>;
 
 export interface ApiFoodDay {
   entries: ApiFoodEntry[];
@@ -400,6 +414,13 @@ export interface ApiFoodDay {
   total_kcal: number;
   total_protein: number;
   total_fibre: number;
+  // The day as a range against the band, never a point figure — the same
+  // estimate the week is built from, so the two cannot disagree.
+  kcal_low: number;
+  kcal_high: number;
+  in_band: boolean; // the day's range overlaps the band
+  band_low: number; // 0 until the profile has real numbers
+  band_high: number;
 }
 
 /** A plate logged before — one tap to log it again. */
@@ -416,8 +437,8 @@ export interface ApiFoodWeekDay extends ApiPlate {
   in_band: boolean; // the day's range overlaps the target band
 }
 
-/** The rolling seven days as a calorie range against the band — the one place
- * calories appear, because a week's estimate error averages out. */
+/** The rolling seven days as a calorie range against the band — the widest lens
+ * on the same estimate the day shows, and the one where the error averages out. */
 export interface ApiFoodWeek {
   days: ApiFoodWeekDay[];
   logged_days: number;

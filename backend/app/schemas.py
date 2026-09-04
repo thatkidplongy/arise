@@ -231,6 +231,11 @@ class FoodLogIn(BaseModel):
     kcal: int = Field(0, ge=0)
     protein_g: int = Field(0, ge=0)
     fibre_g: int = Field(0, ge=0)
+    # Where the figures came from: 'claude' (handed over from the Claude app),
+    # 'photo' (read in app), 'label' (off a nutrition panel), '' (counted by hand).
+    # Anything else is stored as '' — an unrecognised claim of provenance is worse
+    # than none.
+    source: str = ""
 
 
 class FoodAnalyzeIn(BaseModel):
@@ -288,6 +293,13 @@ class FoodEntryOut(BaseModel):
     kcal: int
     protein_g: int
     fibre_g: int
+    # 'claude' | 'photo' | 'label' | '' (hand-counted). The screen badges the row
+    # from this, so an estimate never looks like a measurement.
+    source: str = ""
+    # This row's own honest range, derived from the same portion table the week
+    # uses. Wide on a plate of hands, tight on a label read.
+    kcal_low: int = 0
+    kcal_high: int = 0
 
 
 class PlateOut(BaseModel):
@@ -302,10 +314,17 @@ class FoodDayOut(BaseModel):
     entries: list[FoodEntryOut]
     plate: PlateOut  # what the day's plates added up to, in hands
     # Only what was logged with real numbers; zero on a day logged entirely in
-    # hands. The day's calorie *range* lives on the week, never here.
+    # hands.
     total_kcal: int
     total_protein: int
     total_fibre: int
+    # The day as a range against the band — never a point figure. Same estimate
+    # the week is built from, so the day and the trend cannot disagree.
+    kcal_low: int = 0
+    kcal_high: int = 0
+    in_band: bool = False
+    band_low: int = 0  # 0 until the profile has real numbers
+    band_high: int = 0
 
 
 class UsualOut(PlateOut):
@@ -323,8 +342,8 @@ class FoodWeekDayOut(PlateOut):
 
 
 class FoodWeekOut(BaseModel):
-    """The rolling seven days as a calorie range against the band — the one place
-    calories are shown, because a week's estimate error averages out."""
+    """The rolling seven days as a calorie range against the band — the widest lens
+    on the same estimate the day shows, and the one where the error averages out."""
     days: list[FoodWeekDayOut]
     logged_days: int
     in_band_days: int

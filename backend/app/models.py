@@ -178,7 +178,8 @@ class FoodEntry(Base):
     restaurant table without a scale. The gram/calorie columns stay for the foods
     that genuinely come with numbers — a packaged label, a database lookup — and
     are zero on a plate logged by hand. Either way the calories are only ever
-    *derived* into a range, on the weekly trend (see nutrition.day_estimate)."""
+    *derived*, and only ever into a range — per row, per day and per week, all
+    from the one portion table (see nutrition.estimate)."""
 
     __tablename__ = "food_entries"
 
@@ -199,6 +200,10 @@ class FoodEntry(Base):
     # The clock the hunter saw when they ate, 'HH:MM'. Sent by the client because
     # `at` is UTC and a meal remembered as 7am must not read as 11pm on the timeline.
     at_time: Mapped[str] = mapped_column(String, default="")
+    # Where the figures came from, because an estimate must never read as a
+    # measurement: 'claude' (handed over from the Claude app), 'photo' (read in
+    # app), 'label' (off a nutrition panel — the exact case), '' (counted by hand).
+    source: Mapped[str] = mapped_column(String, default="")
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

@@ -53,6 +53,7 @@ export function PackagedSearch({
       protein_g: Math.round(selected.protein_100g * factor),
       fibre_g: Math.round(selected.fibre_100g * factor),
       note: 'Read off the label, so these numbers are real.',
+      source: 'label',
     });
     setSelected(null);
     setResults([]);
