@@ -559,6 +559,11 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
             # a card whose one Learn: chip already names the book — the exact split
             # this slot was just corrected for.
             continue
+        if q.id == "d-recall":
+            # The cards are the hunter's own, and the app already knows which ones are
+            # due. A generated variant would name material the pile doesn't hold and
+            # send them looking for a stack that isn't there.
+            continue
         pk = quests.period_key(q.cadence, day)
         if db.get(GeneratedQuest, {"player_id": player.id, "quest_id": q.id, "period_key": pk}):
             continue

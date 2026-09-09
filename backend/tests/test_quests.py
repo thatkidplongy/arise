@@ -499,3 +499,45 @@ def test_a_kana_row_sends_you_somewhere_it_actually_lives():
     assert "Hiragana stack" in hira["steps"][-1]
     assert "Hiragana stack" not in kata["steps"][-1]
     assert "loanwords" in kata["steps"][-1]
+
+
+def test_index_cards_always_lead_with_the_pile():
+    """Whatever method the day picks, the first step is the pile itself.
+
+    The slot's variants are ways of *working* a card (out loud, cold, in fewer
+    words) — none of them is the reason the card is on the board. If a variant ever
+    became step one, a morning could be spent rewriting one card's back while the
+    ones the ladder actually brought back went untouched."""
+    q = _q("d-recall", "INT", "daily")
+    start = date(2026, 8, 3)
+    titles = set()
+    for offset in range(30):
+        day = (start + timedelta(days=offset)).isoformat()
+        title, desc, steps, _ = quests.content_for(q, day, level=offset % 6)
+        assert steps[0] == quests.FLOORS["d-recall"][0][0], day
+        assert len(steps) == 2, day  # the floor, then the day's method — nothing else
+        assert title and desc
+        titles.add(title)
+    assert len(titles) > 1  # the method still rotates
+
+
+def test_the_index_card_floor_does_not_climb_with_level():
+    """The Leitner ladder is what makes recall harder over time (recall.py). A floor
+    that also climbed would be asking more of the same cards on the same morning."""
+    q = _q("d-recall", "INT", "daily")
+    assert {quests.floor_for(q, level=lvl)[0] for lvl in range(8)} == {quests.FLOORS["d-recall"][0][0]}
+
+
+def test_index_cards_are_worked_where_the_app_keeps_them():
+    """The floor names the surface. A card that says "review your cards" without
+    saying where sends you looking, and the pile lives in exactly one place."""
+    assert "Learn" in quests.FLOORS["d-recall"][0][0]
+
+
+def test_no_index_card_variant_borrows_a_band_from_another_slot():
+    """TIER is keyed by title across every pool, so a title reused from another slot
+    would silently inherit its band and drop out of the pool at low levels. These
+    are all band 0 on purpose: the spacing carries the difficulty, not the wording."""
+    for title, _, _ in quests.POOLS["d-recall"]:
+        assert quests.TIER.get(title, 0) == 0, title
+    assert len(quests.narrow_to_band(quests.POOLS["d-recall"], 2)) == len(quests.POOLS["d-recall"])

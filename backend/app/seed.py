@@ -39,6 +39,10 @@ SEED_QUESTS = [
     dict(id="d-craft", title="The Architect", desc="System design, from your own notes", stat="CFT", xp=25, cadence="daily", target=1),
     dict(id="w-craft", title="Master Work", desc="One real step toward Senior this week", stat="CFT", xp=20, cadence="weekly", target=1),
     dict(id="s-craft", title="Sharpen the Axe", desc="A focused craft rep", stat="CFT", xp=10, cadence="side", target=1),
+    # Intelligence's second daily: the index cards the reading already made. Appended
+    # rather than filed beside d-read because `sort` is this list's index and existing
+    # rows keep the one they were given — inserting mid-list would tie two slots.
+    dict(id="d-recall", title="Index Cards", desc="Work the cards that came due today", stat="INT", xp=25, cadence="daily", target=1),
 ]
 
 

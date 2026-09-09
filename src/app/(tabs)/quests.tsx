@@ -22,7 +22,7 @@ import { STAT_META, clay, neutral, radius, surface, text, typography } from '@/t
  * the first open daily anywhere, else the first — a cleared window still reads. */
 function pickFeatured(daily: ApiQuest[], nowKey: string): ApiQuest | undefined {
   const open = daily.filter((q) => q.done < q.target);
-  return open.find((q) => blockOf(q.stat, q.title) === nowKey) ?? open[0] ?? daily[0];
+  return open.find((q) => blockOf(q) === nowKey) ?? open[0] ?? daily[0];
 }
 
 /**
@@ -105,7 +105,7 @@ export default function QuestsScreen() {
   const rest = daily.filter((q) => q.id !== featured?.id);
   const dailyBlocks = DAY_BLOCKS.map((block) => ({
     block,
-    items: rest.filter((q) => blockOf(q.stat, q.title) === block.key),
+    items: rest.filter((q) => blockOf(q) === block.key),
   })).filter((g) => g.items.length > 0);
 
   const board = (

@@ -314,11 +314,15 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # true two weeks running, and the whole board only repeated every 21 days. A week
 # you can plan a life around is worth more than an evenly-spaced one.
 #
-# Sit, Physical and Grow run every day. Craft takes Mon/Wed/Fri — the same days as
-# the run, which is fine: one is the day block and the other the evening. Creativity
-# and Japanese alternate across the four days Craft leaves, two each. Every day
-# carries exactly four cards, so no day is the heavy one.
-_DAILY_ALWAYS = ("d-meditate", "d-train", "d-read")
+# Sit, Physical, Grow and the index cards run every day. Craft takes Mon/Wed/Fri —
+# the same days as the run, which is fine: one is the day block and the other the
+# evening. Creativity and Japanese alternate across the four days Craft leaves, two
+# each. Every day carries exactly five cards, so no day is the heavy one.
+#
+# The cards are the fifth, and they don't make a day heavier: the pile is whatever
+# the recall ladder brought back overnight, which is minutes, and on a morning it
+# brought back nothing there is nothing to work.
+_DAILY_ALWAYS = ("d-meditate", "d-train", "d-read", "d-recall")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
     ("d-craft",),   # Mon
     ("d-jp",),      # Tue

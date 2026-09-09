@@ -40,9 +40,22 @@ const TITLE_BLOCK: { match: RegExp; block: string }[] = [
   { match: /\b(midday|noon|lunch|afternoon)\b/i, block: 'day' },
 ];
 
-export function blockOf(stat: string, title = ''): string {
-  for (const t of TITLE_BLOCK) if (t.match.test(title)) return t.block;
-  return STAT_BLOCK[stat as StatKey] ?? 'day';
+// A slot whose window belongs to the slot itself rather than to its attribute.
+// The index cards are Intelligence, which reads in the evening — but the pile is
+// what the recall ladder brought back overnight, and a card answered before the
+// day starts is a card answered. Its titles rotate, so this is keyed on the slot
+// and beats both the title match and the attribute default.
+const QUEST_BLOCK: Record<string, string> = {
+  'd-recall': 'morning',
+};
+
+/** The window a quest sits in: its own if it has been given one, else whatever its
+ * title says, else its attribute's default. */
+export function blockOf(quest: { id?: string; stat: string; title?: string }): string {
+  const own = QUEST_BLOCK[quest.id ?? ''];
+  if (own) return own;
+  for (const t of TITLE_BLOCK) if (t.match.test(quest.title ?? '')) return t.block;
+  return STAT_BLOCK[quest.stat as StatKey] ?? 'day';
 }
 
 /** The block the given local hour falls in (pre-dawn hours belong to Wind-down). */

@@ -9,7 +9,7 @@ SKETCH_DAY = "2026-07-19"  # the Sunday after, one of Creativity's two days
 CRAFT_DAY = "2026-07-20"   # the Monday after, the week's first Craft day
 # The dailies dealt on DAY. The board is a fixed weekly schedule, so this is a
 # property of the weekday, not of the whole deck (see state._DAILY_BY_WEEKDAY).
-DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-jp"]
+DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-recall", "d-jp"]
 
 
 def _state(client):
@@ -329,7 +329,7 @@ def test_the_daily_schedule_is_fixed_to_the_weekday(client):
         nxt = (date.fromisoformat("2026-07-27") + timedelta(days=offset)).isoformat()
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
         assert shown == active_daily_ids(d)
-        assert {"d-meditate", "d-train", "d-read"} <= shown  # the always-on three
+        assert {"d-meditate", "d-train", "d-read", "d-recall"} <= shown  # the always-on four
         week.append(shown)
         next_week.append(active_daily_ids(nxt))
 

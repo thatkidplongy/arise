@@ -42,9 +42,11 @@ The pools are tuned to the hunter's real interests:
        weekly and side only, with no daily slot
   INT  the daily is one sitting on one book: the floor names it and asks you to log
        what you read (at your own pace, never a chapter quota), and the day's method
-       varies what you do with it, deepening with the band (see _READ_METHODS). Math
-       from scratch, Japanese and the wider world are the weekly and side slots,
-       where a subject is the whole sitting
+       varies what you do with it, deepening with the band (see _READ_METHODS). A
+       second daily works the index cards the reading already produced — the morning
+       pass over whatever the recall ladder brought back (recall.py). Math from
+       scratch, Japanese and the wider world are the weekly and side slots, where a
+       subject is the whole sitting
   WLT  making money: money psychology & fundamentals first, then managing, then
        earning — side income, monetising skills. Weekly and side only; the daily
        study moved to a phased card in the Learn tab
@@ -209,6 +211,26 @@ POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     # (INT's daily, d-read, has no pool by design: Grow is one sitting on the
     #  hunter's own book — the reading floor names it, _READ_METHODS varies what
     #  you do with it, and the domain work lives in w-tome and s-code.)
+    "d-recall": [  # INT — the index-card pile, worked first thing (the ladder: recall.py)
+        ("Index Cards", "The cards that came due today", [
+            "Answer each card out loud before you flip it — thinking it and saying it are not the same test",
+        ]),
+        ("Cold Recall", "Nothing open but the card", [
+            "Work the stack with the book shut and no notes beside you — a card you look up is one you read, not one you recalled",
+        ]),
+        ("Say It Shorter", "The same idea, in one line", [
+            "On every card you get, say it back as a single sentence — needing three means you know it looser than the grade says",
+        ]),
+        ("Honest Grades", "Shaky is not Got it", [
+            "Grade Shaky whenever you needed a moment to find it — a card you nearly missed is one you'll miss next month",
+        ]),
+        ("Own Words", "Rewrite a back you don't like", [
+            "Rewrite the back of one card in plainer words than it has now — a card is only worth what you can say off it",
+        ]),
+        ("Two Cards Together", "Set them side by side", [
+            "Take two cards you've just worked and say where they meet — the same idea twice, or one qualifying the other",
+        ]),
+    ],
     # ── Weekly ───────────────────────────────────────────────────────────────
     "w-badminton": [  # STR — the badminton raid (kept on-theme for the achievement)
         ("Dungeon Raid: Badminton", "A full badminton session", [
@@ -771,6 +793,12 @@ FLOORS: dict[str, list[list[str]]] = {
         ["Settle for 2 minutes before you begin"],
         ["Settle for 3 minutes before you begin"],
         ["Settle for 5 minutes before you begin"],  # cap
+    ],
+    # INT — the index cards. One tier on purpose: what makes recall harder over time
+    # is the spacing, and the Leitner ladder already owns that (recall.py). A floor
+    # that also climbed would be asking more of the same cards on the same morning.
+    "d-recall": [
+        ["Work every card Learn brought back today — nothing due means pick any stack and test yourself anyway"],
     ],
 }
 
