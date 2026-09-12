@@ -16,10 +16,19 @@ import { TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, 
 // (.tsx) sibling remains the plain-text fallback.
 
 const EDITOR_CLASS = "arise-note-editor";
+const FRAME_CLASS = "arise-note-frame";
 
 /** ProseMirror renders real DOM, so its inner elements (strong/em/ul/li) can't be
- * reached by RN styles — inject a scoped stylesheet once, themed to match the app. */
+ * reached by RN styles — inject a scoped stylesheet once, themed to match the app.
+ *
+ * The frame is the card's only shrinkable child: RN views never shrink, so without
+ * it a long note grows the card past its max height and pushes Save off screen. */
 const CSS = `
+.${FRAME_CLASS} {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .${EDITOR_CLASS} {
   outline: none;
   border: 1px solid ${surface.hairline};
@@ -29,8 +38,8 @@ const CSS = `
   padding: 12px;
   font-size: 14px;
   line-height: 20px;
+  flex: 1 1 auto;
   min-height: 160px;
-  max-height: 46vh;
   overflow-y: auto;
   font-family: inherit;
 }
@@ -253,7 +262,7 @@ export function NoteEditorModal({
             </Btn>
           </View>
 
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} className={FRAME_CLASS} />
 
           <Text style={styles.hint}>
             Select text to format · headings, lists and quotes structure it.
