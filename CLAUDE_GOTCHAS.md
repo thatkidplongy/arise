@@ -59,6 +59,15 @@ Non-obvious things about this repo, kept short.
   new surface that wants "today's kcal" is asking for a number the app decided not
   to claim.
 
+- **A stored line ending in "…" means it was cut, and the next send will finish it.**
+  `llm._clip` marks what it cuts with `llm.CUT`, and `digest.mend_clipped` sends every
+  line still carrying that mark to the model to be written out in full (head kept
+  verbatim, an ending added). So the ellipsis is a signal, not decoration: never
+  append one to stored text any other way, and know that a back edited by hand to end
+  in one will be "finished" next morning. Raising a cap only helps new cards — the
+  rows written under the old one stay cut until the mend reaches them (the 240-char
+  hard cut of August 2026 left 21 backs and 6 hooks that way).
+
 - **A retired daily keeps its `QuestDef` row.** Removing a quest means dropping it
   from `SEED_QUESTS` and from the schedule — never deleting the row, which
   completions, streaks and achievements all key on. The row then exists but is never

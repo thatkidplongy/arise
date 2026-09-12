@@ -686,6 +686,13 @@ class DigestSendOut(BaseModel):
     highlight_count: int
 
 
+class DigestMendOut(BaseModel):
+    """One pass at the cards an earlier cap cut short."""
+    finished: int  # lines written out in full this pass
+    left: int  # cards still carrying a cut, for the next morning
+    detail: str  # why, when a pass finished nothing
+
+
 class DailyQuoteOut(BaseModel):
     """One line surfaced on Status today, rotating by the date — either a pull-quote
     from a capture or one of its takeaways."""

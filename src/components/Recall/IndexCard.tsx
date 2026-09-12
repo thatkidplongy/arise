@@ -1,14 +1,24 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { type LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { clay, font, neutral, radius, sage, shadow, surface, text, withAlpha } from '@/theme';
 
-/** The ruled stock the card is printed on — one faint line per line of writing. */
-export function Ruled({ gap }: { gap: number }) {
+/** Rules drawn before the body has reported its height — enough for a short front,
+ * so the stock never flashes blank. */
+const RULES_AT_LEAST = 14;
+
+/**
+ * The ruled stock the card is printed on — one faint line per line of writing, for
+ * as far down as the body runs. The card grows with its text, so the ruling follows
+ * the body's height: a long back is ruled to its last line rather than trailing off
+ * onto blank stock partway down.
+ */
+export function Ruled({ gap, height }: { gap: number; height: number }) {
+  const count = Math.max(RULES_AT_LEAST, Math.ceil(height / gap));
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {Array.from({ length: 14 }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <View key={i} style={[styles.rule, { top: (i + 1) * gap }]} />
       ))}
     </View>
@@ -72,6 +82,8 @@ export function IndexCard({
   children: ReactNode;
 }) {
   const skin = FACES[face];
+  const [bodyHeight, setBodyHeight] = useState(0);
+  const measureBody = (e: LayoutChangeEvent) => setBodyHeight(e.nativeEvent.layout.height);
   return (
     <View style={[styles.card, shadow.md]}>
       <View style={[styles.head, skin.head]}>
@@ -79,8 +91,8 @@ export function IndexCard({
         {meta ? <Text style={[styles.meta, skin.meta]}>{meta}</Text> : null}
         {metaRight ? <Text style={[styles.meta, skin.meta, styles.metaRight]}>{metaRight}</Text> : null}
       </View>
-      <View style={styles.body}>
-        <Ruled gap={ruleGap} />
+      <View style={styles.body} onLayout={measureBody}>
+        <Ruled gap={ruleGap} height={bodyHeight} />
         {children}
       </View>
       {footer ? <View style={styles.footer}>{footer}</View> : null}

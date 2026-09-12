@@ -173,6 +173,10 @@ the reading daily and your quest reflections are folded in automatically.
 Send one by hand any time: `.venv/bin/python scripts/send_digest.py 2026-08-07`.
 Sending is once-per-day, so an extra run can't double-mail you.
 
+A card the distiller once cut short (a back or hook ending in "…") is written out in
+full on the next send. To do it now rather than at 07:00:
+`curl -X POST localhost:8000/digest/mend`.
+
 Emails come from Resend's shared `onboarding@resend.dev` unless you set
 `ARISE_DIGEST_FROM` to a domain you've verified — check spam on the first one.
 Preview without sending (and tune the wording) at `/digest/preview?day=…`.

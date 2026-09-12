@@ -22,7 +22,8 @@ something ordinary, so reading it makes the idea land (see llm._LEARNING_PROMPT)
 It is deliberately not a mnemonic: a device built from the letters of a term helps
 you recite a phrase you still do not understand, which is the opposite of the job.
 Highlights distilled before hooks existed are hooked a morning at a time by
-`backfill_hooks`.
+`backfill_hooks`, and lines an earlier cap cut short are written out in full the same
+way, by `mend_clipped`.
 
 Distilling is idempotent — a day already distilled is never paid for twice — so a
 preview costs nothing and `send_daily` is the only step with a side effect.
@@ -31,6 +32,7 @@ preview costs nothing and `send_daily` is the only step with a side effect.
 import sys
 from datetime import date, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from . import digest_render, llm, mailer, reading, recall, recap
@@ -522,6 +524,90 @@ def backfill_hooks(db: Session, player: Player, ctx: dict,
     return written
 
 
+# ── Finishing the cards an earlier cap cut short ──────────────────────────────
+
+MENDS_PER_CALL = 30
+
+
+def cards_cut_short(db: Session, player: Player) -> list[Highlight]:
+    """Every card still carrying the clipper's mark on its back or its hook, oldest
+    first — what `mend_clipped` works through, and what is left when it is done."""
+    mark = f"%{llm.CUT}"
+    return (
+        db.query(Highlight)
+        .filter(Highlight.player_id == player.id)
+        .filter(or_(Highlight.text.like(mark), Highlight.hook.like(mark)))
+        .order_by(Highlight.day, Highlight.created_at)
+        .all()
+    )
+
+
+def _cut_lines(row: Highlight) -> list[tuple[str, dict]]:
+    """The lines on one card that were cut — the answer, the analogy, or both — each
+    as the field it lives in and the line `llm.finish_lines` wants."""
+    card = {"source": row.source_label or "", "cue": row.cue or ""}
+    out: list[tuple[str, dict]] = []
+    if (row.text or "").endswith(llm.CUT):
+        out.append(("text", {"kind": "answer", "head": row.text.removesuffix(llm.CUT),
+                             "cap": llm.MAX_HIGHLIGHT_TEXT, **card}))
+    if (row.hook or "").endswith(llm.CUT):
+        out.append(("hook", {"kind": "analogy", "head": row.hook.removesuffix(llm.CUT),
+                             "cap": llm.MAX_HOOK, "answer": row.text or "", **card}))
+    return out
+
+
+def mend_clipped(db: Session, player: Player, ctx: dict | None = None,
+                 problems: list[str] | None = None) -> int:
+    """Write out in full the lines an earlier cap cut short.
+
+    Until the distiller's caps were raised, a back was cut hard at 240 characters and
+    a hook at 160 — mid-word, so a card could read "…when everything is highly
+    interconnect…". The clipper marks what it cuts with an ellipsis, and that mark is
+    what this looks for: every line still carrying one goes up in one call, with the
+    card around it, to be finished. Only a line that comes back with its head verbatim
+    is kept (llm._parse_finished), so a card is only ever finished, never rewritten.
+
+    Runs from the send, never from the preview: it writes, and it spends. Last in line
+    for the morning's allowance, after the hooks — a card that has read cut short for
+    weeks can wait one more day. Once the backlog is done this finds nothing and costs
+    nothing.
+
+    A failure is not fatal: the reason is appended to `problems` and the cards stay as
+    they were."""
+    pending = [
+        (row, field, line)
+        for row in cards_cut_short(db, player)
+        for field, line in _cut_lines(row)
+    ][:MENDS_PER_CALL]
+    if not pending or not llm.enabled() or llm.budget_left() <= 0:
+        return 0
+
+    try:
+        finished = llm.finish_lines([line for _, _, line in pending])
+    except Exception as err:
+        llm.note_refusal(err)
+        reason = f"cut lines not finished ({_why(err)})"
+        print(f"[arise.digest] {reason}; the cards stay as they were.", file=sys.stderr)
+        if problems is not None:
+            problems.append(reason)
+        return 0
+
+    shown = list((ctx or {}).get("highlights") or []) + list((ctx or {}).get("recall") or [])
+    written = 0
+    for i, (row, field, _) in enumerate(pending, 1):
+        full = finished.get(i, "")
+        if not full:
+            continue
+        setattr(row, field, full)
+        for item in shown:
+            if item.get("id") == row.id:
+                item[field] = full  # the email renders from the context, not a re-read
+        written += 1
+    if written:
+        db.commit()
+    return written
+
+
 # ── Sending ──────────────────────────────────────────────────────────────────
 
 
@@ -582,8 +668,9 @@ def send_daily(db: Session, player: Player, day: str, force: bool = False) -> di
         notes = "; ".join(ctx.get("problems") or [])
         return _record(db, player, day, "skipped", notes or "nothing logged", 0)
 
-    # After the emptiness check, so a quiet morning never spends a call on it.
+    # After the emptiness check, so a quiet morning never spends a call on either.
     backfill_hooks(db, player, ctx, ctx.get("problems"))
+    mend_clipped(db, player, ctx, ctx.get("problems"))
     notes = "; ".join(ctx.get("problems") or [])
 
     # The picture rides along as a part, and the HTML points at it by content id —

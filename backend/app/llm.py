@@ -42,7 +42,9 @@ _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gen
 DAILY_LIMIT = int(os.environ.get("ARISE_LLM_DAILY_LIMIT", "20"))
 # A digest is three calls — distil the day, rewrite the book's running sentence, then
 # hook whatever older highlights are still missing one — and each retries twice
-# against a burst limit. Nine is one whole morning.
+# against a burst limit. Nine is one whole morning. Finishing the lines an earlier cap
+# cut short (digest.mend_clipped) is a fourth that comes out of whatever is left, and
+# stops being asked for once the backlog is gone.
 DIGEST_RESERVE = int(os.environ.get("ARISE_LLM_DIGEST_RESERVE", "9"))
 # The free tier's window rolls at midnight Pacific, wherever the hunter is.
 _QUOTA_TZ = ZoneInfo("America/Los_Angeles")
@@ -380,6 +382,11 @@ _DISTIL_PROMPT = (
 )
 
 
+# What _clip leaves where it cut. A stored line ending in it was cut, and that is the
+# one thing digest.mend_clipped looks for — so nothing else may append one.
+CUT = "…"
+
+
 def _clip(s, n: int) -> str:
     """Collapse whitespace and cap length — keeps stored lines tidy for display.
 
@@ -392,7 +399,7 @@ def _clip(s, n: int) -> str:
     head = s[: n - 1]
     if not s[n - 1].isspace() and " " in head:
         head = head[: head.rindex(" ")]
-    return head.rstrip(" ,;:·—-") + "…"
+    return head.rstrip(" ,;:·—-") + CUT
 
 
 def _parse_distillation(payload: dict) -> dict:
@@ -470,9 +477,17 @@ def distill_tips(transcript: str, timeout: float = 25.0) -> dict:
 # the thing being recalled — the reader saw the question, guessed, and then couldn't
 # tell whether they'd got it right. Sized so the model's own "one self-contained
 # idea" always fits whole, and only genuinely runaway output is cut.
-_MAX_HIGHLIGHT_TEXT = 700
-_MAX_HIGHLIGHT_CUE = 300
-_MAX_HOOK = 160
+# The most a stored line may run to. The distiller is not told these — a highlight is
+# whatever the idea takes, and the card grows with it — so they are a net against a
+# runaway answer, not a target. Whatever they do cut is marked with CUT and written
+# out in full on the next send (digest.mend_clipped): the cards were once cut hard at
+# 240 characters with no word boundary, and a back ending "highly interconnect…" is
+# what that looked like.
+MAX_HIGHLIGHT_TEXT = 700
+MAX_HIGHLIGHT_CUE = 300
+# The hook prompt asks for a dozen to twenty words; the model runs to thirty often
+# enough that 160 kept cutting one.
+MAX_HOOK = 240
 
 
 _LEARNING_SCHEMA = {
@@ -587,9 +602,9 @@ def _parse_learning(payload: dict) -> dict:
         if not body:
             continue
         out.append({
-            "text": _clip(body, _MAX_HIGHLIGHT_TEXT),
-            "cue": _clip(str(item.get("cue") or "").strip(), _MAX_HIGHLIGHT_CUE),
-            "hook": _clip(str(item.get("hook") or "").strip(), _MAX_HOOK),
+            "text": _clip(body, MAX_HIGHLIGHT_TEXT),
+            "cue": _clip(str(item.get("cue") or "").strip(), MAX_HIGHLIGHT_CUE),
+            "hook": _clip(str(item.get("hook") or "").strip(), MAX_HOOK),
             "entry": _entry_index(item.get("entry")),
         })
     return {"highlights": out[:10]}
@@ -654,7 +669,7 @@ def _parse_hooks(payload: dict) -> dict[int, str]:
             n = int(item.get("n"))
         except (TypeError, ValueError):
             continue
-        hook = _clip(str(item.get("hook") or "").strip(), _MAX_HOOK)
+        hook = _clip(str(item.get("hook") or "").strip(), MAX_HOOK)
         if hook:
             out[n] = hook
     return out
@@ -687,6 +702,122 @@ def hooks_for(facts: list[dict], timeout: float = 30.0) -> dict[int, str]:
     note_spend(3)  # one attempt plus its two retries
     payload = net.post_json(url, body, timeout=timeout, retries=2)
     return _parse_hooks(payload)
+
+
+# ── Finishing lines an earlier cap cut short ─────────────────────────────────
+
+_FINISH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "lines": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "n": {"type": "integer"},
+                    "text": {"type": "string"},
+                },
+                "required": ["n", "text"],
+            },
+        },
+    },
+    "required": ["lines"],
+}
+
+_FINISH_PROMPT = (
+    "You finish lines that were cut off, for a personal growth app's recall cards. "
+    "Each numbered LINE was distilled from someone's reading and then cut mid-sentence "
+    "by a length limit: it ends with an ellipsis where the cut fell. You are given what "
+    "survived, what it was distilled from, and the question it answers. An ANALOGY is "
+    "the line printed under an answer to explain it, and you are given that answer too.\n"
+    "Return every line written out in full.\n"
+    "• Keep everything before the ellipsis exactly as it is — the same words, spelling "
+    "and punctuation, nothing added, dropped or moved — and continue from the cut, "
+    "finishing a word that was split.\n"
+    "• Finish the sentence and the thought the way the source itself would, in at most "
+    "one or two more sentences. Invent nothing the source does not say; when unsure how "
+    "it went on, close the sentence plainly rather than adding claims.\n"
+    "• Plain words, no markdown, no numbering inside the line, and no ellipsis at the "
+    "end of it.\n"
+    'Return JSON only: {lines:[{n, text}]}.'
+)
+
+_LINE_KINDS = {"answer": "ANSWER", "analogy": "ANALOGY"}
+
+
+def _format_lines(lines: list[dict]) -> str:
+    """The cut lines as the prompt describes them: numbered, each with what survived
+    and the card around it."""
+    blocks = []
+    for i, line in enumerate(lines, 1):
+        kind = _LINE_KINDS.get(line.get("kind"), "LINE")
+        parts = [f"{i}. {kind}, cut short: {line['head']}{CUT}"]
+        if line.get("source"):
+            parts.append(f"   FROM: {line['source']}")
+        if line.get("cue"):
+            parts.append(f"   ASKED AS: {line['cue']}")
+        if line.get("answer"):
+            parts.append(f"   THE ANSWER IT EXPLAINS: {line['answer']}")
+        blocks.append("\n".join(parts))
+    return "\n\n".join(blocks)
+
+
+def _parse_finished(payload: dict, lines: list[dict]) -> dict[int, str]:
+    """Pure: Gemini response JSON → {number: finished line}, keeping only a line that
+    is the one sent with an ending added. Testable offline.
+
+    The head has to come back verbatim: a card is in the reader's words, and a line
+    "finished" by rewriting its start would swap what they kept for what the model
+    preferred. A line still ending in the cut mark, or grown past its cap, is dropped
+    too — kept, either would be sent up again tomorrow, and every day after."""
+    text = payload["candidates"][0]["content"]["parts"][0]["text"]
+    out: dict[int, str] = {}
+    for item in json.loads(text).get("lines") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            n = int(item.get("n"))
+        except (TypeError, ValueError):
+            continue
+        if not 1 <= n <= len(lines):
+            continue
+        head, cap = lines[n - 1]["head"], lines[n - 1]["cap"]
+        full = " ".join(str(item.get("text") or "").split())
+        if not full.startswith(head) or len(full) <= len(head):
+            continue
+        if full.endswith(CUT) or len(full) > cap:
+            continue
+        out[n] = full
+    return out
+
+
+def finish_lines(lines: list[dict], timeout: float = 30.0) -> dict[int, str]:
+    """One Gemini call → each cut-short line written out in full, keyed by its position
+    in `lines` (1-based). A line is {kind, head, cap, source, cue, answer}: `head` is
+    what survived the cut, without the mark; `cap` the most the finished line may run
+    to; the rest is the card around it, for context.
+
+    For cards written under an earlier, harder cap — 240 characters and no word
+    boundary, so a back could end "highly interconnect…". They are asked for years,
+    so one call to finish them is worth it. Raises on transport/parse failure; the
+    caller leaves the cards as they are."""
+    body = {
+        "contents": [{"parts": [
+            {"text": _FINISH_PROMPT},
+            {"text": "LINES:\n" + _format_lines(lines)},
+        ]}],
+        "generationConfig": {
+            "temperature": 0.2,  # the head is a copy and the ending is the source's
+            "responseMimeType": "application/json",
+            "responseSchema": _FINISH_SCHEMA,
+        },
+    }
+    if budget_left() <= 0:
+        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    note_spend(3)  # one attempt plus its two retries
+    payload = net.post_json(url, body, timeout=timeout, retries=2)
+    return _parse_finished(payload, lines)
 
 
 _THREAD_SCHEMA = {

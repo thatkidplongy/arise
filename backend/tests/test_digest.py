@@ -924,6 +924,160 @@ def test_a_quiet_morning_spends_nothing_on_hooks(db, monkeypatch):
     assert digest.send_daily(db, player, DAY)["status"] == "skipped"
 
 
+# ── finishing the cards an earlier cap cut short ──────────────────────────────
+
+
+def _finisher(monkeypatch, finished: dict, asked: list | None = None):
+    def _finish_lines(lines, timeout=30.0):
+        if asked is not None:
+            asked.append(lines)
+        return finished
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "finish_lines", _finish_lines)
+
+
+def test_parse_finished_keeps_a_line_only_with_its_head_verbatim():
+    """A card is in the reader's words: a line that came back rewritten, still cut, or
+    grown past its cap is dropped, and only an ending added to the head is kept."""
+    lines = [
+        {"kind": "answer", "head": "Graph models suit data that is highly interconnect", "cap": 700},
+        {"kind": "analogy", "head": "Like yarn for webs", "cap": 240},
+        {"kind": "answer", "head": "Fan-out is the number of", "cap": 700},
+        {"kind": "answer", "head": "Short", "cap": 700},
+        {"kind": "answer", "head": "Same", "cap": 700},
+    ]
+    out = llm._parse_finished(_payload({"lines": [
+        {"n": 1, "text": "Graph models suit data that is highly   interconnected, where "
+                         "anything may relate to anything."},
+        {"n": 2, "text": "Like string for webs, and boxes for trees."},  # head rewritten
+        {"n": 3, "text": "Fan-out is the number of helper tasks per request…"},  # still cut
+        {"n": 4, "text": "Short" + " and long" * 100},  # grown past its cap
+        {"n": 5, "text": "Same"},  # nothing added
+        {"n": 9, "text": "no line was sent as 9"},
+        "a bare string",
+    ]}), lines)
+    assert out == {
+        1: "Graph models suit data that is highly interconnected, where anything may relate to anything.",
+    }
+
+
+def test_finish_lines_asks_for_the_head_verbatim_and_shows_the_card_around_it():
+    lowered = llm._FINISH_PROMPT.lower()
+    assert "exactly as it is" in lowered
+    assert "ellipsis" in lowered
+    shown = llm._format_lines([
+        {"kind": "answer", "head": "Fan-out is the number of", "cap": 700,
+         "source": "DDIA ch 1", "cue": "What is fan-out?"},
+        {"kind": "analogy", "head": "Like a megaphone", "cap": 240,
+         "source": "DDIA ch 1", "cue": "What is fan-out?", "answer": "Fan-out is the number of…"},
+    ])
+    assert "1. ANSWER, cut short: Fan-out is the number of…" in shown
+    assert "   FROM: DDIA ch 1\n   ASKED AS: What is fan-out?" in shown
+    assert "2. ANALOGY, cut short: Like a megaphone…" in shown
+    assert "   THE ANSWER IT EXPLAINS: Fan-out is the number of…" in shown
+
+
+def test_mend_clipped_finishes_the_cards_an_earlier_cap_cut_short(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    cut = _older(db, player, "Graph models suit data that is highly interconnect…",
+                 "When does a graph model fit?", hook="Like yarn for webs, a grid for…")
+    whole = _older(db, player, "Depth beats speed.", "What beats speed?", hook="a deep well")
+    asked: list = []
+    _finisher(monkeypatch, {
+        1: "Graph models suit data that is highly interconnected.",
+        2: "Like yarn for webs, a grid for tables.",
+    }, asked)
+
+    assert digest.mend_clipped(db, player) == 2
+    db.refresh(cut)
+    db.refresh(whole)
+    assert cut.text == "Graph models suit data that is highly interconnected."
+    assert cut.hook == "Like yarn for webs, a grid for tables."
+    assert (whole.text, whole.hook) == ("Depth beats speed.", "a deep well")
+    # Only the cut lines went up, each without its mark and with the card around it.
+    assert [(line["kind"], line["head"]) for line in asked[0]] == [
+        ("answer", "Graph models suit data that is highly interconnect"),
+        ("analogy", "Like yarn for webs, a grid for"),
+    ]
+    assert asked[0][0]["cue"] == "When does a graph model fit?"
+    assert asked[0][0]["cap"] == llm.MAX_HIGHLIGHT_TEXT
+    assert asked[0][1]["answer"] == "Graph models suit data that is highly interconnect…"
+    assert asked[0][1]["cap"] == llm.MAX_HOOK
+    assert digest.cards_cut_short(db, player) == []
+
+
+def test_mend_clipped_asks_nothing_when_no_card_is_cut(db, monkeypatch):
+    """The backlog drains and then costs nothing."""
+    player = state.get_or_create_player(db)
+    _older(db, player, "Depth beats speed.", "What beats speed?", hook="a deep well")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("nothing was cut short")
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "finish_lines", _boom)
+    assert digest.mend_clipped(db, player) == 0
+
+
+def test_mend_clipped_leaves_the_cards_as_they_were_when_it_fails(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    cut = _older(db, player, "Fan-out is the number of…", "What is fan-out?")
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "finish_lines",
+                        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("no quota")))
+
+    problems: list[str] = []
+    assert digest.mend_clipped(db, player, problems=problems) == 0
+    assert problems and "cut lines not finished" in problems[0]
+    db.refresh(cut)
+    assert cut.text == "Fan-out is the number of…"
+
+
+def test_mend_clipped_stops_when_the_days_quota_is_gone(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Fan-out is the number of…", "What is fan-out?")
+    _finisher(monkeypatch, {1: "Fan-out is the number of helper tasks per request."})
+    llm.note_spend(llm.DAILY_LIMIT)
+    assert digest.mend_clipped(db, player) == 0
+
+
+def test_a_preview_finishes_nothing(db, monkeypatch):
+    """build_context is what the app and the preview read, as often as they like."""
+    player = state.get_or_create_player(db)
+    _older(db, player, "Fan-out is the number of…", "What is fan-out?")
+
+    def _boom(*_a, **_k):
+        raise AssertionError("a preview must not spend the allowance")
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "finish_lines", _boom)
+    assert digest.build_context(db, player, DAY)["recall"][0]["text"] == "Fan-out is the number of…"
+
+
+def test_send_daily_finishes_the_cut_cards_and_mails_them_whole(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _older(db, player, "Fan-out is the number of…", "What is fan-out?", hook="a megaphone")
+    _finisher(monkeypatch, {1: "Fan-out is the number of helper tasks one request needs."})
+    sent = {}
+    monkeypatch.setattr(digest.mailer, "enabled", lambda: True)
+    monkeypatch.setattr(digest.mailer, "send", lambda s, h, t, **_k: sent.update(text=t, html=h))
+
+    assert digest.send_daily(db, player, DAY)["status"] == "sent"
+    assert "helper tasks one request needs" in sent["text"]
+    assert "Fan-out is the number of…" not in sent["text"]
+
+
+def test_mend_route_reports_what_a_pass_did(client, monkeypatch):
+    assert client.post("/digest/mend").status_code == 503  # no model key, nothing to spend
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "finish_lines",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("nothing was cut")))
+    res = client.post("/digest/mend")
+    assert res.status_code == 200
+    assert res.json() == {"finished": 0, "left": 0, "detail": ""}
+
+
 # ── cross-day duplicates ──────────────────────────────────────────────────────
 
 

@@ -9,7 +9,7 @@ from .db import get_db
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CaptureFailureOut,
                       CaptureSweepOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
-                      CommitmentPatch, CompleteIn, DigestOut, DigestSendOut,
+                      CommitmentPatch, CompleteIn, DigestMendOut, DigestOut, DigestSendOut,
                       FoodAnalyzeIn, FoodEstimateOut, FoodLogIn, FoodSearchItemOut,
                       GroceryIn, GroceryToggleIn, HistoryItemOut, IncomeIn, InsightAddIn,
                       InsightOut, InterviewModeIn, JournalEntryIn, JournalEntryUpdateIn,
@@ -526,6 +526,19 @@ def send_digest(day: str | None = Query(None), force: bool = Query(False),
         # Say what actually broke: the nightly job's log is the only place this
         # surfaces, and "couldn't send" alone sends you hunting.
         raise HTTPException(502, f"Couldn't send that digest — {digest._why(err)}")
+
+
+@router.post("/digest/mend", response_model=DigestMendOut)
+def mend_digest(db: Session = Depends(get_db)):
+    """Finish the cards an earlier cap cut short now, rather than on the next send —
+    which does the same on its own each morning."""
+    player = state.get_or_create_player(db)
+    if not llm.enabled():
+        raise HTTPException(503, "Finishing cards needs a model key (set ARISE_LLM_API_KEY).")
+    problems: list[str] = []
+    finished = digest.mend_clipped(db, player, problems=problems)
+    return {"finished": finished, "left": len(digest.cards_cut_short(db, player)),
+            "detail": "; ".join(problems)}
 
 
 # ── Profile avatar (kept out of /state; fetched on demand) ────────────────────
