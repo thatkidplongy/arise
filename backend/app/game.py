@@ -37,9 +37,20 @@ RANK_GATES = [
 ]
 
 
+# Both curves were pitched when a daily was worth 10 XP. A daily is 25 now, and a
+# perfect day is 155 — five dailies plus the clear bonus — so the old numbers bought
+# a character level every half day at the bottom and put rank D inside a fortnight.
+# Both are scaled by three: every level costs exactly triple what it did, which
+# leaves the *shape* the ranks and achievements were pitched against untouched and
+# moves only the pace. Rescaling is safe by construction — a completion stores the
+# XP it was awarded (see quests.py), so this only changes what the next level costs,
+# never what past days earned. It does re-derive the *current* level downward,
+# because level is computed from banked XP rather than stored alongside it.
+
+
 def xp_to_next(level: int) -> int:
     """XP needed to go from `level` to `level + 1`."""
-    return 80 + (level - 1) * 40
+    return 240 + (level - 1) * 120
 
 
 def level_info(total_xp: int) -> dict:
@@ -51,8 +62,9 @@ def level_info(total_xp: int) -> dict:
 
 
 def stat_xp_to_next(level: int) -> int:
-    """Stats level on a cheaper curve so they move visibly."""
-    return 50 + (level - 1) * 30
+    """Stats level on a cheaper curve so they move visibly. Scaled with the character
+    curve above so it stays the *same* fraction of it — cheaper, not trivial."""
+    return 150 + (level - 1) * 90
 
 
 def stat_level_info(xp: int) -> dict:

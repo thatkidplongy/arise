@@ -4,21 +4,30 @@ from app import game
 
 
 def test_xp_curve_grows_linearly():
-    assert game.xp_to_next(1) == 80
-    assert game.xp_to_next(2) == 120
-    assert game.xp_to_next(3) == 160
+    assert game.xp_to_next(1) == 240
+    assert game.xp_to_next(2) == 360
+    assert game.xp_to_next(3) == 480
 
 
 def test_level_info_accumulates():
-    assert game.level_info(0) == {"level": 1, "into": 0, "needed": 80}
-    assert game.level_info(79)["level"] == 1
-    assert game.level_info(80) == {"level": 2, "into": 0, "needed": 120}
-    assert game.level_info(200)["level"] == 3  # 80 + 120 = 200 → into level 3
+    assert game.level_info(0) == {"level": 1, "into": 0, "needed": 240}
+    assert game.level_info(239)["level"] == 1
+    assert game.level_info(240) == {"level": 2, "into": 0, "needed": 360}
+    assert game.level_info(600)["level"] == 3  # 240 + 360 = 600 → into level 3
 
 
 def test_stat_curve_is_cheaper():
-    assert game.stat_xp_to_next(1) == 50
-    assert game.stat_level_info(50)["level"] == 2
+    assert game.stat_xp_to_next(1) == 150
+    assert game.stat_level_info(150)["level"] == 2
+    # Cheaper than the character curve at every level, which is the whole point.
+    assert all(game.stat_xp_to_next(n) < game.xp_to_next(n) for n in range(1, 61))
+
+
+def test_first_level_is_more_than_one_perfect_day():
+    """A perfect day is five dailies at 25 plus the clear bonus. The first level
+    used to cost half of that; the curve is no longer buyable in a single sitting."""
+    perfect_day = 5 * 25 + game.DAILY_CLEAR_BONUS
+    assert game.xp_to_next(1) > perfect_day
 
 
 def test_rank_requires_both_level_and_streak():
