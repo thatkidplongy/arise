@@ -653,6 +653,18 @@ def _owned(db: Session, model, row_id: str, player: Player):
     return row if row is not None and row.player_id == player.id else None
 
 
+def _delete_owned(db: Session, model, row_id: str, player: Player) -> None:
+    """Drop one of this player's rows, if it's theirs and it's there.
+
+    Deleting is the half of a personal list with nothing to say for itself — five
+    of these were the same four lines with the model swapped. A missing id is not
+    an error: the row is gone either way, which is what the caller asked for."""
+    row = _owned(db, model, row_id, player)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+
+
 def add_reminder(db: Session, player: Player, text: str) -> None:
     text = (text or "").strip()[:limits.REMINDER]
     if text:
@@ -661,10 +673,7 @@ def add_reminder(db: Session, player: Player, text: str) -> None:
 
 
 def remove_reminder(db: Session, player: Player, reminder_id: str) -> None:
-    row = _owned(db, Reminder, reminder_id, player)
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, Reminder, reminder_id, player)
 
 
 def toggle_reminder(db: Session, player: Player, reminder_id: str, done: bool) -> None:
@@ -709,10 +718,7 @@ def update_quest_note(db: Session, player: Player, note_id: str, text: str) -> N
 
 
 def remove_quest_note(db: Session, player: Player, note_id: str) -> None:
-    row = _owned(db, QuestNote, note_id, player)
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, QuestNote, note_id, player)
 
 
 def add_journal_entry(db: Session, player: Player, day: str, text: str) -> None:
@@ -733,10 +739,7 @@ def update_journal_entry(db: Session, player: Player, entry_id: str, text: str) 
 
 
 def remove_journal_entry(db: Session, player: Player, entry_id: str) -> None:
-    row = _owned(db, JournalEntry, entry_id, player)
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, JournalEntry, entry_id, player)
 
 
 def add_grocery(db: Session, player: Player, name: str) -> None:
@@ -747,10 +750,7 @@ def add_grocery(db: Session, player: Player, name: str) -> None:
 
 
 def remove_grocery(db: Session, player: Player, item_id: str) -> None:
-    row = _owned(db, GroceryItem, item_id, player)
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, GroceryItem, item_id, player)
 
 
 def toggle_grocery(db: Session, player: Player, item_id: str, bought: bool) -> None:
@@ -835,10 +835,7 @@ def is_commitment_paid(db: Session, player: Player, commitment_id: str, day: str
 
 
 def remove_money(db: Session, player: Player, entry_id: str) -> None:
-    row = _owned(db, MoneyEntry, entry_id, player)
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, MoneyEntry, entry_id, player)
 
 
 def reset_money(db: Session, player: Player) -> int:
