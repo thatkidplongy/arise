@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { CharacterCount, Placeholder } from "@tiptap/extensions";
+import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { useEffect } from "react";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 
+import { NoteCounter } from "@/components/NoteCounter";
 import { Text } from "@/components/ui/Text";
-import { QUEST_NOTE_MAX } from "@/consts";
+import { LEARNING_NOTE_MAX } from "@/consts";
 import { TAP_MIN, accent, neutral, onAccent, press, radius, surface, text, typography, withAlpha } from "@/theme";
 
 // Web build only: a true WYSIWYG note editor. Bold/italic/lists render as
@@ -128,14 +129,16 @@ export function NoteEditorModal({
   initial,
   onSave,
   onClose,
-  maxLength = QUEST_NOTE_MAX,
+  maxLength = LEARNING_NOTE_MAX,
 }: {
   visible: boolean;
   prompt: string;
   initial: string;
   onSave: (text: string) => void;
   onClose: () => void;
-  /** The surface's own cap — see src/consts.ts. Defaults to the tightest one. */
+  /** The surface's own cap — see src/consts.ts. Defaults to the tightest of them,
+   * so a caller that forgets to pass one can't overrun its own server-side cap.
+   * (That is the learning note now; the quest note is the roomiest.) */
   maxLength?: number;
 }) {
   useEditorStyles();
@@ -148,9 +151,12 @@ export function NoteEditorModal({
       StarterKit.configure({ link: { autolink: false } }),
       Markdown,
       Placeholder.configure({ placeholder: "Write it here…" }),
-      // Counts the visible text, while the cap applies to the Markdown we send —
-      // so the room left for markers is why the limit here is a little under it.
-      CharacterCount.configure({ limit: Math.floor(maxLength * 0.9) }),
+      // No CharacterCount: it counts the visible text while the cap applies to the
+      // Markdown we send, so it could only ever guess at the room the markers need
+      // (it reserved a flat 10%, which a bulleted list of short lines eats on its
+      // own). The count below measures the Markdown itself, and the cap is enforced
+      // by disabling Save rather than by refusing the keystroke — so a long paste
+      // arrives whole and can be trimmed, instead of being silently clipped.
     ],
     content: initial,
     contentType: "markdown",
@@ -176,17 +182,22 @@ export function NoteEditorModal({
       quote: e?.isActive("blockquote") ?? false,
       code: e?.isActive("codeBlock") ?? false,
       empty: e?.isEmpty ?? true,
+      // Serialised every keystroke so the count is the truth rather than an
+      // estimate. It's a few hundred microseconds on a note this size, and it's
+      // the same string `save` sends — the number on screen can't drift from it.
+      stored: e ? toStoredMarkdown(e.getMarkdown()).trim() : "",
     }),
   });
 
+  const stored = state?.stored ?? "";
+  const over = stored.length > maxLength;
+
   const save = () => {
-    if (!editor || editor.isEmpty) return;
-    const md = toStoredMarkdown(editor.getMarkdown()).trim();
-    if (!md) return;
-    onSave(md);
+    if (!stored || over) return;
+    onSave(stored);
   };
 
-  const disabled = state?.empty ?? true;
+  const disabled = (state?.empty ?? true) || over;
 
   return (
     <Modal
@@ -264,6 +275,7 @@ export function NoteEditorModal({
 
           <EditorContent editor={editor} className={FRAME_CLASS} />
 
+          <NoteCounter length={stored.length} max={maxLength} />
           <Text style={styles.hint}>
             Select text to format · headings, lists and quotes structure it.
           </Text>
