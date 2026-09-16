@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from . import (body, books, digest, digest_render, insights, llm, mailer, nutrition,
                recall, service, skincare, state)
 from .db import get_db
+from .models import Player
 from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       BookIn, BookReviewIn, BookOut, BookShelfOut, CaptureFailureOut,
                       CaptureSweepOut, CommitmentIn, CraftPhaseIn, CraftPieceIn, CraftSourceIn,
@@ -33,11 +34,32 @@ def _valid_day(day: str | None) -> str:
     return day
 
 
-def _external_lookup(db: Session, fn, unavailable: str):
-    """Shared shape for the free-API lookups (books, food, skincare): ensure a
-    player exists, run the search, and turn any transport/parse failure into a
-    clean 502 rather than a bare 500."""
-    state.get_or_create_player(db)
+def query_day(day: str | None = Query(None, description="Client-local date, YYYY-MM-DD")) -> str:
+    """The day the client is looking at, defaulted to the server's today.
+
+    A dependency rather than a line in each handler because it was being called
+    twice in the same body often enough to matter — once to act on and once to
+    build the returned state — which is two chances to validate one string. The
+    handlers that read a day out of the *body* (a back-dated payment, a note
+    written for yesterday) still use `_valid_day` directly; that's a different
+    day with different rules."""
+    return _valid_day(day)
+
+
+def current_player(db: Session = Depends(get_db)) -> Player:
+    """The hunter this server is for, created on first contact.
+
+    Single-player by design, so there is no lookup to do — but every handler
+    still has to say that the row exists before it can touch anything, and all
+    71 of them were saying it by hand. As a dependency it happens once, before
+    the handler runs, and a new route can't forget it."""
+    return state.get_or_create_player(db)
+
+
+def _external_lookup(fn, unavailable: str):
+    """Shared shape for the free-API lookups (books, food, skincare): run the
+    search, and turn any transport/parse failure into a clean 502 rather than a
+    bare 500."""
     try:
         return fn()
     except Exception:
@@ -46,56 +68,55 @@ def _external_lookup(db: Session, fn, unavailable: str):
 
 @router.get("/state", response_model=StateOut)
 def get_state(
-    day: str | None = Query(None, description="Client-local date, YYYY-MM-DD"),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """Everything the app needs to render, in one shot."""
-    player = state.get_or_create_player(db)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.get("/history", response_model=list[HistoryItemOut])
-def quest_history(db: Session = Depends(get_db)):
+def quest_history(db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """A dated log of finished quests, newest first — for the You → History screen."""
-    player = state.get_or_create_player(db)
     return state.history_of(db, player)
 
 
 @router.post("/completions", response_model=ActionResult)
-def complete_quest(body: CompleteIn, db: Session = Depends(get_db)):
+def complete_quest(body: CompleteIn, db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Complete a quest. Returns System events (level up, rank up, achievements...)
     plus the fresh state."""
-    player = state.get_or_create_player(db)
     return service.complete_quest(db, player, body.quest_id, _valid_day(body.day))
 
 
 @router.post("/steps", response_model=StepResult)
-def toggle_step(body: StepToggleIn, db: Session = Depends(get_db)):
+def toggle_step(body: StepToggleIn, db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Tick/untick one step of a quest. Ticking the last step auto-completes it
     (see `completed` in the response); unticking a step of a done quest undoes it."""
-    player = state.get_or_create_player(db)
     return service.toggle_step(db, player, body.quest_id, body.step_index, _valid_day(body.day))
 
 
 @router.delete("/completions/{completion_id}", response_model=ActionResult)
 def undo_completion(
     completion_id: str,
-    day: str | None = Query(None, description="Client-local date, for the returned state"),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
-    player = state.get_or_create_player(db)
-    return service.undo_completion(db, player, completion_id, _valid_day(day))
+    return service.undo_completion(db, player, completion_id, day)
 
 
 @router.put("/player", response_model=StateOut)
 def update_player(
     body: PlayerIn,
-    day: str | None = Query(None),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """Update hunter name, equipped title, and/or North Star. Send equipped_title:
     null to unequip; send north_star: "" to clear it."""
-    player = state.get_or_create_player(db)
     service.update_player(
         db,
         player,
@@ -105,56 +126,56 @@ def update_player(
         north_star_provided="north_star" in body.model_fields_set,
         north_star=body.north_star,
     )
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/rest", response_model=StateOut)
-def toggle_rest(day: str | None = Query(None), db: Session = Depends(get_db)):
+def toggle_rest(day: str = Depends(query_day), db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Toggle today's rest day. Rest keeps your streak — it's part of the path."""
-    player = state.get_or_create_player(db)
-    service.toggle_rest_day(db, player, _valid_day(day))
-    return state.build_state(db, player, _valid_day(day))
+    service.toggle_rest_day(db, player, day)
+    return state.build_state(db, player, day)
 
 
 @router.put("/preferences", response_model=StateOut)
 def update_preferences(
     body: PreferencesIn,
-    day: str | None = Query(None),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """Set a focus and/or a "where I'm at" level per attribute
     (STR/CRE/SPI/CHA/INT/WLT). A set focus themes that attribute's side quest;
     the level feeds LLM sequencing when enabled."""
-    player = state.get_or_create_player(db)
     service.update_preferences(db, player, body.preferences, body.levels)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/quests/generate", response_model=StateOut)
-def generate_quests(day: str | None = Query(None), db: Session = Depends(get_db)):
+def generate_quests(day: str = Depends(query_day), db: Session = Depends(get_db),
+                    player: Player = Depends(current_player)):
     """Personalise this period's quests with the LLM (if a key is configured),
     caching the result. Safe to call any time: a no-op when the LLM is off or the
     period is already generated, and it falls back to the pools on any failure."""
-    player = state.get_or_create_player(db)
-    return service.generate_quests(db, player, _valid_day(day))
+    return service.generate_quests(db, player, day)
 
 
 @router.put("/book", response_model=StateOut)
-def set_book(body: BookIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_book(body: BookIn, day: str = Depends(query_day), db: Session = Depends(get_db),
+             player: Player = Depends(current_player)):
     """Set or change the book you're currently reading. Send "" to clear it.
     Optional `chapters` is the book's length — the finish line your logged chapters
     are measured against, not a per-day target."""
-    player = state.get_or_create_player(db)
-    service.set_book(db, player, body.current_book, _valid_day(day), body.chapters)
-    return state.build_state(db, player, _valid_day(day))
+    service.set_book(db, player, body.current_book, day, body.chapters)
+    return state.build_state(db, player, day)
 
 
 @router.post("/reading/log", response_model=StateOut)
-def log_reading(body: ReadingLogIn, db: Session = Depends(get_db)):
+def log_reading(body: ReadingLogIn, db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Log what you actually read today — which chapters, and how many. Progress on
     the book comes entirely from these, so nothing here is a quota you can miss.
     Log as many sittings in a day as you like; they add up."""
-    player = state.get_or_create_player(db)
     if not player.current_book:
         raise HTTPException(400, "Set the book you're reading first (Status → Current book).")
     day = _valid_day(body.day)
@@ -163,24 +184,25 @@ def log_reading(body: ReadingLogIn, db: Session = Depends(get_db)):
 
 
 @router.delete("/reading/log/{log_id}", response_model=StateOut)
-def remove_reading_log(log_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+def remove_reading_log(log_id: str, day: str = Depends(query_day), db: Session = Depends(get_db),
+                       player: Player = Depends(current_player)):
     """Take back a logged sitting."""
-    player = state.get_or_create_player(db)
     service.remove_reading_log(db, player, log_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
-@router.get("/books/search", response_model=list[BookOut])
-def books_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+@router.get("/books/search", response_model=list[BookOut],
+            dependencies=[Depends(current_player)])
+def books_search(q: str = Query(..., min_length=1)):
     """Search Open Library for a book to set as your current read (free, no key)."""
-    return _external_lookup(db, lambda: books.search(q),
+    return _external_lookup(lambda: books.search(q),
                             "Book search is unavailable right now — try again, or type the title.")
 
 
-@router.get("/books/suggest", response_model=list[BookShelfOut])
-def books_suggest(db: Session = Depends(get_db)):
+@router.get("/books/suggest", response_model=list[BookShelfOut],
+            dependencies=[Depends(current_player)])
+def books_suggest():
     """A few themed reading shelves (Grow / Money / Craft / Calm) from Open Library."""
-    state.get_or_create_player(db)
     try:
         return books.suggestions()
     except Exception:
@@ -188,63 +210,61 @@ def books_suggest(db: Session = Depends(get_db)):
 
 
 @router.post("/book/review", response_model=ActionResult)
-def review_book(body: BookReviewIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def review_book(body: BookReviewIn, day: str = Depends(query_day), db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Answer the weekly reading review: finished → counts it and rolls to
     next_book; not yet → keeps the current book. Asked once per new week.
 
     Returns events as well as state: finishing a book can unlock an achievement, and
     the answer to "did you finish it?" is the moment to say so."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    events = service.review_book(db, player, body.finished, body.next_book, d)
-    return {"events": events, "state": state.build_state(db, player, d)}
+    events = service.review_book(db, player, body.finished, body.next_book, day)
+    return {"events": events, "state": state.build_state(db, player, day)}
 
 
 @router.put("/craft/source", response_model=StateOut)
-def set_craft_source(body: CraftSourceIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_craft_source(body: CraftSourceIn, day: str = Depends(query_day),
+                     db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Set the one thing you're studying for Craft — the chapter or Notion page open in
     front of you. The daily names this and nothing else; send "" to clear it."""
-    player = state.get_or_create_player(db)
     service.set_craft_source(db, player, body.source)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/craft/piece", response_model=StateOut)
-def finish_craft_piece(body: CraftPieceIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def finish_craft_piece(body: CraftPieceIn, day: str = Depends(query_day),
+                       db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Tick the current piece of the phase off (done → the next one becomes the
     source), or send done=false to take the last tick back. Logging a sitting is a
     different thing and doesn't move this."""
-    player = state.get_or_create_player(db)
     service.finish_craft_piece(db, player, body.done)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/craft/phase", response_model=StateOut)
-def review_craft_phase(body: CraftPhaseIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def review_craft_phase(body: CraftPhaseIn, day: str = Depends(query_day),
+                       db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Answer the system-design phase check-in: done → the next phase begins; not yet
     → this one carries on. The only thing that moves the plan — there is no date at
     which it advances on its own."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    service.review_craft_phase(db, player, body.done, d)
-    return state.build_state(db, player, d)
+    service.review_craft_phase(db, player, body.done, day)
+    return state.build_state(db, player, day)
 
 
 @router.put("/interview", response_model=StateOut)
-def set_interview_mode(body: InterviewModeIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_interview_mode(body: InterviewModeIn, day: str = Depends(query_day),
+                       db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Toggle Craft's interview-prep mode. On → the coding attribute's quests shift
     to timed DSA, mock system design, and behavioural stories; off → steady growth."""
-    player = state.get_or_create_player(db)
     service.set_interview_mode(db, player, body.enabled)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/reset", response_model=StateOut)
-def reset(day: str | None = Query(None), db: Session = Depends(get_db)):
+def reset(day: str = Depends(query_day), db: Session = Depends(get_db),
+          player: Player = Depends(current_player)):
     """Erase all progress (completions + achievements). Name is kept."""
-    player = state.get_or_create_player(db)
     service.reset_all(db, player)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 # ── Body: nutrition + skincare (standalone wellness tools) ────────────────────
@@ -253,39 +273,40 @@ def reset(day: str | None = Query(None), db: Session = Depends(get_db)):
 # Note: served at /body/state, not /body — the bare /body path belongs to the
 # web app's Body tab, so a browser refresh there loads the app, not this JSON.
 @router.get("/body/state", response_model=BodyOut)
-def get_body(day: str | None = Query(None), db: Session = Depends(get_db)):
+def get_body(day: str = Depends(query_day), db: Session = Depends(get_db),
+             player: Player = Depends(current_player)):
     """Everything the Body screen needs: calorie/protein targets, the day's food
     log with totals, and the AM/PM skincare routine with today's ticks."""
-    player = state.get_or_create_player(db)
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
 @router.put("/body/profile", response_model=BodyOut)
-def set_body_profile(profile: BodyProfileIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_body_profile(profile: BodyProfileIn, day: str = Depends(query_day),
+                     db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Set the one-time body inputs; targets are recomputed on read."""
-    player = state.get_or_create_player(db)
     body.set_profile(
         db, player.id, sex=profile.sex, age=profile.age, height_cm=profile.height_cm,
         weight_kg=profile.weight_kg, activity=profile.activity, goal=profile.goal,
         goal_weight_kg=profile.goal_weight_kg, country=profile.country,
     )
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
-@router.get("/food/search", response_model=list[FoodSearchItemOut])
-def food_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+@router.get("/food/search", response_model=list[FoodSearchItemOut],
+            dependencies=[Depends(current_player)])
+def food_search(q: str = Query(..., min_length=1)):
     """Look a food up in Open Food Facts (per-100 g values). The client picks one
     and logs the grams eaten. A lookup failure is a clean 502, not a crash."""
-    return _external_lookup(db, lambda: nutrition.search(q),
+    return _external_lookup(lambda: nutrition.search(q),
                             "Food lookup is unavailable right now — try again, or log it by hand.")
 
 
-@router.post("/food/analyze", response_model=FoodEstimateOut)
-def analyze_food(shot: FoodAnalyzeIn, db: Session = Depends(get_db)):
+@router.post("/food/analyze", response_model=FoodEstimateOut,
+             dependencies=[Depends(current_player)])
+def analyze_food(shot: FoodAnalyzeIn):
     """Estimate a meal's calories/protein/fibre from a photo (Gemini vision). The
     estimate is returned for the user to review and edit — it is NOT logged here.
     Needs a Gemini key; a rough estimate by nature, never a precise measurement."""
-    state.get_or_create_player(db)
     if not llm.enabled():
         raise HTTPException(503, "Photo estimate needs a Gemini key (set ARISE_LLM_API_KEY).")
     if not shot.image.strip():
@@ -297,69 +318,70 @@ def analyze_food(shot: FoodAnalyzeIn, db: Session = Depends(get_db)):
 
 
 @router.post("/food/log", response_model=BodyOut)
-def log_food(entry: FoodLogIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def log_food(entry: FoodLogIn, day: str = Depends(query_day), db: Session = Depends(get_db),
+             player: Player = Depends(current_player)):
     """Add one plate to the day's log."""
-    player = state.get_or_create_player(db)
-    body.log_food(db, player.id, _valid_day(day), entry.name, entry.grams,
+    body.log_food(db, player.id, day, entry.name, entry.grams,
                   entry.kcal, entry.protein_g, entry.fibre_g,
                   slot=entry.slot, place=entry.place, at_time=entry.at_time,
                   protein_p=entry.protein_p, veg_p=entry.veg_p,
                   carb_p=entry.carb_p, extra_p=entry.extra_p,
                   source=entry.source)
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
 @router.delete("/food/log/{entry_id}", response_model=BodyOut)
-def remove_food(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_food(entry_id: str, day: str = Depends(query_day), db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     body.remove_food(db, player.id, entry_id)
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
-@router.get("/skincare/search", response_model=list[SkincareProductOut])
-def skincare_search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+@router.get("/skincare/search", response_model=list[SkincareProductOut],
+            dependencies=[Depends(current_player)])
+def skincare_search(q: str = Query(..., min_length=1)):
     """Look a product up in Open Beauty Facts (free, no key) and read its
     ingredients, flagging the actives that help pigmentation & pores. A gentle
     guide, not medical advice. A lookup failure is a clean 502, not a crash."""
-    return _external_lookup(db, lambda: skincare.lookup(q),
+    return _external_lookup(lambda: skincare.lookup(q),
                             "Ingredient lookup is unavailable right now — try again in a bit.")
 
 
 @router.post("/skincare/step", response_model=BodyOut)
-def add_skincare_step(step: SkincareStepIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def add_skincare_step(step: SkincareStepIn, day: str = Depends(query_day),
+                      db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Append a step to your AM or PM routine."""
-    player = state.get_or_create_player(db)
     body.add_skincare_step(db, player.id, step.routine, step.text)
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
 @router.delete("/skincare/step/{step_id}", response_model=BodyOut)
-def remove_skincare_step(step_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_skincare_step(step_id: str, day: str = Depends(query_day),
+                         db: Session = Depends(get_db), player: Player = Depends(current_player)):
     body.remove_skincare_step(db, player.id, step_id)
-    return body.build_body(db, player.id, _valid_day(day))
+    return body.build_body(db, player.id, day)
 
 
 @router.post("/skincare/check", response_model=BodyOut)
-def check_skincare(body_in: SkincareCheckIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def check_skincare(body_in: SkincareCheckIn, day: str = Depends(query_day),
+                   db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Tick or untick one skincare step for the day."""
-    player = state.get_or_create_player(db)
-    body.toggle_skincare(db, player.id, body_in.step_id, body_in.done, _valid_day(day))
-    return body.build_body(db, player.id, _valid_day(day))
+    body.toggle_skincare(db, player.id, body_in.step_id, body_in.done, day)
+    return body.build_body(db, player.id, day)
 
 
 # ── Inspire: capture a motivational video → distilled insight ─────────────────
 
 
 @router.get("/insights", response_model=list[InsightOut])
-def list_insights(db: Session = Depends(get_db)):
+def list_insights(db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Every captured video, newest first, with its distilled takeaways + quotes."""
-    player = state.get_or_create_player(db)
     return insights.list_insights(db, player.id)
 
 
 @router.post("/insights", response_model=InsightOut)
-def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
+def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Capture a video: fetch its spoken transcript (Supadata) and distil it (Gemini)
     into takeaways + pull-quotes. Needs a Supadata key; distilling needs the Gemini key.
     A rough, editable capture by nature — never logged silently anywhere else.
@@ -367,7 +389,6 @@ def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
     A link that doesn't make it lands in the failure ledger on the way out
     (`GET /insights/failed`), so the error response is a report rather than the only
     record of what was pasted."""
-    player = state.get_or_create_player(db)
     try:
         return insights.capture(db, player.id, body_in.url, body_in.kind)
     except insights.CaptureError as e:
@@ -375,25 +396,24 @@ def add_insight(body_in: InsightAddIn, db: Session = Depends(get_db)):
 
 
 @router.get("/insights/failed", response_model=list[CaptureFailureOut])
-def list_failed_captures(db: Session = Depends(get_db)):
+def list_failed_captures(db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Links that never distilled, newest first — the ones still worth another go."""
-    player = state.get_or_create_player(db)
     return insights.list_failures(db, player.id)
 
 
 @router.post("/insights/failed/retry", response_model=CaptureSweepOut)
-def retry_failed_captures(db: Session = Depends(get_db)):
+def retry_failed_captures(db: Session = Depends(get_db),
+                          player: Player = Depends(current_player)):
     """Try the kept links again — for once the key is set or the day's quota has
     rolled. Bounded (see insights.retry_failures); `untried` says what's left."""
-    player = state.get_or_create_player(db)
     return insights.retry_failures(db, player.id)
 
 
 @router.post("/insights/failed/{failure_id}/retry", response_model=InsightOut)
-def retry_failed_capture(failure_id: str, db: Session = Depends(get_db)):
+def retry_failed_capture(failure_id: str, db: Session = Depends(get_db),
+                         player: Player = Depends(current_player)):
     """Try one kept link again. Fails the same way a fresh paste would, and the
     ledger entry survives with one more attempt on it."""
-    player = state.get_or_create_player(db)
     try:
         return insights.retry_failure(db, player.id, failure_id)
     except LookupError:
@@ -403,17 +423,17 @@ def retry_failed_capture(failure_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/insights/failed/{failure_id}", response_model=list[CaptureFailureOut])
-def forget_failed_capture(failure_id: str, db: Session = Depends(get_db)):
+def forget_failed_capture(failure_id: str, db: Session = Depends(get_db),
+                          player: Player = Depends(current_player)):
     """Give up on a link. Returns what's still kept."""
-    player = state.get_or_create_player(db)
     insights.forget_failure(db, player.id, failure_id)
     return insights.list_failures(db, player.id)
 
 
 @router.delete("/insights/{insight_id}", response_model=list[InsightOut])
-def remove_insight(insight_id: str, db: Session = Depends(get_db)):
+def remove_insight(insight_id: str, db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Forget a capture. Returns the remaining list."""
-    player = state.get_or_create_player(db)
     insights.remove_insight(db, player.id, insight_id)
     return insights.list_insights(db, player.id)
 
@@ -422,16 +442,16 @@ def remove_insight(insight_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/learnings", response_model=list[LearningOut])
-def list_learnings(day: str | None = Query(None), db: Session = Depends(get_db)):
+def list_learnings(day: str = Depends(query_day), db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """What you logged reading or learning on a day, oldest first."""
-    player = state.get_or_create_player(db)
-    return digest.list_learnings(db, player.id, _valid_day(day))
+    return digest.list_learnings(db, player.id, day)
 
 
 @router.post("/learnings", response_model=StateOut)
-def add_learning(body_in: LearningIn, db: Session = Depends(get_db)):
+def add_learning(body_in: LearningIn, db: Session = Depends(get_db),
+                 player: Player = Depends(current_player)):
     """Log something you read or learned. The source alone is enough — notes optional."""
-    player = state.get_or_create_player(db)
     day = _valid_day(body_in.day)
     if not body_in.source.strip() and not body_in.text.strip():
         raise HTTPException(400, "Give it a source or a note — something to remember it by.")
@@ -441,27 +461,26 @@ def add_learning(body_in: LearningIn, db: Session = Depends(get_db)):
 
 
 @router.delete("/learnings/{learning_id}", response_model=StateOut)
-def remove_learning(learning_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
+def remove_learning(learning_id: str, day: str = Depends(query_day), db: Session = Depends(get_db),
+                    player: Player = Depends(current_player)):
     """Drop a logged learning."""
-    player = state.get_or_create_player(db)
     digest.remove_learning(db, player.id, learning_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.get("/digest/preview", response_model=DigestOut)
-def preview_digest(day: str | None = Query(None), db: Session = Depends(get_db)):
+def preview_digest(day: str = Depends(query_day), db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Build a day's digest and return it rendered, without sending. Distilling is
     idempotent, so a later send reuses these highlights rather than paying again."""
-    player = state.get_or_create_player(db)
-    valid = _valid_day(day)
     if not llm.enabled():
         raise HTTPException(503, "Distilling needs a Gemini key (set ARISE_LLM_API_KEY).")
     try:
-        ctx = digest.build_context(db, player, valid)
+        ctx = digest.build_context(db, player, day)
     except Exception:
         raise HTTPException(502, "Couldn't distil that day — try again in a moment.")
     return {
-        "day": valid,
+        "day": day,
         "subject": digest_render.subject_for(ctx),
         "highlights": [h["text"] for h in ctx["highlights"]],
         "recall": ctx["recall"],
@@ -472,56 +491,52 @@ def preview_digest(day: str | None = Query(None), db: Session = Depends(get_db))
 
 
 @router.get("/recall/library", response_model=list[RecallOut])
-def recall_library(day: str | None = Query(None), db: Session = Depends(get_db)):
+def recall_library(day: str = Depends(query_day), db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Every highlight ever distilled, in the day's own shuffled order — the shelf
     the app's recall card browses once the due handful runs out."""
-    player = state.get_or_create_player(db)
-    return recall.library(db, player, _valid_day(day))
+    return recall.library(db, player, day)
 
 
 @router.patch("/recall/{highlight_id}", response_model=StateOut)
-def edit_recall(highlight_id: str, body: RecallEditIn, day: str | None = Query(None),
-                db: Session = Depends(get_db)):
+def edit_recall(highlight_id: str, body: RecallEditIn, day: str = Depends(query_day),
+                db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Rewrite the back of a card — the words stay yours after the distiller's first
     pass. The schedule is untouched."""
-    player = state.get_or_create_player(db)
     try:
         result = recall.edit(db, player, highlight_id, body.text)
     except ValueError as err:
         raise HTTPException(422, str(err))
     if result is None:
         raise HTTPException(404, "No such highlight.")
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/recall/{highlight_id}/grade", response_model=StateOut)
-def grade_recall(highlight_id: str, body: RecallGradeIn, day: str | None = Query(None),
-                 db: Session = Depends(get_db)):
+def grade_recall(highlight_id: str, body: RecallGradeIn, day: str = Depends(query_day),
+                 db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Say how a recall went, and reschedule it. Knew it → further away; no clue →
     back tomorrow. Grading is optional: an ungraded highlight still climbs the ladder
     each time it's shown."""
-    player = state.get_or_create_player(db)
-    valid = _valid_day(day)
     try:
-        result = recall.grade(db, player, highlight_id, body.grade, valid)
+        result = recall.grade(db, player, highlight_id, body.grade, day)
     except ValueError as err:
         raise HTTPException(422, str(err))
     if result is None:
         raise HTTPException(404, "No such highlight.")
-    return state.build_state(db, player, valid)
+    return state.build_state(db, player, day)
 
 
 @router.post("/digest/send", response_model=DigestSendOut)
-def send_digest(day: str | None = Query(None), force: bool = Query(False),
-                db: Session = Depends(get_db)):
+def send_digest(day: str = Depends(query_day), force: bool = Query(False),
+                db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Send a day's digest now — what the nightly job calls. At most once per day
     unless `force`, so a manual send and the job can't both land in the inbox."""
-    player = state.get_or_create_player(db)
     if not mailer.enabled():
         raise HTTPException(503, "Sending needs a Resend key and a recipient "
                                  "(set ARISE_RESEND_API_KEY and ARISE_DIGEST_TO).")
     try:
-        return digest.send_daily(db, player, _valid_day(day), force=force)
+        return digest.send_daily(db, player, day, force=force)
     except Exception as err:
         # Say what actually broke: the nightly job's log is the only place this
         # surfaces, and "couldn't send" alone sends you hunting.
@@ -529,10 +544,9 @@ def send_digest(day: str | None = Query(None), force: bool = Query(False),
 
 
 @router.post("/digest/mend", response_model=DigestMendOut)
-def mend_digest(db: Session = Depends(get_db)):
+def mend_digest(db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Finish the cards an earlier cap cut short now, rather than on the next send —
     which does the same on its own each morning."""
-    player = state.get_or_create_player(db)
     if not llm.enabled():
         raise HTTPException(503, "Finishing cards needs a model key (set ARISE_LLM_API_KEY).")
     problems: list[str] = []
@@ -545,16 +559,15 @@ def mend_digest(db: Session = Depends(get_db)):
 
 
 @router.get("/player/avatar", response_model=AvatarOut)
-def get_avatar(db: Session = Depends(get_db)):
+def get_avatar(player: Player = Depends(current_player)):
     """The profile picture as a data URI, or "" when none is set."""
-    player = state.get_or_create_player(db)
     return {"avatar": player.avatar or ""}
 
 
 @router.put("/player/avatar", response_model=AvatarOut)
-def put_avatar(body_in: AvatarIn, db: Session = Depends(get_db)):
+def put_avatar(body_in: AvatarIn, db: Session = Depends(get_db),
+               player: Player = Depends(current_player)):
     """Set (or clear, with "") the profile picture — a small image data URI."""
-    player = state.get_or_create_player(db)
     av = (body_in.avatar or "").strip()
     if av and not av.startswith("data:image/"):
         raise HTTPException(400, "Avatar must be an image data URI.")
@@ -568,61 +581,62 @@ def put_avatar(body_in: AvatarIn, db: Session = Depends(get_db)):
 
 
 @router.post("/reminders", response_model=StateOut)
-def add_reminder(body_in: ReminderIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def add_reminder(body_in: ReminderIn, day: str = Depends(query_day),
+                 db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Jot a plain reminder. It shows as a simple list on Status."""
-    player = state.get_or_create_player(db)
     service.add_reminder(db, player, body_in.text)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/reminders/{reminder_id}/toggle", response_model=StateOut)
 def toggle_reminder(reminder_id: str, body_in: ReminderToggleIn,
-                    day: str | None = Query(None), db: Session = Depends(get_db)):
+                    day: str = Depends(query_day), db: Session = Depends(get_db),
+                    player: Player = Depends(current_player)):
     """Check a to-do off (or back on). Done items stay in the list."""
-    player = state.get_or_create_player(db)
     service.toggle_reminder(db, player, reminder_id, body_in.done)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.delete("/reminders/{reminder_id}", response_model=StateOut)
-def remove_reminder(reminder_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_reminder(reminder_id: str, day: str = Depends(query_day),
+                    db: Session = Depends(get_db), player: Player = Depends(current_player)):
     service.remove_reminder(db, player, reminder_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 # ── Grocery list (things to buy; tick when bought) ────────────────────────────
 
 
 @router.post("/grocery", response_model=StateOut)
-def add_grocery(body_in: GroceryIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def add_grocery(body_in: GroceryIn, day: str = Depends(query_day),
+                db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Add something to buy. It shows as a checklist on Body and the You hub."""
-    player = state.get_or_create_player(db)
     service.add_grocery(db, player, body_in.name)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/grocery/{item_id}/toggle", response_model=StateOut)
 def toggle_grocery(item_id: str, body_in: GroceryToggleIn,
-                   day: str | None = Query(None), db: Session = Depends(get_db)):
+                   day: str = Depends(query_day), db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Mark a grocery bought (or back to unbought). Bought items stay as a record."""
-    player = state.get_or_create_player(db)
     service.toggle_grocery(db, player, item_id, body_in.bought)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.delete("/grocery/{item_id}", response_model=StateOut)
-def remove_grocery(item_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_grocery(item_id: str, day: str = Depends(query_day),
+                   db: Session = Depends(get_db), player: Player = Depends(current_player)):
     service.remove_grocery(db, player, item_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 # ── Money log (in/out, with today/this-week totals on You) ────────────────────
 
 
 @router.post("/money", response_model=StateOut)
-def add_money(body_in: MoneyIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def add_money(body_in: MoneyIn, day: str = Depends(query_day), db: Session = Depends(get_db),
+              player: Player = Depends(current_player)):
     """Log an amount in (income) or out (spending). `bucket` tags spending against the
     50/30/20 rule; it's ignored on money in.
 
@@ -630,98 +644,94 @@ def add_money(body_in: MoneyIn, day: str | None = Query(None), db: Session = Dep
     it and the entry lands on the query day, as every existing caller expects. The
     state that comes back is always for the query day — that's the screen the client
     is looking at, not the day it just filed something under."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    on = _valid_day(body_in.day) if body_in.day else d
+    on = _valid_day(body_in.day) if body_in.day else day
     # A future entry sits outside every period the app can navigate to, so it would be
     # accepted and then invisible. Refuse it rather than swallow it.
-    if on > d:
+    if on > day:
         raise HTTPException(400, "day cannot be in the future")
     service.add_money(db, player, body_in.amount, body_in.direction, body_in.note, on, bucket=body_in.bucket)
-    return state.build_state(db, player, d)
+    return state.build_state(db, player, day)
 
 
 @router.delete("/money", response_model=StateOut)
-def reset_money(day: str | None = Query(None), db: Session = Depends(get_db)):
+def reset_money(day: str = Depends(query_day), db: Session = Depends(get_db),
+                player: Player = Depends(current_player)):
     """Clear the whole money log — a fresh start, balance back to zero."""
-    player = state.get_or_create_player(db)
     service.reset_money(db, player)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.delete("/money/{entry_id}", response_model=StateOut)
-def remove_money(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_money(entry_id: str, day: str = Depends(query_day), db: Session = Depends(get_db),
+                 player: Player = Depends(current_player)):
     service.remove_money(db, player, entry_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.get("/money/history", response_model=MoneyHistoryOut)
 def money_history(
     scope: str = Query("week"),
-    day: str | None = Query(None),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """One period of the money log (scope = day | week | month) anchored on `day`."""
-    player = state.get_or_create_player(db)
-    return state.money_history(db, player, scope, _valid_day(day))
+    return state.money_history(db, player, scope, day)
 
 
 # ── Budget (take-home pay + the standing commitments it's divided across) ─────
 
 
 @router.put("/budget/income", response_model=StateOut)
-def set_income(body_in: IncomeIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_income(body_in: IncomeIn, day: str = Depends(query_day), db: Session = Depends(get_db),
+               player: Player = Depends(current_player)):
     """Set monthly take-home pay — the base every 50/30/20 line is computed from."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    service.set_monthly_income(db, player, body_in.monthly_income, d)
-    return state.build_state(db, player, d)
+    service.set_monthly_income(db, player, body_in.monthly_income, day)
+    return state.build_state(db, player, day)
 
 
 @router.post("/budget/commitments", response_model=StateOut)
-def add_commitment(body_in: CommitmentIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def add_commitment(body_in: CommitmentIn, day: str = Depends(query_day),
+                   db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Add a standing monthly commitment — a bill, or a planned allowance."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
     service.add_commitment(
         db, player, body_in.label, body_in.amount, body_in.bucket, body_in.due_day, body_in.variable
     )
-    return state.build_state(db, player, d)
+    return state.build_state(db, player, day)
 
 
 @router.patch("/budget/commitments/{commitment_id}", response_model=StateOut)
 def update_commitment(
     commitment_id: str,
     body_in: CommitmentPatch,
-    day: str | None = Query(None),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """Edit one commitment. Only the fields sent are touched."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
     if not service.update_commitment(
         db, player, commitment_id,
         label=body_in.label, amount=body_in.amount, bucket=body_in.bucket,
         due_day=body_in.due_day, variable=body_in.variable, active=body_in.active,
     ):
         raise HTTPException(status_code=404, detail="No such commitment")
-    return state.build_state(db, player, d)
+    return state.build_state(db, player, day)
 
 
 @router.delete("/budget/commitments/{commitment_id}", response_model=StateOut)
-def remove_commitment(commitment_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_commitment(commitment_id: str, day: str = Depends(query_day),
+                      db: Session = Depends(get_db), player: Player = Depends(current_player)):
     service.remove_commitment(db, player, commitment_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/budget/commitments/{commitment_id}/pay", response_model=StateOut)
 def pay_commitment(
     commitment_id: str,
     body_in: PayCommitmentIn | None = None,
-    day: str | None = Query(None),
+    day: str = Depends(query_day),
     db: Session = Depends(get_db),
+    player: Player = Depends(current_player),
 ):
     """Log a standing commitment as paid — writes the money-log entry for you, tagged
     to the right bucket, so a bill is never typed twice. 409 when it's already been
@@ -732,87 +742,88 @@ def pay_commitment(
     tapping a bill while you pay it expects. Note the month that decides "already
     paid" follows the *paid* day, so a bill back-dated into last month is settled
     there and comes due again in this one."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    on = _valid_day(body_in.day) if body_in and body_in.day else d
+    on = _valid_day(body_in.day) if body_in and body_in.day else day
     # A payment that hasn't happened yet isn't a payment, and would land in a period
     # the app can't navigate to. Same refusal as POST /money.
-    if on > d:
+    if on > day:
         raise HTTPException(400, "day cannot be in the future")
     amount = body_in.amount if body_in else None
     if not service.pay_commitment(db, player, commitment_id, on, amount):
         raise HTTPException(status_code=409, detail="No such commitment, or already paid this month")
-    return state.build_state(db, player, d)
+    return state.build_state(db, player, day)
 
 
 # ── Priority (a self-set focus pinned on top of the plan) ─────────────────────
 
 
 @router.post("/priority", response_model=StateOut)
-def set_priority(body_in: PriorityIn, day: str | None = Query(None), db: Session = Depends(get_db)):
+def set_priority(body_in: PriorityIn, day: str = Depends(query_day),
+                 db: Session = Depends(get_db), player: Player = Depends(current_player)):
     """Pin a priority for one attribute — it sits on top of that category's plan."""
-    player = state.get_or_create_player(db)
-    d = _valid_day(day)
-    service.set_priority(db, player, body_in.stat, body_in.focus, body_in.scope, d)
-    return state.build_state(db, player, d)
+    service.set_priority(db, player, body_in.stat, body_in.focus, body_in.scope, day)
+    return state.build_state(db, player, day)
 
 
 @router.delete("/priority/{stat}", response_model=StateOut)
-def clear_priority(stat: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def clear_priority(stat: str, day: str = Depends(query_day), db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     service.clear_priority(db, player, stat)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 # ── Quest journal (reflection notes) ──────────────────────────────────────────
 
 
 @router.post("/quest-notes", response_model=StateOut)
-def add_quest_note(body_in: QuestNoteIn, db: Session = Depends(get_db)):
+def add_quest_note(body_in: QuestNoteIn, db: Session = Depends(get_db),
+                   player: Player = Depends(current_player)):
     """Save what you wrote for a reflective quest. Kept, dated, in the Journal."""
-    player = state.get_or_create_player(db)
+    day = _valid_day(body_in.day)
     service.add_quest_note(
-        db, player, body_in.quest_id, _valid_day(body_in.day), body_in.text,
+        db, player, body_in.quest_id, day, body_in.text,
         body_in.prompt, body_in.step_index,
     )
-    return state.build_state(db, player, _valid_day(body_in.day))
+    return state.build_state(db, player, day)
 
 
 @router.post("/quest-notes/{note_id}", response_model=StateOut)
-def update_quest_note(note_id: str, body_in: QuestNoteUpdateIn, db: Session = Depends(get_db)):
+def update_quest_note(note_id: str, body_in: QuestNoteUpdateIn, db: Session = Depends(get_db),
+                      player: Player = Depends(current_player)):
     """Edit a saved reflection (the modal editor saves through here)."""
-    player = state.get_or_create_player(db)
     service.update_quest_note(db, player, note_id, body_in.text)
     return state.build_state(db, player, _valid_day(body_in.day))
 
 
 @router.delete("/quest-notes/{note_id}", response_model=StateOut)
-def remove_quest_note(note_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_quest_note(note_id: str, day: str = Depends(query_day),
+                      db: Session = Depends(get_db), player: Player = Depends(current_player)):
     service.remove_quest_note(db, player, note_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
 
 
 # ── Journal (free-form daily entries) ─────────────────────────────────────────
 
 
 @router.post("/journal", response_model=StateOut)
-def add_journal_entry(body_in: JournalEntryIn, db: Session = Depends(get_db)):
+def add_journal_entry(body_in: JournalEntryIn, db: Session = Depends(get_db),
+                      player: Player = Depends(current_player)):
     """Write anything for the day — a free journal entry, unlinked to any quest."""
-    player = state.get_or_create_player(db)
-    service.add_journal_entry(db, player, _valid_day(body_in.day), body_in.text)
-    return state.build_state(db, player, _valid_day(body_in.day))
+    day = _valid_day(body_in.day)
+    service.add_journal_entry(db, player, day, body_in.text)
+    return state.build_state(db, player, day)
 
 
 @router.post("/journal/{entry_id}", response_model=StateOut)
-def update_journal_entry(entry_id: str, body_in: JournalEntryUpdateIn, db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def update_journal_entry(entry_id: str, body_in: JournalEntryUpdateIn,
+                         db: Session = Depends(get_db),
+                         player: Player = Depends(current_player)):
     service.update_journal_entry(db, player, entry_id, body_in.text)
     return state.build_state(db, player, _valid_day(body_in.day))
 
 
 @router.delete("/journal/{entry_id}", response_model=StateOut)
-def remove_journal_entry(entry_id: str, day: str | None = Query(None), db: Session = Depends(get_db)):
-    player = state.get_or_create_player(db)
+def remove_journal_entry(entry_id: str, day: str = Depends(query_day),
+                         db: Session = Depends(get_db),
+                         player: Player = Depends(current_player)):
     service.remove_journal_entry(db, player, entry_id)
-    return state.build_state(db, player, _valid_day(day))
+    return state.build_state(db, player, day)
