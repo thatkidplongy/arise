@@ -12,6 +12,16 @@ function describeReturn(days: number): string {
   return `back in ${days} days`;
 }
 
+/** What Missed promises. It books the bottom rung, which a card already sitting on
+ * that rung is only being sent back to — so on a new or freshly-missed card Shaky
+ * offers the very same day and the date has stopped telling the two apart. What
+ * still separates them is the sitting: a missed card comes round again a few cards
+ * later, where a shaky one is finished for today. Say that instead. */
+function describeMissed(ifMissed: number, ifShaky: number): string {
+  if (ifMissed === ifShaky) return 'back in this sitting';
+  return describeReturn(ifMissed);
+}
+
 /** One of the three piles a graded card can land in. */
 function GradeButton({
   label,
@@ -59,7 +69,12 @@ export function GradeBar({
     <View style={styles.wrap}>
       <Text style={styles.ask}>How close were you? Your answer sets when you see this card again.</Text>
       <View style={styles.row}>
-        <GradeButton label="Missed" sub={describeReturn(ifMissed)} emphasis="plain" onPress={() => onGrade('missed')} />
+        <GradeButton
+          label="Missed"
+          sub={describeMissed(ifMissed, ifShaky)}
+          emphasis="plain"
+          onPress={() => onGrade('missed')}
+        />
         <GradeButton label="Shaky" sub={describeReturn(ifShaky)} emphasis="soft" onPress={() => onGrade('shaky')} />
         <GradeButton label="Got it" sub={describeReturn(ifGot)} emphasis="filled" onPress={() => onGrade('got')} />
       </View>
