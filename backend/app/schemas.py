@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from . import limits
+
 # ── Requests ─────────────────────────────────────────────────────────────────
 
 
@@ -33,7 +35,7 @@ class BookIn(BaseModel):
 class ReadingLogIn(BaseModel):
     """A sitting of reading, as the hunter counts it."""
     chapters: int = Field(1, ge=1, le=200, description="How many chapters this sitting")
-    label: str = Field("", max_length=120, description="Which ones — '5–7', 'the intro'")
+    label: str = Field("", max_length=limits.READING_LABEL, description="Which ones — '5–7', 'the intro'")
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
@@ -44,7 +46,7 @@ class BookReviewIn(BaseModel):
 
 class CraftSourceIn(BaseModel):
     """The one thing Craft is studying. "" clears it."""
-    source: str = Field("", max_length=160)
+    source: str = Field("", max_length=limits.CRAFT_SOURCE)
 
 
 class CraftPhaseIn(BaseModel):
@@ -86,8 +88,8 @@ class InsightAddIn(BaseModel):
 
 class LearningIn(BaseModel):
     kind: str = Field(default="other", pattern=r"^(book|notion|article|work|video|other)$")
-    source: str = Field("", max_length=200)  # what it was — title + chapters, a page, a URL
-    text: str = Field("", max_length=4000)  # optional notes; the source alone is enough
+    source: str = Field("", max_length=limits.LEARNING_SOURCE)  # what it was — title + chapters, a page, a URL
+    text: str = Field("", max_length=limits.LEARNING_NOTE)  # optional notes; the source alone is enough
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
@@ -107,7 +109,7 @@ class AvatarIn(BaseModel):
 
 
 class ReminderIn(BaseModel):
-    text: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=limits.REMINDER)
 
 
 class ReminderToggleIn(BaseModel):
@@ -115,7 +117,7 @@ class ReminderToggleIn(BaseModel):
 
 
 class GroceryIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=limits.GROCERY_NAME)
 
 
 class GroceryToggleIn(BaseModel):
@@ -125,7 +127,7 @@ class GroceryToggleIn(BaseModel):
 class MoneyIn(BaseModel):
     amount: float = Field(gt=0, le=1_000_000_000)
     direction: Literal["in", "out"]  # money in (income) or out (spending)
-    note: str = Field("", max_length=120)
+    note: str = Field("", max_length=limits.MONEY_NOTE)
     # Which 50/30/20 bucket this spending counts against. Only meaningful on money
     # out — income isn't divided, it's what the division is of.
     bucket: Literal["needs", "wants"] | None = None
@@ -155,7 +157,7 @@ class IncomeIn(BaseModel):
 class CommitmentIn(BaseModel):
     """A standing monthly commitment: a bill, or a planned allowance like groceries.
     Only 'needs' and 'wants' — savings is the remainder, never a thing you commit to."""
-    label: str = Field(min_length=1, max_length=60)
+    label: str = Field(min_length=1, max_length=limits.COMMITMENT_LABEL)
     amount: float = Field(gt=0, le=1_000_000_000)
     bucket: Literal["needs", "wants"]
     due_day: int = Field(0, ge=0, le=31)   # day of the month, 0 = no fixed date
@@ -165,7 +167,7 @@ class CommitmentIn(BaseModel):
 class CommitmentPatch(BaseModel):
     """Every field optional — the app flips `active` or nudges one amount without
     resending the whole row."""
-    label: str | None = Field(None, min_length=1, max_length=60)
+    label: str | None = Field(None, min_length=1, max_length=limits.COMMITMENT_LABEL)
     amount: float | None = Field(None, gt=0, le=1_000_000_000)
     bucket: Literal["needs", "wants"] | None = None
     due_day: int | None = Field(None, ge=0, le=31)
@@ -175,30 +177,30 @@ class CommitmentPatch(BaseModel):
 
 class PriorityIn(BaseModel):
     stat: str = Field(min_length=3, max_length=3)     # the attribute to prioritise (STR, CRE, …)
-    focus: str = Field(min_length=1, max_length=60)   # e.g. "abs", "passive income"
+    focus: str = Field(min_length=1, max_length=limits.PRIORITY_FOCUS)  # e.g. "abs", "passive income"
     scope: Literal["day", "week", "open"] = "week"    # today / this ISO week / until cleared
 
 
 class QuestNoteIn(BaseModel):
     quest_id: str
-    text: str = Field(min_length=1, max_length=2000)  # lightweight Markdown
-    prompt: str = Field("", max_length=500)  # the write-step/question being answered
+    text: str = Field(min_length=1, max_length=limits.QUEST_NOTE)  # lightweight Markdown
+    prompt: str = Field("", max_length=limits.QUEST_NOTE_PROMPT)  # the write-step/question being answered
     step_index: int | None = Field(None, ge=0)  # the step that produced it (binds note↔step)
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
 class QuestNoteUpdateIn(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)  # lightweight Markdown
+    text: str = Field(min_length=1, max_length=limits.QUEST_NOTE)  # lightweight Markdown
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
 class JournalEntryIn(BaseModel):
-    text: str = Field(min_length=1, max_length=5000)  # free-form Markdown
+    text: str = Field(min_length=1, max_length=limits.JOURNAL_ENTRY)  # free-form Markdown
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 
 class JournalEntryUpdateIn(BaseModel):
-    text: str = Field(min_length=1, max_length=5000)
+    text: str = Field(min_length=1, max_length=limits.JOURNAL_ENTRY)
     day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Client-local date")
 
 

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from datetime import date, timedelta
 
-from . import game, japanese, llm, progression, quests
+from . import game, japanese, limits, llm, progression, quests
 from .achievements import ACHIEVEMENTS
 from .models import (
     AchievementUnlock,
@@ -654,7 +654,7 @@ def _owned(db: Session, model, row_id: str, player: Player):
 
 
 def add_reminder(db: Session, player: Player, text: str) -> None:
-    text = (text or "").strip()[:200]
+    text = (text or "").strip()[:limits.REMINDER]
     if text:
         db.add(Reminder(player_id=player.id, text=text))
         db.commit()
@@ -684,7 +684,7 @@ def add_quest_note(
     one only from a 'write' step, but any note that arrives is kept. `prompt` is the
     step text being answered, stored so the Journal can show what the note responds
     to; `step_index` binds it to that step so undoing the step removes the note."""
-    text = (text or "").strip()[:2000]
+    text = (text or "").strip()[:limits.QUEST_NOTE]
     if not text:
         return
     quest = next((q for q in quest_defs(db) if q.id == quest_id), None)
@@ -693,14 +693,15 @@ def add_quest_note(
     pk = quests.period_key(quest.cadence, day)
     db.add(QuestNote(
         player_id=player.id, quest_id=quest_id, period_key=pk, day=day,
-        text=text, prompt=(prompt or "").strip()[:500], step_index=step_index,
+        text=text, prompt=(prompt or "").strip()[:limits.QUEST_NOTE_PROMPT],
+        step_index=step_index,
     ))
     db.commit()
 
 
 def update_quest_note(db: Session, player: Player, note_id: str, text: str) -> None:
     """Edit an existing reflection in place (the modal editor saves through here)."""
-    text = (text or "").strip()[:2000]
+    text = (text or "").strip()[:limits.QUEST_NOTE]
     row = _owned(db, QuestNote, note_id, player)
     if row is not None and text:
         row.text = text
@@ -716,14 +717,14 @@ def remove_quest_note(db: Session, player: Player, note_id: str) -> None:
 
 def add_journal_entry(db: Session, player: Player, day: str, text: str) -> None:
     """Write a free-form entry for the day (Markdown). Unlinked to any quest."""
-    text = (text or "").strip()[:5000]
+    text = (text or "").strip()[:limits.JOURNAL_ENTRY]
     if text:
         db.add(JournalEntry(player_id=player.id, day=day, text=text))
         db.commit()
 
 
 def update_journal_entry(db: Session, player: Player, entry_id: str, text: str) -> None:
-    text = (text or "").strip()[:5000]
+    text = (text or "").strip()[:limits.JOURNAL_ENTRY]
     row = _owned(db, JournalEntry, entry_id, player)
     if row is not None and text:
         row.text = text
@@ -739,7 +740,7 @@ def remove_journal_entry(db: Session, player: Player, entry_id: str) -> None:
 
 
 def add_grocery(db: Session, player: Player, name: str) -> None:
-    name = (name or "").strip()[:120]
+    name = (name or "").strip()[:limits.GROCERY_NAME]
     if name:
         db.add(GroceryItem(player_id=player.id, name=name))
         db.commit()
@@ -786,7 +787,7 @@ def add_money(
         return
     db.add(MoneyEntry(
         player_id=player.id, amount=float(amount), direction=direction,
-        note=(note or "").strip()[:120], day=day,
+        note=(note or "").strip()[:limits.MONEY_NOTE], day=day,
         bucket=bucket if (direction == "out" and bucket in BUDGET_BUCKETS) else None,
         commitment_id=commitment_id,
     ))
@@ -881,7 +882,7 @@ def add_commitment(
 ) -> BudgetCommitment | None:
     """Add a standing monthly commitment — a bill or a planned allowance. Returns the
     row, or None when the label is blank or the bucket isn't one we divide across."""
-    label = (label or "").strip()[:60]
+    label = (label or "").strip()[:limits.COMMITMENT_LABEL]
     if not label or bucket not in BUDGET_BUCKETS or amount <= 0:
         return None
     row = BudgetCommitment(
@@ -918,7 +919,7 @@ def update_commitment(
     if row is None:
         return False
     if label is not None and label.strip():
-        row.label = label.strip()[:60]
+        row.label = label.strip()[:limits.COMMITMENT_LABEL]
     if amount is not None and amount > 0:
         row.amount = round(amount, 2)
     if bucket in BUDGET_BUCKETS:
@@ -956,7 +957,7 @@ def set_priority(db: Session, player: Player, stat: str, focus: str, scope: str,
     """Pin a priority for one attribute, on top of that category's plan. `scope` is
     'day' | 'week' | 'open'; the period stamps when it was set so day/week
     priorities expire on their own. Setting a stat again replaces its priority."""
-    focus = (focus or "").strip()[:60]
+    focus = (focus or "").strip()[:limits.PRIORITY_FOCUS]
     if stat not in game.STAT_KEYS or not focus:
         return
     if scope not in ("day", "week", "open"):
