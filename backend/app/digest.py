@@ -35,7 +35,7 @@ from datetime import date, timedelta
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from . import digest_render, llm, mailer, reading, recall, recap
+from . import digest_render, limits, llm, mailer, reading, recall, recap
 from .models import (Completion, DigestRun, Highlight, Learning, Player, QuestNote,
                      Thread)
 
@@ -139,7 +139,50 @@ def gather(db: Session, player: Player, day: str) -> list[dict]:
                 "text": "Read today's chapters (which ones wasn't recorded, so stay general).",
             })
 
-    return entries
+    return fit_to_budget(entries)
+
+
+# The cut is announced rather than silent: a note that simply stops mid-sentence
+# reads to the model as a finished thought that trailed off, and it will dutifully
+# distil the trailing-off. Short, because it is spent from the entry's own share.
+_TRIMMED = " …[trimmed]"
+
+
+def fit_to_budget(entries: list[dict], budget: int = limits.DIGEST_ENTRIES) -> list[dict]:
+    """Cut a day's notes down to what the distiller can read in one call.
+
+    The per-note caps in `limits.py` bound one note; nothing bounded the pile, so
+    a prolific day was an unbounded prompt. This bounds it — and it is what lets a
+    quest note be 8000 without the digest paying for it.
+
+    Nothing is dropped whole. A day with six sources should come back with
+    highlights from six sources, and an entry cut to nothing is a source the model
+    can't see at all — worse than every entry being a little shorter. So each note
+    gets an equal share of the budget, and whatever the short ones leave unspent is
+    handed back to the long ones until it runs out. The upshot: an ordinary day is
+    untouched, and on a huge one it is the longest notes that give ground, not
+    whoever happened to write last.
+    """
+    texts = [(e.get("text") or "") for e in entries]
+    if sum(len(t) for t in texts) <= budget:
+        return entries
+
+    # Raise a common ceiling until the kept total meets the budget: walk the notes
+    # shortest-first, and the first one that wants more than an even split of
+    # what's left is where the ceiling lands (every longer note is cut to it).
+    ceiling, left, rest = budget, len(texts), budget
+    for n in sorted(len(t) for t in texts):
+        share = rest // left
+        if n > share:
+            ceiling = share
+            break
+        rest -= n
+        left -= 1
+
+    return [
+        e if len(t) <= ceiling else {**e, "text": t[:ceiling].rstrip() + _TRIMMED}
+        for e, t in zip(entries, texts)
+    ]
 
 
 def _book_label(book: str, chapters: str) -> str:

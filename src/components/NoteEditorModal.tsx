@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { NoteCounter } from '@/components/NoteCounter';
 import { Text, TextInput } from '@/components/ui/Text';
-import { QUEST_NOTE_MAX } from '@/consts';
+import { LEARNING_NOTE_MAX } from '@/consts';
 import { TAP_MIN, accent, neutral, onAccent, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Sel = { start: number; end: number };
@@ -51,14 +52,16 @@ export function NoteEditorModal({
   initial,
   onSave,
   onClose,
-  maxLength = QUEST_NOTE_MAX,
+  maxLength = LEARNING_NOTE_MAX,
 }: {
   visible: boolean;
   prompt: string;
   initial: string;
   onSave: (text: string) => void;
   onClose: () => void;
-  /** The surface's own cap — see src/consts.ts. Defaults to the tightest one. */
+  /** The surface's own cap — see src/consts.ts. Defaults to the tightest of them,
+   * so a caller that forgets to pass one can't overrun its own server-side cap.
+   * (That is the learning note now; the quest note is the roomiest.) */
   maxLength?: number;
 }) {
   const [value, setValue] = useState(initial);
@@ -82,10 +85,14 @@ export function NoteEditorModal({
     setSel(r.sel);
   };
 
+  // What gets stored, and so what the cap applies to — here the typed text *is*
+  // the Markdown, so no serialising step stands between the two.
+  const stored = value.trim();
+  const over = stored.length > maxLength;
+
   const save = () => {
-    const t = value.trim();
-    if (!t) return;
-    onSave(t);
+    if (!stored || over) return;
+    onSave(stored);
   };
 
   return (
@@ -143,8 +150,8 @@ export function NoteEditorModal({
               autoFocus
               scrollEnabled
               textAlignVertical="top"
-              maxLength={maxLength}
             />
+            <NoteCounter length={stored.length} max={maxLength} />
             <Text style={styles.hint}>
               Use <Text style={styles.b}>**bold**</Text>, <Text style={styles.i}>_italic_</Text>,{' '}
               <Text style={styles.mono}>`code`</Text>, <Text style={styles.mono}>```</Text> for code
@@ -160,12 +167,12 @@ export function NoteEditorModal({
               </Pressable>
               <Pressable
                 onPress={save}
-                disabled={!value.trim()}
+                disabled={!stored || over}
                 style={({ pressed }) => [
                   styles.btn,
                   styles.btnSave,
                   pressed && { opacity: press.soft },
-                  !value.trim() && styles.btnDisabled,
+                  (!stored || over) && styles.btnDisabled,
                 ]}
               >
                 <Text style={styles.btnSaveText}>Save</Text>

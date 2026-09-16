@@ -1436,3 +1436,53 @@ def test_hooks_are_asked_for_an_analogy_and_never_a_mnemonic():
         assert "twelve-year-old" in lowered
         # The old instruction that produced wordplay must be gone.
         assert "make it a mnemonic" not in lowered
+
+
+# ── The distiller's budget ───────────────────────────────────────────────────
+
+
+def test_a_normal_day_is_passed_through_untouched():
+    entries = [{"kind": "book", "source": "a", "text": "x" * 500},
+               {"kind": "reflection", "source": "b", "text": "y" * 900}]
+    assert digest.fit_to_budget(entries, budget=24_000) == entries
+
+
+def test_the_budget_caps_what_one_day_can_send():
+    """Per-note caps bound one note; nothing bounded a day of them until now."""
+    entries = [{"kind": "reflection", "source": str(i), "text": "x" * 8000} for i in range(6)]
+    out = digest.fit_to_budget(entries, budget=24_000)
+    assert sum(len(e["text"]) for e in out) <= 24_000 + len(out) * len(digest._TRIMMED)
+
+
+def test_a_short_note_keeps_every_word_while_a_long_one_gives_ground():
+    """Equal shares, with the unspent remainder handed back to the long notes — so
+    the short entries are untouched rather than everyone losing the same slice."""
+    entries = [{"kind": "book", "source": "short", "text": "x" * 100},
+               {"kind": "reflection", "source": "long", "text": "y" * 5000}]
+    short, long = digest.fit_to_budget(entries, budget=1000)
+    assert short["text"] == "x" * 100          # well under its share: keeps all of it
+    assert len(long["text"]) < 5000            # over its share: cut back
+    assert long["text"].endswith(digest._TRIMMED)
+
+
+def test_nothing_is_dropped_whole_so_every_source_stays_visible():
+    """An entry cut to nothing is a source the model can't attribute to at all."""
+    entries = [{"kind": "reflection", "source": str(i), "text": "x" * 4000} for i in range(20)]
+    out = digest.fit_to_budget(entries, budget=2000)
+    assert len(out) == 20
+    assert all(e["text"].strip() for e in out)
+
+
+def test_the_cut_is_announced_rather_than_trailing_off(db):
+    """A note that just stops reads to the model as a thought that trailed off."""
+    from app.models import QuestNote
+
+    player = state.get_or_create_player(db)
+    for i in range(4):
+        db.add(QuestNote(player_id=player.id, quest_id=f"q{i}", period_key=DAY, day=DAY,
+                         text="Base rates come first. " * 600, prompt=""))
+    db.commit()
+
+    entries = digest.gather(db, player, DAY)
+    assert sum(len(e["text"]) for e in entries) < 4 * len("Base rates come first. " * 600)
+    assert all(e["text"].endswith(digest._TRIMMED) for e in entries)
