@@ -157,6 +157,45 @@ def enabled() -> bool:
     return bool(_api_key())
 
 
+def _require_budget() -> None:
+    """Refuse before asking, for the callers that retry.
+
+    Kept at the call site rather than inside `_ask` because it doesn't apply
+    everywhere: generation is gated on `can_generate()` instead (it keeps clear of
+    the digest's reserve), and the photo estimate isn't gated at all — the hunter
+    is standing there looking at the screen. Only the retrying callers refuse up
+    front, where asking anyway would spend three requests learning what's already
+    known."""
+    if budget_left() <= 0:
+        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
+
+
+def _ask(parts: list[dict], schema: dict, temperature: float, timeout: float,
+         retries: int = 0, spend: int = 0) -> dict:
+    """One model call: `parts` in, the raw response payload out.
+
+    Every caller asks the same way — JSON constrained to a schema, against the
+    keyed endpoint for the configured model — and differs only in what it sends
+    and how it pays. `retries` rides out the free tier's burst limit (429) and is
+    for background work only; a caller that retries charges its whole worst case
+    to `spend` before asking, so a burst can't overdraw the digest's reserve.
+
+    Raises on any transport error; every caller lets that propagate to whoever
+    decides what to do without the model."""
+    body = {
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "temperature": temperature,
+            "responseMimeType": "application/json",
+            "responseSchema": schema,
+        },
+    }
+    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    if spend:
+        note_spend(spend)
+    return net.post_json(url, body, timeout=timeout, retries=retries)
+
+
 def _build_prompt(slots: list[dict], profile: dict) -> str:
     lines = [
         "You write daily/weekly self-improvement quests for one person's personal",
@@ -233,17 +272,10 @@ def generate(slots: list[dict], profile: dict, timeout: float = 20.0) -> dict[st
     Raises on any transport/parse error; the caller falls back to the pools."""
     if not slots:
         return {}
-    body = {
-        "contents": [{"parts": [{"text": _build_prompt(slots, profile)}]}],
-        "generationConfig": {
-            "temperature": 0.85,
-            "responseMimeType": "application/json",
-            "responseSchema": _RESPONSE_SCHEMA,
-        },
-    }
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    note_spend()
-    payload = net.post_json(url, body, timeout=timeout)
+    payload = _ask(
+        [{"text": _build_prompt(slots, profile)}],
+        _RESPONSE_SCHEMA, 0.85, timeout, spend=1,
+    )
 
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(text)
@@ -338,20 +370,13 @@ def analyze_food(image_b64: str, mime: str = "image/jpeg", timeout: float = 25.0
 
     Raises on any transport/parse error; the route turns that into a clean message.
     Only called on demand (when the user snaps a photo), never in the background."""
-    body = {
-        "contents": [{"parts": [
+    return _parse_estimate(_ask(
+        [
             {"inline_data": {"mime_type": mime or "image/jpeg", "data": image_b64}},
             {"text": _ESTIMATE_PROMPT},
-        ]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "responseMimeType": "application/json",
-            "responseSchema": _ESTIMATE_SCHEMA,
-        },
-    }
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    payload = net.post_json(url, body, timeout=timeout)
-    return _parse_estimate(payload)
+        ],
+        _ESTIMATE_SCHEMA, 0.2, timeout,
+    ))
 
 
 # ── Distil a motivational transcript into takeaways + pull-quotes ────────────────
@@ -439,22 +464,15 @@ _TIPS_PROMPT = (
 
 def _distill(prompt: str, transcript: str, timeout: float) -> dict:
     """Shared Gemini call for a distillation → {summary, takeaways[], quotes[]}."""
-    body = {
-        "contents": [{"parts": [
-            {"text": prompt},
-            {"text": "TRANSCRIPT:\n" + transcript.strip()},
-        ]}],
-        "generationConfig": {
-            "temperature": 0.4,
-            "responseMimeType": "application/json",
-            "responseSchema": _DISTIL_SCHEMA,
-        },
-    }
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
     # Capture runs in the background, so we can afford to ride out Gemini's
     # free-tier burst limit (429) with a couple of retries rather than failing.
-    payload = net.post_json(url, body, timeout=timeout, retries=2)
-    return _parse_distillation(payload)
+    return _parse_distillation(_ask(
+        [
+            {"text": prompt},
+            {"text": "TRANSCRIPT:\n" + transcript.strip()},
+        ],
+        _DISTIL_SCHEMA, 0.4, timeout, retries=2,
+    ))
 
 
 def distill_motivation(transcript: str, timeout: float = 25.0) -> dict:
@@ -685,23 +703,15 @@ def hooks_for(facts: list[dict], timeout: float = 30.0) -> dict[int, str]:
         f"{i}. FACT: {f.get('text') or ''}\n   ASKED AS: {f.get('cue') or ''}"
         for i, f in enumerate(facts, 1)
     )
-    body = {
-        "contents": [{"parts": [
+    _require_budget()
+    return _parse_hooks(_ask(
+        [
             {"text": _HOOKS_PROMPT},
             {"text": "FACTS:\n" + numbered},
-        ]}],
-        "generationConfig": {
-            "temperature": 0.4,  # a hook is an invention; the distillation is not
-            "responseMimeType": "application/json",
-            "responseSchema": _HOOKS_SCHEMA,
-        },
-    }
-    if budget_left() <= 0:
-        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    note_spend(3)  # one attempt plus its two retries
-    payload = net.post_json(url, body, timeout=timeout, retries=2)
-    return _parse_hooks(payload)
+        ],
+        # A hook is an invention; the distillation is not.
+        _HOOKS_SCHEMA, 0.4, timeout, retries=2, spend=3,
+    ))
 
 
 # ── Finishing lines an earlier cap cut short ─────────────────────────────────
@@ -801,23 +811,15 @@ def finish_lines(lines: list[dict], timeout: float = 30.0) -> dict[int, str]:
     boundary, so a back could end "highly interconnect…". They are asked for years,
     so one call to finish them is worth it. Raises on transport/parse failure; the
     caller leaves the cards as they are."""
-    body = {
-        "contents": [{"parts": [
-            {"text": _FINISH_PROMPT},
-            {"text": "LINES:\n" + _format_lines(lines)},
-        ]}],
-        "generationConfig": {
-            "temperature": 0.2,  # the head is a copy and the ending is the source's
-            "responseMimeType": "application/json",
-            "responseSchema": _FINISH_SCHEMA,
-        },
-    }
-    if budget_left() <= 0:
-        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    note_spend(3)  # one attempt plus its two retries
-    payload = net.post_json(url, body, timeout=timeout, retries=2)
-    return _parse_finished(payload, lines)
+    parts = [
+        {"text": _FINISH_PROMPT},
+        {"text": "LINES:\n" + _format_lines(lines)},
+    ]
+    _require_budget()
+    # Temperature 0.2: the head is a copy and the ending is the source's.
+    return _parse_finished(
+        _ask(parts, _FINISH_SCHEMA, 0.2, timeout, retries=2, spend=3), lines,
+    )
 
 
 _THREAD_SCHEMA = {
@@ -856,21 +858,12 @@ def thread_summary(title: str, previous: str, new_lines: list[str], timeout: flo
         f"SENTENCE SO FAR: {previous or '(nothing yet — this is the first sitting)'}",
         "NEW IDEAS:\n" + "\n".join(f"- {ln}" for ln in new_lines),
     ]
-    body = {
-        "contents": [{"parts": [{"text": _THREAD_PROMPT}, {"text": "\n\n".join(parts)}]}],
-        "generationConfig": {
-            "temperature": 0.3,
-            "responseMimeType": "application/json",
-            "responseSchema": _THREAD_SCHEMA,
-        },
-    }
-    if budget_left() <= 0:
-        # The caller keeps the previous sentence, which is the right failure here.
-        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
-    note_spend(3)  # one attempt plus its two retries
-    payload = net.post_json(url, body, timeout=timeout, retries=2)
-    return _parse_thread(payload)
+    # Refused, the caller keeps the previous sentence — the right failure here.
+    _require_budget()
+    return _parse_thread(_ask(
+        [{"text": _THREAD_PROMPT}, {"text": "\n\n".join(parts)}],
+        _THREAD_SCHEMA, 0.3, timeout, retries=2, spend=3,
+    ))
 
 
 def _parse_thread(payload: dict) -> str:
@@ -901,26 +894,14 @@ def distill_learning(entries: list[dict], timeout: float = 30.0) -> dict:
     The day goes up in a single call rather than one per entry: it's cheaper, and it
     lets the model merge the same idea arriving from two sources. Raises on any
     transport/parse error; the caller decides what to do."""
-    body = {
-        "contents": [{"parts": [
-            {"text": _LEARNING_PROMPT},
-            {"text": "ENTRIES:\n" + _format_entries(entries)},
-        ]}],
-        "generationConfig": {
-            "temperature": 0.3,
-            "responseMimeType": "application/json",
-            "responseSchema": _LEARNING_SCHEMA,
-        },
-    }
-    if budget_left() <= 0:
-        # Asking anyway would spend three requests (it retries) learning what we
-        # already know, and the digest logs the reason and sends the rest.
-        raise RuntimeError(f"the day's model quota is spent (limit {DAILY_LIMIT})")
-    url = _ENDPOINT.format(model=_model()) + "?key=" + _api_key()
+    parts = [
+        {"text": _LEARNING_PROMPT},
+        {"text": "ENTRIES:\n" + _format_entries(entries)},
+    ]
+    # Refused, the digest logs the reason and sends the rest.
+    _require_budget()
     # Runs from the nightly digest job, so a free-tier burst limit is worth waiting out.
-    note_spend(3)  # one attempt plus its two retries
-    payload = net.post_json(url, body, timeout=timeout, retries=2)
-    return _parse_learning(payload)
+    return _parse_learning(_ask(parts, _LEARNING_SCHEMA, 0.3, timeout, retries=2, spend=3))
 
 
 def log_failure(err: Exception) -> None:
