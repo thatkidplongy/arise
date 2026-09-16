@@ -7,7 +7,7 @@ import { Text, TextInput } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
 import { STAT_KEYS } from '@/types';
-import { STAT_META, TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, accent, neutral, onAccent, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 // Tap-to-add focus suggestions for the less-obvious attributes. Tapping one adds
 // it to that attribute's focus set (same as typing it). Extend per stat as needed.
@@ -203,7 +203,7 @@ export function FocusAreasCard() {
               />
               <Pressable
                 onPress={() => addFocus(k)}
-                style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [styles.addBtn, pressed && { opacity: press.medium }]}
               >
                 <Text style={[styles.addBtnText, { color: STAT_META[k].color }]}>Add</Text>
               </Pressable>

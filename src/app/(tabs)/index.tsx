@@ -16,7 +16,7 @@ import { Text } from '@/components/ui/Text';
 import { dateKey } from '@/lib/dates';
 import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { accent, clay, feedback, neutral, radius, sage, surface, text, typography } from '@/theme';
+import { accent, clay, feedback, neutral, press, radius, sage, surface, text, typography } from '@/theme';
 
 // Quiet reminders — that rest and living are part of the path, not a detour.
 const REMINDERS = [
@@ -158,7 +158,7 @@ export default function StatusScreen() {
 }
 
 const styles = StyleSheet.create({
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: press.soft },
   masthead: {
     flexDirection: 'row',
     alignItems: 'center',

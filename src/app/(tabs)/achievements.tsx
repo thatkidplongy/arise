@@ -9,7 +9,7 @@ import { Card, Kicker, ScreenTitle } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import type { ApiState } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { TAP_MIN, clay, feedback, neutral, radius, sage, surface, text, typography } from '@/theme';
+import { TAP_MIN, clay, feedback, neutral, press, radius, sage, surface, text, typography } from '@/theme';
 
 type Achievement = ApiState['achievements'][number];
 
@@ -75,7 +75,7 @@ export default function AchievementsScreen() {
                 styles.row,
                 i > 0 && styles.rowRule,
                 !unlocked && styles.locked,
-                pressed && canEquip && { opacity: 0.7 },
+                pressed && canEquip && { opacity: press.medium },
               ]}
             >
               <View style={[styles.disc, unlocked ? styles.discOn : styles.discOff]}>

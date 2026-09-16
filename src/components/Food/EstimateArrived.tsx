@@ -11,7 +11,7 @@ import { Text } from '@/components/ui/Text';
 import type { ApiFoodDay, ApiPlate } from '@/lib/api';
 import { sayHandoffRange, type Handoff } from '@/lib/handoff';
 import { PORTION, PORTION_ORDER, SLOTS, slotLabel, type PlateDraft } from '@/lib/plate';
-import { TAP_MIN, clay, neutral, radius, sage, shadow, space, surface, text, typography } from '@/theme';
+import { TAP_MIN, clay, neutral, press, radius, sage, shadow, space, surface, text, typography } from '@/theme';
 
 /**
  * An estimate that arrived from somewhere else, held up for review before it
@@ -242,7 +242,7 @@ function Step({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label === '+' ? 'One more serving' : 'One fewer serving'}
-      style={({ pressed }) => [styles.step, disabled && styles.stepOff, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.step, disabled && styles.stepOff, pressed && { opacity: press.medium }]}
     >
       <Text style={styles.stepLabel}>{label}</Text>
     </Pressable>

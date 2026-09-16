@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { useSearch } from '@/hooks/useSearch';
 import type { ApiBook, ApiBookShelf } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
-import { accent, neutral, surface, text, typography } from '@/theme';
+import { accent, neutral, press, surface, text, typography } from '@/theme';
 
 /** Estimate chapters from page count (~15 pages/chapter) — a starting guess the
  * user can adjust; 0 when the page count is unknown. */
@@ -70,7 +70,7 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
             <Pressable
               key={`${b.title}-${i}`}
               onPress={() => pick(b)}
-              style={({ pressed }) => [styles.resultRow, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.resultRow, pressed && { opacity: press.medium }]}
             >
               <Cover url={b.cover_url} size={30} />
               <View style={styles.resultMain}>
@@ -104,7 +104,7 @@ export function BookPicker({ onPick }: { onPick: (title: string, chapters: numbe
                   <Pressable
                     key={`${b.title}-${i}`}
                     onPress={() => pick(b)}
-                    style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.card, pressed && { opacity: press.medium }]}
                   >
                     <Cover url={b.cover_url} size={56} />
                     <Text style={styles.cardTitle} numberOfLines={2}>

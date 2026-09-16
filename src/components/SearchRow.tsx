@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/ui/Text';
-import { TAP_MIN, accent, radius, surface, text, typography } from '@/theme';
+import { TAP_MIN, accent, press, radius, surface, text, typography } from '@/theme';
 
 /** The search input + button shared by the lookup panels. `tone` colours the
  * button/spinner (each panel has its own accent); everything else is standard. */
@@ -34,7 +34,7 @@ export function SearchRow({
         placeholderTextColor={text.faint}
         maxLength={maxLength}
       />
-      <Pressable onPress={onSubmit} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}>
+      <Pressable onPress={onSubmit} style={({ pressed }) => [styles.btn, pressed && { opacity: press.medium }]}>
         {searching ? (
           <ActivityIndicator size="small" color={tone} />
         ) : (

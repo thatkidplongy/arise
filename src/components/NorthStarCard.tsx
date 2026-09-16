@@ -6,7 +6,7 @@ import { EdgeBlock } from '@/components/ui/EdgeBlock';
 import { Text } from '@/components/ui/Text';
 import type { ApiDailyQuote } from '@/lib/api';
 import { fetchInsights } from '@/query/useInsights';
-import { clay, font, neutral, sage, surface, text, typography } from '@/theme';
+import { clay, font, neutral, press, sage, surface, text, typography } from '@/theme';
 
 /**
  * The two lines you carry, on one card with no fills.
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   // No fill at all: on the sand page the two coloured rules are the whole structure,
   // so the block sits in the page gutter rather than on a card floated above it.
   card: { paddingVertical: 6 },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: press.soft },
   divider: { height: 1, backgroundColor: surface.hairline, marginVertical: 22 },
   starLead: { ...typography.numeral, fontSize: 23, lineHeight: 31, color: neutral[900] },
   starRest: { ...typography.body, fontSize: 14, color: text.secondary, marginTop: -2 },

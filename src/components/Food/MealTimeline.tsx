@@ -6,7 +6,7 @@ import { SectionTitle } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import type { ApiFoodEntry, EntrySource, MealSlot } from '@/lib/api';
 import { clockLabel, isPlate, mealTitle, plateOf, slotLabel } from '@/lib/plate';
-import { TAP_MIN, clay, neutral, radius, sage, space, surface, text, typography } from '@/theme';
+import { TAP_MIN, clay, neutral, press, radius, sage, space, surface, text, typography } from '@/theme';
 
 /**
  * The day as it was eaten, in order, with an open row for the meal still ahead.
@@ -89,7 +89,7 @@ function MealRow({ entry, first, onRemove }: { entry: ApiFoodEntry; first: boole
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={`Remove ${mealTitle(entry)}`}
-          style={({ pressed }) => [styles.remove, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.remove, pressed && { opacity: press.strong }]}
         >
           <Ionicons name="close" size={15} color={text.faint} />
         </Pressable>
@@ -166,7 +166,7 @@ function OpenRow({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Log ${slotLabel(slot).toLowerCase()}`}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.row, pressed && { opacity: press.medium }]}
     >
       <View style={[styles.rail, { backgroundColor: clay[400] }]} />
       <View style={[styles.body, first ? null : styles.divided]}>

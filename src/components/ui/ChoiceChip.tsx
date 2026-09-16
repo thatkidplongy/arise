@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { STAT_META, radius, surface, text, withAlpha } from '@/theme';
+import { STAT_META, press, radius, surface, text, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color;
 
@@ -27,7 +27,7 @@ export function ChoiceChip({
     <Pressable
       onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && { opacity: press.soft }]}
       accessibilityRole="button"
       accessibilityState={{ selected: on }}
       accessibilityLabel={accessibilityLabel ?? label}

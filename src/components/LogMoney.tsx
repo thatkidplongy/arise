@@ -8,7 +8,7 @@ import { ChoiceChip, ChoiceRow } from '@/components/ui/ChoiceChip';
 import { Text, TextInput } from '@/components/ui/Text';
 import { readMoneyDraft, type MoneyBucket, type MoneyDirection } from '@/lib/moneyEntry';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, TAP_MIN, radius, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, press, radius, surface, text, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color; // the wealth attribute's tone, as everywhere on this screen
 
@@ -117,7 +117,7 @@ export function LogMoney() {
         <Pressable
           onPress={() => void submit()}
           disabled={!entry}
-          style={({ pressed }) => [styles.addBtn, !entry && styles.addBtnOff, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.addBtn, !entry && styles.addBtnOff, pressed && { opacity: press.soft }]}
           accessibilityLabel={`Log ${DIRECTION_LABEL[direction].toLowerCase()}`}
         >
           <Ionicons name="add" size={18} color={entry ? TONE : text.faint} />

@@ -12,7 +12,7 @@ import type { ApiInsight, InsightKind } from '@/lib/api';
 import { useInsights } from '@/query/useInsights';
 import { useCaptures, type PendingCapture } from '@/store/useCaptures';
 import { useSystem } from '@/store/useSystem';
-import { TAP_MIN, accent, clay, feedback, radius, surface, text, typography } from '@/theme';
+import { TAP_MIN, accent, clay, feedback, press, radius, surface, text, typography } from '@/theme';
 
 // Normalise a link so we can spot the same video pasted twice — mirrors the
 // server's clean_url enough to guard against re-hitting the API for a dupe.
@@ -64,7 +64,7 @@ function CardActions({
       {sourceUrl ? (
         <Pressable
           onPress={() => Linking.openURL(sourceUrl).catch(() => {})}
-          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: press.strong }]}
           hitSlop={6}
         >
           <Ionicons name="open-outline" size={14} color={text.secondary} />
@@ -73,7 +73,7 @@ function CardActions({
       ) : null}
       <Pressable
         onPress={() => onRemove(id)}
-        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: press.strong }]}
         hitSlop={6}
       >
         <Ionicons name="trash-outline" size={14} color={feedback.danger} />
@@ -121,7 +121,7 @@ function PendingCard({
       {!working ? (
         <Pressable
           onPress={() => onRetry(item.tempId)}
-          style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.retryBtn, pressed && { opacity: press.medium }]}
         >
           <Text style={styles.retryText}>Try again</Text>
         </Pressable>
@@ -180,7 +180,7 @@ function InsightCard({
               <Text style={styles.quoteText}>“{q}”</Text>
               <Pressable
                 onPress={() => setAsNorthStar(q)}
-                style={({ pressed }) => [styles.starBtn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [styles.starBtn, pressed && { opacity: press.medium }]}
                 hitSlop={6}
               >
                 <Ionicons
@@ -266,7 +266,7 @@ function TipsCard({
                   <Pressable
                     onPress={() => sendToTodo(step, i)}
                     hitSlop={6}
-                    style={({ pressed }) => [styles.todoBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.todoBtn, pressed && { opacity: press.medium }]}
                   >
                     <Ionicons
                       name={added.includes(i) ? 'checkmark-circle' : 'add-circle-outline'}

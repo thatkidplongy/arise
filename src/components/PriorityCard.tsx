@@ -6,7 +6,7 @@ import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiPriority } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { STAT_KEYS, type StatKey } from '@/types';
-import { STAT_META, TAP_MIN, accent, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, accent, onAccent, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Scope = 'day' | 'week' | 'open';
 const SCOPES: { key: Scope; label: string }[] = [
@@ -134,7 +134,7 @@ export function PriorityBoard({ priorities }: { priorities: ApiPriority[] }) {
             })}
           </View>
           <View style={styles.actions}>
-            <Pressable onPress={save} style={({ pressed }) => [styles.save, pressed && { opacity: 0.85 }]}>
+            <Pressable onPress={save} style={({ pressed }) => [styles.save, pressed && { opacity: press.soft }]}>
               <Text style={styles.saveText}>Pin it</Text>
             </Pressable>
             <Pressable onPress={() => setEditing(false)} hitSlop={6}>
@@ -143,7 +143,7 @@ export function PriorityBoard({ priorities }: { priorities: ApiPriority[] }) {
           </View>
         </View>
       ) : (
-        <Pressable onPress={openNew} style={({ pressed }) => [styles.setBtn, pressed && { opacity: 0.7 }]}>
+        <Pressable onPress={openNew} style={({ pressed }) => [styles.setBtn, pressed && { opacity: press.medium }]}>
           <Ionicons name="flag-outline" size={15} color={accent} />
           <Text style={styles.setText}>{priorities.length ? 'Add another priority' : 'Set a priority'}</Text>
         </Pressable>

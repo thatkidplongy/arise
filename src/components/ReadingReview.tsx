@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/ui/Text';
 import { useSystem } from '@/store/useSystem';
-import { accent, clay, neutral, onAccent, radius, surface, text, typography } from '@/theme';
+import { accent, clay, neutral, onAccent, press, radius, surface, text, typography } from '@/theme';
 
 /**
  * The reading check-in. A book is never reset by a week ending — it carries on
@@ -35,14 +35,14 @@ export function ReadingReview() {
       {!finishing ? (
         <View style={styles.row}>
           <Pressable
-            style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: press.soft }]}
             onPress={() => setFinishing(true)}
             disabled={busy}
           >
             <Text style={styles.primaryText}>Yes, finished it</Text>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.btn, pressed && { opacity: press.medium }]}
             onPress={() => run(() => reviewBook(false, ''))}
             disabled={busy}
           >
@@ -61,7 +61,7 @@ export function ReadingReview() {
             autoFocus
           />
           <Pressable
-            style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: press.soft }]}
             onPress={() => run(() => reviewBook(true, next))}
             disabled={busy}
           >

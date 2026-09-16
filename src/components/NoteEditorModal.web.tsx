@@ -8,7 +8,7 @@ import { Modal, Pressable, StyleSheet, View } from "react-native";
 
 import { Text } from "@/components/ui/Text";
 import { QUEST_NOTE_MAX } from "@/consts";
-import { TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from "@/theme";
+import { TAP_MIN, accent, neutral, onAccent, press, radius, surface, text, typography, withAlpha } from "@/theme";
 
 // Web build only: a true WYSIWYG note editor. Bold/italic/lists render as
 // styled text (not raw ** markers), and we serialise back to Markdown on save
@@ -271,7 +271,7 @@ export function NoteEditorModal({
           <View style={styles.actions}>
             <Pressable
               onPress={onClose}
-              style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.btn, pressed && { opacity: press.medium }]}
             >
               <Text style={styles.btnGhost}>Cancel</Text>
             </Pressable>
@@ -281,7 +281,7 @@ export function NoteEditorModal({
               style={({ pressed }) => [
                 styles.btn,
                 styles.btnSave,
-                pressed && { opacity: 0.85 },
+                pressed && { opacity: press.soft },
                 disabled && styles.btnDisabled,
               ]}
             >

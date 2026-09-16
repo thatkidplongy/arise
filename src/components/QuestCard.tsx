@@ -13,7 +13,7 @@ import { QUEST_NOTE_MAX } from '@/consts';
 import type { ApiQuest } from '@/lib/api';
 import { isWriteStep, resolveQuestProgress } from '@/lib/quests';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, ink, radius, sage, typography } from '@/theme';
+import { STAT_META, ink, press, radius, sage, typography } from '@/theme';
 
 /**
  * One quest, as a System window.
@@ -163,7 +163,7 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
           <Pressable
             onPress={requestUndo}
             hitSlop={6}
-            style={({ pressed }) => [styles.stepDown, pressed && { opacity: 0.6 }]}
+            style={({ pressed }) => [styles.stepDown, pressed && { opacity: press.strong }]}
           >
             <Ionicons name="arrow-undo-outline" size={13} color={ink.textDim} />
             <Text style={styles.stepDownText}>Undo last</Text>

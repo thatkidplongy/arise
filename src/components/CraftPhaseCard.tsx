@@ -13,7 +13,7 @@ import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiCraft, ApiLearning } from '@/lib/api';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, TAP_MIN, feedback, onAccent, radius, surface, text, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, onAccent, press, radius, surface, text, withAlpha } from '@/theme';
 
 /** Craft's colour — this is the coding/architecture attribute. */
 const HUE = STAT_META.CFT.color;
@@ -34,13 +34,13 @@ function PhaseReview({ label }: { label: string }) {
       </Text>
       <View style={styles.row}>
         <Pressable
-          style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.btn, styles.primary, pressed && { opacity: press.soft }]}
           onPress={() => void reviewCraftPhase(true)}
         >
           <Text style={styles.primaryText}>Yes, move on</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.btn, pressed && { opacity: press.medium }]}
           onPress={() => void reviewCraftPhase(false)}
         >
           <Text style={styles.btnText}>Not yet</Text>
@@ -90,7 +90,7 @@ function UndoTick() {
     <Pressable
       onPress={() => void finishCraftPiece(false)}
       hitSlop={6}
-      style={({ pressed }) => [styles.undo, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.undo, pressed && { opacity: press.strong }]}
     >
       <Ionicons name="arrow-undo-outline" size={12} color={text.secondary} />
       <Text style={styles.undoText}>Back to the one before</Text>
@@ -208,7 +208,7 @@ function StudyLog({ source }: { source: string }) {
           styles.primary,
           styles.wide,
           !canLog && styles.primaryOff,
-          pressed && { opacity: 0.85 },
+          pressed && { opacity: press.soft },
         ]}
       >
         <Text style={styles.primaryText}>{saveLabel(save.state, 'Log what I studied')}</Text>
@@ -274,7 +274,7 @@ function ChangeSource({ current }: { current: string }) {
           styles.primary,
           styles.wide,
           !canSave && styles.primaryOff,
-          pressed && { opacity: 0.85 },
+          pressed && { opacity: press.soft },
         ]}
       >
         <Text style={styles.primaryText}>
@@ -312,7 +312,7 @@ function StudySection({ craft }: { craft: ApiCraft }) {
         onPress={toggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [styles.disclose, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.disclose, pressed && { opacity: press.strong }]}
       >
         <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={text.faint} />
         <Text style={styles.discloseLabel}>Change what I’m studying</Text>

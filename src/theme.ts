@@ -149,6 +149,21 @@ export const space = {
 /** Nothing interactive is smaller than this, ever. */
 export const TAP_MIN = 44;
 
+/**
+ * How far a control dims while it's held.
+ *
+ * Scaled to how much of it there is: a bare icon or a line of text has little
+ * area to show the change on and needs the strongest dim to register, a filled
+ * button or a whole card has plenty and needs the least. These were written out
+ * as bare numbers at forty-odd call sites, which is how two otherwise identical
+ * submit buttons ended up dimming by different amounts (see ReadingCard).
+ */
+export const press = {
+  strong: 0.6, // an icon, a small text button
+  medium: 0.7, // a row, a chip, a list item
+  soft: 0.85, // a filled button, a card — a large area, so a little goes far
+} as const;
+
 /** Elevation, tuned to the sand ground. */
 export const shadow: Record<'sm' | 'md' | 'lg', ViewStyle> = {
   sm: {

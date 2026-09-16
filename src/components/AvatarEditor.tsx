@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { toBoundedDataUri } from '@/lib/image';
 import { useAvatar } from '@/query/useAvatar';
 import { useSystem } from '@/store/useSystem';
-import { clay, onAccent, radius, sage, surface, text, typography } from '@/theme';
+import { clay, onAccent, press, radius, sage, surface, text, typography } from '@/theme';
 
 /** The tappable profile picture on the You hub: pick a square photo, or remove it.
  * Displayed elsewhere (Status) read-only via useAvatar. */
@@ -38,7 +38,7 @@ export function AvatarEditor() {
       <Pressable
         onPress={pick}
         disabled={busy}
-        style={({ pressed }) => [styles.ringWrap, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.ringWrap, pressed && { opacity: press.soft }]}
       >
         <View style={[styles.ring, busy && { opacity: 0.55 }]}>
           {shown ? (

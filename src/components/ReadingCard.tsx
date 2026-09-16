@@ -11,7 +11,7 @@ import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiReading, ApiReadingLog } from '@/lib/api';
 import { countChapters, describeChaptersRead } from '@/lib/reading';
 import { useSystem } from '@/store/useSystem';
-import { TAP_MIN, accent, clay, feedback, onAccent, radius, sage, surface, text, typography, withAlpha } from '@/theme';
+import { TAP_MIN, accent, clay, feedback, onAccent, press, radius, sage, surface, text, typography, withAlpha } from '@/theme';
 
 /** The book, and whether today has anything on it yet. */
 function BookHead({ reading }: { reading: ApiReading }) {
@@ -169,6 +169,9 @@ function LogToday({ reading }: { reading: ApiReading }) {
           maxLength={3}
           onSubmitEditing={submit}
         />
+        {/* 0.8, where every other filled submit button uses press.soft (0.85) — left
+            as it is rather than nudged, since changing it is a visual call, not a
+            tidy-up. Both of this card's buttons drift together. */}
         <Pressable
           disabled={!canLog}
           onPress={submit}
@@ -281,7 +284,7 @@ function ReadingPanel({ reading }: { reading: ApiReading }) {
         onPress={toggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [styles.disclose, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.disclose, pressed && { opacity: press.strong }]}
       >
         <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={text.faint} />
         <Text style={styles.discloseLabel}>Change book</Text>

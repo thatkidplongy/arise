@@ -25,7 +25,7 @@ import { hasLoggedPayday, PAYDAY_NOTE } from '@/lib/moneyEntry';
 import { num } from '@/lib/num';
 import { useMoneyHistory } from '@/query/useMoneyHistory';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, TAP_MIN, feedback, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 const TONE = STAT_META.WLT.color; // the wealth attribute's tone, for this whole area
 const EDITABLE: ('needs' | 'wants')[] = ['needs', 'wants'];
@@ -184,7 +184,7 @@ function AddLine({ bucket }: { bucket: 'needs' | 'wants' }) {
       />
       <Pressable
         onPress={submit}
-        style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.addBtn, pressed && { opacity: press.soft }]}
         accessibilityLabel={`Add a ${bucket} line`}
       >
         <Ionicons name="add" size={18} color={TONE} />
@@ -266,7 +266,7 @@ function PaydayButton({ payday }: { payday: number }) {
       // Held until today's entries are in: tapping before they load can't tell
       // whether the payday is already there, and would risk logging it twice.
       disabled={logged || loading}
-      style={({ pressed }) => [styles.paydayBtn, logged && styles.paydayBtnDone, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [styles.paydayBtn, logged && styles.paydayBtnDone, pressed && { opacity: press.soft }]}
       accessibilityLabel={logged ? 'Payday already logged today' : `Log payday, ${peso(payday)} in`}
     >
       <Ionicons

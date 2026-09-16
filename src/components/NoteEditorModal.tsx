@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } fr
 
 import { Text, TextInput } from '@/components/ui/Text';
 import { QUEST_NOTE_MAX } from '@/consts';
-import { TAP_MIN, accent, neutral, onAccent, radius, surface, text, typography, withAlpha } from '@/theme';
+import { TAP_MIN, accent, neutral, onAccent, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 type Sel = { start: number; end: number };
 
@@ -154,7 +154,7 @@ export function NoteEditorModal({
             <View style={styles.actions}>
               <Pressable
                 onPress={onClose}
-                style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [styles.btn, pressed && { opacity: press.medium }]}
               >
                 <Text style={styles.btnGhost}>Cancel</Text>
               </Pressable>
@@ -164,7 +164,7 @@ export function NoteEditorModal({
                 style={({ pressed }) => [
                   styles.btn,
                   styles.btnSave,
-                  pressed && { opacity: 0.85 },
+                  pressed && { opacity: press.soft },
                   !value.trim() && styles.btnDisabled,
                 ]}
               >

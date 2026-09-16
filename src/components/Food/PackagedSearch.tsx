@@ -8,7 +8,7 @@ import { useSearch } from '@/hooks/useSearch';
 import type { ApiFoodSearchItem, MealSlot } from '@/lib/api';
 import { num } from '@/lib/num';
 import { emptyDraft, type PlateDraft } from '@/lib/plate';
-import { TAP_MIN, neutral, onAccent, radius, sage, space, surface, text, typography } from '@/theme';
+import { TAP_MIN, neutral, onAccent, press, radius, sage, space, surface, text, typography } from '@/theme';
 
 const TONE = sage[600];
 
@@ -97,7 +97,7 @@ export function PackagedSearch({
                 <Text style={styles.preview}>
                   ≈ {Math.round((r.kcal_100g * Math.max(0, num(grams))) / 100)} kcal
                 </Text>
-                <Pressable onPress={add} style={({ pressed }) => [styles.add, pressed && { opacity: 0.7 }]}>
+                <Pressable onPress={add} style={({ pressed }) => [styles.add, pressed && { opacity: press.medium }]}>
                   <Text style={styles.addLabel}>Add</Text>
                 </Pressable>
               </View>

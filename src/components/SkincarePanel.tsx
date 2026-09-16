@@ -8,7 +8,7 @@ import { useSearch } from '@/hooks/useSearch';
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { useBody } from '@/query/useBody';
-import { STAT_META, TAP_MIN, feedback, neutral, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, neutral, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 import { Box } from '@/components/ui/Check';
 
@@ -77,7 +77,7 @@ function Routine({
           placeholderTextColor={text.faint}
           maxLength={120}
         />
-        <Pressable onPress={add} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.7 }]}>
+        <Pressable onPress={add} style={({ pressed }) => [styles.addBtn, pressed && { opacity: press.medium }]}>
           <Text style={[styles.addBtnText, { color: TONE }]}>Add</Text>
         </Pressable>
       </View>

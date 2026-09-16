@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import type { RecallGrade } from '@/lib/api';
-import { clay, font, neutral, onAccent, radius, sage, surface, text } from '@/theme';
+import { clay, font, neutral, onAccent, press, radius, sage, surface, text } from '@/theme';
 
 /** When this grade would bring the card back. Spelled with the verb, because a bare
  * "in 3 days" on a button reads like a delay being imposed rather than the next
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
   },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: press.soft },
   label: { fontFamily: font.semibold, fontSize: 12.5 },
   sub: { fontFamily: font.regular, fontSize: 9.5 },
 });

@@ -7,13 +7,13 @@ import { Text } from '@/components/ui/Text';
 import type { ApiCaptureFailure, InsightKind } from '@/lib/api';
 import { REASON_LABELS, describeAttempts, summariseSweep } from '@/lib/captures';
 import { useFailedCaptures } from '@/query/useFailedCaptures';
-import { TAP_MIN, accent, feedback, radius, surface, text, typography } from '@/theme';
+import { TAP_MIN, accent, feedback, press, radius, surface, text, typography } from '@/theme';
 
 function LinkRow({ url }: { url: string }) {
   return (
     <Pressable
       onPress={() => Linking.openURL(url).catch(() => {})}
-      style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.linkRow, pressed && { opacity: press.strong }]}
       hitSlop={4}
     >
       <Ionicons name="link-outline" size={13} color={text.faint} />
@@ -54,7 +54,7 @@ function FailedCard({
         ) : null}
         <Pressable
           onPress={() => onForget(item.id)}
-          style={({ pressed }) => [styles.forget, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.forget, pressed && { opacity: press.strong }]}
           hitSlop={6}
         >
           <Ionicons name="trash-outline" size={14} color={text.secondary} />
