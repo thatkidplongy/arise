@@ -53,12 +53,13 @@ function Back({
         face="back"
         kicker="The back"
         metaRight={source || undefined}
+        // The question again, because the turn is one-way: grading asks how close you
+        // were, which is not a judgement to make from memory of the front. It rides in
+        // the head rather than on the ruled stock, which is for what you wrote.
+        headline={item.cue || undefined}
         ruleGap={26}
         footer={<Button label="Edit" tone="quiet" onPress={onEdit} />}
       >
-        {/* The question again, because the turn is one-way: grading asks how close
-            you were, which is not a judgement to make from memory of the front. */}
-        {item.cue ? <Text style={styles.asked}>{item.cue}</Text> : null}
         <Text style={styles.answer}>{item.text}</Text>
         {item.hook ? <Text style={styles.hook}>{item.hook}</Text> : null}
         {item.origin ? (
@@ -95,7 +96,6 @@ export function FlashCard({
 const styles = StyleSheet.create({
   question: { fontFamily: font.display, fontSize: 19, lineHeight: 30, color: neutral[900] },
   sayIt: { fontFamily: font.regular, fontSize: 11.5, color: text.secondary, textAlign: 'center' },
-  asked: { fontFamily: font.display, fontSize: 13.5, lineHeight: 22, color: text.secondary },
   answer: { fontFamily: font.regular, fontSize: 14.5, lineHeight: 26, color: neutral[900] },
   hook: { fontFamily: font.regular, fontSize: 11.5, lineHeight: 17, fontStyle: 'italic', color: text.secondary },
   origin: { gap: 7, paddingTop: 2 },

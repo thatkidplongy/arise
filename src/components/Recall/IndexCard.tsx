@@ -67,6 +67,7 @@ export function IndexCard({
   kicker,
   meta,
   metaRight,
+  headline,
   ruleGap = 30,
   footer,
   children,
@@ -77,6 +78,9 @@ export function IndexCard({
   meta?: string;
   /** Pushed to the far edge of the head. */
   metaRight?: string;
+  /** A line under the label row, still inside the head — for a card whose head has
+   * something to say rather than only naming the side. */
+  headline?: string;
   ruleGap?: number;
   footer?: ReactNode;
   children: ReactNode;
@@ -87,9 +91,12 @@ export function IndexCard({
   return (
     <View style={[styles.card, shadow.md]}>
       <View style={[styles.head, skin.head]}>
-        {kicker ? <Text style={[styles.kicker, skin.kicker]}>{kicker}</Text> : null}
-        {meta ? <Text style={[styles.meta, skin.meta]}>{meta}</Text> : null}
-        {metaRight ? <Text style={[styles.meta, skin.meta, styles.metaRight]}>{metaRight}</Text> : null}
+        <View style={styles.headRow}>
+          {kicker ? <Text style={[styles.kicker, skin.kicker]}>{kicker}</Text> : null}
+          {meta ? <Text style={[styles.meta, skin.meta]}>{meta}</Text> : null}
+          {metaRight ? <Text style={[styles.meta, skin.meta, styles.metaRight]}>{metaRight}</Text> : null}
+        </View>
+        {headline ? <Text style={[styles.headline, skin.headline]}>{headline}</Text> : null}
       </View>
       <View style={styles.body} onLayout={measureBody}>
         <Ruled gap={ruleGap} height={bodyHeight} />
@@ -105,11 +112,13 @@ const FACES = {
     head: { borderBottomColor: clay[300] } as const,
     kicker: { color: clay[700] } as const,
     meta: { color: text.secondary } as const,
+    headline: { color: neutral[900] } as const,
   },
   back: {
     head: { backgroundColor: surface.sagePatch, borderBottomColor: sage[300] } as const,
     kicker: { color: sage[800] } as const,
     meta: { color: sage[800] } as const,
+    headline: { color: sage[900] } as const,
   },
 };
 
@@ -120,14 +129,14 @@ const styles = StyleSheet.create({
   behindNear: { backgroundColor: surface.card, opacity: 0.8, transform: [{ rotate: '0.7deg' }] },
   card: { position: 'relative', borderRadius: radius.md, backgroundColor: surface.card, overflow: 'hidden' },
   head: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 9,
     paddingHorizontal: 18,
     paddingTop: 15,
     paddingBottom: 11,
     borderBottomWidth: 1,
   },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  headline: { fontFamily: font.display, fontSize: 14.5, lineHeight: 22 },
   kicker: { fontFamily: font.semibold, fontSize: 9.5, letterSpacing: 1.4, textTransform: 'uppercase' },
   meta: { fontFamily: font.regular, fontSize: 10.5 },
   metaRight: { marginLeft: 'auto' },
