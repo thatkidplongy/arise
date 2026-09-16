@@ -3,67 +3,17 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
-import { Counter, RewardBand, SystemWindow } from '@/components/ui/SystemWindow';
+import { Objectives } from '@/components/Quest/Objectives';
+import { QuestNote } from '@/components/Quest/QuestNote';
+import { useNoteEditor } from '@/components/Quest/useNoteEditor';
+import { RewardBand, SystemWindow } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { QUEST_NOTE_MAX } from '@/consts';
-import { useCollapse } from '@/hooks/useCollapse';
 import type { ApiQuest } from '@/lib/api';
-import { isQuestDone, isWriteStep } from '@/lib/quests';
-import { snippet } from '@/lib/text';
+import { isWriteStep, resolveQuestProgress } from '@/lib/quests';
 import { useSystem } from '@/store/useSystem';
-import { STAT_META, ink, neutral, radius, sage, typography } from '@/theme';
-
-/** One written reflection on a quest. Short notes show inline; long or multi-line
- * ones (the glossaries some log-steps produce) fold to a one-line preview so they
- * don't swamp the window — tap the bar to unfold, tap the text to edit, × to remove. */
-function QuestNote({
-  text: value,
-  onEdit,
-  onRemove,
-}: {
-  text: string;
-  onEdit: () => void;
-  onRemove: () => void;
-}) {
-  const long = value.includes('\n') || value.length > 100;
-  const { open, toggle } = useCollapse(long, long);
-
-  if (!long) {
-    return (
-      <View style={styles.noteItem}>
-        <Pressable style={styles.noteItemBody} onPress={onEdit}>
-          <Markdown value={value} color={ink.text} />
-        </Pressable>
-        <Pressable onPress={onRemove} hitSlop={8}>
-          <Text style={styles.noteX}>×</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.noteItem, styles.noteItemCol]}>
-      <View style={styles.noteBar}>
-        <Pressable style={styles.noteBarTap} onPress={toggle} hitSlop={4}>
-          <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={ink.textDim} />
-          <Text style={styles.notePreview} numberOfLines={1}>
-            {open ? 'Your note' : snippet(value)}
-          </Text>
-        </Pressable>
-        <Pressable onPress={onRemove} hitSlop={8}>
-          <Text style={styles.noteX}>×</Text>
-        </Pressable>
-      </View>
-      {open ? (
-        <Pressable onPress={onEdit}>
-          <Markdown value={value} color={ink.text} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
+import { STAT_META, ink, radius, sage, typography } from '@/theme';
 
 /**
  * One quest, as a System window.
@@ -83,22 +33,10 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
   const removeQuestNote = useSystem((s) => s.removeQuestNote);
   const [busy, setBusy] = useState(false);
 
-  const isDone = isQuestDone(quest);
+  const shape = resolveQuestProgress(quest);
+  const { isDone, partialMulti, progress } = shape;
   const canUndoToday = quest.undoable_id != null;
-  // A multi-session quest with progress but not yet full: the log row adds one,
-  // so it needs its own step-down control.
-  const partialMulti = quest.target > 1 && quest.done > 0 && !isDone;
-  // Single-completion quests with steps get a tickable checklist; multi-session
-  // quests keep the tap-to-log flow and show their steps as guidance.
-  const useChecklist = quest.target === 1 && quest.steps.length > 0;
   const meta = STAT_META[quest.stat];
-  const doneCount = quest.steps_done.filter(Boolean).length;
-
-  // How full the window's track reads: fraction of steps ticked for a checklist
-  // quest, sessions logged for a multi-session one, else empty until done.
-  const totalUnits = useChecklist ? quest.steps.length : quest.target;
-  const doneUnits = isDone ? totalUnits : useChecklist ? doneCount : quest.done;
-  const progress = totalUnits > 0 ? Math.min(doneUnits / totalUnits, 1) : 0;
 
   const tone = isDone ? 'sage' : 'clay';
   const ring = isDone ? ink.sage : ink.accentDim;
@@ -112,36 +50,24 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
 
   // The writing editor (a modal). Opens when you tap a "write" step, or when you
   // tap an already-saved entry to edit it.
-  const [noteOpen, setNoteOpen] = useState(false);
-  const [notePrompt, setNotePrompt] = useState('');
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [noteInitial, setNoteInitial] = useState('');
-  const [pendingStep, setPendingStep] = useState<number | null>(null);
+  const editor = useNoteEditor();
 
   // A guard before anything that would discard a written reflection.
   const [confirm, setConfirm] = useState<{ message: string; label: string; onYes: () => void } | null>(null);
 
-  const openEditNote = (n: { id: string; text: string }) => {
-    setPendingStep(null);
-    setEditingNoteId(n.id);
-    setNoteInitial(n.text);
-    setNotePrompt('Edit your entry');
-    setNoteOpen(true);
-  };
-
   const saveNote = async (t: string) => {
-    setNoteOpen(false);
-    if (editingNoteId) {
-      void updateQuestNote(editingNoteId, t);
+    const was = editor.editing;
+    editor.close();
+    if (was?.kind === 'saved') {
+      void updateQuestNote(was.id, t);
       return;
     }
+    if (!was) return;
     // A fresh entry written from a step: log it (with the step text as the prompt,
     // so the Journal shows what was answered), then tick that step — which may
     // complete the quest if it was the last one.
-    const step = pendingStep;
-    setPendingStep(null);
-    await addQuestNote(quest.id, t, step != null ? quest.steps[step] : notePrompt, step);
-    if (step != null) await toggleStep(quest, step);
+    await addQuestNote(quest.id, t, quest.steps[was.step], was.step);
+    await toggleStep(quest, was.step);
   };
 
   // Undoing a completion removes any reflections written for it, so confirm first
@@ -169,11 +95,7 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
   const onStepPress = (i: number) => {
     const isWrite = isWriteStep(quest.steps[i]);
     if (!quest.steps_done[i] && isWrite) {
-      setEditingNoteId(null);
-      setNoteInitial('');
-      setNotePrompt(quest.steps[i]);
-      setPendingStep(i);
-      setNoteOpen(true);
+      editor.openForStep(i, quest.steps[i]);
       return;
     }
     if (quest.steps_done[i] && isWrite && quest.notes.some((n) => n.step === i)) {
@@ -186,8 +108,6 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
     }
     run(() => toggleStep(quest, i));
   };
-
-  const logLabel = quest.target > 1 ? 'Log a session' : 'Log this once you have done it';
 
   return (
     <>
@@ -207,65 +127,14 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
 
         {quest.resource && !isDone ? <Text style={styles.resource}>Learn: {quest.resource}</Text> : null}
 
-        {/* Done: one row that says so, and takes the tap that undoes it — the steps
-            are folded away, so this is the only way back. */}
-        {isDone ? (
-          <Pressable
-            onPress={completeOrUndo}
-            disabled={!canUndoToday}
-            accessibilityRole="button"
-            accessibilityLabel={canUndoToday ? 'Undo this quest' : undefined}
-            style={styles.objective}
-          >
-            <View style={[styles.dot, styles.dotOn]}>
-              <Ionicons name="checkmark" size={12} color={neutral[900]} />
-            </View>
-            <Text style={[styles.objectiveText, styles.objectiveFaint]}>
-              {canUndoToday ? 'Logged — tap to undo' : 'Logged'}
-            </Text>
-            <Counter done={doneUnits} total={totalUnits} color={ink.sage} />
-          </Pressable>
-        ) : useChecklist ? (
-          <View style={styles.objectives}>
-            {quest.steps.map((step, i) => {
-              const on = quest.steps_done[i];
-              return (
-                <Pressable
-                  key={i}
-                  onPress={() => onStepPress(i)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  style={styles.objective}
-                >
-                  <View style={[styles.dot, on ? styles.dotOn : { borderColor: ring }]}>
-                    {on ? <Ionicons name="checkmark" size={12} color={neutral[900]} /> : null}
-                  </View>
-                  <Text style={[styles.objectiveText, on && styles.objectiveDone]}>{step}</Text>
-                  {isWriteStep(step) && !on ? (
-                    <Ionicons name="create-outline" size={13} color={ink.accent} style={styles.pen} />
-                  ) : null}
-                  <Counter done={on ? 1 : 0} total={1} color={on ? ink.sage : ink.textDim} />
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={styles.objectives}>
-            {/* A multi-session quest can't tick its steps — they're what the session
-                is, so they read as guidance above the one row that logs it. */}
-            {quest.steps.map((step, i) => (
-              <View key={i} style={styles.guide}>
-                <View style={[styles.guideDot, { backgroundColor: ring }]} />
-                <Text style={styles.guideText}>{step}</Text>
-              </View>
-            ))}
-            <Pressable onPress={completeOrUndo} accessibilityRole="button" style={styles.objective}>
-              <View style={[styles.dot, { borderColor: ring }]} />
-              <Text style={styles.objectiveText}>{logLabel}</Text>
-              <Counter done={quest.done} total={quest.target} color={ink.textDim} />
-            </Pressable>
-          </View>
-        )}
+        <Objectives
+          quest={quest}
+          shape={shape}
+          ring={ring}
+          canUndo={canUndoToday}
+          onStepPress={onStepPress}
+          onLogOrUndo={completeOrUndo}
+        />
 
         <View style={styles.track}>
           <View
@@ -283,7 +152,7 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
               <QuestNote
                 key={n.id}
                 text={n.text}
-                onEdit={() => openEditNote(n)}
+                onEdit={() => editor.openForSaved(n)}
                 onRemove={() => void removeQuestNote(n.id)}
               />
             ))}
@@ -311,12 +180,12 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
       </SystemWindow>
 
       <NoteEditorModal
-        visible={noteOpen}
-        prompt={notePrompt}
-        initial={noteInitial}
+        visible={editor.visible}
+        prompt={editor.prompt}
+        initial={editor.initial}
         maxLength={QUEST_NOTE_MAX}
         onSave={saveNote}
-        onClose={() => setNoteOpen(false)}
+        onClose={editor.close}
       />
       <ConfirmModal
         visible={confirm != null}
@@ -352,45 +221,9 @@ const styles = StyleSheet.create({
     backgroundColor: ink.fill,
     color: ink.textDim,
   },
-  objectives: { gap: 2 },
-  objective: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
-  dot: {
-    width: 22,
-    height: 22,
-    flexShrink: 0,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: ink.accentDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotOn: { backgroundColor: sage[400], borderColor: sage[400] },
-  objectiveText: { ...typography.body, fontSize: 13, flex: 1, minWidth: 0, color: ink.text },
-  objectiveDone: { color: ink.textFaint, textDecorationLine: 'line-through' },
-  objectiveFaint: { color: ink.textFaint },
-  pen: { marginRight: 2 },
-  guide: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 26, paddingVertical: 3 },
-  guideDot: { width: 5, height: 5, borderRadius: radius.pill, marginTop: 7, marginLeft: 9 },
-  guideText: { ...typography.small, fontSize: 12.5, lineHeight: 19, flex: 1, minWidth: 0, color: ink.textDim },
   track: { height: 5, borderRadius: radius.pill, backgroundColor: ink.track, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: radius.pill },
   notes: { gap: 8 },
-  noteItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: ink.fill,
-    borderRadius: radius.md,
-    paddingVertical: 11,
-    paddingHorizontal: 13,
-    overflow: 'hidden', // clip any stray horizontal spill from a long note line
-  },
-  noteItemCol: { flexDirection: 'column', gap: 6 },
-  noteItemBody: { flex: 1, minWidth: 0 },
-  noteBar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  noteBarTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  notePreview: { ...typography.small, fontSize: 12, flex: 1, minWidth: 0, color: ink.textDim },
-  noteX: { color: ink.textFaint, fontSize: 18, fontWeight: '700', marginTop: -2 },
   stepDown: {
     flexDirection: 'row',
     alignItems: 'center',

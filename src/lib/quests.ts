@@ -42,3 +42,48 @@ export function isWriteStep(step: string): boolean {
 export function isQuestDone(quest: Pick<ApiQuest, 'done' | 'target'>): boolean {
   return quest.done >= quest.target;
 }
+
+/** How a quest's window reads: which of the three shapes it takes, and how full
+ * its track is. See `resolveQuestProgress`. */
+export interface QuestProgress {
+  isDone: boolean;
+  /** A single-completion quest with steps: the steps are the objectives, so they
+   * tick. A multi-session one keeps tap-to-log and shows its steps as guidance —
+   * they're what the session *is*, not a checklist over it. */
+  useChecklist: boolean;
+  /** Has progress but isn't full, on a quest logged more than once. The log row
+   * only ever adds, so this is what earns a step-down control. */
+  partialMulti: boolean;
+  doneUnits: number;
+  totalUnits: number;
+  /** 0..1 — what the track fills to. */
+  progress: number;
+}
+
+/**
+ * Everything the quest window's shape and fill are derived from, in one place.
+ *
+ * The units differ per shape and that's the whole subtlety: a checklist counts
+ * ticked steps, a multi-session quest counts sessions, and a done quest reads
+ * full whichever it is. Computed inline in the component, the relationship
+ * between the three was six `const`s deep in a 260-line render — easy to read
+ * past and impossible to test.
+ */
+export function resolveQuestProgress(quest: ApiQuest): QuestProgress {
+  const isDone = isQuestDone(quest);
+  const useChecklist = quest.target === 1 && quest.steps.length > 0;
+  const totalUnits = useChecklist ? quest.steps.length : quest.target;
+
+  let doneUnits = quest.done;
+  if (isDone) doneUnits = totalUnits;
+  else if (useChecklist) doneUnits = quest.steps_done.filter(Boolean).length;
+
+  return {
+    isDone,
+    useChecklist,
+    partialMulti: quest.target > 1 && quest.done > 0 && !isDone,
+    doneUnits,
+    totalUnits,
+    progress: totalUnits > 0 ? Math.min(doneUnits / totalUnits, 1) : 0,
+  };
+}
