@@ -9,9 +9,43 @@ import { Button } from '@/components/ui/Button';
 import { Card, ScreenTitle } from '@/components/ui/Card';
 import { Field, TextArea } from '@/components/ui/Field';
 import { Text } from '@/components/ui/Text';
-import { saveLabel, useSaveState } from '@/hooks/useSaveState';
+import { isSaving, saveLabel, useSaveState, type SaveState } from '@/hooks/useSaveState';
+import type { LinkStatus } from '@/store/useSystem';
 import { useSystem } from '@/store/useSystem';
 import { feedback, neutral, radius, text, typography } from '@/theme';
+
+/** The dot beside the link, and what it says. Kept as two tables rather than two
+ * ternary chains: a new LinkStatus then fails to compile until both are answered,
+ * where a chain would quietly fall through to "connecting". */
+const STATUS_COLOR: Record<LinkStatus, string> = {
+  online: feedback.success,
+  offline: feedback.danger,
+  unauthorized: feedback.danger,
+  connecting: text.faint,
+};
+
+const STATUS_MESSAGE: Record<LinkStatus, string> = {
+  online: 'Connected to the System server.',
+  unauthorized: 'Access token rejected. Enter the correct token below.',
+  offline: 'Server unreachable. Check the address and that the backend is running.',
+  connecting: 'Connecting…',
+};
+
+/** The link button says "reconnect", not "save" — it's re-pointing the app at a
+ * server, not storing a preference, so saveLabel's wording doesn't fit. */
+function reconnectLabel(state: SaveState): string {
+  if (state === 'saving') return 'Reconnecting…';
+  if (state === 'done') return 'Reconnected';
+  return 'Save and reconnect';
+}
+
+/** Reset asks twice. The middle state is the whole safeguard, so it gets to say
+ * exactly what the second tap does. */
+function resetLabel(resetting: boolean, confirming: boolean): string {
+  if (resetting) return 'Resetting…';
+  if (confirming) return 'Tap again to erase all progress';
+  return 'Reset all data';
+}
 
 export default function SettingsScreen() {
   const state = useSystem((s) => s.state);
@@ -61,21 +95,8 @@ export default function SettingsScreen() {
 
   const saveNorthStarFlow = () => void northStarSave.run(() => saveNorthStar(northStarDraft.trim()));
 
-  const statusColor =
-    status === 'online'
-      ? feedback.success
-      : status === 'offline' || status === 'unauthorized'
-        ? feedback.danger
-        : text.faint;
-
-  const statusMessage =
-    status === 'online'
-      ? 'Connected to the System server.'
-      : status === 'unauthorized'
-        ? 'Access token rejected. Enter the correct token below.'
-        : status === 'offline'
-          ? 'Server unreachable. Check the address and that the backend is running.'
-          : 'Connecting…';
+  const statusColor = STATUS_COLOR[status];
+  const statusMessage = STATUS_MESSAGE[status];
 
   return (
     <Screen>
@@ -97,7 +118,7 @@ export default function SettingsScreen() {
           />
           <Button
             label={saveLabel(northStarSave.state, 'Save North Star')}
-            busy={northStarSave.state === 'saving'}
+            busy={isSaving(northStarSave.state)}
             onPress={saveNorthStarFlow}
             block
           />
@@ -127,14 +148,8 @@ export default function SettingsScreen() {
           placeholder="Access token (leave blank for local)"
         />
         <Button
-          label={
-            linkSave.state === 'saving'
-              ? 'Reconnecting…'
-              : linkSave.state === 'done'
-                ? 'Reconnected'
-                : 'Save and reconnect'
-          }
-          busy={linkSave.state === 'saving'}
+          label={reconnectLabel(linkSave.state)}
+          busy={isSaving(linkSave.state)}
           onPress={saveLink}
           block
         />
@@ -150,7 +165,7 @@ export default function SettingsScreen() {
         />
         <Button
           label={saveLabel(nameSave.state, 'Save')}
-          busy={nameSave.state === 'saving'}
+          busy={isSaving(nameSave.state)}
           onPress={saveNameFlow}
           block
         />
@@ -189,9 +204,7 @@ export default function SettingsScreen() {
           it — a quiet week is not a reason to reset.
         </Text>
         <Button
-          label={
-            resetting ? 'Resetting…' : confirmReset ? 'Tap again to erase all progress' : 'Reset all data'
-          }
+          label={resetLabel(resetting, confirmReset)}
           tone="danger"
           busy={resetting}
           block

@@ -51,6 +51,15 @@ function Masthead() {
   );
 }
 
+/** How the day stands, in three words or so. Resting outranks cleared: a rest day
+ * keeps the streak whether or not anything was ticked, so saying "all of today"
+ * over the top of it would be answering a question nobody asked. */
+function describeDay(resting: boolean, cleared: boolean): string {
+  if (resting) return 'Resting today';
+  if (cleared) return 'All of today — beautiful';
+  return 'Whatever you manage counts';
+}
+
 export default function StatusScreen() {
   const state = useSystem((s) => s.state);
   const toggleRest = useSystem((s) => s.toggleRest);
@@ -90,13 +99,7 @@ export default function StatusScreen() {
 
       <SystemPanel
         title="Today"
-        sub={
-          today.resting
-            ? 'Resting today'
-            : today.cleared
-              ? 'All of today — beautiful'
-              : 'Whatever you manage counts'
-        }
+        sub={describeDay(today.resting, today.cleared)}
       >
         <View style={styles.xpRow}>
           <Text style={styles.xpLabel}>Daily quests</Text>

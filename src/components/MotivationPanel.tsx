@@ -49,6 +49,40 @@ function matches(i: ApiInsight, q: string): boolean {
   return [i.summary, ...i.takeaways, ...i.steps, ...i.quotes].join(' ').toLowerCase().includes(q);
 }
 
+/** Why the Capture button is greyed out, or null when it isn't.
+ *
+ * Every case here is one that would spend an API call to learn something already
+ * known — nothing typed, half a link, or a video captured under this mode before —
+ * so the button says why instead of letting the request go out. Ordered from least
+ * to most typed: a half-written link isn't a duplicate yet, it's just unfinished.
+ */
+function describeCaptureBlock(
+  url: string,
+  looksValid: boolean,
+  dup: 'pending' | 'done' | null,
+): string | null {
+  if (!url) return null;
+  if (!looksValid) return 'Paste a full link — it should start with https://.';
+  if (dup === 'pending') return 'That link is already being captured.';
+  if (dup === 'done') return 'You’ve already captured that one — it’s in your list below.';
+  return null;
+}
+
+/** What a capture in flight is doing, or that it didn't make it. */
+function pendingTitle(working: boolean, kind: InsightKind): string {
+  if (!working) return 'Couldn’t capture this one';
+  return kind === 'tips' ? 'Pulling out the tips…' : 'Listening & distilling…';
+}
+
+/** Which key is missing. The transcript comes first because without it there is
+ * nothing for the model to distil — naming the second key first would send you
+ * after the wrong one. */
+function gateMessage(transcriptOn: boolean, llmOn: boolean): string | null {
+  if (!transcriptOn) return 'Add a free Supadata key (ARISE_SUPADATA_API_KEY) on the server to enable this.';
+  if (!llmOn) return 'Distilling needs your Gemini key (ARISE_LLM_API_KEY).';
+  return null;
+}
+
 /** The footer shared by both card kinds: open the original, or remove it. */
 function CardActions({
   sourceUrl,
@@ -102,11 +136,7 @@ function PendingCard({
           <Ionicons name="alert-circle-outline" size={16} color={feedback.danger} />
         )}
         <Text style={styles.pendingTitle} numberOfLines={1}>
-          {working
-            ? item.kind === 'tips'
-              ? 'Pulling out the tips…'
-              : 'Listening & distilling…'
-            : 'Couldn’t capture this one'}
+          {pendingTitle(working, item.kind)}
         </Text>
         {!working ? (
           <Pressable onPress={() => onDismiss(item.tempId)} hitSlop={8}>
@@ -319,17 +349,7 @@ export function MotivationPanel() {
   const dup = duplicateOf(trimmed, mode, pending, insights);
   const canCapture = ready && looksValid && !dup;
 
-  // The API-wasting cases (empty, half-typed, already-captured) are all blocked
-  // before a request goes out — the button greys out and says why.
-  const statusMsg = !trimmed
-    ? null
-    : !looksValid
-      ? 'Paste a full link — it should start with https://.'
-      : dup === 'pending'
-        ? 'That link is already being captured.'
-        : dup === 'done'
-          ? 'You’ve already captured that one — it’s in your list below.'
-          : null;
+  const statusMsg = describeCaptureBlock(trimmed, looksValid, dup);
 
   const capture = () => {
     if (!canCapture) return; // defense in depth (also guards the keyboard submit)
@@ -446,6 +466,7 @@ function CaptureCard({
   onCapture: () => void;
 }) {
   const tips = mode === 'tips';
+  const gate = gateMessage(transcriptOn, llmOn);
   return (
     <SystemPanel title="Capture" sub="TikTok · Reels · YouTube">
       <View style={styles.modeRow}>
@@ -482,13 +503,7 @@ function CaptureCard({
         block
         large
       />
-      {!transcriptOn ? (
-        <Text style={styles.gate}>
-          Add a free Supadata key (ARISE_SUPADATA_API_KEY) on the server to enable this.
-        </Text>
-      ) : !llmOn ? (
-        <Text style={styles.gate}>Distilling needs your Gemini key (ARISE_LLM_API_KEY).</Text>
-      ) : null}
+      {gate ? <Text style={styles.gate}>{gate}</Text> : null}
       {statusMsg ? <Text style={styles.hint}>{statusMsg}</Text> : null}
     </SystemPanel>
   );

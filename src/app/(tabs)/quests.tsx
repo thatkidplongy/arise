@@ -21,6 +21,22 @@ import { STAT_META, clay, neutral, radius, surface, text, typography } from '@/t
 
 /** The one the System is asking for now: the first open daily in this block, else
  * the first open daily anywhere, else the first — a cleared window still reads. */
+/** The line under the board. Resting outranks cleared — a rest day keeps the
+ * streak on its own terms, so it says that and nothing else. */
+function describeRhythm(resting: boolean, cleared: boolean): string {
+  if (resting) return 'Resting today — your streak is safe.';
+  if (cleared) return 'Every area today.';
+  return 'Your day in blocks — do what fits the moment.';
+}
+
+/** A block's chip. "Now" wins over "Cleared": the block you're in is the more
+ * useful thing to point at, even once everything in it is ticked. */
+function blockBadge(isNow: boolean, allDone: boolean): { label: string; tone: 'ink' | 'sage' } | undefined {
+  if (isNow) return { label: 'Now', tone: 'ink' };
+  if (allDone) return { label: 'Cleared', tone: 'sage' };
+  return undefined;
+}
+
 function pickFeatured(daily: ApiQuest[], nowKey: string): ApiQuest | undefined {
   const open = daily.filter((q) => q.done < q.target);
   return open.find((q) => blockOf(q) === nowKey) ?? open[0] ?? daily[0];
@@ -122,11 +138,7 @@ export default function QuestsScreen() {
       </View>
 
       <Text style={styles.rhythmNote}>
-        {isResting
-          ? 'Resting today — your streak is safe.'
-          : state.today.cleared
-            ? 'Every area today.'
-            : 'Your day in blocks — do what fits the moment.'}
+        {describeRhythm(isResting, state.today.cleared)}
       </Text>
 
       {featured ? <QuestCard quest={featured} featured /> : null}
@@ -143,7 +155,7 @@ export default function QuestsScreen() {
           <SystemPanel
             key={`${block.key}-${visit}`}
             title={block.label}
-            badge={isNow ? { label: 'Now', tone: 'ink' } : allDone ? { label: 'Cleared', tone: 'sage' } : undefined}
+            badge={blockBadge(isNow, allDone)}
             style={styles.blockPanel}
             collapsible
             defaultCollapsed={allDone}

@@ -43,8 +43,9 @@ module.exports = defineConfig([
       ],
 
       // Baseline: "Never nest ternaries in JSX. Each distinct UI state gets its own
-      // named component." Two pre-existing, hence warn.
-      "no-nested-ternary": "warn",
+      // named component." The backlog is zero, so per this file's own rule it turns
+      // up to error and can't come back.
+      "no-nested-ternary": "error",
     },
   },
 ]);

@@ -133,11 +133,19 @@ export function describeDaily(line: DailyLine, peso: (n: number) => string): str
   return `${peso(Math.abs(line.left))} past today's line`;
 }
 
+/** Where a bucket's plan sits against its line. A sub-peso gap is rounding noise,
+ * not a real breach — read it as on the line. */
+function readStanding(planned: number, target: number, gap: number): BucketStanding {
+  if (gap < 1) return 'on';
+  if (planned > target) return 'over';
+  return 'under';
+}
+
+
 function readBucket(bucket: BudgetBucket, planned: number, actual: number, income: number): BucketReading {
   const target = round2(income * BUDGET_SPLIT[bucket]);
   const gap = round2(Math.abs(planned - target));
-  // A sub-peso gap is rounding noise, not a real breach — read it as on the line.
-  const standing: BucketStanding = gap < 1 ? 'on' : planned > target ? 'over' : 'under';
+  const standing = readStanding(planned, target, gap);
   return {
     bucket,
     planned,

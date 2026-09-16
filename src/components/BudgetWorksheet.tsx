@@ -18,6 +18,7 @@ import {
   readBudget,
   summariseBudget,
   type BucketReading,
+  type BudgetReading,
   type DailyLine,
 } from '@/lib/budget';
 import { peso } from '@/lib/money';
@@ -302,6 +303,43 @@ function EmptyState() {
  * to: it's whatever income the other two buckets leave behind, which is what makes
  * a needs overrun visibly come out of it.
  */
+/** Waiting on this month's pay. The rule follows real money, never a projection
+ * of pay still to come — so there is nothing to divide and no lines to draw. */
+function NotPaidYet() {
+  return (
+    <Text style={styles.empty}>Nothing in yet this month. Log your payday when it lands and the lines follow.</Text>
+  );
+}
+
+/** The three lines, once there is pay to divide. */
+function DividedLines({ reading }: { reading: BudgetReading }) {
+  return (
+    <>
+      <BucketRow reading={reading.needs} daily={reading.daily.needs} />
+      <BucketRow reading={reading.wants} daily={reading.daily.wants} />
+      {/* Savings gets no daily line: it's what the other two leave behind,
+          not something you spend a day's worth of. */}
+      <BucketRow reading={reading.savings} />
+      <Text style={styles.summary}>{summariseBudget(reading, peso)}</Text>
+      {/* Say so rather than letting the buckets look complete when they aren't. */}
+      {reading.untagged > 0 ? (
+        <Text style={styles.untagged}>
+          {peso(reading.untagged)} spent this month isn’t tagged needs or wants — it still counts against what
+          you keep.
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+/** Which of the three the panel is in: no pay set, pay set but none received, or
+ * the lines themselves. */
+function Lines({ reading }: { reading: BudgetReading }) {
+  if (!reading.isSet) return <EmptyState />;
+  if (reading.received === 0) return <NotPaidYet />;
+  return <DividedLines reading={reading} />;
+}
+
 export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
   const reading = readBudget(budget);
   const payday = budget?.monthly_income ?? 0; // stored per-payday amount — a setting, not money
@@ -315,29 +353,7 @@ export function BudgetWorksheet({ budget }: { budget: ApiBudget | undefined }) {
       >
         <IncomeField payday={payday} />
         {payday > 0 ? <PaydayButton payday={payday} /> : null}
-        {!reading.isSet ? (
-          <EmptyState />
-        ) : reading.received === 0 ? (
-          // No money in yet this month — nothing to divide, so no lines. The rule
-          // follows real money, never a projection of pay still to come.
-          <Text style={styles.empty}>Nothing in yet this month. Log your payday when it lands and the lines follow.</Text>
-        ) : (
-          <>
-            <BucketRow reading={reading.needs} daily={reading.daily.needs} />
-            <BucketRow reading={reading.wants} daily={reading.daily.wants} />
-            {/* Savings gets no daily line: it's what the other two leave behind,
-                not something you spend a day's worth of. */}
-            <BucketRow reading={reading.savings} />
-            <Text style={styles.summary}>{summariseBudget(reading, peso)}</Text>
-            {/* Say so rather than letting the buckets look complete when they aren't. */}
-            {reading.untagged > 0 ? (
-              <Text style={styles.untagged}>
-                {peso(reading.untagged)} spent this month isn’t tagged needs or wants — it still counts against what
-                you keep.
-              </Text>
-            ) : null}
-          </>
-        )}
+        <Lines reading={reading} />
       </SystemPanel>
 
       {EDITABLE.map((bucket) => (

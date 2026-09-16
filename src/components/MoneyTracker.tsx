@@ -33,6 +33,27 @@ function monthDay(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+/** "July 2026" for a 'YYYY-MM' or 'YYYY-MM-DD'. */
+function monthYear(key: string): string {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/** What period the chart is showing. A week is named by the days it actually
+ * spans, which only the loaded history knows — so it falls back to "This week"
+ * while that's still in flight rather than naming a range it can't see yet. */
+function describePeriod(
+  scope: MoneyScope,
+  anchor: string,
+  today: string,
+  history: { start: string; end: string } | null | undefined,
+): string {
+  if (scope === 'day') return shortDay(anchor, today);
+  if (scope === 'month') return monthYear(anchor);
+  if (history) return `${monthDay(history.start)} – ${monthDay(history.end)}`;
+  return 'This week';
+}
+
 function weekdayNarrow(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'narrow' });
@@ -138,17 +159,7 @@ export function MoneyTracker({ money }: { money: ApiMoney }) {
     refresh();
   };
 
-  const periodLabel =
-    scope === 'day'
-      ? shortDay(anchor, today)
-      : scope === 'month'
-        ? (() => {
-            const [y, m] = anchor.split('-').map(Number);
-            return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-          })()
-        : history
-          ? `${monthDay(history.start)} – ${monthDay(history.end)}`
-          : 'This week';
+  const periodLabel = describePeriod(scope, anchor, today, history);
 
   const buckets = history?.buckets ?? [];
   const chartMax = Math.max(1, ...buckets.map((b) => Math.max(b.earned, b.spent)));

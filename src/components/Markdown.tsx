@@ -89,7 +89,7 @@ export function Markdown({ value, color }: { value: string; color?: string }) {
     const heading = raw.match(HEADING);
     if (heading) {
       const level = heading[1].length; // 1, 2 or 3
-      const hStyle = level === 1 ? styles.h1 : level === 2 ? styles.h2 : styles.h3;
+      const hStyle = [styles.h1, styles.h2, styles.h3][level - 1];
       out.push(
         <Text key={key} style={[base, hStyle]}>
           {parseInline(heading[2], key)}

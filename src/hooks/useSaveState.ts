@@ -34,7 +34,16 @@ export function useSaveState(holdMs = 1600) {
   return { state, run };
 }
 
-/** The label a Save button shows for the current state (idle label passed in). */
+/** The label a Save button shows for the current state (idle label passed in).
+ * `saving` and `done` override it, because a button mid-write should say so in the
+ * same words everywhere. */
 export function saveLabel(state: SaveState, idle: string): string {
-  return state === 'saving' ? 'Saving…' : state === 'done' ? 'Saved' : idle;
+  if (state === 'saving') return 'Saving…';
+  if (state === 'done') return 'Saved';
+  return idle;
+}
+
+/** Whether a write is in flight — what a button's `busy` prop wants. */
+export function isSaving(state: SaveState): boolean {
+  return state === 'saving';
 }
