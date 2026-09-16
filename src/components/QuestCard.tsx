@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/Text';
 import { QUEST_NOTE_MAX } from '@/consts';
 import { useCollapse } from '@/hooks/useCollapse';
 import type { ApiQuest } from '@/lib/api';
-import { isWriteStep } from '@/lib/quests';
+import { isQuestDone, isWriteStep } from '@/lib/quests';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, ink, neutral, radius, sage, typography } from '@/theme';
@@ -83,7 +83,7 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
   const removeQuestNote = useSystem((s) => s.removeQuestNote);
   const [busy, setBusy] = useState(false);
 
-  const isDone = quest.done >= quest.target;
+  const isDone = isQuestDone(quest);
   const canUndoToday = quest.undoable_id != null;
   // A multi-session quest with progress but not yet full: the log row adds one,
   // so it needs its own step-down control.

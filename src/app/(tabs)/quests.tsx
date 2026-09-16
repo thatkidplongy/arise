@@ -14,6 +14,7 @@ import { SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { useWide } from '@/hooks/useWide';
 import type { ApiQuest, ApiState } from '@/lib/api';
+import { isQuestDone } from '@/lib/quests';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, clay, neutral, radius, surface, text, typography } from '@/theme';
@@ -137,7 +138,7 @@ export default function QuestsScreen() {
 
       {dailyBlocks.map(({ block, items }) => {
         const isNow = !isResting && block.key === nowKey;
-        const allDone = items.every((q) => q.done >= q.target);
+        const allDone = items.every(isQuestDone);
         return (
           <SystemPanel
             key={`${block.key}-${visit}`}

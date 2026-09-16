@@ -1,5 +1,7 @@
 // Pure, React-free quest-domain helpers.
 
+import type { ApiQuest } from '@/lib/api';
+
 // Contexts where a "write"/"note" verb means DO, not journal (write code, record
 // audio, practise kana, repeat N times…). Kept out so those stay normal check-offs.
 // Nouns allow a trailing plural; "5×" / "N times" / "N reps" flag drills.
@@ -28,4 +30,15 @@ export function isWriteStep(step: string): boolean {
   // "write … down" split across the phrase, e.g. "write your plan down".
   if (/\bwrite\b/.test(s) && /\bdown\b/.test(s) && !DOING_CONTEXT.test(s)) return true;
   return false;
+}
+
+/**
+ * Whether a quest has met its target for the period.
+ *
+ * Trivial, and spelled out in four places across three files — the card, the
+ * board's "all done" check and the store, twice. Four chances to write `>` where
+ * the rest write `>=`, on the one comparison the whole board is built from.
+ */
+export function isQuestDone(quest: Pick<ApiQuest, 'done' | 'target'>): boolean {
+  return quest.done >= quest.target;
 }
