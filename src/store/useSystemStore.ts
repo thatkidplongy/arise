@@ -5,10 +5,11 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import {
-  api,
+  createClient,
   UnauthorizedError,
   type ApiBook,
   type ApiBookShelf,
+  type ApiClient,
   type ApiEvent,
   type ApiQuest,
   type ApiState,
@@ -17,6 +18,7 @@ import {
   type RecallGrade,
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
+import { isQuestDone } from '@/lib/quests';
 import type { Notice, StatKey, Toast } from '@/types';
 
 function computeDefaultServerUrl(): string {
@@ -179,19 +181,34 @@ export interface SystemStore {
 export const useSystemStore = create<SystemStore>()(
   persist(
     (set, get) => {
+      // The API with this link's server + token already bound in — the same shape
+      // src/query/authed.ts hands its queries, so there is one way to reach the
+      // server rather than one per state container. Read fresh each call: the
+      // hunter can repoint the link in Settings mid-session.
+      const client = (): ApiClient => {
+        const { serverUrl, apiToken } = get();
+        return createClient(serverUrl, apiToken);
+      };
+
+      // Route a failed request to the link status, and — when the hunter asked for
+      // it — to a notice. Pass the notices captured before the request, not the
+      // ones at failure time, which is what the hand-written actions did. A passive
+      // refresh passes none: it's silent, because the ConnectionPanel says it.
+      const fail = (e: unknown, notices?: Notice[]): void => {
+        const { status, notice } = errorOutcome(e);
+        set(notices ? { status, notices: [...notices, notice] } : { status });
+      };
+
       // Shared shape for a mutation that returns fresh state: run it, commit the
-      // state, route any error to a user-facing notice. Reads serverUrl/token/
-      // notices fresh at call time, exactly as the hand-written actions did.
+      // state, route any error to a user-facing notice.
       const mutate = async (
-        fn: (base: string, token: string, day: string) => Promise<ApiState>,
+        fn: (api: ApiClient, day: string) => Promise<ApiState>,
       ): Promise<void> => {
-        const { serverUrl, apiToken, notices } = get();
+        const { notices } = get();
         try {
-          const state = await fn(serverUrl, apiToken, dateKey());
-          set({ state, status: 'online' });
+          set({ state: await fn(client(), dateKey()), status: 'online' });
         } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
+          fail(e, notices);
         }
       };
 
@@ -204,10 +221,9 @@ export const useSystemStore = create<SystemStore>()(
       toast: null,
 
       refresh: async () => {
-        const { serverUrl, apiToken, state } = get();
-        if (!state) set({ status: 'connecting' });
+        if (!get().state) set({ status: 'connecting' });
         try {
-          const fresh = await api.state(serverUrl, apiToken, dateKey());
+          const fresh = await client().state(dateKey());
           set({ state: fresh, status: 'online' });
           // If the LLM is on, personalise this period in the background — the
           // pool-based board is already showing; it quietly upgrades when ready.
@@ -215,57 +231,48 @@ export const useSystemStore = create<SystemStore>()(
         } catch (e) {
           // Passive refresh is silent — the ConnectionPanel communicates the
           // problem (offline vs unauthorized). No pop-up on load.
-          set({ status: errorOutcome(e).status });
+          fail(e);
         }
       },
 
       complete: async (quest) => {
-        const { serverUrl, apiToken, notices } = get();
-        if (quest.done >= quest.target) return;
+        const { notices } = get();
+        if (isQuestDone(quest)) return;
         try {
-          const { events, state } = await api.complete(serverUrl, apiToken, quest.id, dateKey());
+          const { events, state } = await client().complete(quest.id, dateKey());
           // Tapping the check circle deserves the same floating confirmation as
           // ticking the last step did — without it a save that worked looks like
           // nothing happened. Only once it's actually at target, so a quest that
           // takes several reps isn't told it's complete on the first one.
           const fresh = state.quests.find((q) => q.id === quest.id);
-          const isDone = !!fresh && fresh.done >= fresh.target;
           set({
             state,
             status: 'online',
             notices: [...notices, ...noticesFrom(events)],
-            toast: isDone
+            toast: fresh && isQuestDone(fresh)
               ? { id: toastId(), title: quest.title, xp: quest.xp, undo: { kind: 'completion', questId: quest.id } }
               : null,
           });
         } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
+          fail(e, notices);
         }
       },
 
       undo: async (quest) => {
-        const { serverUrl, apiToken, notices } = get();
+        const { notices } = get();
         if (!quest.undoable_id) return;
         try {
-          const { state } = await api.undo(serverUrl, apiToken, quest.undoable_id, dateKey());
+          const { state } = await client().undo(quest.undoable_id, dateKey());
           set({ state, status: 'online' });
         } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
+          fail(e, notices);
         }
       },
 
       toggleStep: async (quest, stepIndex) => {
-        const { serverUrl, apiToken, notices } = get();
+        const { notices } = get();
         try {
-          const { events, state, completed } = await api.toggleStep(
-            serverUrl,
-            apiToken,
-            quest.id,
-            stepIndex,
-            dateKey(),
-          );
+          const { events, state, completed } = await client().toggleStep(quest.id, stepIndex, dateKey());
           set({
             state,
             status: 'online',
@@ -282,15 +289,14 @@ export const useSystemStore = create<SystemStore>()(
               : null,
           });
         } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: [...notices, notice] });
+          fail(e, notices);
         }
       },
 
       undoToast: async () => {
         const t = get().toast;
         if (!t) return;
-        const { serverUrl, apiToken, state } = get();
+        const { state } = get();
         set({ toast: null });
         // Undo the way it was done: un-tick the step that finished it, or reverse the
         // completion itself (its id comes from the state the completion returned).
@@ -302,98 +308,91 @@ export const useSystemStore = create<SystemStore>()(
         try {
           const fresh =
             t.undo.kind === 'step'
-              ? await api.toggleStep(serverUrl, apiToken, t.undo.questId, t.undo.stepIndex, dateKey())
-              : await api.undo(serverUrl, apiToken, undoableId as string, dateKey());
+              ? await client().toggleStep(t.undo.questId, t.undo.stepIndex, dateKey())
+              : await client().undo(undoableId as string, dateKey());
           set({ state: fresh.state, status: 'online' });
         } catch (e) {
-          set({ status: errorOutcome(e).status });
+          fail(e);
         }
       },
 
       dismissToast: () => set({ toast: null }),
 
-      saveName: (name) => mutate((b, t, d) => api.updatePlayer(b, t, { name }, d)),
-      equipTitle: (title) => mutate((b, t, d) => api.updatePlayer(b, t, { equipped_title: title }, d)),
-      saveNorthStar: (northStar) => mutate((b, t, d) => api.updatePlayer(b, t, { north_star: northStar }, d)),
-      toggleRest: () => mutate((b, t, d) => api.toggleRest(b, t, d)),
+      saveName: (name) => mutate((api, d) => api.updatePlayer({ name }, d)),
+      equipTitle: (title) => mutate((api, d) => api.updatePlayer({ equipped_title: title }, d)),
+      saveNorthStar: (northStar) => mutate((api, d) => api.updatePlayer({ north_star: northStar }, d)),
+      toggleRest: () => mutate((api, d) => api.toggleRest(d)),
       savePreferences: (preferences, levels = {}) =>
-        mutate((b, t, d) => api.updatePreferences(b, t, preferences, levels, d)),
-      addReminder: (text) => mutate((b, t, d) => api.addReminder(b, t, text, d)),
-      toggleReminder: (id, done) => mutate((b, t, d) => api.toggleReminder(b, t, id, done, d)),
-      removeReminder: (id) => mutate((b, t, d) => api.removeReminder(b, t, id, d)),
-      addGrocery: (name) => mutate((b, t, d) => api.addGrocery(b, t, name, d)),
-      toggleGrocery: (id, bought) => mutate((b, t, d) => api.toggleGrocery(b, t, id, bought, d)),
-      removeGrocery: (id) => mutate((b, t, d) => api.removeGrocery(b, t, id, d)),
-      addMoney: (entry) => mutate((b, t, d) => api.addMoney(b, t, entry, d)),
-      payCommitment: (id, amount, on) => mutate((b, t, d) => api.payCommitment(b, t, id, d, amount, on)),
-      removeMoney: (id) => mutate((b, t, d) => api.removeMoney(b, t, id, d)),
-      resetMoney: () => mutate((b, t, d) => api.resetMoney(b, t, d)),
-      setIncome: (monthlyIncome) => mutate((b, t, d) => api.setIncome(b, t, monthlyIncome, d)),
-      addCommitment: (commitment) => mutate((b, t, d) => api.addCommitment(b, t, commitment, d)),
-      updateCommitment: (id, patch) => mutate((b, t, d) => api.updateCommitment(b, t, id, patch, d)),
-      removeCommitment: (id) => mutate((b, t, d) => api.removeCommitment(b, t, id, d)),
-      setPriority: (stat, focus, scope) => mutate((b, t, d) => api.setPriority(b, t, stat, focus, scope, d)),
-      clearPriority: (stat) => mutate((b, t, d) => api.clearPriority(b, t, stat, d)),
+        mutate((api, d) => api.updatePreferences(preferences, levels, d)),
+      addReminder: (text) => mutate((api, d) => api.addReminder(text, d)),
+      toggleReminder: (id, done) => mutate((api, d) => api.toggleReminder(id, done, d)),
+      removeReminder: (id) => mutate((api, d) => api.removeReminder(id, d)),
+      addGrocery: (name) => mutate((api, d) => api.addGrocery(name, d)),
+      toggleGrocery: (id, bought) => mutate((api, d) => api.toggleGrocery(id, bought, d)),
+      removeGrocery: (id) => mutate((api, d) => api.removeGrocery(id, d)),
+      addMoney: (entry) => mutate((api, d) => api.addMoney(entry, d)),
+      payCommitment: (id, amount, on) => mutate((api, d) => api.payCommitment(id, d, amount, on)),
+      removeMoney: (id) => mutate((api, d) => api.removeMoney(id, d)),
+      resetMoney: () => mutate((api, d) => api.resetMoney(d)),
+      setIncome: (monthlyIncome) => mutate((api, d) => api.setIncome(monthlyIncome, d)),
+      addCommitment: (commitment) => mutate((api, d) => api.addCommitment(commitment, d)),
+      updateCommitment: (id, patch) => mutate((api, d) => api.updateCommitment(id, patch, d)),
+      removeCommitment: (id) => mutate((api, d) => api.removeCommitment(id, d)),
+      setPriority: (stat, focus, scope) => mutate((api, d) => api.setPriority(stat, focus, scope, d)),
+      clearPriority: (stat) => mutate((api, d) => api.clearPriority(stat, d)),
       addQuestNote: (questId, text, prompt = '', stepIndex = null) =>
-        mutate((b, t, d) => api.addQuestNote(b, t, questId, text, d, prompt, stepIndex)),
-      updateQuestNote: (id, text) => mutate((b, t, d) => api.updateQuestNote(b, t, id, text, d)),
-      removeQuestNote: (id) => mutate((b, t, d) => api.removeQuestNote(b, t, id, d)),
-      addJournalEntry: (text) => mutate((b, t, d) => api.addJournalEntry(b, t, text, d)),
-      updateJournalEntry: (id, text) => mutate((b, t, d) => api.updateJournalEntry(b, t, id, text, d)),
-      removeJournalEntry: (id) => mutate((b, t, d) => api.removeJournalEntry(b, t, id, d)),
-      addLearning: (entry) => mutate((b, t, d) => api.addLearning(b, t, entry, d)),
-      removeLearning: (id) => mutate((b, t, d) => api.removeLearning(b, t, id, d)),
-      gradeRecall: (id, grade) => mutate((b, t, d) => api.gradeRecall(b, t, id, grade, d)),
-      editRecall: (id, text) => mutate((b, t, d) => api.editRecall(b, t, id, text, d)),
+        mutate((api, d) => api.addQuestNote(questId, text, d, prompt, stepIndex)),
+      updateQuestNote: (id, text) => mutate((api, d) => api.updateQuestNote(id, text, d)),
+      removeQuestNote: (id) => mutate((api, d) => api.removeQuestNote(id, d)),
+      addJournalEntry: (text) => mutate((api, d) => api.addJournalEntry(text, d)),
+      updateJournalEntry: (id, text) => mutate((api, d) => api.updateJournalEntry(id, text, d)),
+      removeJournalEntry: (id) => mutate((api, d) => api.removeJournalEntry(id, d)),
+      addLearning: (entry) => mutate((api, d) => api.addLearning(entry, d)),
+      removeLearning: (id) => mutate((api, d) => api.removeLearning(id, d)),
+      gradeRecall: (id, grade) => mutate((api, d) => api.gradeRecall(id, grade, d)),
+      editRecall: (id, text) => mutate((api, d) => api.editRecall(id, text, d)),
 
       generate: async () => {
-        const { serverUrl, apiToken } = get();
         try {
-          const state = await api.generate(serverUrl, apiToken, dateKey());
-          set({ state, status: 'online' });
+          set({ state: await client().generate(dateKey()), status: 'online' });
         } catch (e) {
-          set({ status: errorOutcome(e).status });
+          fail(e);
         }
       },
 
       saveBook: (currentBook, chapters = 0) =>
-        mutate((b, t, d) => api.setBook(b, t, currentBook, chapters, d)),
+        mutate((api, d) => api.setBook(currentBook, chapters, d)),
       logReading: (chapters, label) =>
-        mutate((b, t, d) => api.logReading(b, t, chapters, label, d)),
-      removeReadingLog: (id) => mutate((b, t, d) => api.removeReadingLog(b, t, id, d)),
-      reviewCraftPhase: (done) => mutate((b, t, d) => api.reviewCraftPhase(b, t, done, d)),
-      finishCraftPiece: (done) => mutate((b, t, d) => api.finishCraftPiece(b, t, done, d)),
-      setCraftSource: (source) => mutate((b, t, d) => api.setCraftSource(b, t, source, d)),
+        mutate((api, d) => api.logReading(chapters, label, d)),
+      removeReadingLog: (id) => mutate((api, d) => api.removeReadingLog(id, d)),
+      reviewCraftPhase: (done) => mutate((api, d) => api.reviewCraftPhase(done, d)),
+      finishCraftPiece: (done) => mutate((api, d) => api.finishCraftPiece(done, d)),
+      setCraftSource: (source) => mutate((api, d) => api.setCraftSource(source, d)),
       // Not `mutate` like its neighbours: this one answers with events as well as
       // state, because saying you finished a book is what earns the achievement.
       reviewBook: async (finished, nextBook) => {
-        const { serverUrl, apiToken, notices } = get();
+        const { notices } = get();
         try {
-          const { events, state } = await api.reviewBook(serverUrl, apiToken, finished, nextBook, dateKey());
+          const { events, state } = await client().reviewBook(finished, nextBook, dateKey());
           set({ state, status: 'online', notices: [...notices, ...noticesFrom(events)] });
         } catch (e) {
-          const { status, notice } = errorOutcome(e);
-          set({ status, notices: notice ? [...notices, notice] : notices });
+          fail(e, notices);
         }
       },
-      setInterviewMode: (enabled) => mutate((b, t, d) => api.setInterviewMode(b, t, enabled, d)),
+      setInterviewMode: (enabled) => mutate((api, d) => api.setInterviewMode(enabled, d)),
 
       // Book lookup (Open Library). Search lets errors surface so the picker can
       // show a hint; suggestions are a nicety, so they fail quietly to empty.
-      searchBooks: async (q) => {
-        const { serverUrl, apiToken } = get();
-        return api.searchBooks(serverUrl, apiToken, q);
-      },
+      searchBooks: (q) => client().searchBooks(q),
       suggestBooks: async () => {
-        const { serverUrl, apiToken } = get();
         try {
-          return await api.suggestBooks(serverUrl, apiToken);
+          return await client().suggestBooks();
         } catch {
           return [];
         }
       },
 
-      resetAll: () => mutate((b, t, d) => api.reset(b, t, d)),
+      resetAll: () => mutate((api, d) => api.reset(d)),
 
       // Pure setters — the caller decides when to refresh (so it can await it
       // and show a saving indicator).
