@@ -172,11 +172,16 @@ def render_text(ctx: dict) -> str:
     """The plain-text part — also the readable fallback if the HTML is stripped."""
     items = quiz_items(ctx)
     rows = _recap_rows(ctx)
+    missed = ctx.get("missed") or ""
     out = [f"Recall · {_pretty_day(ctx['day'])}", ""]
 
-    if not items and not _uncued(ctx) and not rows:
+    if not items and not _uncued(ctx) and not rows and not missed:
         out += ["Nothing logged. A quiet day is still a day — rest counts.", "", "— Arise"]
         return "\n".join(out)
+
+    if missed:
+        # Where yesterday's questions would have been, so the gap explains itself.
+        out += [f"  {missed}", ""]
 
     if items:
         out += ["TRY TO RECALL", "", f"  {RECALL_INSTRUCTION}", ""]
@@ -345,14 +350,21 @@ def render_html(ctx: dict, avatar_src: str | None = None) -> str:
     items = quiz_items(ctx)
     extra = _uncued(ctx)
     rows = _recap_rows(ctx)
+    missed = ctx.get("missed") or ""
 
-    if not items and not extra and not rows:
+    if not items and not extra and not rows and not missed:
         body = (
             f'<ul style="margin:0;padding-left:18px">'
             f'{_li("Nothing logged. A quiet day is still a day — rest counts.")}</ul>'
         )
     else:
         body = ""
+        if missed:
+            # Where yesterday's questions would have been, so the gap explains itself.
+            body += (
+                f'<div style="color:{_MUTED};font-size:13px;line-height:1.5;'
+                f'margin:22px 0 0">{missed}</div>'
+            )
         if items:
             body += (
                 _h2("Try to recall")

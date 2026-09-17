@@ -30,8 +30,12 @@ def post_json(url: str, body: dict, headers: dict | None = None,
               timeout: float = 20.0, retries: int = 0, backoff: float = 2.0) -> dict:
     """POST `body` as JSON to `url` and decode the JSON response.
 
-    `retries` > 0 retries only on HTTP 429 (Too Many Requests) with a linear
-    backoff — Gemini's free tier rate-limits bursts, and a short wait clears it."""
+    `retries` > 0 retries, with a linear backoff, on the two answers that mean
+    "not now" rather than "no": HTTP 429 (Gemini's free tier rate-limits bursts,
+    and a short wait clears it) and a 5xx (the model is overloaded or the service
+    hiccuped, and the request did nothing). Anything else — a 4xx, a timeout — is
+    raised at once: a bad request won't get better, and a timed-out one may have
+    gone through."""
     merged = {"content-type": "application/json", **(headers or {})}
     for attempt in range(retries + 1):
         req = urllib.request.Request(
@@ -41,7 +45,13 @@ def post_json(url: str, body: dict, headers: dict | None = None,
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.load(resp)
         except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < retries:
+            if _transient(e.code) and attempt < retries:
                 time.sleep(backoff * (attempt + 1))
                 continue
             raise
+
+
+def _transient(code: int) -> bool:
+    """Whether an HTTP status says to try again: a burst limit or a server-side
+    failure, never a rejected request."""
+    return code == 429 or code >= 500
