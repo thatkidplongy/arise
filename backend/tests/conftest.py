@@ -12,6 +12,9 @@ import pytest
 
 _TMP_DB = Path(tempfile.gettempdir()) / "arise-pytest.db"
 os.environ["ARISE_DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
+# The model budget's tally is written beside the database so a restart can pick it
+# up; in tests it goes to a throwaway file the budget fixture below clears.
+os.environ["ARISE_LLM_BUDGET_FILE"] = str(Path(tempfile.gettempdir()) / "arise-pytest-llm-budget.json")
 # Keep the LLM off during tests regardless of the developer's shell env, so the
 # fallback paths are what's exercised.
 os.environ.pop("ARISE_LLM_API_KEY", None)

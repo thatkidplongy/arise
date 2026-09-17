@@ -484,6 +484,58 @@ def test_the_email_still_goes_out_when_distilling_fails(db, monkeypatch):
     assert out["status"] == "sent"
     assert "1 quest finished" in sent["text"]  # the recap made it
     assert "429" in out["detail"]  # and the hole in it is on the record
+    # ...and the reader is told, in plain words, rather than left with a gap.
+    assert "weren't distilled this morning" in sent["text"]
+    assert "daily quota was spent" in sent["text"]
+
+
+def test_notes_with_no_key_to_distil_them_are_on_the_record(db, monkeypatch):
+    """A day with notes and no model key used to look exactly like a clean morning."""
+    player = state.get_or_create_player(db)
+    _learn(db, player, DAY, source="Deep Work, ch 2")
+
+    problems: list[str] = []
+    assert digest.build_highlights(db, player, DAY, problems) == []  # no key in tests
+    assert problems == ["not distilled (no model key)"]
+
+
+def test_a_model_that_kept_nothing_is_on_the_record(db, monkeypatch):
+    player = state.get_or_create_player(db)
+    _learn(db, player, DAY, source="Deep Work, ch 2")
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "distill_learning", lambda _e: {"highlights": []})
+
+    problems: list[str] = []
+    assert digest.build_highlights(db, player, DAY, problems) == []
+    assert problems == ["not distilled (the model kept nothing from 1 entry)"]
+    # Nothing written, so the catch-up asks again tomorrow.
+    assert db.query(Highlight).filter_by(player_id=player.id, day=DAY).count() == 0
+
+
+def test_a_day_with_nothing_logged_is_not_a_miss(db):
+    player = state.get_or_create_player(db)
+    problems: list[str] = []
+    assert digest.build_highlights(db, player, DAY, problems) == []
+    assert problems == []
+
+
+@pytest.mark.parametrize("reason,words", [
+    ("not distilled (HTTPError 429: PerDay)", "daily quota was spent"),
+    ("not distilled (HTTPError 503: overloaded)", "couldn't be reached"),
+    ("not distilled (TimeoutError)", "couldn't be reached"),
+    ("not distilled (no model key)", "no model key"),
+    ("not distilled (the model kept nothing from 2 entries)", "nothing in them worth keeping"),
+])
+def test_missed_line_says_why_in_plain_words(reason, words):
+    line = digest.missed_line([reason])
+    assert line.startswith("Yesterday's notes weren't distilled")
+    assert words in line
+    assert "HTTPError" not in line  # the raw reason is for the log, not the inbox
+
+
+def test_missed_line_is_silent_when_yesterday_distilled():
+    assert digest.missed_line([]) == ""
+    assert digest.missed_line(["hooks not written (TimeoutError)"]) == ""
 
 
 def test_a_clean_send_records_no_note(db, monkeypatch):
@@ -542,6 +594,28 @@ def test_render_text_is_kind_about_an_empty_day():
     out = digest_render.render_text(_ctx())
     assert "rest counts" in out
     assert "TRY TO RECALL" not in out
+
+
+def test_both_bodies_say_why_yesterday_is_missing():
+    """A morning without yesterday's questions must explain itself, above the older
+    cards it does ask — otherwise it reads as the app having forgotten."""
+    missed = digest.missed_line(["not distilled (HTTPError 429: PerDay)"])
+    ctx = {**_ctx(recall=[_recalled("Older.", "Older cue?")]), "missed": missed}
+
+    text = digest_render.render_text(ctx)
+    html = digest_render.render_html(ctx)
+    assert missed in text and missed in html
+    assert text.index(missed) < text.index("TRY TO RECALL")
+    assert html.index(missed) < html.index("Try to recall")
+
+
+def test_a_missed_day_with_nothing_else_is_not_called_quiet():
+    missed = digest.missed_line(["not distilled (TimeoutError)"])
+    ctx = {**_ctx(), "missed": missed}
+    text = digest_render.render_text(ctx)
+    assert missed in text
+    assert "rest counts" not in text
+    assert "rest counts" not in digest_render.render_html(ctx)
 
 
 def test_render_keeps_a_cueless_highlight_rather_than_dropping_it():

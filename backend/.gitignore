@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 arise.db
 logs/
+.llm-budget.json
+.llm-budget.json.tmp

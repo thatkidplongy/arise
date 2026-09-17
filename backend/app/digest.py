@@ -266,7 +266,12 @@ def build_highlights(db: Session, player: Player, day: str,
     no highlights are returned. The rest of the email — the spaced recall and the
     day's record — needs no model at all, and losing the whole 7am email because a
     free-tier quota ran out is the worst possible trade. Nothing is written either,
-    so the day distils properly the next time it's asked for."""
+    so the day distils properly the next time it's asked for.
+
+    Every way a logged day can end up with no cards is reported the same way, not
+    only the exception: a day with notes but no key, and a model that came back with
+    nothing, used to leave no trace anywhere — the email simply had a hole where
+    yesterday should have been, and the run's record read as a clean morning."""
     existing = (
         db.query(Highlight)
         .filter_by(player_id=player.id, day=day)
@@ -277,19 +282,21 @@ def build_highlights(db: Session, player: Player, day: str,
         return existing
 
     entries = gather(db, player, day)
-    if not entries or not llm.enabled():
+    if not entries:
+        return []  # nothing was logged; not a miss
+    if not llm.enabled():
+        _not_distilled(problems, "no model key")
         return []
 
     try:
         items = llm.distill_learning(entries)["highlights"]
     except Exception as err:
         llm.note_refusal(err)  # a per-day refusal closes the window for everyone
-        reason = f"not distilled ({_why(err)})"
-        print(f"[arise.digest] {reason}; sending the rest of the email.", file=sys.stderr)
-        if problems is not None:
-            problems.append(reason)
+        _not_distilled(problems, _why(err))
         return []
     if not items:
+        _not_distilled(problems, f"the model kept nothing from {len(entries)} "
+                                 f"entr{'y' if len(entries) == 1 else 'ies'}")
         return []
 
     rows = [
@@ -305,6 +312,39 @@ def build_highlights(db: Session, player: Player, day: str,
     db.commit()
     update_thread(db, player, day, entries, thread_lines(entries, rows))
     return rows
+
+
+_NOT_DISTILLED = "not distilled"
+
+
+def _not_distilled(problems: list[str] | None, why: str) -> None:
+    """Note that a day's notes produced no cards, and why, for the run's record."""
+    reason = f"{_NOT_DISTILLED} ({why})"
+    print(f"[arise.digest] {reason}; sending the rest of the email.", file=sys.stderr)
+    if problems is not None:
+        problems.append(reason)
+
+
+def missed_line(problems: list[str]) -> str:
+    """What the email says over the hole where yesterday's cards would have been.
+
+    The record keeps the raw reason (an HTTP status and body, for whoever reads the
+    log); the reader gets one plain sentence, because a morning that arrives without
+    yesterday and says nothing about it reads as the app having forgotten. Empty when
+    yesterday distilled — or when nothing was logged, which is not a miss."""
+    reason = next((p for p in problems if p.startswith(_NOT_DISTILLED)), "")
+    if not reason:
+        return ""
+    if "no model key" in reason:
+        why = "distilling is switched off: no model key is set"
+    elif "kept nothing" in reason:
+        why = "the model found nothing in them worth keeping"
+    elif " 429" in reason:
+        why = "the model's daily quota was spent"
+    else:
+        why = "the model couldn't be reached"
+    return (f"Yesterday's notes weren't distilled this morning — {why}. "
+            f"They'll be tried again tomorrow.")
 
 
 # ── Threads — the running summary per book ───────────────────────────────────
@@ -496,6 +536,8 @@ def build_context(db: Session, player: Player, day: str) -> dict:
     highlights = build_highlights(db, player, day, problems)
     return {
         "problems": problems,
+        # The one problem the reader is told about, in their words; "" when none.
+        "missed": missed_line(problems),
         "day": day,
         "name": player.name,
         "highlights": [

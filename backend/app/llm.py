@@ -52,6 +52,52 @@ _QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 _spent: dict[str, int] = {}
 _exhausted_day: str = ""
 
+# The tally lives on disk as well as in memory. The deploy job restarts the backend
+# on every backend commit, and a restart used to start the day's count from zero —
+# a per-day refusal it had already learned was walked into again, and generation
+# could spend the digest's reserve twice over. Beside arise.db (both are relative
+# to the backend's working directory); a missing or unwritable file just means the
+# tally is in memory only, as it always was.
+_BUDGET_FILE = os.environ.get("ARISE_LLM_BUDGET_FILE", ".llm-budget.json")
+_loaded = False
+
+
+def _load() -> None:
+    """Pick the tally back up after a restart. Once per process; a file that is
+    missing, unreadable or malformed is treated as no tally at all."""
+    global _loaded, _exhausted_day
+    if _loaded:
+        return
+    _loaded = True
+    try:
+        with open(_BUDGET_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return
+    if not isinstance(data, dict):
+        return
+    spent = data.get("spent")
+    if isinstance(spent, dict):
+        for day, n in spent.items():
+            if isinstance(day, str) and isinstance(n, int) and not isinstance(n, bool):
+                _spent[day] = n
+    exhausted = data.get("exhausted_day")
+    if isinstance(exhausted, str):
+        _exhausted_day = exhausted
+
+
+def _save() -> None:
+    """Write the tally down. Atomic — a crash mid-write leaves the old file, not a
+    torn one — and never fatal: a disk that won't take it costs nothing but the
+    memory across the next restart."""
+    try:
+        tmp = _BUDGET_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"spent": _spent, "exhausted_day": _exhausted_day}, f)
+        os.replace(tmp, _BUDGET_FILE)
+    except OSError:
+        pass
+
 
 def quota_day() -> str:
     """Which allowance today's requests come out of."""
@@ -60,6 +106,7 @@ def quota_day() -> str:
 
 def budget_left(reserve: int = 0) -> int:
     """Requests still safe to make, holding `reserve` back for something else."""
+    _load()
     day = quota_day()
     if _exhausted_day == day:
         return 0
@@ -74,17 +121,25 @@ def can_generate() -> bool:
 
 def note_spend(n: int = 1) -> None:
     """Record requests made. Yesterday's tally is dropped, not accumulated."""
+    _load()
     day = quota_day()
     for stale in [k for k in _spent if k != day]:
         del _spent[stale]
     _spent[day] = _spent.get(day, 0) + n
+    _save()
 
 
 def reset_budget() -> None:
-    """Forget the tally — for tests, and for a manual reset after topping up."""
-    global _exhausted_day
+    """Forget the tally, on disk too — for tests, and for a manual reset after
+    topping up."""
+    global _exhausted_day, _loaded
     _spent.clear()
     _exhausted_day = ""
+    _loaded = True  # nothing to pick back up; a stale file must not be re-read
+    try:
+        os.remove(_BUDGET_FILE)
+    except OSError:
+        pass
 
 
 def _error_body(err: Exception) -> str:
@@ -117,7 +172,9 @@ def note_refusal(err: Exception) -> None:
     body = _error_body(err)
     if "PerDay" in body or "per day" in body.lower():
         global _exhausted_day
+        _load()
         _exhausted_day = quota_day()
+        _save()
 
 # Gemini structured-output schema (OpenAPI subset): one object per slot.
 _RESPONSE_SCHEMA = {

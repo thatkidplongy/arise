@@ -181,6 +181,26 @@ Emails come from Resend's shared `onboarding@resend.dev` unless you set
 `ARISE_DIGEST_FROM` to a domain you've verified — check spam on the first one.
 Preview without sending (and tune the wording) at `/digest/preview?day=…`.
 
+**A morning arrives without yesterday's questions.** The distillation is the one
+step that needs the model, and it can fail on its own (quota spent, Gemini
+overloaded, a timeout) while the rest of the email still goes out. When it does,
+the email says so in a line above the older cards, and the reason is on the record:
+
+```bash
+tail -n 3 backend/logs/digest.log   # e.g. "sent (0 highlight(s)) not distilled (HTTPError 429: …)"
+```
+
+Nothing is lost. The next morning's send re-distils any day from the past week that
+was logged but never distilled, and asks those cards as due. To have them now
+instead, ask for the preview — distilling is idempotent, so this makes the cards
+without sending a second email:
+`curl "localhost:8000/digest/preview?day=YYYY-MM-DD"` (add
+`-H "authorization: Bearer $ARISE_API_TOKEN"` if you set one). To re-send the
+whole email as well: `curl -X POST "localhost:8000/digest/send?day=YYYY-MM-DD&force=true"`.
+
+The model's daily tally is kept in `backend/.llm-budget.json` so a backend restart
+(every deploy is one) doesn't start the count over. Delete it to reset by hand.
+
 ## Backups
 
 `install.sh` also schedules `com.arise.backup`: a daily snapshot of `arise.db`

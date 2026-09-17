@@ -109,3 +109,50 @@ def test_yesterdays_spending_is_not_carried_forward(monkeypatch):
 
     monkeypatch.setattr(llm, "quota_day", lambda: "2026-08-12")
     assert llm.budget_left() == llm.DAILY_LIMIT
+
+
+# ── The tally outlives the process ─────────────────────────────────────────────
+#
+# The deploy job restarts the backend on every backend commit. A restart that
+# forgot the day's spending would let generation spend the digest's reserve a
+# second time, and walk back into a per-day refusal it had already learned.
+
+
+def _restart() -> None:
+    """What a process restart does to the module: memory gone, file untouched."""
+    llm._spent.clear()
+    llm._exhausted_day = ""
+    llm._loaded = False
+
+
+def test_the_days_spending_survives_a_restart():
+    llm.note_spend(llm.DAILY_LIMIT - llm.DIGEST_RESERVE)
+    assert llm.can_generate() is False
+
+    _restart()
+    assert llm.can_generate() is False
+    assert llm.budget_left() == llm.DIGEST_RESERVE
+
+
+def test_a_learned_refusal_survives_a_restart():
+    llm.note_refusal(_refusal(PER_DAY))
+    _restart()
+    assert llm.budget_left() == 0
+    assert llm.can_generate() is False
+
+
+def test_a_missing_or_torn_tally_is_no_tally(tmp_path, monkeypatch):
+    monkeypatch.setattr(llm, "_BUDGET_FILE", str(tmp_path / "budget.json"))
+    _restart()
+    assert llm.budget_left() == llm.DAILY_LIMIT  # nothing written yet
+
+    (tmp_path / "budget.json").write_text("{not json")
+    _restart()
+    assert llm.budget_left() == llm.DAILY_LIMIT  # unreadable: start clean, don't crash
+
+
+def test_a_reset_clears_the_file_too():
+    llm.note_spend(llm.DAILY_LIMIT)
+    llm.reset_budget()
+    _restart()
+    assert llm.budget_left() == llm.DAILY_LIMIT
