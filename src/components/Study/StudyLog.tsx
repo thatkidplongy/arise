@@ -8,7 +8,7 @@ import { StudyButton } from '@/components/Study/StudyButton';
 import { Text } from '@/components/ui/Text';
 import { LEARNING_NOTE_MAX } from '@/consts';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
-import type { ApiLearning, ApiStudy } from '@/lib/api';
+import type { ApiLearning, ApiStudy, StudySubject } from '@/lib/api';
 import { isSittingFor, openPieceOf, studyKindOf } from '@/lib/study';
 import { snippet } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
@@ -59,23 +59,19 @@ function StudyDraft({ value, hue, onPress }: { value: string; hue: string; onPre
   );
 }
 
-/** How a sitting is worded, the one line the subjects say differently: Craft's is a
- * page you close, a walk's is an exercise you just did. */
+/** How a sitting is worded — the one line the three subjects say differently, because
+ * closing a chapter, closing a chart and putting a pencil down are not the same act. */
+const HELP: Record<StudySubject, string> = {
+  craft:
+    'Close the page and say the idea back. One sitting is one piece of the phase, at whatever pace suits you.',
+  japanese:
+    'Look away from the chart and say it back — the row, the sounds, the one that keeps sliding off. The step itself moves when you say you’re through it.',
+  sketch:
+    'Put the pencil down and say what you noticed — about the subject, or about your own seeing. The step itself moves when you say you’re through it.',
+};
+
 function StudyHelp({ study }: { study: ApiStudy }) {
-  if (study.subject === 'craft') {
-    return (
-      <Text style={styles.help}>
-        Close the page and say the idea back. One sitting is one piece of the phase, at
-        whatever pace suits you.
-      </Text>
-    );
-  }
-  return (
-    <Text style={styles.help}>
-      Put the pencil down and say what you noticed. Logging it is what brings it back to
-      you later — the step itself moves when you say you’re through it.
-    </Text>
-  );
+  return <Text style={styles.help}>{HELP[study.subject]}</Text>;
 }
 
 /**
