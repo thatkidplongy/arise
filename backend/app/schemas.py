@@ -76,6 +76,36 @@ class CraftOut(BaseModel):
     pending: bool  # the check-in is due
 
 
+class StudyOut(BaseModel):
+    """The one study card Learn shows, on whichever subject the board deals today.
+
+    One shape for three subjects that are built differently underneath: Craft is a
+    phase with a source you pick, Japanese and drawing are positions along a fixed
+    walk. The keys that only one of them can answer are still present on all three,
+    empty — a card that reads the same shape every day is worth more than three
+    almost-identical cards (see study.py).
+    """
+    subject: str  # craft | japanese | sketch
+    stat: str     # the attribute it feeds: CFT | INT | CRE
+    title: str    # what the card calls itself
+    unit: str     # what a stretch is called here — "Phase" or "Stage"
+    phase: int
+    phases: int
+    label: str
+    detail: str
+    plan: list[str]  # this stretch's pieces, in the order you'd take them
+    piece: str       # the one open in front of you ('' once the stretch is covered)
+    steps: list[str]  # how to work it — the walks name the exercise; Craft's piece is the chapter
+    resource: str     # where the step's material lives ('' for Craft: the source is the hunter's)
+    source: str       # Craft only: the one thing being studied ('' = not set)
+    done: int
+    studied: int
+    pieces: int
+    progress: float
+    is_last: bool
+    pending: bool  # Craft only: the phase check-in is due
+
+
 class InterviewModeIn(BaseModel):
     enabled: bool  # Craft (CFT): shift quests to interview prep when true
 
@@ -864,6 +894,7 @@ class StateOut(BaseModel):
     today: TodayOut
     book_review: BookReviewOut
     craft: CraftOut
+    study: StudyOut | None  # today's study card — craft, Japanese or drawing
     reading: ReadingOut | None  # progress on the current book, or null when none set
     week_review: WeekReviewOut  # a gentle recap of the current ISO week
     next_rank: RankGateOut | None

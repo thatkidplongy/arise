@@ -240,6 +240,16 @@ def finish_craft_piece(body: CraftPieceIn, day: str = Depends(query_day),
     return state.build_state(db, player, day)
 
 
+@router.post("/study/piece", response_model=StateOut)
+def finish_study_piece(body: CraftPieceIn, day: str = Depends(query_day),
+                       db: Session = Depends(get_db), player: Player = Depends(current_player)):
+    """Move today's study subject on by one, or send done=false to take it back. Which
+    plan that lands on is the day's — Craft Mon/Wed/Fri, Japanese Tue/Sat, drawing
+    Thu/Sun — so the card has one button whatever it's showing."""
+    service.finish_study_piece(db, player, day, body.done)
+    return state.build_state(db, player, day)
+
+
 @router.post("/craft/phase", response_model=StateOut)
 def review_craft_phase(body: CraftPhaseIn, day: str = Depends(query_day),
                        db: Session = Depends(get_db), player: Player = Depends(current_player)):

@@ -45,6 +45,10 @@ class Player(Base):
     # shape, then kanji. It moves when a day that handed over new material is
     # finished — never on a schedule.
     japanese_step: Mapped[int] = mapped_column(Integer, default=0)
+    # How far along the drawing walk the hunter is (0-based; see sketch.PLAN): seeing,
+    # then negative space, proportion, value, and drawing from life. Same shape as
+    # `japanese_step` and for the same reason — a position, never a calendar.
+    sketch_step: Mapped[int] = mapped_column(Integer, default=0)
     # The ISO week the system-design plan began — kept for display ("started 3 weeks
     # ago"), never to decide what to study. The phase advances on reading, not time.
     craft_started_week: Mapped[str] = mapped_column(String, default="")

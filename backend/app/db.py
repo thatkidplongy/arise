@@ -75,6 +75,9 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     # guessed at from how long ago they began — the deck on Learn is one sitting away
     # from telling them what they already know.
     ("players", "japanese_step", "INTEGER DEFAULT 0"),
+    # Where the drawing plan stands. Existing players start at the first step — the
+    # walk opens by drawing where you are today, so nothing is skipped by starting.
+    ("players", "sketch_step", "INTEGER DEFAULT 0"),
     ("insights", "kind", "VARCHAR DEFAULT 'motivation'"),
     ("quest_notes", "prompt", "VARCHAR DEFAULT ''"),
     ("quest_notes", "step_index", "INTEGER"),

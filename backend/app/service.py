@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from datetime import date, timedelta
 
-from . import game, japanese, limits, llm, progression, quests
+from . import game, japanese, limits, llm, progression, quests, sketch, study
 from .achievements import ACHIEVEMENTS
 from .models import (
     AchievementUnlock,
@@ -405,6 +405,28 @@ def finish_craft_piece(db: Session, player: Player, done: bool) -> None:
     if nxt:
         player.craft_source = nxt
     _clear_generated_for_craft(db, player)  # only interview mode generates this slot
+    db.commit()
+
+
+def finish_study_piece(db: Session, player: Player, day: str, done: bool) -> None:
+    """Move today's study subject on by one, or take the last move back.
+
+    One action for all three subjects, because Learn draws one card: the day decides
+    which plan it lands on (see `state.study_of`). Craft keeps its own path — ticking
+    a piece there also hands over the next chapter as the source — while the two walks
+    are a position and move by one.
+    """
+    subject = study.subject_for(active_daily_ids(day))
+    if subject == study.CRAFT:
+        finish_craft_piece(db, player, done)
+        return
+    step = 1 if done else -1
+    if subject == study.JAPANESE:
+        at = (player.japanese_step or 0) + step
+        player.japanese_step = max(0, min(at, japanese.LAST_STEP))
+    elif subject == study.SKETCH:
+        at = (player.sketch_step or 0) + step
+        player.sketch_step = max(0, min(at, sketch.LAST_STEP))
     db.commit()
 
 

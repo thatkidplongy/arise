@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConnectionPanel } from '@/components/ConnectionPanel';
-import { CraftPhaseCard } from '@/components/CraftPhaseCard';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { ReadingCard } from '@/components/ReadingCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { RecallBlock } from '@/components/Recall/RecallBlock';
 import { Screen } from '@/components/Screen';
+import { StudyCard } from '@/components/Study/StudyCard';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
 import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
@@ -211,7 +211,11 @@ export default function LearnScreen() {
               the logged chapters cover the book, so it costs nothing until then. */}
           <ReadingReview />
 
-          <CraftPhaseCard />
+          {/* The one thing being worked through today. The board alternates between
+              system design, Japanese and drawing, and this follows it — it used to
+              show system design every morning, including the four a week the board
+              isn't on it. */}
+          <StudyCard />
 
           <Capture />
 

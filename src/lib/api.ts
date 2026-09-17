@@ -139,6 +139,7 @@ export interface ApiState {
   };
   book_review: { pending: boolean; book: string };
   craft: ApiCraft; // where the system-design plan is, advanced by reading not dates
+  study: ApiStudy | null; // the one study card Learn shows — today's subject of the three
   reading: ApiReading | null; // progress on the current book, or null when none set
   week_review: ApiWeekReview; // a gentle recap of the current ISO week
   next_rank: { rank: Rank; level: number; streak: number } | null;
@@ -314,6 +315,25 @@ export interface ApiCraft {
   is_last: boolean;
   pending: boolean; // the phase check-in is due
 }
+
+/**
+ * The study card Learn shows today, on whichever of the three subjects the board is
+ * on: system design Mon/Wed/Fri, Japanese Tue/Sat, drawing Thu/Sun.
+ *
+ * One shape for three plans that are built differently underneath — Craft is a phase
+ * with a source you pick, the other two are positions along a fixed walk — so the app
+ * draws one card rather than three that are nearly the same.
+ */
+export interface ApiStudy extends ApiCraft {
+  subject: StudySubject;
+  stat: StatKey; // the attribute it feeds — CFT, INT or CRE
+  title: string; // what the card calls itself
+  unit: string; // what a stretch is called here: 'Phase' or 'Stage'
+  steps: string[]; // how to work the open piece (the walks name the exercise; Craft's is a chapter)
+  resource: string; // where the step's material lives ('' for Craft — the source is yours)
+}
+
+export type StudySubject = 'craft' | 'japanese' | 'sketch';
 
 /** One logged sitting of reading — what you read, in your own units. */
 export interface ApiReadingLog {
@@ -747,8 +767,8 @@ export const api = {
       body: JSON.stringify({ done }),
     }),
 
-  finishCraftPiece: (base: string, token: string, done: boolean, day: string) =>
-    request<ApiState>(base, `/craft/piece?day=${day}`, token, {
+  finishStudyPiece: (base: string, token: string, done: boolean, day: string) =>
+    request<ApiState>(base, `/study/piece?day=${day}`, token, {
       method: 'POST',
       body: JSON.stringify({ done }),
     }),

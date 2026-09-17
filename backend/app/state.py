@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from . import (body, digest, game, insights, japanese, llm, mailer, progression, quests,
-               reading, recall, transcript)
+               reading, recall, sketch, study, transcript)
 from .achievements import ACHIEVEMENTS, Snapshot
 from .models import (
     AchievementUnlock,
@@ -191,6 +191,11 @@ def _jp_step(player: Player) -> int:
     """How far along the Japanese plan the player is. Deliberately not derived from
     the calendar — see japanese.py for why a week clock was the wrong shape."""
     return max(0, min(player.japanese_step or 0, japanese.LAST_STEP))
+
+
+def _sketch_step(player: Player) -> int:
+    """How far along the drawing plan the player is — the drawing twin of `_jp_step`."""
+    return max(0, min(player.sketch_step or 0, sketch.LAST_STEP))
 
 
 def _craft_phase_num(player: Player) -> int:
@@ -555,6 +560,24 @@ def craft_of(db: Session, player: Player, day: str) -> dict:
             and player.craft_review_week != game.week_key(day)
         ),
     }
+
+
+def study_of(db: Session, player: Player, day: str) -> dict | None:
+    """The one study card Learn shows today, on whichever subject the board is on.
+
+    The card follows the board rather than sitting on system design every morning:
+    Craft Mon/Wed/Fri, Japanese Tue/Sat, drawing Thu/Sun. The weekday table lives in
+    this module and nowhere else — `study` is handed the day's daily ids and answers
+    which subject they carry, so the two can never drift (see study.py).
+    """
+    subject = study.subject_for(active_daily_ids(day))
+    if subject == study.CRAFT:
+        return study.craft_card(craft_of(db, player, day))
+    if subject == study.JAPANESE:
+        return study.walk_card(study.JAPANESE, japanese, _jp_step(player))
+    if subject == study.SKETCH:
+        return study.walk_card(study.SKETCH, sketch, _sketch_step(player))
+    return None
 
 
 def history_of(db: Session, player: Player, limit: int = 200) -> list[dict]:
@@ -941,6 +964,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "craft": craft_of(db, player, day),
+        "study": study_of(db, player, day),  # today's subject: craft, Japanese or drawing
         "reading": reading_view,
         "week_review": week_review_of(rows, defs, day),
         "stats": [
