@@ -484,16 +484,31 @@ def _clip(s, n: int) -> str:
     return head.rstrip(" ,;:·—-") + CUT
 
 
+# Stored lengths for a distilled capture — runaway guards, not display budgets, the
+# same rule the highlight caps below are sized by. The summary IS the card's header:
+# the one line the Inspire list shows and the only part read when scanning, so a cap
+# that fires on ordinary output cuts the card's title mid-clause. It was 220, which
+# the tips prompt's own "1–2 plain sentences" overran routinely — a header ending
+# "through handwriting, error tracking, and…" is what that looked like. Sized now so
+# a full two-sentence summary always fits whole and only a runaway is cut.
+MAX_SUMMARY = 500
+# A takeaway/step is asked for as "a short line"; a quote is asked for as "under ~120
+# characters". Both keep a guard above what the prompt asks for, so neither fires on
+# output that obeyed it.
+MAX_TAKEAWAY = 200
+MAX_QUOTE = 160
+
+
 def _parse_distillation(payload: dict) -> dict:
     """Pure: Gemini response JSON → {summary, takeaways[], steps[], quotes[]}. `steps`
     is optional (tips captures only; empty for motivation). Testable offline."""
     text = payload["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(text)
-    takeaways = [_clip(x, 200) for x in (data.get("takeaways") or []) if str(x).strip()]
-    steps = [_clip(x, 200) for x in (data.get("steps") or []) if str(x).strip()]
-    quotes = [_clip(x, 160) for x in (data.get("quotes") or []) if str(x).strip()]
+    takeaways = [_clip(x, MAX_TAKEAWAY) for x in (data.get("takeaways") or []) if str(x).strip()]
+    steps = [_clip(x, MAX_TAKEAWAY) for x in (data.get("steps") or []) if str(x).strip()]
+    quotes = [_clip(x, MAX_QUOTE) for x in (data.get("quotes") or []) if str(x).strip()]
     return {
-        "summary": _clip(data.get("summary", ""), 220),
+        "summary": _clip(data.get("summary", ""), MAX_SUMMARY),
         "takeaways": takeaways[:6],
         "steps": steps[:6],
         "quotes": quotes[:3],

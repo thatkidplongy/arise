@@ -39,6 +39,33 @@ def test_parse_distillation_caps_counts():
     assert len(out["takeaways"]) == 6 and len(out["steps"]) == 6 and len(out["quotes"]) == 3
 
 
+def test_parse_distillation_keeps_an_ordinary_two_sentence_summary_whole():
+    """The summary is the card's header — the line the Inspire list shows and the
+    only part read when scanning. A real tips capture ran to ~280 characters and the
+    old 220-character cap cut it at "error tracking, and…", mid-clause. Anything the
+    tips prompt's own "1-2 plain sentences" can ordinarily produce must survive."""
+    summary = (
+        "This video teaches how to achieve deep memory retention using three "
+        "high-effort learning techniques inspired by the Chinese education system. "
+        "By embracing 'desirable difficulty' through handwriting, error tracking "
+        "and active recall, you hold on to far more than rereading ever gives you."
+    )
+    assert 220 < len(summary) <= llm.MAX_SUMMARY  # the window the old cap cut
+    out = llm._parse_distillation(_payload({"summary": summary, "takeaways": [], "quotes": []}))
+    assert out["summary"] == summary
+    assert llm.CUT not in out["summary"]
+
+
+def test_parse_distillation_still_cuts_a_runaway_summary():
+    """The cap is a guard, not a budget: a model that hands back the transcript is
+    still cut — at a word boundary, and marked so the cut is visible."""
+    out = llm._parse_distillation(_payload({
+        "summary": "word " * 400, "takeaways": [], "quotes": [],
+    }))
+    assert len(out["summary"]) <= llm.MAX_SUMMARY
+    assert out["summary"].endswith(llm.CUT)
+
+
 # ── add / list / remove (db-level, network stubbed) ───────────────────────────
 
 
