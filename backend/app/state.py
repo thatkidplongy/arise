@@ -320,7 +320,7 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # whole board only repeated every 21 days. A week you can plan a life around is
 # worth more than an evenly-spaced one — for Craft.
 #
-# Sit, Physical, Grow and the index cards run every day. Craft takes Mon/Wed/Fri —
+# Physical, Grow and the index cards run every day. Craft takes Mon/Wed/Fri —
 # the same days as the run, which is fine: one is the day block and the other the
 # evening.
 #
@@ -333,8 +333,12 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 #
 # The cards are the fifth, and they don't make a day heavier: the pile is whatever
 # the recall ladder brought back overnight, which is minutes, and on a morning it
-# brought back nothing there is nothing to work. Craft days carry six.
-_DAILY_ALWAYS = ("d-meditate", "d-train", "d-read", "d-recall")
+# brought back nothing there is nothing to work. Craft days carry five, the rest four.
+#
+# Sit (`d-meditate`) is off the daily board for now. Spirit still has its weekly long
+# sit (`w-still`) and its side quest (`s-nature`); the daily keeps its QuestDef row
+# and history, and putting it back in this tuple is all it takes to return.
+_DAILY_ALWAYS = ("d-train", "d-read", "d-recall")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
     ("d-craft",),  # Mon
     (),            # Tue
@@ -355,7 +359,7 @@ def alternating_daily_id(day: str) -> str:
 
 
 def active_daily_ids(day: str) -> set[str]:
-    """The daily quests shown on `day`: the always-on four, whatever that weekday
+    """The daily quests shown on `day`: the always-on three, whatever that weekday
     carries (Craft), and today's turn of Japanese or drawing. Non-daily quests are
     unaffected."""
     return {
@@ -943,7 +947,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    active_ids = active_daily_ids(day)  # the always-on four + Craft's weekdays + today's walk
+    active_ids = active_daily_ids(day)  # the always-on three + Craft's weekdays + today's walk
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)

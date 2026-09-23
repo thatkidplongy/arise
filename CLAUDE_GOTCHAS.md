@@ -22,7 +22,9 @@ Non-obvious things about this repo, kept short.
   walk is on every day, so anything that paces the Japanese plan by date will fight
   that; the plan is held at `Player.japanese_step` and moves on completion for
   exactly this reason. On Craft days Learn shows two study cards, and
-  `/study/piece` names the subject it moves. `quests.SYSTEMS_WEEKDAY` has the same
+  `/study/piece` names the subject it moves.
+  Sit (`d-meditate`) is out of `_DAILY_ALWAYS` for now — Spirit runs on its weekly
+  and side quests, and its progression freezes rather than easing down. `quests.SYSTEMS_WEEKDAY` has the same
   constraint from the other side: it must name a day Craft is actually dealt, or
   the systems-thinking rep silently never happens.
 

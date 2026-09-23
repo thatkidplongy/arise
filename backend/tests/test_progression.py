@@ -128,7 +128,8 @@ def test_availability_is_derived_from_the_schedule_itself():
     """The two must not be able to drift: the days-per-week count is read off the
     same tables the board deals from."""
     days = state.daily_days_per_week()
-    assert days["STR"] == days["INT"] == days["SPI"] == 7  # the always-on four (Grow anchors INT)
+    assert days["STR"] == days["INT"] == 7  # always on (Grow anchors INT)
+    assert days["SPI"] == 0  # Sit is off the daily board for now — frozen, not dropped
     assert days["CFT"] == 3  # Mon/Wed/Fri
     assert days["CRE"] == 3  # every other day: three or four a week, held to three
     assert days["CHA"] == days["WLT"] == 0  # retired — no daily dealt at all

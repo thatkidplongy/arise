@@ -37,7 +37,7 @@ from . import game
 DAILY_BY_STAT: dict[str, str] = {
     "STR": "d-train",
     "CRE": "d-sketch",
-    "SPI": "d-meditate",
+    "SPI": "d-meditate",  # off the board for now — frozen, not retired
     "CHA": "d-connect",   # retired
     "INT": "d-read",
     "WLT": "d-wealth",    # retired

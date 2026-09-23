@@ -4,12 +4,12 @@ from datetime import date, timedelta
 
 from app import game, quests
 
-DAY = "2026-07-18"         # a Saturday — Sit, Physical, Grow and Japanese
+DAY = "2026-07-18"         # a Saturday — Physical, Grow and Japanese
 SKETCH_DAY = "2026-07-19"  # the Sunday after, drawing's turn
 CRAFT_DAY = "2026-07-20"   # the Monday after, the week's first Craft day
-# The dailies dealt on DAY: the always-on four and that day's walk, not the whole
+# The dailies dealt on DAY: the always-on three and that day's walk, not the whole
 # deck (see state.active_daily_ids).
-DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-recall", "d-jp"]
+DAILY_IDS = ["d-train", "d-read", "d-recall", "d-jp"]
 
 
 def _state(client):
@@ -329,7 +329,8 @@ def test_the_daily_schedule_is_fixed_to_the_weekday(client):
         nxt = (date.fromisoformat("2026-07-27") + timedelta(days=offset)).isoformat()
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
         assert shown == active_daily_ids(d)
-        assert {"d-meditate", "d-train", "d-read", "d-recall"} <= shown  # the always-on four
+        assert {"d-train", "d-read", "d-recall"} <= shown  # the always-on three
+        assert "d-meditate" not in shown  # Sit is weekly/side only for now
         assert len(shown & {"d-jp", "d-sketch"}) == 1  # one walk, every day
         week.append(shown - {"d-jp", "d-sketch"})
         next_week.append(active_daily_ids(nxt) - {"d-jp", "d-sketch"})
