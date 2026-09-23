@@ -584,6 +584,10 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
             # a card whose one Learn: chip already names the book — the exact split
             # this slot was just corrected for.
             continue
+        if q.id == "d-hansei":
+            # The evening look-back walks six named principles in a fixed cycle and
+            # reads back last night's change; a generated card would drop both.
+            continue
         if q.id == "d-recall":
             # The cards are the hunter's own, and the app already knows which ones are
             # due. A generated variant would name material the pile doesn't hold and

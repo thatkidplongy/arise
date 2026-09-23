@@ -18,3 +18,12 @@ export const JOURNAL_NOTE_MAX = 4000; // limits.JOURNAL_ENTRY
  * the limit and a number on screen is just noise; above it, you get enough warning
  * to finish the thought and trim rather than discovering the cap by being stopped. */
 export const NOTE_COUNT_FROM = 0.85;
+
+/** Each attribute's content band, named as the path it is: Shu (follow the form
+ * exactly), Ha (bend it), Ri (make it your own). Indexed by `ApiProgression.band`,
+ * which `progression.band_for` derives from the level (two levels a stage). */
+export const SHUHARI = ['Shu', 'Ha', 'Ri'] as const;
+
+export function shuhariOf(band: number | undefined): string {
+  return SHUHARI[Math.max(0, Math.min(band ?? 0, SHUHARI.length - 1))];
+}

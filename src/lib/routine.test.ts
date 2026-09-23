@@ -25,6 +25,12 @@ describe('blockOf', () => {
     expect(blockOf({ id: 'd-recall', stat: 'INT', title: 'Evening Reflect' })).toBe('morning');
   });
 
+  it('closes the day on the look-back, whichever lens it wears', () => {
+    // Spirit's default is the morning, and none of the lens titles names a time.
+    for (const title of ['Hansei', 'Kaizen', 'Poka-yoke', 'Kata', 'Shokunin', 'Shuhari'])
+      expect(blockOf({ id: 'd-hansei', stat: 'SPI', title })).toBe('night');
+  });
+
   it('leaves every other slot to the title and attribute rules', () => {
     expect(blockOf({ id: 'd-read', stat: 'INT', title: 'Deep Page' })).toBe('evening');
   });

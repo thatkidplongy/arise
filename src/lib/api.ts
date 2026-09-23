@@ -33,7 +33,7 @@ export interface ApiProgression {
   cap: number; // the ceiling tier
   required: number; // days to clear this week to level up
   cleared_this_week: number; // days cleared so far this week
-  band: number; // 0 foundation, 1 building, 2 depth
+  band: number; // 0 foundation, 1 building, 2 depth — shown as Shu · Ha · Ri (consts.SHUHARI)
 }
 
 export interface ApiQuest {

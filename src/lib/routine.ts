@@ -45,8 +45,12 @@ const TITLE_BLOCK: { match: RegExp; block: string }[] = [
 // what the recall ladder brought back overnight, and a card answered before the
 // day starts is a card answered. Its titles rotate, so this is keyed on the slot
 // and beats both the title match and the attribute default.
+//
+// The evening look-back (Hansei) is Spirit, whose default is the morning sit — but a
+// day can only be looked back on once it's over, so it closes the day in Wind-down.
 const QUEST_BLOCK: Record<string, string> = {
   'd-recall': 'morning',
+  'd-hansei': 'night',
 };
 
 /** The window a quest sits in: its own if it has been given one, else whatever its

@@ -7,9 +7,9 @@ from app import game, quests
 DAY = "2026-07-18"         # a Saturday — Physical, Grow and Japanese
 SKETCH_DAY = "2026-07-19"  # the Sunday after, drawing's turn
 CRAFT_DAY = "2026-07-20"   # the Monday after, the week's first Craft day
-# The dailies dealt on DAY: the always-on three and that day's walk, not the whole
+# The dailies dealt on DAY: the always-on four and that day's walk, not the whole
 # deck (see state.active_daily_ids).
-DAILY_IDS = ["d-train", "d-read", "d-recall", "d-jp"]
+DAILY_IDS = ["d-train", "d-read", "d-recall", "d-hansei", "d-jp"]
 
 
 def _state(client):
@@ -447,3 +447,19 @@ def test_week_review_recaps_the_week(client):
     assert wr["active_days"] == 1
     assert wr["top_stat"] == "STR" and wr["by_stat"].get("STR") == 1
     assert wr["week"].startswith("2026-W")
+
+
+def test_hansei_reads_last_nights_change_back(client):
+    """The Kaizen loop: the change written on one evening's look-back is the line on
+    the next evening's card — and only that step's answer, not the other two."""
+    tomorrow = (date.fromisoformat(DAY) + timedelta(days=1)).isoformat()
+    for step, text in ((0, "the walk happened"), (quests.HANSEI_CHANGE_STEP, "Lay out the gym kit tonight")):
+        client.post("/quest-notes", json={
+            "quest_id": "d-hansei", "text": text, "step_index": step, "day": DAY,
+        })
+    card = _quest(client.get(f"/state?day={tomorrow}").json(), "d-hansei")
+    lens_line = quests.hansei_content(tomorrow)[1]
+    assert card["desc"] == quests.hansei_echo(lens_line, "Lay out the gym kit tonight")
+    # A day after that, nothing was written the night before — the lens's own line.
+    later = (date.fromisoformat(DAY) + timedelta(days=2)).isoformat()
+    assert "Last night" not in _quest(client.get(f"/state?day={later}").json(), "d-hansei")["desc"]

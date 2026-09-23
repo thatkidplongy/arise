@@ -23,8 +23,11 @@ Non-obvious things about this repo, kept short.
   that; the plan is held at `Player.japanese_step` and moves on completion for
   exactly this reason. On Craft days Learn shows two study cards, and
   `/study/piece` names the subject it moves.
-  Sit (`d-meditate`) is out of `_DAILY_ALWAYS` for now — Spirit runs on its weekly
-  and side quests, and its progression freezes rather than easing down. `quests.SYSTEMS_WEEKDAY` has the same
+  Sit (`d-meditate`) is out of `_DAILY_ALWAYS` for now, and its progression freezes
+  rather than easing down. Spirit's daily is the evening look-back, `d-hansei` — but
+  it is deliberately *not* in `progression.DAILY_BY_STAT`: `replay` holds every past
+  week to the current schedule, so re-anchoring Spirit on a quest that didn't exist
+  before 2026-09-23 would ease its level to zero. `quests.SYSTEMS_WEEKDAY` has the same
   constraint from the other side: it must name a day Craft is actually dealt, or
   the systems-thinking rep silently never happens.
 
@@ -80,3 +83,10 @@ Non-obvious things about this repo, kept short.
   dealt, so `service.generate_quests` skips undealt dailies (otherwise the LLM
   budget is spent writing cards nobody sees) and `quests.pool_variant` falls back to
   the seeded title for any slot with no pool.
+
+- **The look-back reads last night back from its third step.** `d-hansei`'s card
+  line gains *Last night's change: "…"* when yesterday's note on step
+  `quests.HANSEI_CHANGE_STEP` exists (`state._hansei_echo`). So every lens in
+  `HANSEI_LENSES` must keep tomorrow's change as its third step, `STEP_CAPS` must
+  keep it at three, and the echo may only change the *desc* — the step-toggle path
+  resolves steps without notes, so a step that depended on them would drift.

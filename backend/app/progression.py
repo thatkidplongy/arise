@@ -79,6 +79,9 @@ def required_days(level: int) -> int:
     return min(3 + level, 6)
 
 
+# The bands are Shuhari, too — Shu (follow the form exactly), Ha (bend it), Ri (make
+# it your own). The app shows those names beside each level; these plainer words are
+# what the LLM prompt is pitched in.
 BAND_LABELS = {0: "foundation", 1: "building", 2: "depth"}
 
 

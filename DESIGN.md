@@ -66,7 +66,7 @@ keeps working** — the app is designed so an outside service can never take it 
 |---|---|---|---|
 | Healthy | Badminton + conditioning | **STR** | Sessions are "dungeon raids"; the daily rotates its conditioning but always opens with a push-ups + plank + explosive-core floor that *climbs with your level* (see Progression) at real training volume — sets × reps that force adaptation, not a warm-up. A second always-on daily, **Fuel**, carries the diet plan: its floor is written from your own body-profile targets, in **hand portions** (palms of protein, fists of veg, cupped hands of starch) rather than grams — most meals here are bought, and a gram target on a restaurant plate is a number you'd invent. The physique the training asks for is written in the kitchen |
 | Creative | Drawing, dance, singing, music (FL Studio), photo/video | **CRE** | Visible output, cheap to start |
-| Peaceful | Meditation | **SPI** | Calm, focus, reflection, breath — 10 min baseline |
+| Peaceful | Meditation + reflection | **SPI** | Calm, focus, reflection, breath. The daily is the evening **Hansei** look-back (see *Six principles*); the sits are weekly and side |
 | Connect | Social quests | **CHA** | Weekly gathering + daily micro-connections (ambivert-friendly) |
 | Grow | Math, Japanese, reading, the world | **INT** | Reads a book at your own pace (a chapter a day is the mandatory floor) — one book runs for as many weeks as it takes, never reset by a week ending; the rest — learn-how-to-learn/math/Japanese/history/science — rotates on top. The Japanese track walks a fixed beginner path — **hiragana → katakana → words & particles → sentence shape → kanji** — held at a position you finish your way to, never paced by the calendar (hiragana first, as every course teaches it; the chart is also a recall stack on Learn) |
 | Wealth | Making money | **WLT** | Fundamentals, side income, monetising your skills, and managing/growing money |
@@ -131,6 +131,28 @@ answered. Because the reflection *is* that step's answer, it's tied to the step:
 confirmation first, so you never lose writing by accident. The Journal also has a
 free-form daily space unattached to any quest.
 
+## Six principles — the evening look-back (Hansei)
+
+Five principles from Japanese craft and manufacturing, plus **Shuhari**, the path
+they sit on, are built into the board rather than kept as a list to remember. They
+cover all of a life — work, home and play — so nothing here names a domain.
+
+| Principle | What it asks | Where it lives |
+|---|---|---|
+| **Hansei** | Reflect on the process, not yourself | The evening daily, `d-hansei` (Spirit), every day in Wind-down |
+| **Kaizen** | 1% a day; shrink a task until it can't fail | Every look-back ends on one small change for tomorrow — and the next evening's card reads it back: *Last night's change: "…" — did it happen?* The leveled floors are Kaizen too: they start tiny and climb |
+| **Poka-yoke** | Mistake-proof the surroundings, not your willpower | A lens: change one thing tonight so tomorrow's slip is hard |
+| **Kata** | Follow an established form exactly before innovating | A lens; and the Shu stage below |
+| **Shokunin** | One micro-skill at a time, drilled to your standard | A lens: name it, define good enough, drill it tomorrow |
+| **Shuhari** | Shu (follow the form) → Ha (bend it) → Ri (make it yours) | A lens; and each attribute's content band is named Shu · Ha · Ri beside its level |
+
+The look-back is one card with three steps — what happened, why, and one change for
+tomorrow — seen each evening through one of the six in a fixed cycle
+(`quests.HANSEI_LENSES`), so each comes round once every six days. Its steps are
+write-steps, so the answers land in the Journal. It isn't handed to the LLM (the
+cycle and the read-back would be lost), and it isn't Spirit's progression anchor —
+Spirit's level stays frozen while the sit is off the daily board.
+
 ## Daily floors — the leveled non-negotiables
 
 Some daily quests carry a **non-negotiable floor** (`FLOORS` in `quests.py`, plus
@@ -175,7 +197,8 @@ Two flavours of "harder":
   SPI a pause → a 5-min sit, WLT "log it" → a real money check-in, CFT 15 → 45
   minutes of daily deep work. Each **caps** at a sustainable maintain tier.
 - **A content band** where it isn't — 0 foundation → 1 building → 2 depth (`TIER`
-  in `quests.py`). Fundamentals before tactics: **INT** starts with *learning how
+  in `quests.py`), shown in the app as **Shu · Ha · Ri**: follow the form exactly,
+  then bend it, then make it your own (the LLM is told the same). Fundamentals before tactics: **INT** starts with *learning how
   to learn* (active recall, mind-mapping, the Feynman technique) before domains;
   **WLT** with money *psychology* before hustle; **CFT** with fluency &
   fundamentals before patterns, and patterns before system design & architecture;

@@ -43,6 +43,10 @@ SEED_QUESTS = [
     # rather than filed beside d-read because `sort` is this list's index and existing
     # rows keep the one they were given — inserting mid-list would tie two slots.
     dict(id="d-recall", title="Index Cards", desc="Work the cards that came due today", stat="INT", xp=25, cadence="daily", target=1),
+    # Spirit's evening daily: Hansei, looking back at the day through one of six
+    # Japanese practice principles in turn, and ending on one small change for
+    # tomorrow (quests.HANSEI_LENSES). Appended for the same `sort` reason as above.
+    dict(id="d-hansei", title="Hansei", desc="Five minutes at day's end: look back, change one thing", stat="SPI", xp=25, cadence="daily", target=1),
 ]
 
 

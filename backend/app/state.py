@@ -338,7 +338,12 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # Sit (`d-meditate`) is off the daily board for now. Spirit still has its weekly long
 # sit (`w-still`) and its side quest (`s-nature`); the daily keeps its QuestDef row
 # and history, and putting it back in this tuple is all it takes to return.
-_DAILY_ALWAYS = ("d-train", "d-read", "d-recall")
+#
+# Hansei (`d-hansei`) is Spirit's daily now — five minutes at the end of every day.
+# It is *not* Spirit's progression anchor (`progression.DAILY_BY_STAT` still names
+# `d-meditate`), so Spirit's level stays frozen: re-anchoring would replay every past
+# week against a quest that didn't exist yet and ease the level to zero.
+_DAILY_ALWAYS = ("d-train", "d-read", "d-recall", "d-hansei")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
     ("d-craft",),  # Mon
     (),            # Tue
@@ -472,6 +477,8 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         jp_step=jp_step,
         craft_source=craft_source,
     )
+    if q.id == "d-hansei":
+        desc = _hansei_echo(day, desc, notes_by or {})
     checked = checks_by.get((q.id, pk), set())
     return {
         "id": q.id,
@@ -490,6 +497,18 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         # client detects which steps are "write" steps from their wording.
         "notes": (notes_by or {}).get((q.id, pk), []),
     }
+
+
+def _hansei_echo(day: str, desc: str, notes_by: dict[tuple[str, str], list[dict]]) -> str:
+    """Tonight's look-back line, with last night's change read back onto it — just
+    `desc` when yesterday's card named none. Only the card's line changes, never its steps, so
+    the step-toggle path (which doesn't see notes) still lands on the right step."""
+    yesterday = (date.fromisoformat(day) - timedelta(days=1)).isoformat()
+    changes = [
+        n["text"] for n in notes_by.get(("d-hansei", yesterday), [])
+        if n.get("step") == quests.HANSEI_CHANGE_STEP and (n.get("text") or "").strip()
+    ]
+    return quests.hansei_echo(desc, changes[-1]) if changes else desc
 
 
 def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) -> dict | None:

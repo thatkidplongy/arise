@@ -12,6 +12,7 @@ import { XpBar } from '@/components/XpBar';
 import { Disc, StatChip } from '@/components/ui/StatChip';
 import { SectionRule } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
+import { shuhariOf } from '@/consts';
 import { useWide } from '@/hooks/useWide';
 import type { ApiQuest, ApiState } from '@/lib/api';
 import { isQuestDone } from '@/lib/quests';
@@ -78,7 +79,7 @@ function Aside({ state }: { state: ApiState }) {
               <StatChip statKey={stat.key} size={32} />
               <Text style={styles.asideStatLabel}>{meta.label}</Text>
               <Text style={[styles.asideStatLevel, { color: meta.color }]}>
-                Lv {progression?.[stat.key]?.level ?? 0}
+                Lv {progression?.[stat.key]?.level ?? 0} · {shuhariOf(progression?.[stat.key]?.band)}
               </Text>
             </View>
           );

@@ -134,7 +134,7 @@ def test_resource_matches_variant_title():
 
 
 def test_all_resource_keys_exist_as_variant_titles():
-    pools = list(quests.POOLS.values()) + list(quests.INTERVIEW_POOLS.values())
+    pools = list(quests.POOLS.values()) + list(quests.INTERVIEW_POOLS.values()) + [quests.HANSEI_LENSES]
     titles = {v[0] for pool in pools for v in pool}
     missing = [t for t in quests.RESOURCES if t not in titles]
     assert not missing, missing  # every citation maps to a real variant
@@ -541,3 +541,26 @@ def test_no_index_card_variant_borrows_a_band_from_another_slot():
     for title, _, _ in quests.POOLS["d-recall"]:
         assert quests.TIER.get(title, 0) == 0, title
     assert len(quests.narrow_to_band(quests.POOLS["d-recall"], 2)) == len(quests.POOLS["d-recall"])
+
+
+def test_hansei_walks_every_lens_once_in_six_evenings():
+    """Each principle comes round once every six days — a fixed cycle, not a hash
+    that repeats one and skips another — opening on plain Hansei the day it arrived."""
+    q = _q("d-hansei", "SPI", "daily")
+    start = date(2026, 9, 23)
+    titles = [quests.content_for(q, (start + timedelta(days=i)).isoformat())[0] for i in range(12)]
+    assert titles[0] == "Hansei"
+    assert sorted(titles[:6]) == sorted(t for t, _, _ in quests.HANSEI_LENSES)
+    assert titles[6:] == titles[:6]
+
+
+def test_every_hansei_lens_ends_on_tomorrows_change_and_keeps_it():
+    """The third step is the change the next evening reads back — so every lens has
+    one there, and the bare-slot step cap can't trim it off the card."""
+    q = _q("d-hansei", "SPI", "daily")
+    for i in range(len(quests.HANSEI_LENSES)):
+        day = (date(2026, 9, 23) + timedelta(days=i)).isoformat()
+        _, _, steps, _ = quests.content_for(q, day)
+        steps = quests.cap_steps(steps, 0, "d-hansei")
+        assert len(steps) == 3, steps
+        assert "tomorrow" in steps[quests.HANSEI_CHANGE_STEP].lower(), steps

@@ -2,6 +2,7 @@ import { Image, StyleSheet, View } from 'react-native';
 
 import { Counter, SystemWindow } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
+import { shuhariOf } from '@/consts';
 import type { ApiState } from '@/lib/api';
 import { STAT_META, clay, ink, radius, typography } from '@/theme';
 
@@ -71,6 +72,7 @@ export function StatusWindow({ state, avatarUri }: { state: ApiState; avatarUri?
               <View style={styles.statHead}>
                 <Text style={styles.statKey}>{stat.key}</Text>
                 <Text style={styles.statLabel}>{meta.label}</Text>
+                <Text style={styles.statBand}>{shuhariOf(prog?.band)}</Text>
                 <Text style={styles.statLevel}>Lv {level}</Text>
                 <Counter done={cleared} total={required} />
               </View>
@@ -138,7 +140,8 @@ const styles = StyleSheet.create({
   statHead: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
   statKey: { ...typography.kicker, fontSize: 10.5, letterSpacing: 1.4, color: ink.textSoft },
   statLabel: { ...typography.small, color: ink.textFaint },
-  statLevel: { ...typography.numeral, fontSize: 15, marginLeft: 'auto', color: ink.accent, includeFontPadding: false },
+  statBand: { ...typography.small, marginLeft: 'auto', color: ink.textFaint },
+  statLevel: { ...typography.numeral, fontSize: 15, color: ink.accent, includeFontPadding: false },
   statTrack: { height: 3, borderRadius: radius.pill, backgroundColor: ink.track, overflow: 'hidden' },
   statFill: { height: '100%', borderRadius: radius.pill, backgroundColor: ink.accentDim },
 });

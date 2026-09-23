@@ -36,8 +36,10 @@ The pools are tuned to the hunter's real interests:
        and a fixed 5 km on Mon/Wed/Fri (see ROADWORK). Diet is no longer a quest:
        it's tracked on the Food screen, not asked about on the board
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
-  SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone,
-       and the one daily that opens every morning
+  SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone.
+       Its daily is the evening look-back (Hansei), seen through one of six Japanese
+       practice principles a night and ending on one change for tomorrow
+       (see HANSEI_LENSES); the sits are weekly and side
   CHA  ambivert: deepen 1-on-1s and occasionally reach past the comfort zone —
        weekly and side only, with no daily slot
   INT  the daily is one sitting on one book: the floor names it and asks you to log
@@ -847,6 +849,9 @@ RESOURCES: dict[str, str] = {
     "Body Scan": "🎧 Waking Up — Sam Harris",
     "Deep Stillness": "🎧 Waking Up — Sam Harris",
     "Box Breathing": "🎥 Huberman Lab (YouTube)",
+    # SPI — the evening look-back's lenses (HANSEI_LENSES)
+    "Kaizen": "📖 One Small Step Can Change Your Life — Robert Maurer",
+    "Kata": "📖 Toyota Kata — Mike Rother",
     # CHA — people skills
     "Listen Fully": "📖 How to Win Friends and Influence People — Dale Carnegie",
     "Deep Talk": "🎥 Charisma on Command (YouTube)",
@@ -1094,7 +1099,9 @@ def priority_content(focus: str) -> tuple[str, str, list[str]]:
 # a list of sets, and a kana row is three lines of a chart plus what to do with them.
 # Trimming those to two isn't leanness, it's a row of hiragana served without its
 # handakuten.
-STEP_CAPS: dict[str, int] = {"d-train": 5, "d-jp": 5}
+# The evening look-back is three questions that only make sense together: what
+# happened, why, and the one change it leads to — trimmed to two, the change goes.
+STEP_CAPS: dict[str, int] = {"d-train": 5, "d-jp": 5, "d-hansei": 3}
 _STEP_CAP_WITH_FLOOR = 3
 _STEP_CAP_BARE = 2
 
@@ -1376,6 +1383,73 @@ def craft_content(day: str) -> tuple[str, str, list[str], str]:
     return _CRAFT_METHODS[_pick("d-craft", f"craft:{day}", len(_CRAFT_METHODS))]
 
 
+# ── Hansei: the evening look-back ────────────────────────────────────────────
+# Five principles from Japanese craft and manufacturing, plus Shuhari, the path
+# they sit on. They're for all of a life — work, home and play alike — so no lens
+# names a domain; the day picks where to look.
+#
+#   Hansei    reflect on the process, not yourself
+#   Kaizen    small daily improvements; shrink a task until it can't fail
+#   Poka-yoke mistake-proof the surroundings instead of leaning on willpower
+#   Kata      follow an established form exactly before innovating
+#   Shokunin  isolate one micro-skill and drill it to your own standard
+#   Shuhari   Shu (follow the form) → Ha (bend it) → Ri (make it your own)
+#
+# One lens an evening, in a fixed cycle rather than a hash: a hash repeats and
+# skips, and each of the six should come round once every six days. Every lens
+# ends on the same thing, one small change for tomorrow — that step *is* Kaizen,
+# and it's the one the next evening's card reads back (HANSEI_CHANGE_STEP).
+HANSEI_LENSES: list[tuple[str, str, list[str]]] = [
+    ("Hansei", "Look back without blame — the process, not you", [
+        "Write what worked today — at work, at home or at play",
+        "Write what broke, and the step in the process where it broke",
+        "Write one process change for tomorrow, small enough that it can't fail",
+    ]),
+    ("Kaizen", "One percent: shrink what felt heavy until it can't fail", [
+        "What felt too big to start today?",
+        "Write the smallest version of it — one page, shoes on, one line",
+        "Write tomorrow's 1% change: when and where that small version happens",
+    ]),
+    ("Poka-yoke", "Mistake-proof tomorrow: change the room, not your willpower", [
+        "Where did today slip, and what made slipping easy?",
+        "Change one thing tonight so the slip is hard tomorrow — phone in another room, kit laid out, tab closed",
+        "Write the change you made, so tomorrow knows it's there",
+    ]),
+    ("Kata", "Follow the form before you improvise", [
+        "Where did you improvise today where a proven method would have served?",
+        "Write the form you'll follow instead — a template, a recipe, someone's exact steps",
+        "Write when tomorrow you'll run it exactly as written, no edits yet",
+    ]),
+    ("Shokunin", "One micro-skill at a time, drilled to your own standard", [
+        "Which single micro-skill held back today's work or play?",
+        "Write what good enough looks like for it — your standard, plainly",
+        "Write tomorrow's drill: ten minutes on that one skill and nothing else",
+    ]),
+    ("Shuhari", "Shu, Ha, Ri — follow the form, bend it, then make it yours", [
+        "Pick one thing you practise. Is it at Shu (copying), Ha (adapting) or Ri (your own)?",
+        "Write what honest practice looks like at that stage — more copying, or a first variation?",
+        "Write one change to tomorrow's practice that fits the stage you're really at",
+    ]),
+]
+HANSEI_CHANGE_STEP = 2  # every lens's third step is tomorrow's change
+# Anchored so the cycle opens on plain Hansei the day it arrived (2026-09-23).
+_HANSEI_ANCHOR = date(2026, 9, 23).toordinal()
+
+
+def hansei_content(day: str) -> tuple[str, str, list[str], str]:
+    """The evening look-back for `day`: which of the six lenses it's seen through."""
+    title, desc, steps = HANSEI_LENSES[(date.fromisoformat(day).toordinal() - _HANSEI_ANCHOR) % len(HANSEI_LENSES)]
+    return title, desc, list(steps), RESOURCES.get(title, "")
+
+
+def hansei_echo(desc: str, change: str) -> str:
+    """The card's line when last night's look-back named a change for today — the
+    Kaizen loop closed: what you said you'd change, read back the next evening. The
+    lens's own line stays in front, because it's the only place the principle is
+    explained."""
+    return f"{desc}. Last night's change: “{change.strip()}” — did it happen?"
+
+
 # ── Roadwork: the fixed running days ─────────────────────────────────────────
 # Mon/Wed/Fri, with a rest day between each — the standard spacing for building
 # distance. Safe as a weekday rule because Physical is in `_DAILY_ALWAYS` and shows
@@ -1424,6 +1498,9 @@ def content_for(
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
         return japanese.content(jp_step)
+    if quest.id == "d-hansei":
+        # The lens follows a fixed six-day cycle, not the pool hash — see HANSEI_LENSES.
+        return hansei_content(day)
     if quest.id == "d-read":
         # One sitting on one source: the floor names the book, the method is what you
         # do with it, and the chip points at the book rather than a fourth place to be.
