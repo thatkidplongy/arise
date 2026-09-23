@@ -4,8 +4,8 @@ import type { ApiLearning, ApiStudy } from '@/lib/api';
  * The rules the study card shares with the log beneath it. Pure, so they're tested
  * here rather than inferred from the card's behaviour.
  *
- * The card draws three subjects that alternate across the week — system design,
- * Japanese, drawing — and the two things that differ per subject are what a sitting
+ * The cards draw three subjects — Japanese and drawing taking turns every day, system
+ * design Mon/Wed/Fri — and the two things that differ per subject are what a sitting
  * is filed as and which of today's logs belong to it.
  */
 

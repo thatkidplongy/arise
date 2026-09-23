@@ -13,18 +13,22 @@ Non-obvious things about this repo, kept short.
   If a slot's steps *are* the material rather than variety on top of it, it needs an
   entry in `STEP_CAPS` — otherwise content silently disappears off the card.
 
-- **The board is a fixed weekly schedule, not a rotation** (`state._DAILY_ALWAYS` +
-  `_DAILY_BY_WEEKDAY`). The same Monday every Monday. `d-craft` lands Mon/Wed/Fri,
-  and `d-jp` and `d-sketch` alternate across the other four (Tue/Sat and Thu/Sun) —
-  so none of them is on every day. Anything that paces the Japanese plan by date
-  will fight that; the plan is held at `Player.japanese_step` and moves on
-  completion for exactly this reason. `quests.SYSTEMS_WEEKDAY` has the same
+- **Craft is a fixed weekly schedule; Japanese and drawing alternate every day**
+  (`state._DAILY_ALWAYS` + `_DAILY_BY_WEEKDAY` + `_ALTERNATING`). `d-craft` lands
+  Mon/Wed/Fri, the same Monday every Monday. `d-jp` and `d-sketch` take turns by the
+  date's ordinal parity — one of them every day, never the same twice running, which
+  a weekday table can't do because seven is odd. Folding them back into the weekday
+  table puts two of the same walk back to back every Sunday→Monday. Neither
+  walk is on every day, so anything that paces the Japanese plan by date will fight
+  that; the plan is held at `Player.japanese_step` and moves on completion for
+  exactly this reason. On Craft days Learn shows two study cards, and
+  `/study/piece` names the subject it moves. `quests.SYSTEMS_WEEKDAY` has the same
   constraint from the other side: it must name a day Craft is actually dealt, or
   the systems-thinking rep silently never happens.
 
 - **Progression asks only for the days the schedule deals.** `_settle_week` caps the
   weekly bar at `state.daily_days_per_week()[stat]`, and freezes a stat whose daily
-  is never dealt. Without it, Creativity (one weekday) and Charisma and Wealth (no
+  is never dealt. Without it, Craft (three weekdays), Creativity (every other day) and Charisma and Wealth (no
   daily at all) would ease down a level every week however faithfully they were
   cleared. Retiring a daily therefore means checking `progression.DAILY_BY_STAT` —
   an anchor pointing at a quest the board never deals rots that attribute to zero.

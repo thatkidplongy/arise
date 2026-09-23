@@ -314,50 +314,73 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
     return _count(rows, quest.id, week=game.week_key(day))
 
 
-# A fixed weekly schedule, not a rotation. The old 3-day cycle was keyed on the
-# date's ordinal, so no weekday meant anything: "Wednesday is my sit" was never
-# true two weeks running, and the whole board only repeated every 21 days. A week
-# you can plan a life around is worth more than an evenly-spaced one.
+# A fixed weekly schedule for Craft, and a strict every-other-day alternation for
+# the two walks. The old 3-day cycle was keyed on the date's ordinal, so no weekday
+# meant anything: "Wednesday is my sit" was never true two weeks running, and the
+# whole board only repeated every 21 days. A week you can plan a life around is
+# worth more than an evenly-spaced one — for Craft.
 #
 # Sit, Physical, Grow and the index cards run every day. Craft takes Mon/Wed/Fri —
 # the same days as the run, which is fine: one is the day block and the other the
-# evening. Creativity and Japanese alternate across the four days Craft leaves, two
-# each. Every day carries exactly five cards, so no day is the heavy one.
+# evening.
+#
+# Japanese and drawing alternate *every day*, one or the other, never both and never
+# the same one twice running. That can't be a weekday table: seven is odd, so any
+# table puts the same walk on Sunday and the Monday after. It goes by the date's
+# ordinal instead, anchored so 2026-09-22 (a Japanese day under the old table) stays
+# Japanese and the alternation carried on from there. Each walk lands three or four
+# days a week, depending on the week.
 #
 # The cards are the fifth, and they don't make a day heavier: the pile is whatever
 # the recall ladder brought back overnight, which is minutes, and on a morning it
-# brought back nothing there is nothing to work.
+# brought back nothing there is nothing to work. Craft days carry six.
 _DAILY_ALWAYS = ("d-meditate", "d-train", "d-read", "d-recall")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
-    ("d-craft",),   # Mon
-    ("d-jp",),      # Tue
-    ("d-craft",),   # Wed
-    ("d-sketch",),  # Thu
-    ("d-craft",),   # Fri
-    ("d-jp",),      # Sat
-    ("d-sketch",),  # Sun
+    ("d-craft",),  # Mon
+    (),            # Tue
+    ("d-craft",),  # Wed
+    (),            # Thu
+    ("d-craft",),  # Fri
+    (),            # Sat
+    (),            # Sun
 )
+# Odd ordinals are Japanese, even ones drawing.
+_ALTERNATING = ("d-sketch", "d-jp")
+
+
+def alternating_daily_id(day: str) -> str:
+    """Which of the two walks `day` carries — Japanese and drawing take turns, one
+    day each, straight through week boundaries."""
+    return _ALTERNATING[date.fromisoformat(day).toordinal() % 2]
 
 
 def active_daily_ids(day: str) -> set[str]:
-    """The daily quests shown on `day`: the always-on three plus whatever that
-    weekday carries. The same every week — Monday is always Monday. Non-daily
-    quests are unaffected."""
-    return {*_DAILY_ALWAYS, *_DAILY_BY_WEEKDAY[date.fromisoformat(day).weekday()]}
+    """The daily quests shown on `day`: the always-on four, whatever that weekday
+    carries (Craft), and today's turn of Japanese or drawing. Non-daily quests are
+    unaffected."""
+    return {
+        *_DAILY_ALWAYS,
+        *_DAILY_BY_WEEKDAY[date.fromisoformat(day).weekday()],
+        alternating_daily_id(day),
+    }
 
 
 def daily_days_per_week() -> dict[str, int]:
     """How many days a week each attribute's daily is actually dealt.
 
     Progression asks for a number of cleared days per week, and that ask has to be
-    answerable: Creativity is dealt twice a week and Craft three times, so a flat
-    "three days" would ratchet them down however faithfully they were cleared.
-    Attributes with no daily at all (Charisma, Wealth) come back 0 and are frozen
-    rather than settled. Derived from the schedule itself so the two can't drift."""
+    answerable: Craft is dealt three times a week, so a flat "five days" would
+    ratchet it down however faithfully it was cleared. The alternating walks get three
+    or four days depending on the week, so they're held to the three every week
+    gives. Attributes with no daily at all (Charisma, Wealth) come back 0 and are
+    frozen rather than settled. Derived from the schedule itself so the two can't
+    drift."""
     out: dict[str, int] = {}
     for stat, qid in progression.DAILY_BY_STAT.items():
         if qid in _DAILY_ALWAYS:
             out[stat] = 7
+        elif qid in _ALTERNATING:
+            out[stat] = 7 // len(_ALTERNATING)
         else:
             out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots)
     return {stat: out.get(stat, 0) for stat in game.STAT_KEYS}
@@ -562,22 +585,24 @@ def craft_of(db: Session, player: Player, day: str) -> dict:
     }
 
 
-def study_of(db: Session, player: Player, day: str) -> dict | None:
-    """The one study card Learn shows today, on whichever subject the board is on.
-
-    The card follows the board rather than sitting on system design every morning:
-    Craft Mon/Wed/Fri, Japanese Tue/Sat, drawing Thu/Sun. The weekday table lives in
-    this module and nowhere else — `study` is handed the day's daily ids and answers
-    which subject they carry, so the two can never drift (see study.py).
-    """
-    subject = study.subject_for(active_daily_ids(day))
+def _card_for(db: Session, player: Player, day: str, subject: str) -> dict:
     if subject == study.CRAFT:
         return study.craft_card(craft_of(db, player, day))
     if subject == study.JAPANESE:
         return study.walk_card(study.JAPANESE, japanese, _jp_step(player))
-    if subject == study.SKETCH:
-        return study.walk_card(study.SKETCH, sketch, _sketch_step(player))
-    return None
+    return study.walk_card(study.SKETCH, sketch, _sketch_step(player))
+
+
+def studies_of(db: Session, player: Player, day: str) -> list[dict]:
+    """The study cards Learn shows today, one per subject the board deals.
+
+    The cards follow the board rather than sitting on system design every morning:
+    Japanese or drawing every day, taking turns, and Craft as well on Mon/Wed/Fri. The
+    schedule lives in this module and nowhere else — `study` is handed the day's daily
+    ids and answers which subjects they carry, so the two can never drift (see
+    study.py).
+    """
+    return [_card_for(db, player, day, s) for s in study.subjects_for(active_daily_ids(day))]
 
 
 def history_of(db: Session, player: Player, limit: int = 200) -> list[dict]:
@@ -918,7 +943,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    active_ids = active_daily_ids(day)  # the always-on three + this weekday's
+    active_ids = active_daily_ids(day)  # the always-on four + Craft's weekdays + today's walk
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
@@ -964,7 +989,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "craft": craft_of(db, player, day),
-        "study": study_of(db, player, day),  # today's subject: craft, Japanese or drawing
+        "studies": studies_of(db, player, day),  # today's subjects: Japanese or drawing, plus Craft
         "reading": reading_view,
         "week_review": week_review_of(rows, defs, day),
         "stats": [

@@ -59,6 +59,12 @@ class CraftPieceIn(BaseModel):
     done: bool  # True → this piece is covered, move to the next; False → undo one
 
 
+class StudyPieceIn(BaseModel):
+    """Move one of today's study subjects on by a piece, or take the last move back."""
+    subject: str  # craft | japanese | sketch — must be one the day deals
+    done: bool
+
+
 class CraftOut(BaseModel):
     """Where the hunter is in the system-design plan, measured in pieces covered."""
     phase: int
@@ -77,7 +83,7 @@ class CraftOut(BaseModel):
 
 
 class StudyOut(BaseModel):
-    """The one study card Learn shows, on whichever subject the board deals today.
+    """A study card Learn shows, one per subject the board deals today.
 
     One shape for three subjects that are built differently underneath: Craft is a
     phase with a source you pick, Japanese and drawing are positions along a fixed
@@ -894,7 +900,7 @@ class StateOut(BaseModel):
     today: TodayOut
     book_review: BookReviewOut
     craft: CraftOut
-    study: StudyOut | None  # today's study card — craft, Japanese or drawing
+    studies: list[StudyOut]  # today's study cards — Japanese or drawing, plus Craft Mon/Wed/Fri
     reading: ReadingOut | None  # progress on the current book, or null when none set
     week_review: WeekReviewOut  # a gentle recap of the current ISO week
     next_rank: RankGateOut | None

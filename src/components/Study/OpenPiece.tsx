@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { StudyButton } from '@/components/Study/StudyButton';
 import { Text } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
-import type { ApiStudy } from '@/lib/api';
+import type { ApiStudy, StudySubject } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { press, radius, text, withAlpha } from '@/theme';
 
@@ -21,11 +21,11 @@ function PhaseCovered() {
 
 /** Steps back to the piece before this one — for a chapter that wants a second
  * sitting, or a log you didn't mean to move you on. */
-function UndoTick() {
+function UndoTick({ subject }: { subject: StudySubject }) {
   const finishStudyPiece = useSystem((s) => s.finishStudyPiece);
   return (
     <Pressable
-      onPress={() => void finishStudyPiece(false)}
+      onPress={() => void finishStudyPiece(subject, false)}
       hitSlop={6}
       accessibilityRole="button"
       style={({ pressed }) => [styles.undo, pressed && { opacity: press.strong }]}
@@ -73,7 +73,7 @@ export function NowStudying({ study, hue }: { study: ApiStudy; hue: string }) {
     <OpenBox hue={hue} icon="document-text" label="NOW STUDYING">
       <Text style={styles.openTitle}>{study.source}</Text>
       {covered ? <PhaseCovered /> : <UpNext next={study.plan[study.done + 1] ?? ''} />}
-      {study.done > 0 ? <UndoTick /> : null}
+      {study.done > 0 ? <UndoTick subject={study.subject} /> : null}
     </OpenBox>
   );
 }
@@ -92,14 +92,14 @@ export function NowWorking({ study, hue }: { study: ApiStudy; hue: string }) {
         </Text>
       ))}
       <StepResource resource={study.resource} />
-      {study.done > 0 ? <UndoTick /> : null}
+      {study.done > 0 ? <UndoTick subject={study.subject} /> : null}
     </OpenBox>
   );
 }
 
 /** Saying you're through the step. Separate from logging a sitting on purpose: a step
  * can take three sittings, and only this says you're done with it. */
-export function FinishStep({ hue }: { hue: string }) {
+export function FinishStep({ subject, hue }: { subject: StudySubject; hue: string }) {
   const finishStudyPiece = useSystem((s) => s.finishStudyPiece);
   const save = useSaveState();
 
@@ -109,7 +109,7 @@ export function FinishStep({ hue }: { hue: string }) {
         label={saveLabel(save.state, 'I’m through this step')}
         hue={hue}
         disabled={save.state === 'saving'}
-        onPress={() => void save.run(() => finishStudyPiece(true))}
+        onPress={() => void save.run(() => finishStudyPiece(subject, true))}
       />
     </View>
   );

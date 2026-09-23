@@ -18,7 +18,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       MoneyIn, MoneyHistoryOut, PayCommitmentIn, PriorityIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReadingLogIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
-                      SkincareProductOut, SkincareStepIn, StateOut, StepResult,
+                      SkincareProductOut, SkincareStepIn, StateOut, StepResult, StudyPieceIn,
                       StepToggleIn)
 
 router = APIRouter()
@@ -241,12 +241,13 @@ def finish_craft_piece(body: CraftPieceIn, day: str = Depends(query_day),
 
 
 @router.post("/study/piece", response_model=StateOut)
-def finish_study_piece(body: CraftPieceIn, day: str = Depends(query_day),
+def finish_study_piece(body: StudyPieceIn, day: str = Depends(query_day),
                        db: Session = Depends(get_db), player: Player = Depends(current_player)):
-    """Move today's study subject on by one, or send done=false to take it back. Which
-    plan that lands on is the day's — Craft Mon/Wed/Fri, Japanese Tue/Sat, drawing
-    Thu/Sun — so the card has one button whatever it's showing."""
-    service.finish_study_piece(db, player, day, body.done)
+    """Move one of today's study subjects on by one, or send done=false to take it
+    back. The card names its subject; only one the day deals — Japanese or drawing,
+    plus Craft Mon/Wed/Fri — can move."""
+    if not service.finish_study_piece(db, player, day, body.subject, body.done):
+        raise HTTPException(400, "That subject isn't on today's board.")
     return state.build_state(db, player, day)
 
 

@@ -408,18 +408,20 @@ def finish_craft_piece(db: Session, player: Player, done: bool) -> None:
     db.commit()
 
 
-def finish_study_piece(db: Session, player: Player, day: str, done: bool) -> None:
-    """Move today's study subject on by one, or take the last move back.
+def finish_study_piece(db: Session, player: Player, day: str, subject: str, done: bool) -> bool:
+    """Move one of today's study subjects on by one, or take the last move back.
 
-    One action for all three subjects, because Learn draws one card: the day decides
-    which plan it lands on (see `state.study_of`). Craft keeps its own path — ticking
-    a piece there also hands over the next chapter as the source — while the two walks
-    are a position and move by one.
+    One action for all three subjects, because Learn draws them as one kind of card.
+    Only a subject the day actually deals can move (see `state.studies_of`) — False
+    otherwise, and nothing changes. Craft keeps its own path — ticking a piece there
+    also hands over the next chapter as the source — while the two walks are a
+    position and move by one.
     """
-    subject = study.subject_for(active_daily_ids(day))
+    if subject not in study.subjects_for(active_daily_ids(day)):
+        return False
     if subject == study.CRAFT:
         finish_craft_piece(db, player, done)
-        return
+        return True
     step = 1 if done else -1
     if subject == study.JAPANESE:
         at = (player.japanese_step or 0) + step
@@ -428,6 +430,7 @@ def finish_study_piece(db: Session, player: Player, day: str, done: bool) -> Non
         at = (player.sketch_step or 0) + step
         player.sketch_step = max(0, min(at, sketch.LAST_STEP))
     db.commit()
+    return True
 
 
 def advance_craft_on_log(db: Session, player: Player, kind: str, source: str) -> None:

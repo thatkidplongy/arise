@@ -5,10 +5,10 @@ from datetime import date, timedelta
 from app import game, quests
 
 DAY = "2026-07-18"         # a Saturday — Sit, Physical, Grow and Japanese
-SKETCH_DAY = "2026-07-19"  # the Sunday after, one of Creativity's two days
+SKETCH_DAY = "2026-07-19"  # the Sunday after, drawing's turn
 CRAFT_DAY = "2026-07-20"   # the Monday after, the week's first Craft day
-# The dailies dealt on DAY. The board is a fixed weekly schedule, so this is a
-# property of the weekday, not of the whole deck (see state._DAILY_BY_WEEKDAY).
+# The dailies dealt on DAY: the always-on four and that day's walk, not the whole
+# deck (see state.active_daily_ids).
 DAILY_IDS = ["d-meditate", "d-train", "d-read", "d-recall", "d-jp"]
 
 
@@ -319,8 +319,8 @@ def test_step_checklist_autocompletes_and_reverses(client):
 
 def test_the_daily_schedule_is_fixed_to_the_weekday(client):
     """The board used to rotate on the date's ordinal, so no weekday meant anything
-    and the whole thing only repeated every 21 days. It's a weekly schedule now:
-    the same Monday every Monday, which is the point of it."""
+    and the whole thing only repeated every 21 days. Craft is a weekly schedule now —
+    the same Monday every Monday — and Japanese and drawing take turns every day."""
     from app.state import active_daily_ids
 
     week, next_week = [], []
@@ -330,18 +330,19 @@ def test_the_daily_schedule_is_fixed_to_the_weekday(client):
         shown = {q["id"] for q in client.get(f"/state?day={d}").json()["quests"] if q["cadence"] == "daily"}
         assert shown == active_daily_ids(d)
         assert {"d-meditate", "d-train", "d-read", "d-recall"} <= shown  # the always-on four
-        week.append(shown)
-        next_week.append(active_daily_ids(nxt))
+        assert len(shown & {"d-jp", "d-sketch"}) == 1  # one walk, every day
+        week.append(shown - {"d-jp", "d-sketch"})
+        next_week.append(active_daily_ids(nxt) - {"d-jp", "d-sketch"})
 
-    assert week == next_week  # the same week, every week
+    assert week == next_week  # Craft's week, every week
     # Every daily still comes around inside one week.
-    assert set().union(*week) == set(quests_dealt_in_a_week())
+    assert set().union(*week) | {"d-jp", "d-sketch"} == set(quests_dealt_in_a_week())
 
 
 def quests_dealt_in_a_week() -> set[str]:
-    from app.state import _DAILY_ALWAYS, _DAILY_BY_WEEKDAY
+    from app.state import _ALTERNATING, _DAILY_ALWAYS, _DAILY_BY_WEEKDAY
 
-    return {*_DAILY_ALWAYS, *(q for slots in _DAILY_BY_WEEKDAY for q in slots)}
+    return {*_DAILY_ALWAYS, *_ALTERNATING, *(q for slots in _DAILY_BY_WEEKDAY for q in slots)}
 
 
 def test_step_toggle_rejected_for_multi_target(client):

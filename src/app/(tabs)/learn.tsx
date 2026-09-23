@@ -9,7 +9,7 @@ import { ReadingCard } from '@/components/ReadingCard';
 import { ReadingReview } from '@/components/ReadingReview';
 import { RecallBlock } from '@/components/Recall/RecallBlock';
 import { Screen } from '@/components/Screen';
-import { StudyCard } from '@/components/Study/StudyCard';
+import { StudyCards } from '@/components/Study/StudyCard';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
 import { ScreenBlurb, ScreenTitle } from '@/components/ui/Card';
@@ -211,11 +211,11 @@ export default function LearnScreen() {
               the logged chapters cover the book, so it costs nothing until then. */}
           <ReadingReview />
 
-          {/* The one thing being worked through today. The board alternates between
-              system design, Japanese and drawing, and this follows it — it used to
-              show system design every morning, including the four a week the board
-              isn't on it. */}
-          <StudyCard />
+          {/* What's being worked through today: Japanese or drawing, taking turns
+              every day, and system design as well on Mon/Wed/Fri. It follows the
+              board — it used to show system design every morning, including the
+              days the board isn't on it. */}
+          <StudyCards />
 
           <Capture />
 

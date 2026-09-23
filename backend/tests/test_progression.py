@@ -130,12 +130,16 @@ def test_availability_is_derived_from_the_schedule_itself():
     days = state.daily_days_per_week()
     assert days["STR"] == days["INT"] == days["SPI"] == 7  # the always-on four (Grow anchors INT)
     assert days["CFT"] == 3  # Mon/Wed/Fri
-    assert days["CRE"] == 2  # Thu/Sun, alternating with Japanese
+    assert days["CRE"] == 3  # every other day: three or four a week, held to three
     assert days["CHA"] == days["WLT"] == 0  # retired — no daily dealt at all
     # Every anchor with days on the clock is one the board actually deals, and every
     # anchor on zero is one it doesn't. (Not the converse of the first: Intelligence
     # has two dailies and only Grow anchors its progression.)
-    dealt = {q for slots in state._DAILY_BY_WEEKDAY for q in slots} | set(state._DAILY_ALWAYS)
+    dealt = (
+        {q for slots in state._DAILY_BY_WEEKDAY for q in slots}
+        | set(state._DAILY_ALWAYS)
+        | set(state._ALTERNATING)
+    )
     assert {progression.DAILY_BY_STAT[s] for s, n in days.items() if n} <= dealt
     assert all(progression.DAILY_BY_STAT[s] not in dealt for s, n in days.items() if not n)
 

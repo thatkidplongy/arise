@@ -1,13 +1,13 @@
 """The one study card the Learn tab shows, and which subject it's on today.
 
-Three subjects are being worked through — system design, Japanese and drawing — and
-the board already alternates between them: Craft takes Mon/Wed/Fri, Japanese Tue/Sat,
-Sketch Thu/Sun (see `state._DAILY_BY_WEEKDAY`). Learn used to ignore that and show the
-system-design card every single day, so six mornings a week it named a subject the day
-wasn't on and hid the two it was. Now the card follows the board: one card, today's
-subject, the same alternation in both places.
+Three subjects are being worked through — system design, Japanese and drawing. The
+board deals Japanese or drawing every day, taking turns, and Craft on Mon/Wed/Fri as
+well (see `state.active_daily_ids`). Learn used to ignore that and show the
+system-design card every single day, naming a subject the day wasn't on and hiding the
+ones it was. Now the cards follow the board: one card per subject today deals, the same
+schedule in both places.
 
-The weekday table stays in `state` — this module never re-derives it. It's handed the
+The schedule stays in `state` — this module never re-derives it. It's handed the
 day's daily quest ids and looks up which subject they carry, so the schedule has one
 owner and the two can't drift apart.
 
@@ -30,8 +30,8 @@ CRAFT = "craft"
 JAPANESE = "japanese"
 SKETCH = "sketch"
 
-# The daily quest a subject belongs to. The board deals exactly one of these a day,
-# and that's the subject the card is on.
+# The daily quest a subject belongs to. Whichever of these the board deals today are
+# the subjects Learn shows, in this order.
 SUBJECT_BY_DAILY: dict[str, str] = {
     "d-craft": CRAFT,
     "d-jp": JAPANESE,
@@ -47,17 +47,14 @@ SUBJECTS: dict[str, dict[str, str]] = {
 }
 
 
-def subject_for(daily_ids: set[str]) -> str | None:
-    """Which subject today's board carries, or None on a day with no study daily.
+def subjects_for(daily_ids: set[str]) -> list[str]:
+    """Which subjects today's board carries, in SUBJECT_BY_DAILY's order — Craft first
+    on the days it's dealt, then the day's walk. Empty on a day with no study daily.
 
-    Takes the ids rather than the date so the weekday schedule keeps its single owner
-    in `state`. A day that somehow deals two takes the first in SUBJECT_BY_DAILY's
-    order — a deterministic answer beats an arbitrary one.
+    Takes the ids rather than the date so the schedule keeps its single owner in
+    `state`.
     """
-    for quest_id, subject in SUBJECT_BY_DAILY.items():
-        if quest_id in daily_ids:
-            return subject
-    return None
+    return [subject for quest_id, subject in SUBJECT_BY_DAILY.items() if quest_id in daily_ids]
 
 
 def craft_card(craft: dict) -> dict:

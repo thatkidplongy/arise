@@ -16,6 +16,7 @@ import {
   type ApiMoneyInput,
   type LearningKind,
   type RecallGrade,
+  type StudySubject,
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import { isQuestDone } from '@/lib/quests';
@@ -164,7 +165,7 @@ export interface SystemStore {
   removeReadingLog: (id: string) => Promise<void>;
   reviewBook: (finished: boolean, nextBook: string) => Promise<void>;
   reviewCraftPhase: (done: boolean) => Promise<void>;
-  finishStudyPiece: (done: boolean) => Promise<void>;
+  finishStudyPiece: (subject: StudySubject, done: boolean) => Promise<void>;
   setCraftSource: (source: string) => Promise<void>;
   setInterviewMode: (enabled: boolean) => Promise<void>;
   searchBooks: (q: string) => Promise<ApiBook[]>;
@@ -366,7 +367,8 @@ export const useSystemStore = create<SystemStore>()(
         mutate((api, d) => api.logReading(chapters, label, d)),
       removeReadingLog: (id) => mutate((api, d) => api.removeReadingLog(id, d)),
       reviewCraftPhase: (done) => mutate((api, d) => api.reviewCraftPhase(done, d)),
-      finishStudyPiece: (done) => mutate((api, d) => api.finishStudyPiece(done, d)),
+      finishStudyPiece: (subject, done) =>
+        mutate((api, d) => api.finishStudyPiece(subject, done, d)),
       setCraftSource: (source) => mutate((api, d) => api.setCraftSource(source, d)),
       // Not `mutate` like its neighbours: this one answers with events as well as
       // state, because saying you finished a book is what earns the achievement.

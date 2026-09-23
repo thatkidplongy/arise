@@ -91,7 +91,7 @@ function WalkBody({ study, hue }: { study: ApiStudy; hue: string }) {
     <>
       <NowWorking study={study} hue={hue} />
       <StudyLog study={study} hue={hue} />
-      <FinishStep hue={hue} />
+      <FinishStep subject={study.subject} hue={hue} />
     </>
   );
 }
@@ -102,25 +102,15 @@ function StudyBody({ study, hue }: { study: ApiStudy; hue: string }) {
 }
 
 /**
- * The one thing being worked through today, whichever of the three it is.
- *
- * The board alternates — system design Mon/Wed/Fri, Japanese Tue/Sat, drawing Thu/Sun
- * — and this card follows it rather than sitting on system design every morning, which
- * is what it used to do: six mornings a week it named a subject the day wasn't on and
- * hid the two it was. Which subject today carries is the backend's answer (see
- * `state.study_of`), so the schedule has one owner and Learn can't disagree with the
- * board.
+ * One thing being worked through today, whichever of the three it is.
  *
  * The colour is the subject's attribute — Craft blue, Grow teal, Creativity amber — so
- * the card says which part of the week you're in before you've read it.
+ * the card says which subject it is before you've read it.
  *
  * Progress is what you've covered, never weeks elapsed: a plan that advanced by date
  * would march you past material you hadn't opened.
  */
-export function StudyCard() {
-  const study = useSystem((s) => s.state?.study);
-  if (!study) return null;
-
+function StudyCard({ study }: { study: ApiStudy }) {
   const hue = STAT_META[study.stat].color;
   return (
     <SystemPanel title={study.title} sub={`${study.unit} ${study.phase} of ${study.phases}`}>
@@ -130,6 +120,27 @@ export function StudyCard() {
       <StudyBody study={study} hue={hue} />
       {study.pending ? <PhaseReview label={study.label} hue={hue} /> : null}
     </SystemPanel>
+  );
+}
+
+/**
+ * Today's study cards, one per subject the board deals: Japanese or drawing every
+ * day, taking turns, and system design above it on Mon/Wed/Fri.
+ *
+ * They follow the board rather than sitting on system design every morning, which is
+ * what Learn used to do — naming a subject the day wasn't on and hiding the ones it
+ * was. Which subjects today carries is the backend's answer (see `state.studies_of`),
+ * so the schedule has one owner and Learn can't disagree with the board.
+ */
+export function StudyCards() {
+  const studies = useSystem((s) => s.state?.studies);
+  if (!studies?.length) return null;
+  return (
+    <>
+      {studies.map((study) => (
+        <StudyCard key={study.subject} study={study} />
+      ))}
+    </>
   );
 }
 

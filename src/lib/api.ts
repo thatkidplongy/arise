@@ -139,7 +139,7 @@ export interface ApiState {
   };
   book_review: { pending: boolean; book: string };
   craft: ApiCraft; // where the system-design plan is, advanced by reading not dates
-  study: ApiStudy | null; // the one study card Learn shows — today's subject of the three
+  studies: ApiStudy[]; // the study cards Learn shows — one per subject the day deals
   reading: ApiReading | null; // progress on the current book, or null when none set
   week_review: ApiWeekReview; // a gentle recap of the current ISO week
   next_rank: { rank: Rank; level: number; streak: number } | null;
@@ -317,8 +317,8 @@ export interface ApiCraft {
 }
 
 /**
- * The study card Learn shows today, on whichever of the three subjects the board is
- * on: system design Mon/Wed/Fri, Japanese Tue/Sat, drawing Thu/Sun.
+ * A study card Learn shows today, one per subject the board deals: Japanese or
+ * drawing every day, taking turns, and system design as well on Mon/Wed/Fri.
  *
  * One shape for three plans that are built differently underneath — Craft is a phase
  * with a source you pick, the other two are positions along a fixed walk — so the app
@@ -767,10 +767,16 @@ export const api = {
       body: JSON.stringify({ done }),
     }),
 
-  finishStudyPiece: (base: string, token: string, done: boolean, day: string) =>
+  finishStudyPiece: (
+    base: string,
+    token: string,
+    subject: StudySubject,
+    done: boolean,
+    day: string,
+  ) =>
     request<ApiState>(base, `/study/piece?day=${day}`, token, {
       method: 'POST',
-      body: JSON.stringify({ done }),
+      body: JSON.stringify({ subject, done }),
     }),
 
   reviewBook: (
