@@ -51,7 +51,8 @@ export function describeThreadBook(title: string, sittings: number): string {
 // A source's marker names chapters ('ch 2', 'chapters 5–7') or pages ('pp 40-52').
 // Only the chapter ones place you in the book — page numbers belong to one edition
 // and wouldn't line up with a chapter count anyway — so a span never mixes the two.
-const CHAPTER_MARKER = /^(?:ch|chap|chapter|chapters)\b/i;
+// A book divided into books ('Book 9' of Meditations) is divided into chapters.
+const CHAPTER_MARKER = /^(?:ch|chap|chapter|chapters|book|books)\b/i;
 
 /**
  * The chapters a set of sources covers, as a stack's byline wears it: 'ch 1',

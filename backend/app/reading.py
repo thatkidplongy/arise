@@ -24,7 +24,9 @@ from .models import Player, ReadingLog
 # would be read as a chapter and the book would become 'Cat'.
 # The words that introduce a marker, and the numbering that can follow one — a
 # chapter, a range, or a list of either ('ch 2', 'pp 40-52', 'ch 33, 34-35, 36-37').
-_MARKER_WORDS = r"(?:ch|chap|chapter|chapters|p|pp|page|pages)\.?\s*"
+# 'Book' is a chapter by another name: Meditations is twelve books, not chapters, so
+# 'Meditations, Book 9' is the same book as 'Meditations, ch 8' and not a second one.
+_MARKER_WORDS = r"(?:ch|chap|chapter|chapters|book|books|p|pp|page|pages)\.?\s*"
 _MARKER_RANGE = r"\d+(?:\s*[-–—]\s*\d+)?"
 
 _CHAPTER_MARKER = re.compile(rf"(?:[,;:]\s*|\s+){_MARKER_WORDS}\d.*$", re.I)

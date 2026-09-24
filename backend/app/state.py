@@ -976,7 +976,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     # check-in appears only once the logged chapters cover the book, and then at most
     # once a week so it never nags. A book whose length you never set is never asked
     # about at all — there's nothing to compare against, so finishing it is something
-    # only you can say (Status → Current book).
+    # only you can say (Learn → Reading → Finished it).
     week = game.week_key(day)
     reading_view = reading_of(db, player, day, rows)
     review_pending = bool(

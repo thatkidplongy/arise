@@ -72,6 +72,10 @@ describe('chapterSpan', () => {
     expect(chapterSpan(['pp 40-52', 'ch 6'])).toBe('ch. 6');
   });
 
+  it('reads a book divided into books as chapters', () => {
+    expect(chapterSpan(['Book 9', 'Book 10-12'])).toBe('ch. 9–12');
+  });
+
   it('says nothing when no source named a chapter', () => {
     expect(chapterSpan([])).toBe('');
     expect(chapterSpan(['', 'the intro'])).toBe('');

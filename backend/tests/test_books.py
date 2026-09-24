@@ -61,6 +61,16 @@ def test_book_key_strips_chapter_markers():
     assert reading.book_key("Thinking, Fast and Slow, chapter 4") == "thinking, fast and slow"
 
 
+def test_a_book_divided_into_books_is_still_one_book():
+    """Meditations is twelve books rather than chapters. 'Book 9' is its chapter
+    marker, so a sitting typed that way lands on the same thread as the rest."""
+    assert reading.book_key("Meditations, Book 9") == "meditations"
+    assert reading.book_name("Meditations book 9-12") == "Meditations"
+    assert reading.chapter_marker("Meditations, Book 9–12") == "Book 9–12"
+    # A title that merely contains the word is left alone: no number follows it.
+    assert reading.book_name("The Book of Five Rings") == "The Book of Five Rings"
+
+
 def test_book_key_keeps_a_number_that_is_part_of_the_title():
     assert reading.book_key("Catch 22") == "catch 22"
 

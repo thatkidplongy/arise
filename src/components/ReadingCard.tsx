@@ -249,6 +249,75 @@ function ChangeBook({ current }: { current: string }) {
   );
 }
 
+/**
+ * Saying you finished the book, whenever you did.
+ *
+ * The check-in below the panel only asks once the chapters you logged reach the
+ * length you set — so a length guessed from the page count, a book divided into
+ * something other than chapters, or no length at all left a finished book on the
+ * panel with nothing to tap. Finishing is yours to say; this is where you say it,
+ * through the same door the check-in uses, so it counts the book the same way.
+ */
+function FinishBook({ onDone }: { onDone: () => void }) {
+  const reviewBook = useSystem((s) => s.reviewBook);
+  const save = useSaveState();
+  const [next, setNext] = useState('');
+
+  const submit = async () => {
+    if (save.state === 'saving') return;
+    const landed = await save.run(() => reviewBook(true, next.trim()));
+    // The panel now holds the next book (or none): the form was about the last one.
+    if (landed) onDone();
+  };
+
+  return (
+    <View style={styles.form}>
+      <Text style={styles.help}>
+        Counts it as finished. Name the next one to start it now, or leave it blank and pick later.
+      </Text>
+      <View style={styles.row}>
+        <TextInput
+          value={next}
+          onChangeText={setNext}
+          style={[styles.input, styles.grow]}
+          placeholder="Next book · optional"
+          placeholderTextColor={text.faint}
+          maxLength={120}
+          onSubmitEditing={submit}
+        />
+        <Pressable
+          disabled={save.state === 'saving'}
+          onPress={submit}
+          style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]}
+        >
+          <Text style={styles.btnText}>{saveLabel(save.state, 'Finish')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/** A folded section under the panel: a chevron, its label, and optionally a count. */
+function Disclosure({ label, meta, open, onToggle }: {
+  label: string;
+  meta?: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      style={({ pressed }) => [styles.disclose, pressed && { opacity: press.strong }]}
+    >
+      <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={text.faint} />
+      <Text style={styles.discloseLabel}>{label}</Text>
+      {meta ? <Text style={styles.discloseMeta}>{meta}</Text> : null}
+    </Pressable>
+  );
+}
+
 /** No book yet — then the picker *is* the panel, with nothing folded away. */
 function NoBookYet() {
   return (
@@ -272,6 +341,7 @@ function NoBookYet() {
  */
 function ReadingPanel({ reading }: { reading: ApiReading }) {
   const { open, toggle } = useCollapse(true, true);
+  const [finishing, setFinishing] = useState(false);
   const read = reading.chapters_read ?? 0;
 
   return (
@@ -280,18 +350,15 @@ function ReadingPanel({ reading }: { reading: ApiReading }) {
       <Progress reading={reading} />
       <LogToday reading={reading} />
 
-      <Pressable
-        onPress={toggle}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [styles.disclose, pressed && { opacity: press.strong }]}
-      >
-        <Ionicons name={open ? 'chevron-down' : 'chevron-forward'} size={14} color={text.faint} />
-        <Text style={styles.discloseLabel}>Change book</Text>
-        {reading.books_finished ? (
-          <Text style={styles.discloseMeta}>{reading.books_finished} finished</Text>
-        ) : null}
-      </Pressable>
+      <Disclosure label="Finished it" open={finishing} onToggle={() => setFinishing((f) => !f)} />
+      {finishing ? <FinishBook onDone={() => setFinishing(false)} /> : null}
+
+      <Disclosure
+        label="Change book"
+        meta={reading.books_finished ? `${reading.books_finished} finished` : undefined}
+        open={open}
+        onToggle={toggle}
+      />
       {open ? <ChangeBook current={reading.book} /> : null}
     </SystemPanel>
   );
