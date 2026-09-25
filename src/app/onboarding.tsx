@@ -6,9 +6,13 @@ import { Button } from '@/components/ui/Button';
 import { Field, TextArea } from '@/components/ui/Field';
 import { StatChip } from '@/components/ui/StatChip';
 import { Text } from '@/components/ui/Text';
+import { isStatShown } from '@/lib/stats';
+import { spellCount } from '@/lib/text';
 import { useSystem } from '@/store/useSystem';
 import { STAT_META, clay, neutral, radius, sage, surface, text, typography } from '@/theme';
-import { STAT_KEYS } from '@/types';
+import { STAT_KEYS, type StatKey } from '@/types';
+
+const capitalise = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /**
  * The first run: five steps, every one of them skippable.
@@ -30,6 +34,8 @@ export default function OnboardingScreen() {
   const [star, setStar] = useState(state?.player.north_star ?? '');
   const [name, setName] = useState(state?.player.name ?? '');
   const [busy, setBusy] = useState(false);
+  const shownStats = STAT_KEYS.filter((k) => isStatShown(k, state?.craft_parked ?? false));
+  const count = spellCount(shownStats.length);
 
   const finish = async () => {
     setBusy(true);
@@ -64,11 +70,11 @@ export default function OnboardingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        {step === 0 ? <Welcome /> : null}
+        {step === 0 ? <Welcome count={count} /> : null}
         {step === 1 ? <NorthStarStep value={star} onChange={setStar} /> : null}
-        {step === 2 ? <SevenStep /> : null}
+        {step === 2 ? <AttributesStep stats={shownStats} count={count} /> : null}
         {step === 3 ? <NameStep value={name} onChange={setName} /> : null}
-        {step === 4 ? <ReadyStep rank={state?.player.rank ?? 'E'} /> : null}
+        {step === 4 ? <ReadyStep rank={state?.player.rank ?? 'E'} count={count} /> : null}
       </ScrollView>
 
       <View style={styles.foot}>
@@ -87,7 +93,7 @@ export default function OnboardingScreen() {
   );
 }
 
-function Welcome() {
+function Welcome({ count }: { count: string }) {
   return (
     <>
       <View style={styles.mark}>
@@ -95,8 +101,8 @@ function Welcome() {
       </View>
       <Text style={styles.hero}>A System{'\n'}for real life</Text>
       <Text style={styles.lede}>
-        Seven areas of your life become seven attributes. You get quests, XP and ranks — but this is
-        a guide, not a taskmaster.
+        {capitalise(count)} areas of your life become {count} attributes. You get quests, XP and ranks —
+        but this is a guide, not a taskmaster.
       </Text>
       <View style={styles.bullets}>
         {[
@@ -137,17 +143,17 @@ function NorthStarStep({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
-function SevenStep() {
+function AttributesStep({ stats, count }: { stats: StatKey[]; count: string }) {
   return (
     <>
       <Text style={styles.kicker}>Step two</Text>
-      <Text style={styles.title}>Your seven</Text>
+      <Text style={styles.title}>Your {count}</Text>
       <Text style={styles.lede}>
         One quest a day for each. Each one levels on its own, each one starts gentle — and the floor
         climbs only once you&apos;ve shown you own the current step.
       </Text>
       <View style={styles.tiles}>
-        {STAT_KEYS.map((key) => (
+        {stats.map((key) => (
           <View key={key} style={styles.tile}>
             <StatChip statKey={key} size={42} />
             <Text style={styles.tileLabel}>{STAT_META[key].label}</Text>
@@ -173,7 +179,7 @@ function NameStep({ value, onChange }: { value: string; onChange: (v: string) =>
   );
 }
 
-function ReadyStep({ rank }: { rank: string }) {
+function ReadyStep({ rank, count }: { rank: string; count: string }) {
   return (
     <>
       <View style={[styles.mark, styles.markSage]}>
@@ -181,7 +187,7 @@ function ReadyStep({ rank }: { rank: string }) {
       </View>
       <Text style={styles.hero}>You&apos;re {rank}-Rank.{'\n'}Everyone is.</Text>
       <Text style={styles.lede}>
-        Level 1, no streak, seven quests waiting. The board is the same size whenever you come back
+        Level 1, no streak, {count} quests waiting. The board is the same size whenever you come back
         to it, and a day you miss costs you nothing.
       </Text>
       <View style={styles.dashed}>
