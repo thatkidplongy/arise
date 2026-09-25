@@ -59,6 +59,11 @@ uv run pytest -n 4                  # the same, across 4 processes
 python scripts/smoke.py http://localhost:8000   # liveness check
 ```
 
+Run these from `backend/`. Up at the repo root there is no `pyproject.toml`, so
+`uv run` falls through to whatever `pytest` is on `PATH` — a different install,
+without this project's dependencies. Reach the suite from up there with
+`uv run --directory backend pytest -n 4`.
+
 `-n` is optional and deliberately not the default. Each worker pays the whole
 FastAPI + SQLAlchemy import before it runs a thing, so the useful number is well
 under the core count: on an 8-core machine `-n 4` takes ~4s against ~9s serial,
