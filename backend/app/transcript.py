@@ -61,23 +61,46 @@ def source_of(url: str) -> str:
     return "web"
 
 
+_HOST = re.compile(r"^(https?://[^/?#]+)(.*)$", re.I)
+
+
+def _fold_host(url: str) -> str:
+    """Lower-case the scheme and host, leave everything after them alone.
+
+    A host is case-insensitive by definition — DNS resolves VT.TikTok.com and
+    vt.tiktok.com to the same place — so two spellings of it are one video and
+    have to key the same way. A path is not case-insensitive, and these platforms
+    put case-sensitive base62 ids in theirs, so folding one would both break the
+    link and say two different videos were the same one.
+
+    Deliberately the same rule as `foldHost` in src/lib/capture.ts. The client
+    decides whether to bother asking and this decides what is actually kept, so
+    the two disagreeing about what a duplicate is defeats both."""
+    m = _HOST.match(url)
+    return m.group(1).lower() + m.group(2) if m else url
+
+
 def clean_url(url: str) -> str:
     """Trim a pasted share link to its canonical form where it's safe to do so.
 
     TikTok/Instagram put the id in the path, so we can drop the giant signed
     query string a share button appends, and the host it was shared from.
-    Everything else (incl. YouTube, whose id is in the query) is returned as-is
-    apart from whitespace.
+    Everything else (incl. YouTube, whose id is in the query) keeps its path and
+    query, and gives up only the case of its host.
 
-    Case is never folded. The answer is what gets fetched from Supadata, stored,
-    and opened from the card, and these ids are case-sensitive base62 — folding
-    it would both break the link and merge two different videos."""
+    The answer is what gets fetched from Supadata, stored, and opened from the
+    card — so everything here has to leave a working link behind."""
     url = url.strip()
     for pat, shape in _CANONICAL:
-        m = re.search(pat, url)
+        # Case-insensitive, because folding the host is not enough on its own: an
+        # upper-case host that never matches here keeps its /reels/ and its
+        # trailing slash, and lands as a different video from the same link typed
+        # lower-case. The shapes emit a lower-case host by construction; only the
+        # captured id keeps the case it arrived in.
+        m = re.search(pat, url, re.I)
         if m:
             return shape.format(*m.groups())
-    return url
+    return _fold_host(url)
 
 
 def _join(content) -> str:

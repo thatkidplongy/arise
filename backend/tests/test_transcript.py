@@ -37,10 +37,31 @@ def test_clean_url_keeps_a_post_apart_from_a_reel():
             != transcript.clean_url("https://instagram.com/reel/A1/"))
 
 
-def test_clean_url_never_folds_case():
+def test_clean_url_folds_the_host_but_not_the_path():
+    """A host is case-insensitive by definition, so two spellings of it are one
+    video — and the client's key folds it, so this has to agree or the two
+    disagree about what a duplicate is. The path is left alone: these platforms
+    put case-sensitive base62 ids in it."""
+    assert (transcript.clean_url("https://VT.TikTok.com/ZSabc123/")
+            == "https://vt.tiktok.com/ZSabc123/")
+    assert (transcript.clean_url("https://WWW.YouTube.com/watch?v=dQw4w9WgXcQ")
+            == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+
+def test_clean_url_canonicalises_whatever_case_the_host_arrives_in():
+    """Folding the host is not enough on its own: an upper-case host has to still
+    reach the canonical shape, or it keeps /reels/ and its trailing slash and
+    lands as a different video from the same link typed lower-case."""
+    assert (transcript.clean_url("https://INSTAGRAM.com/reels/AbC1/")
+            == transcript.clean_url("https://instagram.com/reel/AbC1/"))
+    assert (transcript.clean_url("https://TikTok.com/@x/video/1?_r=1")
+            == transcript.clean_url("https://tiktok.com/@x/video/1"))
+
+
+def test_clean_url_never_folds_the_path():
     """Its answer is fetched from Supadata, stored, and opened from the card — and
-    these ids are case-sensitive. Only the client's comparison key may fold the
-    host, and even it leaves the path alone."""
+    the ids in these paths are case-sensitive, so folding one would both break the
+    link and merge two different videos."""
     assert transcript.clean_url("https://vt.tiktok.com/ZSabc123/") == "https://vt.tiktok.com/ZSabc123/"
     assert (transcript.clean_url("https://instagram.com/reel/AbC1/")
             == "https://instagram.com/reel/AbC1")
