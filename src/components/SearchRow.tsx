@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/ui/Text';
-import { TAP_MIN, accent, press, radius, surface, text, typography } from '@/theme';
+import { accent, outlinePill, press, radius, surface, text, typography } from '@/theme';
 
 /** The search input + button shared by the lookup panels. `tone` colours the
  * button/spinner (each panel has its own accent); everything else is standard. */
@@ -57,11 +57,7 @@ const styles = StyleSheet.create({
   },
   grow: { flex: 1 },
   btn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    justifyContent: 'center',
+    ...outlinePill,
     paddingVertical: 10,
     paddingHorizontal: 14,
     minWidth: 74,

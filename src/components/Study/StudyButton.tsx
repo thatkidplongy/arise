@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { TAP_MIN, onAccent, press, radius, surface, text, withAlpha } from '@/theme';
+import { onAccent, outlinePill, press, text, withAlpha } from '@/theme';
 
 /**
  * The study card's own action pill.
@@ -56,11 +56,7 @@ export function StudyQuietButton({ label, onPress }: { label: string; onPress: (
 
 const styles = StyleSheet.create({
   btn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    justifyContent: 'center',
+    ...outlinePill,
     paddingVertical: 9,
     paddingHorizontal: 14,
     alignItems: 'center',

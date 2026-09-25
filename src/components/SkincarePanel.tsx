@@ -8,7 +8,7 @@ import { useSearch } from '@/hooks/useSearch';
 import type { ApiSkincarePick, ApiSkincareProduct, ApiSkincareStep } from '@/lib/api';
 import { COUNTRY_LABEL } from '@/lib/country';
 import { useBody } from '@/query/useBody';
-import { STAT_META, TAP_MIN, feedback, neutral, press, radius, surface, text, typography, withAlpha } from '@/theme';
+import { STAT_META, TAP_MIN, feedback, neutral, outlinePill, press, radius, surface, text, typography, withAlpha } from '@/theme';
 
 import { Box } from '@/components/ui/Check';
 
@@ -287,11 +287,7 @@ const styles = StyleSheet.create({
     backgroundColor: surface.muted,
   },
   addBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    justifyContent: 'center',
+    ...outlinePill,
     paddingVertical: 9,
     paddingHorizontal: 14,
   },

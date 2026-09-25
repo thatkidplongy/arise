@@ -5,7 +5,7 @@ import { shared } from '@/components/Inspire/shared';
 import { Text } from '@/components/ui/Text';
 import { pendingTitle } from '@/lib/capture';
 import type { PendingCapture } from '@/store/useCaptures';
-import { TAP_MIN, accent, feedback, press, radius, surface, text, typography } from '@/theme';
+import { accent, feedback, outlinePill, press, surface, text, typography } from '@/theme';
 
 export function PendingCard({
   item,
@@ -62,11 +62,7 @@ const styles = StyleSheet.create({
   pendingTitle: { ...typography.cardTitle, flex: 1 },
   pendingUrl: { ...typography.small, color: text.faint },
   retryBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    justifyContent: 'center',
+    ...outlinePill,
     paddingVertical: 9,
     alignItems: 'center',
   },

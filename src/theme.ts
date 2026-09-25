@@ -164,6 +164,29 @@ export const press = {
   soft: 0.85, // a filled button, a card — a large area, so a little goes far
 } as const;
 
+/**
+ * The small outline pill: the "Add" beside a field, "Retry" on a failed capture,
+ * "Search" on a lookup row.
+ *
+ * Not the shared `Button` — that one is 48 high with 22 of side padding and a
+ * clay pressed fill, where these sit inside a card at the 44 tap floor with a
+ * lighter rule, and take their label colour from whatever they're part of. Five
+ * components had written the same five properties out; this is those five.
+ *
+ * A style rather than a component on purpose. What varies between the five is
+ * padding, label colour, and whether the label is text or a spinner — four kinds
+ * of variation over five shared properties, which is a component made mostly of
+ * flags. The shape is the only part that's actually shared, so the shape is the
+ * only part that moved.
+ */
+export const outlinePill: ViewStyle = {
+  borderWidth: 1,
+  borderColor: surface.hairline,
+  borderRadius: radius.pill,
+  minHeight: TAP_MIN,
+  justifyContent: 'center',
+};
+
 /** Elevation, tuned to the sand ground. */
 export const shadow: Record<'sm' | 'md' | 'lg', ViewStyle> = {
   sm: {
