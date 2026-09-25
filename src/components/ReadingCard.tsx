@@ -170,13 +170,10 @@ function LogToday({ reading }: { reading: ApiReading }) {
           maxLength={3}
           onSubmitEditing={submit}
         />
-        {/* 0.8, where every other filled submit button uses press.soft (0.85) — left
-            as it is rather than nudged, since changing it is a visual call, not a
-            tidy-up. Both of this card's buttons drift together. */}
         <Pressable
           disabled={!canLog}
           onPress={submit}
-          style={({ pressed }) => [styles.btn, !canLog && styles.btnOff, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [styles.btn, !canLog && styles.btnOff, pressed && { opacity: press.soft }]}
         >
           <Text style={styles.btnText}>{saveLabel(save.state, 'Log')}</Text>
         </Pressable>
@@ -241,7 +238,7 @@ function ChangeBook({ current }: { current: string }) {
         <Pressable
           disabled={!canSave}
           onPress={submit}
-          style={({ pressed }) => [styles.btn, !canSave && styles.btnOff, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [styles.btn, !canSave && styles.btnOff, pressed && { opacity: press.soft }]}
         >
           <Text style={styles.btnText}>{saveLabel(save.state, current ? 'Change' : 'Save')}</Text>
         </Pressable>
@@ -289,7 +286,7 @@ function FinishBook({ onDone }: { onDone: () => void }) {
         <Pressable
           disabled={save.state === 'saving'}
           onPress={submit}
-          style={({ pressed }) => [styles.btn, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [styles.btn, pressed && { opacity: press.soft }]}
         >
           <Text style={styles.btnText}>{saveLabel(save.state, 'Finish')}</Text>
         </Pressable>
