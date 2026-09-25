@@ -17,12 +17,26 @@ from . import net
 
 _ENDPOINT = "https://api.supadata.ai/v1/transcript"
 
-# Canonical shapes we can safely trim to (drops signed share/tracking params that
-# bloat the URL). NOT applied to YouTube — its id lives in the query string, so
-# stripping the query would break it; those pass through untouched.
+# The shapes we can safely rebuild, and what to rebuild them as. Each pattern
+# captures the parts that identify the video; the template puts them back without
+# whatever the share button wrapped around them.
+#
+# Rebuilt rather than returned as matched, which is the whole point: the old
+# version handed back `m.group(0)`, so an optional `(?:www\.)?` still left the
+# www. on when it was there. Since this is the dedup key (see insights.capture),
+# that meant www.tiktok.com/... and tiktok.com/... were two different videos.
+#
+# NOT applied to YouTube — its id lives in the query string, so stripping the
+# query would break it; those pass through untouched.
 _CANONICAL = (
-    r"https?://(?:www\.)?tiktok\.com/@[\w.\-]+/video/\d+",
-    r"https?://(?:www\.)?instagram\.com/(?:reel|reels|p)/[\w\-]+",
+    (r"https?://(?:www\.)?tiktok\.com/@([\w.\-]+)/video/(\d+)",
+     "https://tiktok.com/@{0}/video/{1}"),
+    # Instagram serves a Reel at both /reel/ and /reels/; they are one video, so
+    # they key as one. A /p/ post is genuinely a different thing and keeps its own.
+    (r"https?://(?:www\.)?instagram\.com/reels?/([\w\-]+)",
+     "https://instagram.com/reel/{0}"),
+    (r"https?://(?:www\.)?instagram\.com/p/([\w\-]+)",
+     "https://instagram.com/p/{0}"),
 )
 
 
@@ -51,13 +65,18 @@ def clean_url(url: str) -> str:
     """Trim a pasted share link to its canonical form where it's safe to do so.
 
     TikTok/Instagram put the id in the path, so we can drop the giant signed
-    query string a share button appends. Everything else (incl. YouTube, whose
-    id is in the query) is returned as-is apart from whitespace."""
+    query string a share button appends, and the host it was shared from.
+    Everything else (incl. YouTube, whose id is in the query) is returned as-is
+    apart from whitespace.
+
+    Case is never folded. The answer is what gets fetched from Supadata, stored,
+    and opened from the card, and these ids are case-sensitive base62 — folding
+    it would both break the link and merge two different videos."""
     url = url.strip()
-    for pat in _CANONICAL:
+    for pat, shape in _CANONICAL:
         m = re.search(pat, url)
         if m:
-            return m.group(0)
+            return shape.format(*m.groups())
     return url
 
 

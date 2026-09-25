@@ -16,17 +16,17 @@ const pending = (over: Partial<PendingCapture>): PendingCapture =>
 
 describe('canonical', () => {
   it('strips the tracking tail a share sheet adds', () => {
-    expect(canonical('https://youtu.be/dQw4w9WgXcQ?si=abc123')).toBe('yt:dqw4w9wgxcq');
-    expect(canonical('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s')).toBe('yt:dqw4w9wgxcq');
+    expect(canonical('https://youtu.be/dQw4w9WgXcQ?si=abc123')).toBe('yt:dQw4w9WgXcQ');
+    expect(canonical('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s')).toBe('yt:dQw4w9WgXcQ');
   });
 
   it('reads the two YouTube spellings as the same video', () => {
     expect(canonical('https://youtu.be/dQw4w9WgXcQ')).toBe(canonical('https://youtube.com/watch?v=dQw4w9WgXcQ'));
   });
 
-  it('drops what a TikTok share appends', () => {
+  it('drops what a TikTok share appends, and the host it was shared from', () => {
     expect(canonical('https://www.tiktok.com/@someone/video/12345?is_from_webapp=1')).toBe(
-      'https://www.tiktok.com/@someone/video/12345',
+      'https://tiktok.com/@someone/video/12345',
     );
   });
 
@@ -34,28 +34,36 @@ describe('canonical', () => {
     expect(canonical('https://instagram.com/reel/AbC-1/')).not.toBe(canonical('https://instagram.com/p/AbC-1/'));
   });
 
-  // Characterisation, not endorsement. The host survives into the key for TikTok
-  // and Instagram, so www. and the bare domain read as two different videos and
-  // the same Reel can be captured twice. YouTube is immune because it keeps only
-  // the id. Pinned here so the gap is visible and so a fix is a red test first.
-  it('does NOT yet see www. and the bare domain as the same video', () => {
-    expect(canonical('https://www.tiktok.com/@x/video/1')).not.toBe(canonical('https://tiktok.com/@x/video/1'));
-    expect(canonical('https://www.instagram.com/reel/A1/')).not.toBe(canonical('https://instagram.com/reel/A1/'));
-    // The one that does get it right, for contrast.
+  it('reads www. and the bare domain as the same video', () => {
+    expect(canonical('https://www.tiktok.com/@x/video/1')).toBe(canonical('https://tiktok.com/@x/video/1'));
+    expect(canonical('https://www.instagram.com/reel/A1/')).toBe(canonical('https://instagram.com/reel/A1/'));
     expect(canonical('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(canonical('https://youtu.be/dQw4w9WgXcQ'));
   });
 
-  // Same shape: Instagram serves both spellings, and they key differently.
-  it('does NOT yet see /reel/ and /reels/ as the same Reel', () => {
-    expect(canonical('https://instagram.com/reel/A1/')).not.toBe(canonical('https://instagram.com/reels/A1/'));
+  it('reads /reel/ and /reels/ as the same Reel — Instagram serves both', () => {
+    expect(canonical('https://instagram.com/reel/A1/')).toBe(canonical('https://instagram.com/reels/A1/'));
+  });
+
+  // The ids these platforms put in a path are case-sensitive base62, so folding
+  // case would say two different videos are the same one — a dedup that refuses a
+  // capture the hunter actually wanted, which is worse than one that lets a
+  // duplicate through.
+  it('keeps the case of a share code, which is what tells two videos apart', () => {
+    expect(canonical('https://vt.tiktok.com/ZSabc123/')).not.toBe(canonical('https://vt.tiktok.com/zsABC123/'));
+    expect(canonical('https://youtu.be/dQw4w9WgXcQ')).not.toBe(canonical('https://youtu.be/DqW4W9WGXCq'));
+    expect(canonical('https://instagram.com/reel/AbC1/')).not.toBe(canonical('https://instagram.com/reel/abc1/'));
+  });
+
+  it('still folds the case of the host, which is not', () => {
+    expect(canonical('https://VT.TikTok.com/ZSabc123/')).toBe(canonical('https://vt.tiktok.com/ZSabc123/'));
   });
 
   it('falls back to the link without its query or fragment', () => {
-    expect(canonical('https://Example.com/A/B?utm=x#frag')).toBe('https://example.com/a/b');
+    expect(canonical('https://Example.com/A/B?utm=x#frag')).toBe('https://example.com/A/B');
   });
 
   it('ignores surrounding whitespace, which a paste usually brings', () => {
-    expect(canonical('  https://youtu.be/dQw4w9WgXcQ  ')).toBe('yt:dqw4w9wgxcq');
+    expect(canonical('  https://youtu.be/dQw4w9WgXcQ  ')).toBe('yt:dQw4w9WgXcQ');
   });
 });
 

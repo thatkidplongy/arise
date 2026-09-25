@@ -87,7 +87,7 @@ def test_add_and_list_insight(db, monkeypatch):
     assert out["source"] == "tiktok"
     assert out["title"] == "@justin.sagert"
     # The stored URL is the trimmed, canonical one — not the giant share link.
-    assert out["source_url"] == "https://www.tiktok.com/@justin.sagert/video/7632253916700216590"
+    assert out["source_url"] == "https://tiktok.com/@justin.sagert/video/7632253916700216590"
     assert out["quotes"] == ["Lower the floor, not the ceiling."]
     listed = insights.list_insights(db, player.id)
     assert len(listed) == 1 and listed[0]["id"] == out["id"]
@@ -297,7 +297,7 @@ def test_failed_capture_is_kept_with_its_reason(db, monkeypatch):
     kept = insights.list_failures(db, player.id)
     assert len(kept) == 1
     # Stored canonically, like an insight, so a retry and a re-paste are the same link.
-    assert kept[0]["source_url"] == "https://www.tiktok.com/@a/video/1"
+    assert kept[0]["source_url"] == "https://tiktok.com/@a/video/1"
     assert kept[0]["reason"] == "fetch_failed" and kept[0]["retryable"] is True
     assert kept[0]["title"] == "@a" and kept[0]["attempts"] == 1
     # Nothing was distilled, so nothing landed in the library.

@@ -11,17 +11,40 @@
 import type { ApiInsight, InsightKind } from '@/lib/api';
 import type { PendingCapture } from '@/store/useCaptures';
 
-// Normalise a link so we can spot the same video pasted twice — mirrors the
-// server's clean_url enough to guard against re-hitting the API for a dupe.
+/** Fold the scheme and host, leave the path alone.
+ *
+ * A host is case-insensitive by definition; a path is not, and these platforms
+ * put case-sensitive base62 ids in theirs. Folding the whole link would say
+ * vt.tiktok.com/ZSabc123 and vt.tiktok.com/zsABC123 are one video and refuse the
+ * second — a dedup that blocks a capture the hunter wanted, which is a worse
+ * failure than one that lets a duplicate through. */
+function foldHost(url: string): string {
+  const m = url.match(/^(https?:\/\/[^/?#]+)(.*)$/i);
+  return m ? m[1].toLowerCase() + m[2] : url;
+}
+
+/**
+ * The key two links share when they're the same video.
+ *
+ * Built by rebuilding rather than by returning what matched, which is the part
+ * that used to be wrong: an optional `(?:www\.)?` still leaves the www. in the
+ * match, so the same TikTok pasted from the app and from the web keyed as two.
+ * The server's clean_url makes the same judgements and is the one that actually
+ * decides — this only saves the round trip, so the two have to agree.
+ */
 export function canonical(raw: string): string {
   const u = raw.trim();
-  const tt = u.match(/https?:\/\/(?:www\.)?tiktok\.com\/@[\w.\-]+\/video\/\d+/i);
-  if (tt) return tt[0].toLowerCase();
-  const ig = u.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:reel|reels|p)\/[\w-]+/i);
-  if (ig) return ig[0].toLowerCase();
+  const tt = u.match(/https?:\/\/(?:www\.)?tiktok\.com\/@([\w.\-]+)\/video\/(\d+)/i);
+  if (tt) return `https://tiktok.com/@${tt[1]}/video/${tt[2]}`;
+  // Instagram serves a Reel at both /reel/ and /reels/ — one video, one key. A
+  // /p/ post is a different thing and keeps its own.
+  const reel = u.match(/https?:\/\/(?:www\.)?instagram\.com\/reels?\/([\w-]+)/i);
+  if (reel) return `https://instagram.com/reel/${reel[1]}`;
+  const post = u.match(/https?:\/\/(?:www\.)?instagram\.com\/p\/([\w-]+)/i);
+  if (post) return `https://instagram.com/p/${post[1]}`;
   const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/i);
-  if (yt) return `yt:${yt[1].toLowerCase()}`;
-  return u.split('#')[0].split('?')[0].toLowerCase();
+  if (yt) return `yt:${yt[1]}`;
+  return foldHost(u.split('#')[0].split('?')[0]);
 }
 
 // A dupe only within the same mode — the backend keeps a video once per kind, so
