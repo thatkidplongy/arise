@@ -7,13 +7,14 @@ import { Toggle } from '@/components/ui/Toggle';
 import { useSystem } from '@/store/useSystem';
 import { neutral, text, typography } from '@/theme';
 
-/** Craft's interview-mode toggle — steady growth vs interview-prep quests. */
+/** Craft's interview-mode toggle — steady growth vs interview-prep quests. Hidden while
+ * Craft is parked: with none of its quests dealt, the switch would change nothing. */
 export function InterviewModeCard() {
   const state = useSystem((s) => s.state);
   const setInterviewMode = useSystem((s) => s.setInterviewMode);
   const [saving, setSaving] = useState(false);
 
-  if (!state) return null;
+  if (!state || state.craft_parked) return null;
   const on = state.player.interview_mode;
 
   const toggle = async () => {

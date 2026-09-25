@@ -160,6 +160,7 @@ export interface ApiState {
   levels: Partial<Record<StatKey, string>>;
   progression: Record<StatKey, ApiProgression>;
   llm_enabled: boolean;
+  craft_parked: boolean; // none of Craft is dealt, so interview mode has nothing to switch
   transcript_enabled: boolean; // true when a Supadata key is set (Inspire capture on)
   digest_enabled: boolean; // true when Resend is configured (the Recall email can send)
   daily_quote: ApiDailyQuote | null; // a rotating pull-quote from captured videos

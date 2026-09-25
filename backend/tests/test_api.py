@@ -352,6 +352,7 @@ def test_parked_craft_is_off_the_board_entirely(client):
     assert not {q["id"] for q in s["quests"]} & {"d-craft", "w-craft", "s-craft"}
     assert "craft" not in {c["subject"] for c in s["studies"]}
     assert s["today"]["dailies_total"] == 5  # a Craft weekday carries what any other does
+    assert s["craft_parked"] is True  # so the app hides interview mode, which only switches Craft
 
 
 def quests_dealt_in_a_week() -> set[str]:

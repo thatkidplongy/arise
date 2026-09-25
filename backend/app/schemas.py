@@ -908,6 +908,7 @@ class StateOut(BaseModel):
     levels: dict[str, str]
     progression: dict[str, ProgressionOut]  # per-attribute earned difficulty (STR, INT, …)
     llm_enabled: bool  # true when a Gemini key is configured (quests are personalised)
+    craft_parked: bool  # true when none of Craft is dealt (state._PARKED), so interview mode is moot
     transcript_enabled: bool  # true when a Supadata key is set (Inspire capture is on)
     digest_enabled: bool  # true when Resend is configured (the Recall email can send)
     daily_quote: DailyQuoteOut | None  # a rotating pull-quote from captured videos

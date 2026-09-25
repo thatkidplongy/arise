@@ -350,6 +350,7 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # `_PARKED` and nothing else. Parked is not retired: the rows, completions and XP all
 # stay, and with no days dealt Craft's level freezes rather than easing down.
 _PARKED = frozenset({"d-craft", "w-craft", "s-craft"})
+_CRAFT_IDS = frozenset({"d-craft", "w-craft", "s-craft"})
 _DAILY_ALWAYS = ("d-train", "d-read", "d-recall", "d-hansei")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
     ("d-craft",),  # Mon
@@ -388,6 +389,12 @@ def is_on_board(quest: QuestDef, day: str) -> bool:
     if quest.cadence == "daily":
         return quest.id in active_daily_ids(day)
     return quest.id not in _PARKED
+
+
+def is_craft_parked() -> bool:
+    """Whether none of Craft is dealt — which leaves interview mode, a switch between
+    two sets of Craft quests, with nothing to switch."""
+    return _CRAFT_IDS <= _PARKED
 
 
 def daily_days_per_week() -> dict[str, int]:
@@ -1048,6 +1055,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "levels": levels,
         "progression": prog,
         "llm_enabled": llm.enabled(),
+        "craft_parked": is_craft_parked(),
         "transcript_enabled": transcript.enabled(),
         "digest_enabled": mailer.enabled(),
         "daily_quote": insights.daily_quote(db, player.id, day),
