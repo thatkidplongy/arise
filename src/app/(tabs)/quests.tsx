@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/Text';
 import { shuhariOf } from '@/consts';
 import { useWide } from '@/hooks/useWide';
 import type { ApiQuest, ApiState } from '@/lib/api';
+import { isStatShown } from '@/lib/stats';
 import { isQuestDone } from '@/lib/quests';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
 import { useSystem } from '@/store/useSystem';
@@ -72,7 +73,7 @@ function Aside({ state }: { state: ApiState }) {
 
       <View style={styles.asideCard}>
         <Text style={styles.asideTitle}>Attributes</Text>
-        {stats.map((stat) => {
+        {stats.filter((stat) => isStatShown(stat.key, state.craft_parked)).map((stat) => {
           const meta = STAT_META[stat.key];
           return (
             <View key={stat.key} style={styles.asideStat}>

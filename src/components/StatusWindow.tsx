@@ -4,6 +4,7 @@ import { Counter, SystemWindow } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { shuhariOf } from '@/consts';
 import type { ApiState } from '@/lib/api';
+import { isStatShown } from '@/lib/stats';
 import { STAT_META, clay, ink, radius, typography } from '@/theme';
 
 /**
@@ -60,7 +61,7 @@ export function StatusWindow({ state, avatarUri }: { state: ApiState; avatarUri?
       <View style={styles.hairline} />
 
       <View style={styles.stats}>
-        {stats.map((stat) => {
+        {stats.filter((stat) => isStatShown(stat.key, state.craft_parked)).map((stat) => {
           const meta = STAT_META[stat.key];
           const prog = progression?.[stat.key];
           const level = prog?.level ?? 0;

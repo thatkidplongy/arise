@@ -6,6 +6,7 @@ import { StatChip } from '@/components/ui/StatChip';
 import { CompactField } from '@/components/ui/Field';
 import { Text } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
+import { isStatShown } from '@/lib/stats';
 import { useSystem } from '@/store/useSystem';
 import { STAT_KEYS } from '@/types';
 import { STAT_META, TAP_MIN, accent, neutral, onAccent, outlinePill, press, radius, surface, text, typography, withAlpha } from '@/theme';
@@ -62,10 +63,9 @@ export function FocusAreasCard() {
 
   if (!state) return null;
 
-  // Craft's row goes while Craft is parked — its focuses only theme a side quest that
-  // isn't dealt. Hidden, not dropped: the drafts still carry every attribute, so a
-  // save elsewhere writes Craft's focuses back exactly as they were.
-  const shownStats = STAT_KEYS.filter((k) => !(k === 'CFT' && state.craft_parked));
+  // Hidden rows are only hidden: the drafts still carry every attribute, so a save
+  // elsewhere writes a parked attribute's focuses back exactly as they were.
+  const shownStats = STAT_KEYS.filter((k) => isStatShown(k, state.craft_parked));
 
   // Persist the whole set immediately on any chip change, so nothing is lost to a
   // forgotten "Save" — the exact trap that hid the Wealth/Craft pills' additions.

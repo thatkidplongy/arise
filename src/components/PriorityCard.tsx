@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text, TextInput } from '@/components/ui/Text';
 import type { ApiPriority } from '@/lib/api';
+import { isStatShown } from '@/lib/stats';
 import { useSystem } from '@/store/useSystem';
 import { STAT_KEYS, type StatKey } from '@/types';
 import { STAT_META, TAP_MIN, accent, onAccent, press, radius, surface, text, typography, withAlpha } from '@/theme';
@@ -60,6 +61,7 @@ function PriorityItem({ p, onEdit, onClear }: { p: ApiPriority; onEdit: () => vo
 export function PriorityBoard({ priorities }: { priorities: ApiPriority[] }) {
   const setPriority = useSystem((s) => s.setPriority);
   const clearPriority = useSystem((s) => s.clearPriority);
+  const craftParked = useSystem((s) => s.state?.craft_parked ?? false);
 
   const [editing, setEditing] = useState(false);
   const [stat, setStat] = useState<StatKey>('STR');
@@ -97,7 +99,7 @@ export function PriorityBoard({ priorities }: { priorities: ApiPriority[] }) {
           <Text style={styles.note}>Stacks on top of that category — nothing below is removed.</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stats}>
-            {STAT_KEYS.map((k) => {
+            {STAT_KEYS.filter((k) => isStatShown(k, craftParked)).map((k) => {
               const meta = STAT_META[k];
               const on = stat === k;
               return (
