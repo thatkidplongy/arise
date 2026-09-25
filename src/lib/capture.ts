@@ -42,7 +42,14 @@ export function canonical(raw: string): string {
   if (reel) return `https://instagram.com/reel/${reel[1]}`;
   const post = u.match(/https?:\/\/(?:www\.)?instagram\.com\/p\/([\w-]+)/i);
   if (post) return `https://instagram.com/p/${post[1]}`;
-  const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/i);
+  // Every spelling of a YouTube video keys on its id: the share sheet's youtu.be,
+  // the address bar's watch?v=, a Short, and whichever subdomain it arrived on.
+  // Exactly eleven characters, and the (?![\w-]) insists on it — a longer run is
+  // not an id with a tail, it's a channel or a playlist, and reading eleven
+  // characters out of one would key it as whatever that happened to spell.
+  const yt =
+    u.match(/https?:\/\/(?:[\w-]+\.)?youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/)([\w-]{11})(?![\w-])/i) ??
+    u.match(/https?:\/\/(?:[\w-]+\.)?youtu\.be\/([\w-]{11})(?![\w-])/i);
   if (yt) return `yt:${yt[1]}`;
   return foldHost(u.split('#')[0].split('?')[0]);
 }

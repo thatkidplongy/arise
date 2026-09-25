@@ -20,8 +20,20 @@ describe('canonical', () => {
     expect(canonical('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s')).toBe('yt:dQw4w9WgXcQ');
   });
 
-  it('reads the two YouTube spellings as the same video', () => {
-    expect(canonical('https://youtu.be/dQw4w9WgXcQ')).toBe(canonical('https://youtube.com/watch?v=dQw4w9WgXcQ'));
+  it('reads every YouTube spelling as the same video', () => {
+    const watch = canonical('https://youtube.com/watch?v=dQw4w9WgXcQ');
+    expect(canonical('https://youtu.be/dQw4w9WgXcQ')).toBe(watch);
+    expect(canonical('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe(watch);
+    expect(canonical('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(watch);
+  });
+
+  it('leaves a YouTube link with no video id in it alone', () => {
+    // A channel or a playlist is not a video. Reading eleven characters out of
+    // one anyway would key it as whatever that happened to spell.
+    expect(canonical('https://www.youtube.com/@somechannel')).toBe('https://www.youtube.com/@somechannel');
+    expect(canonical('https://www.youtube.com/playlist?list=PLabc123')).toBe(
+      'https://www.youtube.com/playlist',
+    );
   });
 
   it('drops what a TikTok share appends, and the host it was shared from', () => {

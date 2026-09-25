@@ -26,8 +26,11 @@ _ENDPOINT = "https://api.supadata.ai/v1/transcript"
 # www. on when it was there. Since this is the dedup key (see insights.capture),
 # that meant www.tiktok.com/... and tiktok.com/... were two different videos.
 #
-# NOT applied to YouTube — its id lives in the query string, so stripping the
-# query would break it; those pass through untouched.
+# YouTube used to be excluded, on the grounds that its id is in the query string
+# and trimming the query would break the link. True of trimming; this rebuilds,
+# so the id survives — and the exclusion was costing a real duplicate, since
+# youtu.be/ID from the share sheet and watch?v=ID from the address bar are one
+# video and were two rows.
 _CANONICAL = (
     (r"https?://(?:www\.)?tiktok\.com/@([\w.\-]+)/video/(\d+)",
      "https://tiktok.com/@{0}/video/{1}"),
@@ -37,6 +40,18 @@ _CANONICAL = (
      "https://instagram.com/reel/{0}"),
     (r"https?://(?:www\.)?instagram\.com/p/([\w\-]+)",
      "https://instagram.com/p/{0}"),
+    # Every spelling of a YouTube video: the share sheet's youtu.be, the address
+    # bar's watch?v=, a Short, and whichever subdomain it arrived on. The id is
+    # exactly eleven characters and the `(?![\w-])` insists on it — a longer run
+    # is not an id with a tail, it is something else, and reading eleven
+    # characters out of it would send Supadata somewhere nobody pasted.
+    #
+    # Rebuilt as the full watch URL rather than the shorter youtu.be, because
+    # that is the form every YouTube capture on file was already fetched with.
+    (r"https?://(?:[\w-]+\.)?youtube\.com/(?:watch\?(?:[^#]*&)?v=|shorts/|embed/)([\w-]{11})(?![\w-])",
+     "https://www.youtube.com/watch?v={0}"),
+    (r"https?://(?:[\w-]+\.)?youtu\.be/([\w-]{11})(?![\w-])",
+     "https://www.youtube.com/watch?v={0}"),
 )
 
 
@@ -81,15 +96,19 @@ def _fold_host(url: str) -> str:
 
 
 def clean_url(url: str) -> str:
-    """Trim a pasted share link to its canonical form where it's safe to do so.
+    """Rebuild a pasted share link as the one form that names its video.
 
-    TikTok/Instagram put the id in the path, so we can drop the giant signed
-    query string a share button appends, and the host it was shared from.
-    Everything else (incl. YouTube, whose id is in the query) keeps its path and
-    query, and gives up only the case of its host.
+    Every platform it knows is rebuilt from the parts that identify the video —
+    the id, and for TikTok the handle — so the signed query a share button
+    appends, the subdomain it came from and the spelling of the path all drop
+    away, and every way of writing the same video arrives at the same string.
+    A link it doesn't recognise keeps its path and query and gives up only the
+    case of its host.
 
-    The answer is what gets fetched from Supadata, stored, and opened from the
-    card — so everything here has to leave a working link behind."""
+    This is the dedup key (insights.capture matches on it) *and* the URL handed
+    to Supadata, stored, and opened from the card — so everything here has to
+    leave a working link behind, and the client's `canonical` has to make the
+    same judgements or the two disagree about what a duplicate is."""
     url = url.strip()
     for pat, shape in _CANONICAL:
         # Case-insensitive, because folding the host is not enough on its own: an

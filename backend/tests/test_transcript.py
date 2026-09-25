@@ -67,10 +67,41 @@ def test_clean_url_never_folds_the_path():
             == "https://instagram.com/reel/AbC1")
 
 
-def test_clean_url_leaves_youtube_query_intact():
-    # YouTube's id lives in the query string — trimming it would break the link.
-    url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    assert transcript.clean_url(url) == url
+def test_clean_url_canonicalises_youtube_to_a_watch_url():
+    """YouTube's id is in the query, so this rebuilds rather than trims — the one
+    form Supadata is already being handed for every YouTube capture on file."""
+    assert (transcript.clean_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert (transcript.clean_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PLabc")
+            == "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+
+def test_clean_url_reads_every_youtube_spelling_as_one_video():
+    """A share sheet emits youtu.be, the address bar emits watch?v=, and a Short
+    emits /shorts/ — one video, so one key."""
+    watch = transcript.clean_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert transcript.clean_url("https://youtu.be/dQw4w9WgXcQ?si=abc123") == watch
+    assert transcript.clean_url("https://www.youtube.com/shorts/dQw4w9WgXcQ") == watch
+    assert transcript.clean_url("https://m.youtube.com/watch?v=dQw4w9WgXcQ") == watch
+    assert transcript.clean_url("https://YouTu.be/dQw4w9WgXcQ") == watch
+
+
+def test_clean_url_keeps_the_case_of_a_youtube_id():
+    """Eleven case-sensitive characters — dQw4w9WgXcQ and DQW4W9WGXCQ are two
+    different videos."""
+    a = transcript.clean_url("https://youtu.be/dQw4w9WgXcQ")
+    b = transcript.clean_url("https://youtu.be/DqW4W9WGXCq")
+    assert a != b
+    assert "dQw4w9WgXcQ" in a
+
+
+def test_clean_url_leaves_a_youtube_link_it_cannot_read_alone():
+    """Only an exactly-eleven-character id is a video id. Anything else is a
+    channel, a playlist or a typo, and guessing at it would send Supadata
+    somewhere the hunter never pasted."""
+    for url in ("https://www.youtube.com/@somechannel",
+                "https://www.youtube.com/playlist?list=PLabc123"):
+        assert transcript.clean_url(url) == url
 
 
 def test_source_of():
