@@ -12,6 +12,7 @@ import { Text } from '@/components/ui/Text';
 import { dateKey } from '@/lib/dates';
 import { recapFor, weekLabel, weekOf } from '@/lib/recap';
 import { useHistory } from '@/query/useHistory';
+import { useSystem } from '@/store/useSystem';
 import { STAT_META, STAT_TINT, ink, neutral, sage, text, typography, withAlpha } from '@/theme';
 
 type Which = 'this' | 'last';
@@ -27,9 +28,10 @@ function lineFor(days: number, quests: number, leaned: string | null): string {
 export default function RecapScreen() {
   const { history, loading } = useHistory();
   const [which, setWhich] = useState<Which>('this');
+  const craftParked = useSystem((s) => s.state?.craft_parked ?? false);
 
   const week = weekOf(dateKey(), which === 'this' ? 0 : -1);
-  const recap = recapFor(history, week);
+  const recap = recapFor(history, week, craftParked);
   const busiest = Math.max(1, ...recap.byStat.map((s) => s.quests));
   const leaned = recap.leaned ? STAT_META[recap.leaned].label : null;
 

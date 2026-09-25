@@ -1,4 +1,5 @@
 import type { ApiHistoryItem } from '@/lib/api';
+import { isStatShown } from '@/lib/stats';
 import { STAT_KEYS, type StatKey } from '@/types';
 
 /** A Monday-to-Sunday window, as the client's own local days. */
@@ -42,9 +43,11 @@ export function inWeek(day: string, week: Week): boolean {
   return day >= week.start && day <= week.end;
 }
 
-/** Roll a week of finished quests into the numbers the recap shows. */
-export function recapFor(history: ApiHistoryItem[], week: Week): Recap {
-  const items = history.filter((h) => inWeek(h.day, week));
+/** Roll a week of finished quests into the numbers the recap shows. A hidden
+ * attribute (Craft, while parked) leaves the totals as well as its row, so the
+ * figures on screen still add up to the rows under them. */
+export function recapFor(history: ApiHistoryItem[], week: Week, craftParked = false): Recap {
+  const items = history.filter((h) => inWeek(h.day, week) && isStatShown(h.stat as StatKey, craftParked));
   const tally = new Map<StatKey, { quests: number; xp: number }>();
   const days = new Set<string>();
 
@@ -58,7 +61,10 @@ export function recapFor(history: ApiHistoryItem[], week: Week): Recap {
     tally.set(key, row);
   }
 
-  const byStat = STAT_KEYS.map((key) => ({ key, ...(tally.get(key) ?? { quests: 0, xp: 0 }) }));
+  const byStat = STAT_KEYS.filter((key) => isStatShown(key, craftParked)).map((key) => ({
+    key,
+    ...(tally.get(key) ?? { quests: 0, xp: 0 }),
+  }));
   const leaned = byStat.reduce<{ key: StatKey; quests: number } | null>(
     (best, row) => (row.quests > 0 && (best == null || row.quests > best.quests) ? row : best),
     null,

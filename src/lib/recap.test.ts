@@ -51,6 +51,14 @@ describe('recapFor', () => {
     expect(r.quests).toBe(2);
   });
 
+  it('leaves a parked Craft out of the rows and the totals alike', () => {
+    const history = [done('2026-08-18', 'STR', 10), done('2026-08-19', 'CFT', 25)];
+    const r = recapFor(history, week, true);
+    expect(r.byStat.map((s) => s.key)).not.toContain('CFT');
+    expect([r.days, r.quests, r.xp]).toEqual([1, 1, 10]);
+    expect(recapFor(history, week).xp).toBe(35); // counted again once it's dealt
+  });
+
   it('adds the XP the week actually paid', () => {
     expect(recapFor([done('2026-08-18', 'STR', 10), done('2026-08-19', 'INT', 40)], week).xp).toBe(50);
   });
