@@ -1,264 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FailedCaptures } from '@/components/FailedCaptures';
-import { SystemPanel } from '@/components/SystemPanel';
-import { Button } from '@/components/ui/Button';
-import { Field } from '@/components/ui/Field';
-import { Segmented } from '@/components/ui/Segmented';
+import { CaptureCard } from '@/components/Inspire/CaptureCard';
+import { InsightCard, TipsCard } from '@/components/Inspire/InsightCards';
+import { PendingCard } from '@/components/Inspire/PendingCard';
+import { shared } from '@/components/Inspire/shared';
 import { Text, TextInput } from '@/components/ui/Text';
-import type { ApiInsight, InsightKind } from '@/lib/api';
-import { describeCaptureBlock, duplicateOf, gateMessage, matches, pendingTitle } from '@/lib/capture';
+import type { InsightKind } from '@/lib/api';
+import { describeCaptureBlock, duplicateOf, matches } from '@/lib/capture';
 import { useInsights } from '@/query/useInsights';
-import { useCaptures, type PendingCapture } from '@/store/useCaptures';
+import { useCaptures } from '@/store/useCaptures';
 import { useSystem } from '@/store/useSystem';
-import { TAP_MIN, accent, clay, feedback, press, radius, surface, text, typography } from '@/theme';
+import { radius, surface, text, typography } from '@/theme';
 
-/** The footer shared by both card kinds: open the original, or remove it. */
-function CardActions({
-  sourceUrl,
-  id,
-  onRemove,
-}: {
-  sourceUrl: string;
-  id: string;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <View style={styles.actions}>
-      {sourceUrl ? (
-        <Pressable
-          onPress={() => Linking.openURL(sourceUrl).catch(() => {})}
-          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: press.strong }]}
-          hitSlop={6}
-        >
-          <Ionicons name="open-outline" size={14} color={text.secondary} />
-          <Text style={styles.actionText}>Open original</Text>
-        </Pressable>
-      ) : null}
-      <Pressable
-        onPress={() => onRemove(id)}
-        style={({ pressed }) => [styles.actionBtn, pressed && { opacity: press.strong }]}
-        hitSlop={6}
-      >
-        <Ionicons name="trash-outline" size={14} color={feedback.danger} />
-        <Text style={[styles.actionText, { color: feedback.danger }]}>Remove</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function PendingCard({
-  item,
-  onRetry,
-  onDismiss,
-}: {
-  item: PendingCapture;
-  onRetry: (tempId: string) => void;
-  onDismiss: (tempId: string) => void;
-}) {
-  const working = item.status === 'working';
-  return (
-    <View style={[styles.card, styles.pendingCard]}>
-      <View style={styles.cardHead}>
-        {working ? (
-          <ActivityIndicator size="small" color={accent} />
-        ) : (
-          <Ionicons name="alert-circle-outline" size={16} color={feedback.danger} />
-        )}
-        <Text style={styles.pendingTitle} numberOfLines={1}>
-          {pendingTitle(working, item.kind)}
-        </Text>
-        {!working ? (
-          <Pressable onPress={() => onDismiss(item.tempId)} hitSlop={8}>
-            <Text style={styles.remove}>×</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <Text style={styles.pendingUrl} numberOfLines={1}>
-        {item.url}
-      </Text>
-      {!working && item.error ? <Text style={styles.error}>{item.error}</Text> : null}
-      {!working ? (
-        <Pressable
-          onPress={() => onRetry(item.tempId)}
-          style={({ pressed }) => [styles.retryBtn, pressed && { opacity: press.medium }]}
-        >
-          <Text style={styles.retryText}>Try again</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function InsightCard({
-  insight,
-  expanded,
-  onToggle,
-  onRemove,
-}: {
-  insight: ApiInsight;
-  expanded: boolean;
-  onToggle: () => void;
-  onRemove: (id: string) => void;
-}) {
-  const saveNorthStar = useSystem((s) => s.saveNorthStar);
-  const [justSet, setJustSet] = useState<string | null>(null);
-
-  const setAsNorthStar = async (quote: string) => {
-    setJustSet(quote);
-    await saveNorthStar(quote);
-    setTimeout(() => setJustSet((q) => (q === quote ? null : q)), 2000);
-  };
-
-  const label = insight.summary || insight.quotes[0] || 'Captured video';
-
-  return (
-    <View style={styles.card}>
-      <Pressable style={styles.rowHead} onPress={onToggle} hitSlop={4}>
-        <Text style={styles.rowSummary} numberOfLines={expanded ? undefined : 2}>
-          {label}
-        </Text>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={text.faint} />
-      </Pressable>
-
-      {expanded ? (
-        <>
-          {insight.takeaways.length > 0 ? (
-            <View style={styles.takeaways}>
-              <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
-              {insight.takeaways.map((t, i) => (
-                <View key={i} style={styles.bulletRow}>
-                  <Text style={styles.bulletDot}>•</Text>
-                  <Text style={styles.bulletText}>{t}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {insight.quotes.map((q, i) => (
-            <View key={i} style={styles.quote}>
-              <Text style={styles.quoteText}>“{q}”</Text>
-              <Pressable
-                onPress={() => setAsNorthStar(q)}
-                style={({ pressed }) => [styles.starBtn, pressed && { opacity: press.medium }]}
-                hitSlop={6}
-              >
-                <Ionicons
-                  name={justSet === q ? 'checkmark-circle' : 'compass-outline'}
-                  size={13}
-                  color={justSet === q ? feedback.success : accent}
-                />
-                <Text style={[styles.starText, justSet === q && { color: feedback.success }]}>
-                  {justSet === q ? 'Set as North Star' : 'Make this my North Star'}
-                </Text>
-              </Pressable>
-            </View>
-          ))}
-
-          <CardActions sourceUrl={insight.source_url} id={insight.id} onRemove={onRemove} />
-        </>
-      ) : null}
-    </View>
-  );
-}
-
-/** A captured how-to video: its summary (the header) + takeaways — the kept
- * information — each of which can also drop straight into your to-do list.
- * Collapsible like InsightCard, but no quotes / North Star. */
-function TipsCard({
-  insight,
-  expanded,
-  onToggle,
-  onRemove,
-}: {
-  insight: ApiInsight;
-  expanded: boolean;
-  onToggle: () => void;
-  onRemove: (id: string) => void;
-}) {
-  const addReminder = useSystem((s) => s.addReminder);
-  const [added, setAdded] = useState<number[]>([]);
-
-  const sendToTodo = (step: string, i: number) => {
-    if (added.includes(i)) return;
-    setAdded((xs) => [...xs, i]);
-    void addReminder(step);
-  };
-
-  const label = insight.summary || insight.takeaways[0] || 'Captured tips';
-
-  return (
-    <View style={styles.card}>
-      <Pressable style={styles.rowHead} onPress={onToggle} hitSlop={4}>
-        <Ionicons name="bulb-outline" size={16} color={feedback.gold} />
-        <Text style={styles.rowSummary} numberOfLines={expanded ? undefined : 2}>
-          {label}
-        </Text>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={text.faint} />
-      </Pressable>
-
-      {expanded ? (
-        <>
-          {insight.takeaways.length === 0 && insight.steps.length === 0 ? (
-            <Text style={styles.empty}>Nothing came out of this one.</Text>
-          ) : null}
-
-          {/* The kept knowledge — the important part, just to read. */}
-          {insight.takeaways.length > 0 ? (
-            <View style={styles.takeaways}>
-              <Text style={styles.sectionLabel}>TAKEAWAYS</Text>
-              {insight.takeaways.map((t, i) => (
-                <View key={i} style={styles.bulletRow}>
-                  <Text style={styles.bulletDot}>•</Text>
-                  <Text style={styles.bulletText}>{t}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {/* Optional concrete actions — each can drop into your to-do list. */}
-          {insight.steps.length > 0 ? (
-            <View style={styles.tips}>
-              <Text style={styles.sectionLabel}>STEPS TO TRY</Text>
-              {insight.steps.map((step, i) => (
-                <View key={i} style={styles.tipRow}>
-                  <Text style={styles.tipText}>{step}</Text>
-                  <Pressable
-                    onPress={() => sendToTodo(step, i)}
-                    hitSlop={6}
-                    style={({ pressed }) => [styles.todoBtn, pressed && { opacity: press.medium }]}
-                  >
-                    <Ionicons
-                      name={added.includes(i) ? 'checkmark-circle' : 'add-circle-outline'}
-                      size={14}
-                      color={added.includes(i) ? feedback.success : accent}
-                    />
-                    <Text style={[styles.todoText, added.includes(i) && { color: feedback.success }]}>
-                      {added.includes(i) ? 'Added' : 'To-do'}
-                    </Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <CardActions sourceUrl={insight.source_url} id={insight.id} onRemove={onRemove} />
-        </>
-      ) : null}
-    </View>
-  );
-}
-
-/** The Inspire tab body: paste a video link, keep its distilled wisdom, and let a
- * quote resurface on Status. Captures run in the background (see useCaptures).
- * The library collapses to slim, tappable rows with a search filter so it stays
- * scannable at any size. Standalone — never touches XP.
- *
- * A link that didn't distil isn't dropped: the server keeps it, and FailedCaptures
- * sits between the capture card and the library so it's the first thing you see —
- * a shelf of things to try again, not an error you already missed. */
 export function MotivationPanel() {
   const state = useSystem((s) => s.state);
   const { insights, loaded, remove } = useInsights();
@@ -341,7 +97,7 @@ export function MotivationPanel() {
       ) : null}
 
       {loaded && shownPending.length === 0 && shown.length === 0 ? (
-        <Text style={styles.empty}>
+        <Text style={shared.empty}>
           {isTips
             ? 'No tips yet. Paste a how-to video above — Arise pulls out a summary and takeaways you can act on.'
             : 'No motivation yet. Paste a talk that moved you — Arise keeps its takeaways and quotes, and one resurfaces on your Status.'}
@@ -349,7 +105,7 @@ export function MotivationPanel() {
       ) : null}
 
       {q && filtered.length === 0 && shown.length > 0 ? (
-        <Text style={styles.empty}>No {isTips ? 'tips' : 'motivations'} match “{query}”.</Text>
+        <Text style={shared.empty}>No {isTips ? 'tips' : 'motivations'} match “{query}”.</Text>
       ) : null}
 
       {filtered.map((ins) =>
@@ -376,95 +132,7 @@ export function MotivationPanel() {
 }
 
 // The paste-a-link card, kept separate so it reads cleanly above the library.
-function CaptureCard({
-  url,
-  setUrl,
-  mode,
-  setMode,
-  transcriptOn,
-  llmOn,
-  canCapture,
-  statusMsg,
-  onCapture,
-}: {
-  url: string;
-  setUrl: (v: string) => void;
-  mode: InsightKind;
-  setMode: (m: InsightKind) => void;
-  transcriptOn: boolean;
-  llmOn: boolean;
-  canCapture: boolean;
-  statusMsg: string | null;
-  onCapture: () => void;
-}) {
-  const tips = mode === 'tips';
-  const gate = gateMessage(transcriptOn, llmOn);
-  return (
-    <SystemPanel title="Capture" sub="TikTok · Reels · YouTube">
-      <View style={styles.modeRow}>
-        <Segmented
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: 'motivation', label: 'Motivation' },
-            { value: 'tips', label: 'Tips' },
-          ]}
-        />
-      </View>
-      <Text style={styles.help}>
-        {tips
-          ? 'For a how-to or advice video. Arise pulls out the practical steps worth keeping — and you can drop any step straight into your to-do list.'
-          : 'For something that moved you. Arise distils it into a few takeaways and quotes worth keeping — one resurfaces on your Status now and then.'}
-        {' '}It runs in the background (~8s), so you can paste another or leave this tab.
-      </Text>
-      <Field
-        value={url}
-        onChangeText={setUrl}
-        onSubmitEditing={onCapture}
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        returnKeyType="go"
-        placeholder="Paste a TikTok, Reel or YouTube link"
-      />
-      <Button
-        label={tips ? 'Capture tips' : 'Capture'}
-        onPress={onCapture}
-        disabled={!canCapture}
-        block
-        large
-      />
-      {gate ? <Text style={styles.gate}>{gate}</Text> : null}
-      {statusMsg ? <Text style={styles.hint}>{statusMsg}</Text> : null}
-    </SystemPanel>
-  );
-}
-
 const styles = StyleSheet.create({
-  help: { ...typography.small, color: text.secondary, marginBottom: 14 },
-
-  modeRow: { marginBottom: 14 },
-
-
-  tips: { gap: 8 },
-  tipRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    backgroundColor: surface.muted,
-    borderRadius: radius.md,
-    padding: 13,
-  },
-  tipText: { ...typography.body, flex: 1 },
-  todoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  todoText: { color: accent, fontSize: 12, fontWeight: '700' },
-  input: { marginBottom: 12 },
-  gate: { color: text.faint, fontSize: 11, lineHeight: 16, marginTop: 10, textAlign: 'center' },
-  hint: { color: text.faint, fontSize: 12, lineHeight: 17, marginTop: 10 },
-  error: { color: feedback.danger, fontSize: 12, lineHeight: 17 },
-  empty: { color: text.secondary, fontSize: 13, lineHeight: 20, textAlign: 'center', paddingHorizontal: 8 },
-
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -476,59 +144,4 @@ const styles = StyleSheet.create({
   },
   searchInput: { ...typography.body, flex: 1, paddingVertical: 12 },
 
-  card: {
-    backgroundColor: surface.card,
-    borderRadius: radius.lg,
-    padding: 20,
-    gap: 12,
-  },
-  pendingCard: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: surface.edge,
-  },
-  pendingTitle: { ...typography.cardTitle, flex: 1 },
-  pendingUrl: { ...typography.small, color: text.faint },
-  retryBtn: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    minHeight: TAP_MIN,
-    justifyContent: 'center',
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  retryText: { color: accent, fontSize: 13, fontWeight: '700' },
-
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  remove: { color: text.faint, fontSize: 22, fontWeight: '700', marginTop: -4 },
-
-  rowHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowSummary: { ...typography.numeral, flex: 1, fontSize: 17, lineHeight: 23 },
-
-  takeaways: { gap: 6 },
-  sectionLabel: { ...typography.kicker, color: text.secondary },
-  bulletRow: { flexDirection: 'row', gap: 8 },
-  bulletDot: { color: accent, fontSize: 14, lineHeight: 20 },
-  bulletText: { ...typography.body, lineHeight: 21, flex: 1 },
-  quote: {
-    backgroundColor: clay[100],
-    borderRadius: radius.md,
-    padding: 16,
-    gap: 10,
-  },
-  quoteText: { ...typography.numeral, fontSize: 18, lineHeight: 26, color: clay[800] },
-  starBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  starText: { color: accent, fontSize: 12, fontWeight: '600' },
-
-  actions: {
-    flexDirection: 'row',
-    gap: 18,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: surface.hairline,
-  },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
 });
