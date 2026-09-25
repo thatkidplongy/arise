@@ -333,7 +333,7 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 #
 # The cards are the fifth, and they don't make a day heavier: the pile is whatever
 # the recall ladder brought back overnight, which is minutes, and on a morning it
-# brought back nothing there is nothing to work. Craft days carry five, the rest four.
+# brought back nothing there is nothing to work.
 #
 # Sit (`d-meditate`) is off the daily board for now. Spirit still has its weekly long
 # sit (`w-still`) and its side quest (`s-nature`); the daily keeps its QuestDef row
@@ -343,6 +343,13 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # It is *not* Spirit's progression anchor (`progression.DAILY_BY_STAT` still names
 # `d-meditate`), so Spirit's level stays frozen: re-anchoring would replay every past
 # week against a quest that didn't exist yet and ease the level to zero.
+#
+# Craft is parked (2026-09-25): its daily, weekly and side are all off the board,
+# because three sittings a week of it were crowding days it wasn't earning its place
+# in. The Mon/Wed/Fri row below is left as it was, so bringing Craft back is emptying
+# `_PARKED` and nothing else. Parked is not retired: the rows, completions and XP all
+# stay, and with no days dealt Craft's level freezes rather than easing down.
+_PARKED = frozenset({"d-craft", "w-craft", "s-craft"})
 _DAILY_ALWAYS = ("d-train", "d-read", "d-recall", "d-hansei")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
     ("d-craft",),  # Mon
@@ -364,14 +371,23 @@ def alternating_daily_id(day: str) -> str:
 
 
 def active_daily_ids(day: str) -> set[str]:
-    """The daily quests shown on `day`: the always-on three, whatever that weekday
-    carries (Craft), and today's turn of Japanese or drawing. Non-daily quests are
-    unaffected."""
-    return {
+    """The daily quests shown on `day`: the always-on four, whatever that weekday
+    carries (Craft), and today's turn of Japanese or drawing — less anything parked.
+    Non-daily quests are unaffected; see `is_on_board` for those."""
+    dealt = {
         *_DAILY_ALWAYS,
         *_DAILY_BY_WEEKDAY[date.fromisoformat(day).weekday()],
         alternating_daily_id(day),
     }
+    return dealt - _PARKED
+
+
+def is_on_board(quest: QuestDef, day: str) -> bool:
+    """Whether `quest` is dealt on `day`: a daily when the schedule carries it that
+    day, a weekly or side quest whenever it isn't parked."""
+    if quest.cadence == "daily":
+        return quest.id in active_daily_ids(day)
+    return quest.id not in _PARKED
 
 
 def daily_days_per_week() -> dict[str, int]:
@@ -391,7 +407,7 @@ def daily_days_per_week() -> dict[str, int]:
         elif qid in _ALTERNATING:
             out[stat] = 7 // len(_ALTERNATING)
         else:
-            out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots)
+            out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots and qid not in _PARKED)
     return {stat: out.get(stat, 0) for stat in game.STAT_KEYS}
 
 
@@ -966,7 +982,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
-    active_ids = active_daily_ids(day)  # the always-on three + Craft's weekdays + today's walk
+    active_ids = active_daily_ids(day)
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active_ids]
     dailies_done = sum(1 for q in dailies if _count(rows, q.id, day=day) >= q.target)
     resting = any(game.is_rest(r.quest_id) and r.day == day for r in rows)
@@ -1040,7 +1056,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
                        prog_levels, player.interview_mode, _jp_step(player),
                        player.craft_source, notes_by)
             for q in defs
-            if q.cadence != "daily" or q.id in active_ids  # only today's dailies show
+            if is_on_board(q, day)
         ],
         "achievements": _achievements_of(db, player),
         "record": {

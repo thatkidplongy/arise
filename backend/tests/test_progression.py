@@ -130,7 +130,7 @@ def test_availability_is_derived_from_the_schedule_itself():
     days = state.daily_days_per_week()
     assert days["STR"] == days["INT"] == 7  # always on (Grow anchors INT)
     assert days["SPI"] == 0  # Sit is off the daily board for now — frozen, not dropped
-    assert days["CFT"] == 3  # Mon/Wed/Fri
+    assert days["CFT"] == 0  # parked — Mon/Wed/Fri when it returns
     assert days["CRE"] == 3  # every other day: three or four a week, held to three
     assert days["CHA"] == days["WLT"] == 0  # retired — no daily dealt at all
     # Every anchor with days on the clock is one the board actually deals, and every
@@ -140,7 +140,7 @@ def test_availability_is_derived_from_the_schedule_itself():
         {q for slots in state._DAILY_BY_WEEKDAY for q in slots}
         | set(state._DAILY_ALWAYS)
         | set(state._ALTERNATING)
-    )
+    ) - state._PARKED
     assert {progression.DAILY_BY_STAT[s] for s, n in days.items() if n} <= dealt
     assert all(progression.DAILY_BY_STAT[s] not in dealt for s, n in days.items() if not n)
 

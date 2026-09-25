@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 
+import pytest
+
 from app import game, quests
 
 DAY = "2026-07-18"         # a Saturday — Physical, Grow and Japanese
@@ -43,6 +45,7 @@ def test_read_and_write_paths_resolve_identical_steps(client):
         assert checked > 0  # we actually exercised some quests
 
 
+@pytest.mark.usefixtures("craft_unparked")
 def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
@@ -210,6 +213,7 @@ def test_the_last_craft_phase_never_asks_to_move_on(client):
     assert craft["pending"] is False
 
 
+@pytest.mark.usefixtures("craft_unparked")
 def test_interview_mode_toggles_craft_quests(client):
     # Asked on a Craft weekday, since the daily is only dealt on those.
     s = client.get(f"/state?day={CRAFT_DAY}").json()
@@ -317,6 +321,7 @@ def test_step_checklist_autocompletes_and_reverses(client):
     assert r["state"]["player"]["total_xp"] == 0
 
 
+@pytest.mark.usefixtures("craft_unparked")
 def test_the_daily_schedule_is_fixed_to_the_weekday(client):
     """The board used to rotate on the date's ordinal, so no weekday meant anything
     and the whole thing only repeated every 21 days. Craft is a weekly schedule now —
@@ -338,6 +343,15 @@ def test_the_daily_schedule_is_fixed_to_the_weekday(client):
     assert week == next_week  # Craft's week, every week
     # Every daily still comes around inside one week.
     assert set().union(*week) | {"d-jp", "d-sketch"} == set(quests_dealt_in_a_week())
+
+
+def test_parked_craft_is_off_the_board_entirely(client):
+    """Parked means no card at all — not the daily on its weekdays, not the weekly or
+    the side, and not Learn's system-design card, which follows the board."""
+    s = client.get(f"/state?day={CRAFT_DAY}").json()
+    assert not {q["id"] for q in s["quests"]} & {"d-craft", "w-craft", "s-craft"}
+    assert "craft" not in {c["subject"] for c in s["studies"]}
+    assert s["today"]["dailies_total"] == 5  # a Craft weekday carries what any other does
 
 
 def quests_dealt_in_a_week() -> set[str]:

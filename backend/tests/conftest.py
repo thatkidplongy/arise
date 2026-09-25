@@ -52,6 +52,15 @@ def _fresh_llm_budget():
 
 
 @pytest.fixture
+def craft_unparked(monkeypatch):
+    """Craft is parked off the board for now (`state._PARKED`). The tests of how it
+    behaves when it's dealt run with it back on, so they still hold the day it returns."""
+    from app import state
+
+    monkeypatch.setattr(state, "_PARKED", frozenset())
+
+
+@pytest.fixture
 def client():
     """A TestClient on a freshly-seeded database (lifespan seeds the quests)."""
     Base.metadata.drop_all(engine)

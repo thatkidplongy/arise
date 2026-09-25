@@ -3,6 +3,8 @@
 import re
 from datetime import date, timedelta
 
+import pytest
+
 from app import japanese, quests
 from app.models import QuestDef
 
@@ -204,6 +206,7 @@ def test_craft_rotates_the_method_day_to_day():
     assert len(seen) > 1
 
 
+@pytest.mark.usefixtures("craft_unparked")
 def test_systems_reps_land_exactly_once_a_week_on_a_day_craft_is_shown():
     """Architecture is only half of 'system thinking'. The other half needs a real
     system rather than a page, so the slot leaves the reading regularly.
