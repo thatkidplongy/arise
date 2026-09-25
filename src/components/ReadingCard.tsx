@@ -5,7 +5,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { BookPicker } from '@/components/BookPicker';
 import { SystemPanel } from '@/components/SystemPanel';
 import { XpBar } from '@/components/XpBar';
-import { Text, TextInput } from '@/components/ui/Text';
+import { CompactField } from '@/components/ui/Field';
+import { Text } from '@/components/ui/Text';
 import { useCollapse } from '@/hooks/useCollapse';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import type { ApiReading, ApiReadingLog } from '@/lib/api';
@@ -150,19 +151,19 @@ function LogToday({ reading }: { reading: ApiReading }) {
         quota: your pace is the pace.
       </Text>
       <View style={styles.row}>
-        <TextInput
+        <CompactField
           value={label}
           onChangeText={onLabelChange}
-          style={[styles.input, styles.grow]}
+          style={styles.grow}
           placeholder="Chapters · e.g. 5–7"
           placeholderTextColor={text.faint}
           maxLength={120}
           onSubmitEditing={submit}
         />
-        <TextInput
+        <CompactField
           value={count}
           onChangeText={onCountChange}
-          style={[styles.input, styles.qty]}
+          style={styles.qty}
           keyboardType="number-pad"
           placeholder="Qty"
           placeholderTextColor={text.faint}
@@ -219,19 +220,19 @@ function ChangeBook({ current }: { current: string }) {
           if (guess > 0) setChapters(String(guess));
         }}
       />
-      <TextInput
+      <CompactField
         value={title}
         onChangeText={setTitle}
-        style={[styles.input, styles.stack]}
+        style={styles.stack}
         placeholder="e.g. Atomic Habits — James Clear"
         placeholderTextColor={text.faint}
         maxLength={120}
       />
       <View style={styles.row}>
-        <TextInput
+        <CompactField
           value={chapters}
           onChangeText={(v) => setChapters(v.replace(/[^0-9]/g, ''))}
-          style={[styles.input, styles.grow]}
+          style={styles.grow}
           keyboardType="number-pad"
           placeholder="Total chapters · optional"
           placeholderTextColor={text.faint}
@@ -276,10 +277,10 @@ function FinishBook({ onDone }: { onDone: () => void }) {
         Counts it as finished. Name the next one to start it now, or leave it blank and pick later.
       </Text>
       <View style={styles.row}>
-        <TextInput
+        <CompactField
           value={next}
           onChangeText={setNext}
-          style={[styles.input, styles.grow]}
+          style={styles.grow}
           placeholder="Next book · optional"
           placeholderTextColor={text.faint}
           maxLength={120}
@@ -388,16 +389,6 @@ const styles = StyleSheet.create({
   help: { color: text.secondary, fontSize: 12, lineHeight: 17, marginBottom: 10 },
 
   row: { flexDirection: 'row', gap: 8 },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: surface.base,
-  },
   // minWidth 0 matters on web: an <input> carries an intrinsic min-content width, so
   // flex:1 alone won't let it shrink and the button next to it runs off the card.
   grow: { flex: 1, minWidth: 0 },

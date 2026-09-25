@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Text, TextInput } from '@/components/ui/Text';
+import { CompactField } from '@/components/ui/Field';
+import { Text } from '@/components/ui/Text';
 import type { ApiBodyProfile } from '@/lib/api';
 import { num } from '@/lib/num';
 import { useBody } from '@/query/useBody';
@@ -54,7 +55,6 @@ function Segmented({
   );
 }
 
-
 /** The one-time body inputs (sex, age, height, weight, activity, location, goal).
  * Owns its own drafts; `onDone` closes it (after a save, or on cancel). */
 export function NutritionProfileForm({
@@ -106,10 +106,10 @@ export function NutritionProfileForm({
       <View style={styles.triple}>
         <View style={styles.tripleCol}>
           <Text style={styles.fieldLabel}>Age</Text>
-          <TextInput
+          <CompactField
             value={age}
             onChangeText={(v) => setAge(v.replace(/[^0-9]/g, ''))}
-            style={styles.input}
+            style={styles.field}
             keyboardType="number-pad"
             placeholder="28"
             placeholderTextColor={text.faint}
@@ -118,10 +118,10 @@ export function NutritionProfileForm({
         </View>
         <View style={styles.tripleCol}>
           <Text style={styles.fieldLabel}>Height (cm)</Text>
-          <TextInput
+          <CompactField
             value={height}
             onChangeText={(v) => setHeight(v.replace(/[^0-9]/g, ''))}
-            style={styles.input}
+            style={styles.field}
             keyboardType="number-pad"
             placeholder="163"
             placeholderTextColor={text.faint}
@@ -130,10 +130,10 @@ export function NutritionProfileForm({
         </View>
         <View style={styles.tripleCol}>
           <Text style={styles.fieldLabel}>Weight (kg)</Text>
-          <TextInput
+          <CompactField
             value={weight}
             onChangeText={(v) => setWeight(v.replace(/[^0-9.]/g, ''))}
-            style={styles.input}
+            style={styles.field}
             keyboardType="decimal-pad"
             placeholder="76"
             placeholderTextColor={text.faint}
@@ -147,10 +147,10 @@ export function NutritionProfileForm({
       <Segmented options={COUNTRY} value={country} onChange={setCountry} />
       <Text style={styles.hint}>Tunes the “what to eat” picks to foods you can actually find locally.</Text>
       <Text style={styles.fieldLabel}>Goal weight (kg)</Text>
-      <TextInput
+      <CompactField
         value={goalWeight}
         onChangeText={(v) => setGoalWeight(v.replace(/[^0-9.]/g, ''))}
-        style={styles.input}
+        style={styles.field}
         keyboardType="decimal-pad"
         placeholder="e.g. 65"
         placeholderTextColor={text.faint}
@@ -178,6 +178,7 @@ export function NutritionProfileForm({
 }
 
 const styles = StyleSheet.create({
+  field: { marginBottom: 10 },
   help: { color: text.secondary, fontSize: 12, lineHeight: 18, marginBottom: 12 },
   fieldLabel: { color: text.secondary, fontSize: 12, fontWeight: '700', marginBottom: 7, marginTop: 4 },
   hint: { color: text.faint, fontSize: 12, lineHeight: 17, marginBottom: 10, marginTop: -2 },
@@ -192,17 +193,6 @@ const styles = StyleSheet.create({
   segmentText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
   triple: { flexDirection: 'row', gap: 8 },
   tripleCol: { flex: 1 },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 10,
-    backgroundColor: surface.base,
-  },
   btn: { backgroundColor: accent, borderRadius: radius.pill,
     minHeight: TAP_MIN,
     justifyContent: 'center', paddingVertical: 11, alignItems: 'center' },

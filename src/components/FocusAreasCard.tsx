@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SystemPanel } from '@/components/SystemPanel';
 import { StatChip } from '@/components/ui/StatChip';
-import { Text, TextInput } from '@/components/ui/Text';
+import { CompactField } from '@/components/ui/Field';
+import { Text } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
 import { STAT_KEYS } from '@/types';
@@ -190,13 +191,13 @@ export function FocusAreasCard() {
               </View>
             ) : null}
             <View style={styles.addRow}>
-              <TextInput
+              <CompactField
                 value={focusInput[k] ?? ''}
                 onChangeText={(v) => setFocusInput((s) => ({ ...s, [k]: v }))}
                 onSubmitEditing={() => addFocus(k)}
                 blurOnSubmit={false}
                 returnKeyType="done"
-                style={[styles.input, styles.addInput]}
+                style={styles.addInput}
                 placeholder={`Add a focus · e.g. ${STAT_META[k].sub.toLowerCase()}`}
                 placeholderTextColor={text.faint}
                 maxLength={60}
@@ -208,11 +209,11 @@ export function FocusAreasCard() {
                 <Text style={[styles.addBtnText, { color: STAT_META[k].color }]}>Add</Text>
               </Pressable>
             </View>
-            <TextInput
+            <CompactField
               value={levelDraft[k] ?? ''}
               onChangeText={(v) => setLevelDraft((s) => ({ ...s, [k]: v }))}
               onEndEditing={() => persist(focusDraft, levelDraft)}
-              style={[styles.input, styles.levelInput]}
+              style={styles.levelInput}
               placeholder="Where I'm at (for AI) · e.g. Math: fractions"
               placeholderTextColor={text.faint}
               maxLength={120}
@@ -243,17 +244,6 @@ export function FocusAreasCard() {
 
 const styles = StyleSheet.create({
   help: { color: text.secondary, fontSize: 12, lineHeight: 18, marginBottom: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 10,
-    backgroundColor: surface.base,
-  },
   btn: { backgroundColor: accent, borderRadius: radius.pill,
     minHeight: TAP_MIN,
     justifyContent: 'center', paddingVertical: 11, alignItems: 'center' },
@@ -276,8 +266,8 @@ const styles = StyleSheet.create({
   suggestChip: { borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 11 },
   suggestChipText: { fontSize: 12, fontWeight: '600' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  addInput: { flex: 1, marginBottom: 0 },
-  levelInput: { marginTop: 8, marginBottom: 0, fontSize: 13 },
+  addInput: { flex: 1 },
+  levelInput: { marginTop: 8, fontSize: 13 },
   addBtn: {
     borderWidth: 1,
     borderColor: surface.hairline,

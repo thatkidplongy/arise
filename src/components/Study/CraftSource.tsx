@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { StudyButton, StudyQuietButton } from '@/components/Study/StudyButton';
-import { Text, TextInput } from '@/components/ui/Text';
+import { CompactField } from '@/components/ui/Field';
+import { Text } from '@/components/ui/Text';
 import { saveLabel, useSaveState } from '@/hooks/useSaveState';
 import { useSystem } from '@/store/useSystem';
-import { radius, surface, text, withAlpha } from '@/theme';
+import { radius, text, withAlpha } from '@/theme';
 
 /**
  * The parts only system design has: a source you choose, and a check-in once the
@@ -29,10 +30,10 @@ export function ChangeSource({ current, hue }: { current: string; hue: string })
 
   return (
     <View style={styles.form}>
-      <TextInput
+      <CompactField
         value={draft}
         onChangeText={setDraft}
-        style={styles.input}
+        style={styles.field}
         placeholder={current ? 'Move on to…' : 'e.g. DDIA ch 5 — Replication'}
         placeholderTextColor={text.faint}
         maxLength={160}
@@ -86,19 +87,9 @@ export function PhaseReview({ label, hue }: { label: string; hue: string }) {
 }
 
 const styles = StyleSheet.create({
+  field: { marginBottom: 8 },
   help: { color: text.secondary, fontSize: 12, lineHeight: 17, marginBottom: 10 },
   form: { marginTop: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: surface.hairline,
-    borderRadius: radius.pill,
-    color: text.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: surface.base,
-    marginBottom: 8,
-  },
   review: {
     marginTop: 14,
     borderWidth: 1,
