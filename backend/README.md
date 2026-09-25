@@ -54,9 +54,20 @@ tests/             pytest: unit (game/quests/achievements) + API + migration
 
 ```bash
 uv run pytest                       # unit + integration + migration
+uv run pytest -n 4                  # the same, across 4 processes
 .venv/bin/python scripts/backup_db.py   # manual snapshot → backups/
 python scripts/smoke.py http://localhost:8000   # liveness check
 ```
+
+`-n` is optional and deliberately not the default. Each worker pays the whole
+FastAPI + SQLAlchemy import before it runs a thing, so the useful number is well
+under the core count: on an 8-core machine `-n 4` takes ~4s against ~9s serial,
+while `-n auto` (which is 8) comes in at ~8s — barely worth the trouble. Pick a
+number, don't let it pick one.
+
+Running in parallel is safe because each process gets its own scratch database
+(see `tests/conftest.py`); they shared one fixed file until September 2026, and
+two runs at once wrecked each other.
 
 SQLite runs in WAL mode; the daily launchd job keeps the last 30 snapshots in
 `backend/backups/`.
