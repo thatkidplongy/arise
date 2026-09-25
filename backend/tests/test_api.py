@@ -293,6 +293,24 @@ def test_complete_then_conflict(client):
     assert r2.status_code == 409
 
 
+def test_one_attribute_counts_a_fraction_of_its_xp_toward_the_level(client):
+    """Breadth (game.BREADTH_FROM): the Intelligence dailies alone pay their XP in
+    full, but only the share of attributes they touched counts toward the level."""
+    day = "2026-09-28"  # a Japanese day: STR, SPI and three INT dailies
+    for qid in ("d-read", "d-recall", "d-jp"):
+        assert client.post("/completions", json={"quest_id": qid, "day": day}).status_code == 200
+    s = client.get(f"/state?day={day}").json()
+    assert s["player"]["total_xp"] == 75
+    assert s["today"]["breadth"] == {"touched": 1, "of": 3, "level_xp": 25, "applies": True}
+    assert s["player"]["xp_into"] == 25
+    for qid in ("d-train", "d-hansei"):
+        client.post("/completions", json={"quest_id": qid, "day": day})
+    s = client.get(f"/state?day={day}").json()
+    # The whole board — and its clear bonus — counts in full.
+    assert s["today"]["breadth"]["touched"] == s["today"]["breadth"]["of"] == 3
+    assert s["player"]["xp_into"] == s["player"]["total_xp"] == 125 + game.DAILY_CLEAR_BONUS
+
+
 def test_undo_completion(client):
     client.post("/completions", json={"quest_id": "d-train", "day": DAY})
     undo_id = _quest(_state(client), "d-train")["undoable_id"]

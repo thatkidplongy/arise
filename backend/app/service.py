@@ -58,7 +58,7 @@ def _apply_completion(db: Session, player: Player, quest: QuestDef, day: str, ro
     (daily clear, level up, rank up, achievements). Mutates `rows`; does not commit.
     The caller is responsible for checking the target isn't already met."""
     before = aggregate(rows, defs)
-    before_level = game.level_info(before["total_xp"])["level"]
+    before_level = game.level_info(before["level_xp"])["level"]
     before_rank = game.rank_for(before_level, game.max_streak(before["active_days"]))
 
     completion = Completion(player_id=player.id, quest_id=quest.id, xp=quest.xp, day=day)
@@ -77,7 +77,7 @@ def _apply_completion(db: Session, player: Player, quest: QuestDef, day: str, ro
         events.append({"type": "daily_clear", "data": {"bonus_xp": game.DAILY_CLEAR_BONUS}})
 
     after = aggregate(rows, defs)
-    after_level = game.level_info(after["total_xp"])["level"]
+    after_level = game.level_info(after["level_xp"])["level"]
     if after_level > before_level:
         events.append({"type": "level_up", "data": {"level": after_level}})
 

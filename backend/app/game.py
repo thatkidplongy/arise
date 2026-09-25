@@ -61,6 +61,36 @@ def level_info(total_xp: int) -> dict:
     return {"level": level, "into": rest, "needed": xp_to_next(level)}
 
 
+# Breadth: XP only counts toward your character level in proportion to how many
+# attributes the day touched. Before this, the level was plain accumulated XP, and
+# the board deals Intelligence two or three dailies a day, so Intelligence alone
+# took you to the next level in about four days. A day's XP now counts toward the
+# level as XP × touched / of, where `of` is the attributes the board dealt that day
+# plus any others you touched anyway. Clear the whole board and it all counts. An
+# Intelligence-only day counts a third or a quarter. Doing an extra attribute (a
+# hangout, a money move) never lowers the fraction, because it raises both sides.
+#
+# Only the *level* is weighted. Every card still pays its full XP, and it still lands
+# on its attribute's own bar. `total_xp` stays the plain sum of everything earned.
+# Days before BREADTH_FROM count in full, so nothing that was already banked is
+# recounted and the level you'd reached can't be re-derived downward.
+BREADTH_FROM = "2026-09-26"
+
+
+def breadth(touched: set[str], dealt: set[str]) -> tuple[int, int]:
+    """(touched, of) for one day: how many attributes it touched, out of how many
+    it asked for plus any others it touched. (0, 0) when there was nothing to touch."""
+    return len(touched), len(dealt | touched)
+
+
+def level_xp_for_day(day: str, xp: int, touched: set[str], dealt: set[str]) -> int:
+    """How much of a day's `xp` counts toward the character level (see BREADTH_FROM)."""
+    n, of = breadth(touched, dealt)
+    if day < BREADTH_FROM or of == 0:
+        return xp
+    return xp * n // of
+
+
 def stat_xp_to_next(level: int) -> int:
     """Stats level on a cheaper curve so they move visibly. Scaled with the character
     curve above so it stays the *same* fraction of it — cheaper, not trivial."""

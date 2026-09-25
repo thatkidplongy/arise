@@ -418,6 +418,12 @@ def daily_days_per_week() -> dict[str, int]:
     return {stat: out.get(stat, 0) for stat in game.STAT_KEYS}
 
 
+def dealt_stats(def_by_id: dict[str, QuestDef], day: str) -> set[str]:
+    """The attributes `day`'s board asks for: one per stat among its dealt dailies.
+    Breadth is measured against these (see game.BREADTH_FROM)."""
+    return {def_by_id[q].stat for q in active_daily_ids(day) if q in def_by_id}
+
+
 def dailies_cleared(rows: list[Completion], defs: list[QuestDef], day: str) -> bool:
     active = active_daily_ids(day)
     dailies = [q for q in defs if q.cadence == "daily" and q.id in active]
@@ -434,10 +440,13 @@ def aggregate(rows: list[Completion], defs: list[QuestDef]) -> dict:
     quest_counts: dict[str, int] = {}
     active_days: set[str] = set()
     bonus_days: set[str] = set()
+    xp_by_day: dict[str, int] = {}
+    touched_by_day: dict[str, set[str]] = {}
     total_xp = total_completions = side_completions = 0
 
     for r in rows:
         total_xp += r.xp
+        xp_by_day[r.day] = xp_by_day.get(r.day, 0) + r.xp
         active_days.add(r.day)  # rest days count too — showing up includes resting
         quest_counts[r.quest_id] = quest_counts.get(r.quest_id, 0) + 1
         if r.quest_id == game.DAILY_CLEAR_ID:
@@ -449,17 +458,42 @@ def aggregate(rows: list[Completion], defs: list[QuestDef]) -> dict:
         quest = def_by_id.get(r.quest_id)
         if quest is not None:
             by_stat[quest.stat] = by_stat.get(quest.stat, 0) + r.xp
+            touched_by_day.setdefault(r.day, set()).add(quest.stat)
             if quest.cadence == "side":
                 side_completions += 1
 
+    level_xp_by_day = {
+        d: game.level_xp_for_day(d, xp, touched_by_day.get(d, set()), dealt_stats(def_by_id, d))
+        for d, xp in xp_by_day.items()
+    }
+
     return {
         "total_xp": total_xp,
+        # What counts toward the character level: each day's XP weighted by how many
+        # attributes it touched (game.BREADTH_FROM). total_xp stays the plain sum.
+        "level_xp": sum(level_xp_by_day.values()),
+        "level_xp_by_day": level_xp_by_day,
+        "touched_by_day": touched_by_day,
         "by_stat": by_stat,
         "quest_counts": quest_counts,
         "active_days": active_days,
         "bonus_days": bonus_days,
         "total_completions": total_completions,
         "side_completions": side_completions,
+    }
+
+
+def _breadth_of(agg: dict, defs: list[QuestDef], day: str) -> dict:
+    """Today's breadth (game.BREADTH_FROM): the attributes touched, out of how many,
+    and how much of today's XP that lets count toward the level."""
+    dealt = dealt_stats({q.id: q for q in defs}, day)
+    touched = agg["touched_by_day"].get(day, set())
+    n, of = game.breadth(touched, dealt)
+    return {
+        "touched": n,
+        "of": of,
+        "level_xp": agg["level_xp_by_day"].get(day, 0),
+        "applies": day >= game.BREADTH_FROM,
     }
 
 
@@ -473,7 +507,7 @@ def _top_stat(by_stat: dict[str, int]) -> str | None:
 def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
     return Snapshot(
         total_xp=agg["total_xp"],
-        level=game.level_info(agg["total_xp"])["level"],
+        level=game.level_info(agg["level_xp"])["level"],
         stat_levels={k: game.stat_level_info(v)["level"] for k, v in agg["by_stat"].items()},
         max_streak=game.max_streak(agg["active_days"]),
         daily_clears=len(agg["bonus_days"]),
@@ -984,8 +1018,9 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     if sc_xp:
         agg["by_stat"]["SPI"] += sc_xp
         agg["total_xp"] += sc_xp
+        agg["level_xp"] += sc_xp  # self-care counts in full; it isn't a quest, so it has no breadth
 
-    li = game.level_info(agg["total_xp"])
+    li = game.level_info(agg["level_xp"])
     best = game.max_streak(agg["active_days"])
     rank = game.rank_for(li["level"], best)
 
@@ -1049,6 +1084,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
             "dailies_total": len(dailies),
             "cleared": dailies_done == len(dailies) and len(dailies) > 0,
             "resting": resting,
+            "breadth": _breadth_of(agg, defs, day),
         },
         "next_rank": game.next_gate(li["level"], best),
         "preferences": prefs,

@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/Text';
 import { shuhariOf } from '@/consts';
 import { useWide } from '@/hooks/useWide';
 import type { ApiQuest, ApiState } from '@/lib/api';
+import { describeBreadth } from '@/lib/breadth';
 import { isStatShown } from '@/lib/stats';
 import { isQuestDone } from '@/lib/quests';
 import { DAY_BLOCKS, blockOf, currentBlockKey } from '@/lib/routine';
@@ -52,6 +53,7 @@ function pickFeatured(daily: ApiQuest[], nowKey: string): ApiQuest | undefined {
  */
 function Aside({ state }: { state: ApiState }) {
   const { player, today, stats, progression } = state;
+  const breadth = describeBreadth(today);
   return (
     <View style={styles.aside}>
       <View style={styles.asideCard}>
@@ -67,6 +69,7 @@ function Aside({ state }: { state: ApiState }) {
           </View>
         </View>
         <XpBar value={player.xp_into} max={player.xp_needed} height={10} track={clay[200]} />
+        {breadth ? <Text style={styles.asideXp}>{breadth}</Text> : null}
       </View>
 
       <NorthStarCard northStar={player.north_star} quote={state.daily_quote} />

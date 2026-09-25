@@ -576,6 +576,13 @@ class StreakOut(BaseModel):
     best: int
 
 
+class BreadthOut(BaseModel):
+    touched: int  # attributes today touched
+    of: int  # attributes the board dealt today, plus any others touched
+    level_xp: int  # how much of today's XP counts toward the character level
+    applies: bool  # false before game.BREADTH_FROM, when every day counted in full
+
+
 class TodayOut(BaseModel):
     day: str
     xp: int
@@ -583,6 +590,7 @@ class TodayOut(BaseModel):
     dailies_total: int
     cleared: bool
     resting: bool
+    breadth: BreadthOut
 
 
 class RankGateOut(BaseModel):

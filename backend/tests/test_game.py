@@ -61,3 +61,24 @@ def test_streaks():
 def test_max_streak_finds_longest_run():
     days = {"2026-01-01", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07"}
     assert game.max_streak(days) == 3
+
+
+def test_breadth_counts_the_attributes_touched_out_of_those_asked_for():
+    dealt = {"STR", "INT", "SPI", "CRE"}
+    assert game.breadth({"INT"}, dealt) == (1, 4)
+    assert game.breadth(dealt, dealt) == (4, 4)
+    # An attribute the board didn't ask for joins both sides — it can only help.
+    assert game.breadth({"INT", "CHA"}, dealt) == (2, 5)
+    assert game.breadth(dealt | {"CHA"}, dealt) == (5, 5)
+
+
+def test_a_one_attribute_day_counts_a_fraction_toward_the_level():
+    dealt = {"STR", "INT", "SPI"}
+    day = game.BREADTH_FROM
+    assert game.level_xp_for_day(day, 75, {"INT"}, dealt) == 25
+    assert game.level_xp_for_day(day, 155, dealt, dealt) == 155
+
+
+def test_days_before_breadth_count_in_full():
+    """Nothing already banked is recounted, so the level can't be re-derived down."""
+    assert game.level_xp_for_day("2026-09-25", 75, {"INT"}, {"STR", "INT", "SPI"}) == 75

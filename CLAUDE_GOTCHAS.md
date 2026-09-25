@@ -90,3 +90,10 @@ Non-obvious things about this repo, kept short.
   `HANSEI_LENSES` must keep tomorrow's change as its third step, `STEP_CAPS` must
   keep it at three, and the echo may only change the *desc* — the step-toggle path
   resolves steps without notes, so a step that depended on them would drift.
+
+- **The hunter level isn't `total_xp`.** It's `level_xp`: each day's XP weighted by
+  the share of attributes that day touched (`game.BREADTH_FROM`), so a day spent on
+  one attribute only moves the level by a fraction. Anything new that asks "what
+  level is this?" goes through `aggregate(...)["level_xp"]`. Handing `total_xp` to
+  `game.level_info` brings back the Intelligence-only climb this rule was added to stop,
+  and it makes the level-up toast disagree with the Status window.

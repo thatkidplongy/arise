@@ -4,6 +4,7 @@ import { Counter, SystemWindow } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
 import { shuhariOf } from '@/consts';
 import type { ApiState } from '@/lib/api';
+import { describeBreadth } from '@/lib/breadth';
 import { isStatShown } from '@/lib/stats';
 import { STAT_META, clay, ink, radius, typography } from '@/theme';
 
@@ -16,6 +17,7 @@ import { STAT_META, clay, ink, radius, typography } from '@/theme';
  */
 export function StatusWindow({ state, avatarUri }: { state: ApiState; avatarUri?: string | null }) {
   const { player, stats, streak, today, progression } = state;
+  const breadth = describeBreadth(today);
 
   return (
     <SystemWindow label="Status">
@@ -50,6 +52,7 @@ export function StatusWindow({ state, avatarUri }: { state: ApiState; avatarUri?
             ]}
           />
         </View>
+        {breadth ? <Text style={styles.breadth}>{breadth}</Text> : null}
       </View>
 
       <View style={styles.pills}>
@@ -132,6 +135,7 @@ const styles = StyleSheet.create({
   xpLabel: { ...typography.kicker, fontSize: 9.5, letterSpacing: 1.9, color: ink.textDim },
   track: { height: 8, borderRadius: radius.pill, backgroundColor: ink.track, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: radius.pill, backgroundColor: clay[500] },
+  breadth: { ...typography.small, color: ink.textDim },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: { borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 13, backgroundColor: ink.fill },
   pillText: { ...typography.mono, fontSize: 10.5, letterSpacing: 0.4 },

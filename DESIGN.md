@@ -415,10 +415,16 @@ still in progress). Ranks use *best-ever* streak, so they never regress.
 
 ## XP & Levels
 
-- Hunter level: XP to go from level *n* to *n+1* is `80 + (n−1)·40`.
+- Hunter level: XP to go from level *n* to *n+1* is `240 + (n−1)·120`.
   Early levels come fast (motivation), later ones feel earned.
-- Stats level independently on a cheaper curve: `50 + (n−1)·30`.
+- Stats level independently on a cheaper curve: `150 + (n−1)·90`.
 - The Daily Clear bonus counts toward hunter XP only, not stats.
+- **Breadth.** From 2026-09-26, a day's XP counts toward the hunter level in
+  proportion to the attributes it touched: `XP × touched / of`, where `of` is the
+  attributes the board dealt that day plus any others touched. A full board counts
+  in full; an Intelligence-only day counts a third or a quarter. Every card still
+  pays its full XP to its own attribute, and `total_xp` is still the plain sum.
+  The Status window says how much of today counts.
 
 ## Ranks (E → S)
 

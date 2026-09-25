@@ -138,6 +138,14 @@ export interface ApiAchievement {
   unlocked_at: string | null;
 }
 
+/** How much of today's XP counts toward the level (mirrors schemas.BreadthOut). */
+export interface ApiBreadth {
+  touched: number; // attributes today touched
+  of: number; // attributes the board dealt today, plus any others touched
+  level_xp: number; // the share of today's XP that counts toward the level
+  applies: boolean; // false before the rule began, when every day counted in full
+}
+
 export interface ApiState {
   player: ApiPlayer;
   stats: ApiStat[];
@@ -149,6 +157,7 @@ export interface ApiState {
     dailies_total: number;
     cleared: boolean;
     resting: boolean;
+    breadth: ApiBreadth;
   };
   book_review: { pending: boolean; book: string };
   craft: ApiCraft; // where the system-design plan is, advanced by reading not dates
