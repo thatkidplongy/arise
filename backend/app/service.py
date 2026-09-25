@@ -319,10 +319,7 @@ def log_reading(db: Session, player: Player, day: str, chapters: int, label: str
 
 def remove_reading_log(db: Session, player: Player, log_id: str) -> None:
     """Take back a logged sitting — a mistyped count shouldn't be permanent."""
-    row = db.get(ReadingLog, log_id)
-    if row is not None and row.player_id == player.id:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, ReadingLog, log_id, player)
 
 
 def _same_book(title: str, other: str) -> bool:
@@ -831,11 +828,7 @@ def pay_commitment(db: Session, player: Player, commitment_id: str, day: str, am
     `amount` overrides the planned figure, which is what a variable allowance like
     groceries needs. False when there's no such commitment, or it's already paid
     this month — paying twice would double-count it against the bucket."""
-    row = (
-        db.query(BudgetCommitment)
-        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
-        .first()
-    )
+    row = _owned(db, BudgetCommitment, commitment_id, player)
     if row is None or not row.active:
         return False
     if is_commitment_paid(db, player, commitment_id, day):
@@ -937,11 +930,7 @@ def update_commitment(
 ) -> bool:
     """Edit one commitment in place. Only the fields passed are touched, so the app
     can flip `active` without resending the whole row. False when there's no match."""
-    row = (
-        db.query(BudgetCommitment)
-        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
-        .first()
-    )
+    row = _owned(db, BudgetCommitment, commitment_id, player)
     if row is None:
         return False
     if label is not None and label.strip():
@@ -961,14 +950,7 @@ def update_commitment(
 
 
 def remove_commitment(db: Session, player: Player, commitment_id: str) -> None:
-    row = (
-        db.query(BudgetCommitment)
-        .filter(BudgetCommitment.id == commitment_id, BudgetCommitment.player_id == player.id)
-        .first()
-    )
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    _delete_owned(db, BudgetCommitment, commitment_id, player)
 
 
 def _load_priorities(player: Player) -> dict:
