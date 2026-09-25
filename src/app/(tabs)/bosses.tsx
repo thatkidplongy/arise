@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
@@ -80,14 +80,7 @@ function BossWindow({ boss, equipped }: { boss: Boss; equipped: string | null })
 export default function BossesScreen() {
   const state = useSystem((s) => s.state);
 
-  if (!state) {
-    return (
-      <Screen>
-        <BackLink />
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected back="/you" />;
 
   const bosses = bossesFrom(state);
   const active = activeBoss(bosses);

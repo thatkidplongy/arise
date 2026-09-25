@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { PriorityBoard } from '@/components/PriorityCard';
 import { QuestCard } from '@/components/QuestCard';
 import { Screen } from '@/components/Screen';
@@ -103,13 +103,7 @@ export default function QuestsScreen() {
     }, []),
   );
 
-  if (!state) {
-    return (
-      <Screen>
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected />;
 
   const daily = state.quests.filter((q) => q.cadence === 'daily');
   const weekly = state.quests.filter((q) => q.cadence === 'weekly');

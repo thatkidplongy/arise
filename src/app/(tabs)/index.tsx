@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { NorthStarCard } from '@/components/NorthStarCard';
 import { Reminders } from '@/components/Reminders';
@@ -67,14 +67,7 @@ export default function StatusScreen() {
   const { uri: avatarUri } = useAvatar(hasAvatar); // query auto-loads when there's one
   const [restPending, setRestPending] = useState(false);
 
-  if (!state) {
-    return (
-      <Screen>
-        <Masthead />
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected head={<Masthead />} />;
 
   const { player, streak, today, next_rank } = state;
 

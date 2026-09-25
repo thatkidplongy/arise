@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { Screen } from '@/components/Screen';
 import { SystemPanel } from '@/components/SystemPanel';
 import { Card, Kicker, ScreenTitle } from '@/components/ui/Card';
@@ -33,14 +33,7 @@ export default function AchievementsScreen() {
     setPendingId(null);
   };
 
-  if (!state) {
-    return (
-      <Screen>
-        <BackLink />
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected back="/you" />;
 
   const unlockedCount = state.achievements.filter((a) => a.unlocked_at != null).length;
   const equipped = state.player.equipped_title;

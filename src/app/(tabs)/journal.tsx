@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { DataTable, type Column } from '@/components/DataTable';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
@@ -47,14 +47,7 @@ export default function JournalScreen() {
   const shownReflections =
     filter === 'all' ? reflections : reflections.filter((r) => r.stat === filter);
 
-  if (!state) {
-    return (
-      <Screen>
-        <BackLink />
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected back="/you" />;
 
   const open = (kind: 'journal' | 'reflection', id: string) =>
     router.push({ pathname: '/entry', params: { kind, id } });

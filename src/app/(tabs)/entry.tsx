@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BackLink } from '@/components/BackLink';
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Screen } from '@/components/Screen';
@@ -37,14 +37,7 @@ export default function EntryScreen() {
   const removeQuestNote = useSystem((s) => s.removeQuestNote);
   const [editing, setEditing] = useState(false);
 
-  if (!state) {
-    return (
-      <Screen>
-        <BackLink to="/journal" />
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected back="/journal" />;
 
   // The list is newest-first, so the previous index is the *newer* neighbour.
   const list = kind === 'reflection' ? state.reflections : state.journal;

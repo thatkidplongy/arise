@@ -1,6 +1,6 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
-import { ConnectionPanel } from '@/components/ConnectionPanel';
+import { NotConnected } from '@/components/ConnectionPanel';
 import { RecallSession } from '@/components/Recall/RecallSession';
 import { Screen } from '@/components/Screen';
 import { useRecallCards } from '@/hooks/useRecallCards';
@@ -19,13 +19,7 @@ export default function RecallScreen() {
   // A bare /recall names no stack — that choice belongs to the shelf on Learn.
   if (!params.pile) return <Redirect href="/learn" />;
 
-  if (!state) {
-    return (
-      <Screen>
-        <ConnectionPanel />
-      </Screen>
-    );
-  }
+  if (!state) return <NotConnected />;
 
   return (
     <Screen>
