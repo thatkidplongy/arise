@@ -62,6 +62,11 @@ export function FocusAreasCard() {
 
   if (!state) return null;
 
+  // Craft's row goes while Craft is parked — its focuses only theme a side quest that
+  // isn't dealt. Hidden, not dropped: the drafts still carry every attribute, so a
+  // save elsewhere writes Craft's focuses back exactly as they were.
+  const shownStats = STAT_KEYS.filter((k) => !(k === 'CFT' && state.craft_parked));
+
   // Persist the whole set immediately on any chip change, so nothing is lost to a
   // forgotten "Save" — the exact trap that hid the Wealth/Craft pills' additions.
   const persist = (focus: Record<string, string[]>, levels: Record<string, string>) => {
@@ -147,7 +152,7 @@ export function FocusAreasCard() {
           ? ' “Where I’m at” tells the AI your level so it can prescribe your next step.'
           : ' “Where I’m at” is used once you turn on AI personalisation.'}
       </Text>
-      {STAT_KEYS.map((k) => {
+      {shownStats.map((k) => {
         const items = focusDraft[k] ?? [];
         return (
           <View key={k} style={styles.focusRow}>
