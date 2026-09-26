@@ -119,9 +119,10 @@ class InterviewModeIn(BaseModel):
 class InsightAddIn(BaseModel):
     url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL, or for "
                                                 "a tutorial, any video or article URL")
-    kind: str = Field(default="motivation", pattern=r"^(motivation|tips|tutorial)$",
+    kind: str = Field(default="motivation", pattern=r"^(motivation|tips|tutorial|recipe)$",
                       description="'motivation' (quotes + daily nudge), 'tips' (a practical "
-                                  "playbook) or 'tutorial' (a long video or article's main points)")
+                                  "playbook), 'tutorial' (a long video or article's main points) "
+                                  "or 'recipe' (a cooking video or page's ingredients + method)")
 
 
 class LearningIn(BaseModel):
@@ -639,16 +640,24 @@ class RecordOut(BaseModel):
     top_stat: str | None     # the attribute leaned into most overall (None if nothing yet)
 
 
+class IngredientOut(BaseModel):
+    """One line of a recipe's ingredient list. `amount` is '' when the source gave
+    none ('salt, to taste' keeps its words in `item`)."""
+    amount: str
+    item: str
+
+
 class InsightOut(BaseModel):
     """A captured video distilled into keepable takeaways + pull-quotes."""
     id: str
     source_url: str
     source: str  # tiktok | instagram | youtube | web
-    kind: str  # motivation | tips | tutorial
+    kind: str  # motivation | tips | tutorial | recipe
     title: str
     summary: str
     takeaways: list[str]
     steps: list[str] = []  # optional actions (tips only; empty for motivation)
+    ingredients: list[IngredientOut] = []  # a recipe's; empty for every other kind
     quotes: list[str]
     created_at: datetime
 
@@ -658,7 +667,7 @@ class CaptureFailureOut(BaseModel):
     id: str
     source_url: str
     source: str  # tiktok | instagram | youtube | web
-    kind: str  # motivation | tips | tutorial
+    kind: str  # motivation | tips | tutorial | recipe
     title: str
     reason: str  # no_key | no_speech | fetch_failed | distill_failed | failed
     detail: str  # the line the card shows

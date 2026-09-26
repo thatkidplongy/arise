@@ -633,6 +633,23 @@ def _parse_tutorial(payload: dict) -> dict:
     }
 
 
+def _source_parts(prompt: str, source: str, kind: str, title: str,
+                  caption: str = "") -> list[dict]:
+    """The prompt, the page's own title as a hint when there is one, a video's
+    caption when there is one, then the source — labelled by what it is, and
+    capped at MAX_TUTORIAL_SOURCE. A source left empty (a video with only a
+    caption) is left out rather than sent as a blank."""
+    label = "ARTICLE TEXT" if kind == "article" else "VIDEO TRANSCRIPT"
+    parts = [{"text": prompt}]
+    if title:
+        parts.append({"text": "PAGE TITLE: " + title})
+    if caption:
+        parts.append({"text": "VIDEO CAPTION:\n" + caption.strip()[:MAX_TUTORIAL_SOURCE]})
+    if source.strip():
+        parts.append({"text": f"{label}:\n" + source.strip()[:MAX_TUTORIAL_SOURCE]})
+    return parts
+
+
 def distill_tutorial(source: str, kind: str = "video", title: str = "",
                      timeout: float = 60.0) -> dict:
     """One Gemini call → {title, summary, takeaways[], steps[], quotes[]} from a
@@ -641,12 +658,95 @@ def distill_tutorial(source: str, kind: str = "video", title: str = "",
 
     A long source takes the model a while, so this waits longer than the clip
     distillers and rides out a 429 the same way they do."""
-    label = "ARTICLE TEXT" if kind == "article" else "VIDEO TRANSCRIPT"
-    parts = [{"text": _TUTORIAL_PROMPT}]
-    if title:
-        parts.append({"text": "PAGE TITLE: " + title})
-    parts.append({"text": f"{label}:\n" + source.strip()[:MAX_TUTORIAL_SOURCE]})
+    parts = _source_parts(_TUTORIAL_PROMPT, source, kind, title)
     return _parse_tutorial(_ask(parts, _TUTORIAL_SCHEMA, 0.3, timeout, retries=2))
+
+
+# ── Distil a cooking video or recipe page into ingredients + method ──────────────
+
+_RECIPE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "ingredients": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"amount": {"type": "string"}, "item": {"type": "string"}},
+                "required": ["amount", "item"],
+            },
+        },
+        "steps": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "summary", "ingredients", "steps"],
+}
+
+_RECIPE_PROMPT = (
+    "You turn a cooking video, or a recipe page's text, into a recipe someone can "
+    "shop for and cook from. A video comes as its spoken TRANSCRIPT and/or its "
+    "CAPTION — creators often list the ingredients and amounts in the caption and "
+    "only talk through the method, so read both, and prefer the caption's amounts "
+    "where the two differ. From the source, return:\n"
+    "• title: the dish's plain name (under ~60 characters) — 'Garlic butter salmon', "
+    "not the creator's headline.\n"
+    "• summary: one short line with the servings and total time when the source gives "
+    "them, then what the dish is — e.g. 'Serves 2 · 25 min · a one-pan salmon with a "
+    "garlic-butter sauce'. Leave out any figure the source doesn't give.\n"
+    "• ingredients: EVERY ingredient, in the order they're used, each as {amount, "
+    "item}. amount is the quantity and unit exactly as given ('2 tbsp', '500 g', "
+    "'1'), or '' when none is said. item is what you'd buy, with any preparation "
+    "after a comma ('garlic, minced'; 'salt, to taste'). Group nothing: two uses of "
+    "one ingredient with different amounts stay two lines.\n"
+    "• steps: the method in order, 1–20 steps, each one action with its heat, time "
+    "and doneness cue where the source gives them ('Sear skin-side down on medium-"
+    "high, 4 min, until crisp').\n"
+    "Invent nothing: never add an ingredient, quantity or time the source doesn't "
+    "give — a video that never says how much is an amount of ''. Skip intros, "
+    "sponsor reads, life stories and 'like and subscribe'. If the source isn't a "
+    "recipe, return empty arrays.\n"
+    "Return JSON only: {title, summary, ingredients[], steps[]}."
+)
+
+# A long ingredient list is still one recipe, so these sit well above what any
+# ordinary dish needs — a guard, not a target.
+MAX_RECIPE_INGREDIENTS = 40
+MAX_RECIPE_STEPS = 20
+MAX_AMOUNT = 40
+MAX_INGREDIENT = 120
+
+
+def _parse_recipe(payload: dict) -> dict:
+    """Pure: Gemini response JSON → {title, summary, ingredients[], steps[],
+    takeaways[], quotes[]}. An ingredient with no item is dropped; one with no
+    amount keeps ''."""
+    data = json.loads(payload["candidates"][0]["content"]["parts"][0]["text"])
+    ingredients = []
+    for x in data.get("ingredients") or []:
+        if not isinstance(x, dict) or not str(x.get("item", "")).strip():
+            continue
+        ingredients.append({
+            "amount": _clip(x.get("amount", ""), MAX_AMOUNT),
+            "item": _clip(x["item"], MAX_INGREDIENT),
+        })
+    steps = [_clip(x, MAX_TUTORIAL_LINE) for x in (data.get("steps") or []) if str(x).strip()]
+    return {
+        "title": _clip(data.get("title", ""), MAX_TUTORIAL_TITLE),
+        "summary": _clip(data.get("summary", ""), MAX_SUMMARY),
+        "ingredients": ingredients[:MAX_RECIPE_INGREDIENTS],
+        "steps": steps[:MAX_RECIPE_STEPS],
+        "takeaways": [],
+        "quotes": [],
+    }
+
+
+def distill_recipe(source: str, kind: str = "video", title: str = "", caption: str = "",
+                   timeout: float = 60.0) -> dict:
+    """One Gemini call → a recipe from a cooking video (its transcript and caption)
+    or a recipe page's text. Same shape of call as distill_tutorial: `kind` says
+    which the source is, `title` is the page's or post's own as a hint."""
+    parts = _source_parts(_RECIPE_PROMPT, source, kind, title, caption)
+    return _parse_recipe(_ask(parts, _RECIPE_SCHEMA, 0.2, timeout, retries=2))
 
 
 # Stored lengths for a distilled highlight. These are runaway guards, not display

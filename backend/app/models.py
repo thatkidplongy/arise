@@ -266,14 +266,16 @@ class Insight(Base):
     source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
     # What kind of capture: 'motivation' (quotes + a daily nudge), 'tips' (a
     # practical playbook of steps) or 'tutorial' (a long video or an article's main
-    # points + steps, titled by the distiller). Drives which Gemini prompt distils
-    # it and where it lands in the Inspire tab. Only motivation quotes feed the
-    # Status nudge.
+    # points + steps, titled by the distiller) or 'recipe' (a cooking video or
+    # page's ingredients + method). Drives which Gemini prompt distils it and where
+    # it lands in the Inspire tab. Only motivation quotes feed the Status nudge.
     kind: Mapped[str] = mapped_column(String, default="motivation")
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     summary: Mapped[str] = mapped_column(String, default="")
     takeaways: Mapped[str] = mapped_column(String, default="[]")  # JSON list: the kept lessons
     steps: Mapped[str] = mapped_column(String, default="[]")  # JSON list: optional actions (tips)
+    # JSON list of {amount, item} — a recipe's ingredients; empty for every other kind.
+    ingredients: Mapped[str] = mapped_column(String, default="[]")
     quotes: Mapped[str] = mapped_column(String, default="[]")  # JSON list of strings
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -296,7 +298,7 @@ class CaptureFailure(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     source_url: Mapped[str] = mapped_column(String)  # canonical (transcript.clean_url)
     source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
-    kind: Mapped[str] = mapped_column(String, default="motivation")  # motivation|tips|tutorial
+    kind: Mapped[str] = mapped_column(String, default="motivation")  # motivation|tips|tutorial|recipe
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     # Which stage stopped it, from insights.REASONS — decides whether a retry is
     # worth spending an API call on (no_speech never is).

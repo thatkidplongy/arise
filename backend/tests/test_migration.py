@@ -97,3 +97,22 @@ def test_xp_tiers_are_ordered_daily_then_weekly_then_side():
     assert daily > weekly > side
     # Clearing every area beats any single card on the board.
     assert DAILY_CLEAR_BONUS > daily
+
+
+def test_an_old_insights_table_grows_ingredients_and_old_rows_read_empty():
+    """Every capture before recipes has no ingredient list; it reads as [] rather
+    than failing to load."""
+    Base.metadata.drop_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE insights (id VARCHAR PRIMARY KEY, player_id VARCHAR, source_url VARCHAR, "
+            "source VARCHAR, title VARCHAR, summary VARCHAR, takeaways VARCHAR, quotes VARCHAR, "
+            "created_at DATETIME)"
+        ))
+        conn.execute(text("INSERT INTO insights (id, takeaways, quotes) VALUES ('i1', '[]', '[]')"))
+
+    ensure_schema()
+
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT ingredients FROM insights WHERE id='i1'")).scalar() == "[]"
+    Base.metadata.drop_all(engine)

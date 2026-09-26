@@ -331,6 +331,15 @@ Paste a **TikTok, Reel, Short or YouTube** link and `POST /insights`
     points** and 15 **steps** in order, with the real commands and numbers — so
     the card's **Copy for AI** (`lib/tutorial.ts`) hands another model a
     self-contained Markdown brief. Feeds neither the daily nudge nor Recall.
+  - **Recipe** (`llm.distill_recipe`): a cooking video or a recipe page, fetched the
+    same way as a tutorial, into the dish's name, a servings · time line, every
+    **ingredient** as `{amount, item}` (the `ingredients` column; `amount` is ''
+    when the source never says) and the **method** in order. A video's **caption**
+    is read too (`transcript.metadata`, one more Supadata credit): cooking Reels
+    are mostly music with the recipe written underneath, so a video with a caption
+    and no speech still captures. Each ingredient is one tap onto the grocery list
+    as the thing you buy with how much — `garlic (3 cloves)`, the "minced" left to
+    the cook (`lib/recipe.ts`).
 
   Stored on the `insights` table (`takeaways`, `steps`, `quotes` as JSON).
   A video over ~20 minutes comes back from Supadata as a **job** (202 + `jobId`),

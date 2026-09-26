@@ -7,7 +7,7 @@ import type { PendingCapture } from '@/store/useCaptures';
 const insight = (over: Partial<ApiInsight>): ApiInsight =>
   ({
     id: 'i', kind: 'motivation', source_url: '', source_title: '', creator: '',
-    summary: '', takeaways: [], steps: [], quotes: [], created_at: '',
+    summary: '', takeaways: [], steps: [], ingredients: [], quotes: [], created_at: '',
     ...over,
   }) as ApiInsight;
 

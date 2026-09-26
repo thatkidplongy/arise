@@ -408,17 +408,24 @@ export interface ApiHistoryItem {
 
 // ── Inspire (captured motivational videos → distilled insights) ──────────────
 
-export type InsightKind = 'motivation' | 'tips' | 'tutorial';
+export type InsightKind = 'motivation' | 'tips' | 'tutorial' | 'recipe';
+
+/** One line of a recipe's ingredient list; `amount` is '' when the source gave none. */
+export interface ApiIngredient {
+  amount: string;
+  item: string;
+}
 
 export interface ApiInsight {
   id: string;
   source_url: string;
   source: string; // tiktok | instagram | youtube | web
-  kind: InsightKind; // 'motivation' (quotes + daily nudge), 'tips' (a playbook) or 'tutorial' (main points)
+  kind: InsightKind; // 'motivation' (quotes + daily nudge), 'tips' (a playbook), 'tutorial' (main points) or 'recipe'
   title: string; // @handle / short label; for a tutorial, what it teaches
   summary: string;
   takeaways: string[];
-  steps: string[]; // optional actions (tips, and a tutorial's procedure in order)
+  steps: string[]; // optional actions (tips), a tutorial's procedure, a recipe's method
+  ingredients: ApiIngredient[]; // a recipe's; empty for every other kind
   quotes: string[];
   created_at: string;
 }

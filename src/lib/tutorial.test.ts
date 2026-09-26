@@ -8,7 +8,7 @@ const tutorial = (over: Partial<ApiInsight> = {}): ApiInsight => ({
   title: 'Postgres on a Mac', summary: 'Setting up Postgres for local work.',
   takeaways: ['Use one role per app', 'Keep data out of the repo'],
   steps: ['brew install postgresql@16', 'createdb app'],
-  quotes: [], created_at: '',
+  ingredients: [], quotes: [], created_at: '',
   ...over,
 });
 

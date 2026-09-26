@@ -119,6 +119,8 @@ _ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("food_entries", "carb_p", "INTEGER DEFAULT 0"),
     ("food_entries", "extra_p", "INTEGER DEFAULT 0"),
     ("food_entries", "at_time", "VARCHAR DEFAULT ''"),
+    # A recipe capture's shopping list. Every other kind has none, so '[]'.
+    ("insights", "ingredients", "VARCHAR DEFAULT '[]'"),
 ]
 
 

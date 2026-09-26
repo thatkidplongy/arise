@@ -30,6 +30,12 @@ const MODES: Record<InsightKind, { sub: string; help: string; placeholder: strin
     placeholder: 'Paste a YouTube link or an article URL',
     action: 'Capture tutorial',
   },
+  recipe: {
+    sub: 'Cooking videos · recipe pages',
+    help: 'For something you want to cook. Arise writes down the ingredients with their amounts and the method in order — reading the caption too, where most cooking videos list what goes in — and any ingredient can go straight onto your grocery list.',
+    placeholder: 'Paste a cooking video or a recipe page',
+    action: 'Capture recipe',
+  },
 };
 
 /** Paste a link and pick what to pull out of it. The modes are different asks of
@@ -67,11 +73,12 @@ export function CaptureCard({
             { value: 'motivation', label: 'Motivation' },
             { value: 'tips', label: 'Tips' },
             { value: 'tutorial', label: 'Tutorial' },
+            { value: 'recipe', label: 'Recipe' },
           ]}
         />
       </View>
       <Text style={styles.help}>
-        {copy.help} It runs in the background ({mode === 'tutorial' ? 'up to a few minutes' : '~8s'}), so
+        {copy.help} It runs in the background ({mode === 'tutorial' ? 'up to a few minutes' : '~10s'}), so
         you can paste another or leave this tab.
       </Text>
       <Field

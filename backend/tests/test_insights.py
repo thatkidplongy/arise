@@ -607,3 +607,140 @@ def test_distill_tutorial_sends_the_page_title_and_caps_the_source(monkeypatch):
     assert "PAGE TITLE: Guide" in texts
     assert texts[-1].startswith("ARTICLE TEXT:\n")
     assert len(texts[-1]) == len("ARTICLE TEXT:\n") + llm.MAX_TUTORIAL_SOURCE
+
+
+# ── Recipe mode: a cooking video or a recipe page → ingredients + method ──────
+
+
+_RECIPE = {
+    "title": "Garlic butter salmon", "summary": "Serves 2 · 20 min · a one-pan salmon.",
+    "ingredients": [{"amount": "2", "item": "salmon fillets"}, {"amount": "", "item": "salt, to taste"}],
+    "steps": ["Sear skin-side down, 4 min"], "takeaways": [], "quotes": [],
+}
+
+
+def _recipe_video(monkeypatch, speech="", caption="", fetch_fails=False):
+    seen = {}
+
+    def fetch(url, **kw):
+        if fetch_fails:
+            raise ValueError("supadata down")
+        return {"lang": "en", "text": speech, "source": "tiktok"}
+
+    def distill(t, **kw):
+        seen.update(text=t, **kw)
+        return dict(_RECIPE)
+
+    monkeypatch.setattr(transcript, "fetch", fetch)
+    monkeypatch.setattr(transcript, "metadata", lambda url, **kw: {"title": "Salmon!!", "caption": caption})
+    monkeypatch.setattr(llm, "distill_recipe", distill)
+    return seen
+
+
+def test_recipe_reads_a_videos_caption_as_well_as_its_speech(db, monkeypatch):
+    seen = _recipe_video(monkeypatch, speech="Now we sear the salmon skin-side down.",
+                         caption="Ingredients: 2 salmon fillets, butter, garlic")
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://www.tiktok.com/@chef/video/1", kind="recipe")
+    assert out["kind"] == "recipe" and out["title"] == "Garlic butter salmon"
+    assert out["ingredients"] == _RECIPE["ingredients"]
+    assert out["steps"] == ["Sear skin-side down, 4 min"]
+    assert seen["caption"].startswith("Ingredients:")
+    assert seen["text"] == "Now we sear the salmon skin-side down."
+    assert seen["title"] == "Salmon!!"  # the post's own title, as a hint
+
+
+def test_a_music_only_recipe_video_is_read_from_its_caption(db, monkeypatch):
+    """The usual cooking Reel: music over the food, recipe written underneath."""
+    seen = _recipe_video(monkeypatch, speech="", caption="2 salmon fillets, 30 g butter, 3 cloves garlic")
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://www.tiktok.com/@chef/video/1", kind="recipe")
+    assert out["ingredients"]
+    assert seen["text"] == ""
+
+
+def test_a_recipe_caption_carries_on_when_the_transcript_cant_be_had(db, monkeypatch):
+    _recipe_video(monkeypatch, caption="2 salmon fillets, 30 g butter, 3 cloves garlic", fetch_fails=True)
+    player = state.get_or_create_player(db)
+    assert insights.add_insight(db, player.id, "https://www.tiktok.com/@chef/video/1", kind="recipe")["ingredients"]
+
+
+def test_a_recipe_video_with_neither_speech_nor_caption_says_so(db, monkeypatch):
+    _recipe_video(monkeypatch, speech="", caption="")
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.NoTranscript, match="caption"):
+        insights.add_insight(db, player.id, "https://www.tiktok.com/@chef/video/1", kind="recipe")
+
+
+def test_a_recipe_goes_on_without_a_caption_when_metadata_fails(db, monkeypatch):
+    seen = _recipe_video(monkeypatch, speech="First you take two salmon fillets and salt them.")
+
+    def broken(url, **kw):
+        raise ValueError("metadata down")
+
+    monkeypatch.setattr(transcript, "metadata", broken)
+    player = state.get_or_create_player(db)
+    insights.add_insight(db, player.id, "https://www.tiktok.com/@chef/video/1", kind="recipe")
+    assert seen["caption"] == "" and seen["title"] == ""
+
+
+def test_a_recipe_page_is_scraped_and_asks_for_no_caption(db, monkeypatch):
+    monkeypatch.setattr(transcript, "metadata", lambda url, **kw: pytest.fail("a page has no caption"))
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "Best salmon", "text": "My grandmother... Ingredients: 2 salmon fillets.", "source": "web"})
+    seen = {}
+
+    def distill(t, **kw):
+        seen.update(kw)
+        return dict(_RECIPE)
+
+    monkeypatch.setattr(llm, "distill_recipe", distill)
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://example.com/salmon", kind="recipe")
+    assert out["source"] == "web" and seen["kind"] == "article" and seen["caption"] == ""
+
+
+def test_only_a_recipe_carries_ingredients(db, monkeypatch):
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "", "text": "Some real instructions here, long enough.", "source": "web"})
+    monkeypatch.setattr(llm, "distill_tutorial", _tutorial_distill)
+    player = state.get_or_create_player(db)
+    assert insights.add_insight(db, player.id, "https://example.com/pg", kind="tutorial")["ingredients"] == []
+
+
+def test_recipe_capture_over_http(client, monkeypatch):
+    _enable(monkeypatch)
+    _recipe_video(monkeypatch, caption="2 salmon fillets, 30 g butter, 3 cloves garlic")
+    r = client.post("/insights", json={"url": "https://www.tiktok.com/@chef/video/1", "kind": "recipe"})
+    assert r.status_code == 200, r.text
+    assert r.json()["ingredients"][1] == {"amount": "", "item": "salt, to taste"}
+    assert client.get("/insights").json()[0]["ingredients"][0] == {"amount": "2", "item": "salmon fillets"}
+
+
+def test_recipe_parse_keeps_every_ingredient_line_and_drops_empty_ones():
+    out = llm._parse_recipe(_gemini({
+        "title": "Salmon", "summary": "s",
+        "ingredients": [{"amount": "2 tbsp", "item": "butter"}, {"amount": "1 tbsp", "item": "butter"},
+                        {"amount": "3", "item": "  "}, "garlic", {"item": "salt, to taste"}],
+        "steps": ["Sear", ""],
+    }))
+    assert out["ingredients"] == [
+        {"amount": "2 tbsp", "item": "butter"},
+        {"amount": "1 tbsp", "item": "butter"},  # two uses stay two lines
+        {"amount": "", "item": "salt, to taste"},
+    ]
+    assert out["steps"] == ["Sear"] and out["takeaways"] == [] and out["quotes"] == []
+
+
+def test_distill_recipe_sends_the_caption_before_the_speech(monkeypatch):
+    sent = {}
+
+    def ask(parts, schema, temperature, timeout, retries=0, spend=0):
+        sent["parts"] = parts
+        return _gemini({"title": "t", "summary": "s", "ingredients": [], "steps": []})
+
+    monkeypatch.setattr(llm, "_ask", ask)
+    llm.distill_recipe("", kind="video", caption="2 fillets")
+    assert [p["text"].split(":")[0] for p in sent["parts"][1:]] == ["VIDEO CAPTION"]  # no blank transcript
+    llm.distill_recipe("we sear it", kind="video", caption="2 fillets")
+    assert [p["text"].split(":")[0] for p in sent["parts"][1:]] == ["VIDEO CAPTION", "VIDEO TRANSCRIPT"]

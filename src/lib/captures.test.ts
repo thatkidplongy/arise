@@ -17,6 +17,7 @@ function insight(id: string): ApiInsight {
     summary: 's',
     takeaways: [],
     steps: [],
+    ingredients: [],
     quotes: [],
     created_at: '2026-08-26T00:00:00Z',
   };

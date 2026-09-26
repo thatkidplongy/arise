@@ -210,3 +210,16 @@ def test_is_video_tells_a_page_from_a_platform():
     assert transcript.is_video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     assert transcript.is_video("https://tiktok.com/@x/video/1")
     assert not transcript.is_video("https://fastapi.tiangolo.com/tutorial/")
+
+
+def test_metadata_reads_a_posts_title_and_caption(monkeypatch):
+    calls = _fake_net(monkeypatch, [{
+        "title": "  Garlic  butter salmon ", "description": "Ingredients:\n2 salmon fillets\n",
+        "author": {"username": "chef"}}])
+    out = transcript.metadata("https://www.tiktok.com/@chef/video/1?_r=1")
+    assert out == {"title": "Garlic butter salmon", "caption": "Ingredients:\n2 salmon fillets"}
+    assert calls[0] == (transcript._METADATA_ENDPOINT, {"url": "https://tiktok.com/@chef/video/1"})
+
+
+def test_metadata_reads_a_missing_caption_as_empty():
+    assert transcript.parse_metadata({"title": None, "description": None}) == {"title": "", "caption": ""}

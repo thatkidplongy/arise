@@ -7,7 +7,9 @@ sitting next to your North Star.
 
 A third kind, `tutorial`, takes a long video *or* a written guide (read through
 Supadata's web scrape) and keeps its main points and steps — a reference to hand
-on, so it feeds neither the daily nudge nor anything else.
+on, so it feeds neither the daily nudge nor anything else. A fourth, `recipe`,
+reads a cooking video (its caption as well as its speech) or a recipe page the
+same way and keeps the ingredients and method.
 
 Reads and the single write path both live here (personal scale). `daily_quote`
 is a pure derive-on-read: same day → same quote, rotating as the days pass.
@@ -93,7 +95,11 @@ RETRYABLE_REASONS = {"no_key", "fetch_failed", "distill_failed", "failed"}
 
 # The three asks of a link. Anything else arriving is read as motivation, the
 # kind every capture was before there were others.
-KINDS = ("motivation", "tips", "tutorial")
+KINDS = ("motivation", "tips", "tutorial", "recipe")
+
+# The kinds read from a whole source — a long video, or a page — rather than a clip
+# of speech, and titled by the distiller. Each names the model call that does it.
+_LONGFORM = {"tutorial": "distill_tutorial", "recipe": "distill_recipe"}
 
 
 def _kind(kind: str) -> str:
@@ -117,6 +123,19 @@ def _loads(raw: str) -> list[str]:
     return [str(x) for x in val] if isinstance(val, list) else []
 
 
+def _ingredients(raw: str) -> list[dict]:
+    try:
+        val = json.loads(raw or "[]")
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(val, list):
+        return []
+    return [
+        {"amount": str(x.get("amount", "")), "item": str(x.get("item", ""))}
+        for x in val if isinstance(x, dict) and x.get("item")
+    ]
+
+
 def _title_for(url: str, source: str) -> str:
     """A short human label for the capture — the @handle when the URL shows one."""
     m = re.search(r"(?:tiktok\.com/|instagram\.com/)(@[\w.\-]+)", url)
@@ -135,6 +154,7 @@ def to_out(row: Insight) -> dict:
         "summary": row.summary,
         "takeaways": _loads(row.takeaways),
         "steps": _loads(row.steps),
+        "ingredients": _ingredients(row.ingredients),
         "quotes": _loads(row.quotes),
         "created_at": row.created_at,
     }
@@ -152,7 +172,8 @@ def list_insights(db: Session, player_id: str) -> list[dict]:
 
 def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation") -> dict:
     """Fetch + distil + persist one capture. `kind` is 'motivation' (quotes + a daily
-    nudge), 'tips' (a practical playbook) or 'tutorial' (main points + steps).
+    nudge), 'tips' (a practical playbook), 'tutorial' (main points + steps) or
+    'recipe' (ingredients + method).
 
     Every way this can fail is a `CaptureError` subclass, so the caller learns which
     stage stopped it (which decides whether retrying is worth an API call) without
@@ -170,8 +191,8 @@ def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation")
     )
     if existing is not None:
         return to_out(existing)
-    if kind == "tutorial":
-        return _add_tutorial(db, player_id, url, canonical)
+    if kind in _LONGFORM:
+        return _add_longform(db, player_id, url, canonical, kind)
     try:
         fetched = transcript.fetch(url)
     except Exception as e:
@@ -200,27 +221,48 @@ def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation")
     return to_out(row)
 
 
-def _add_tutorial(db: Session, player_id: str, url: str, canonical: str) -> dict:
-    """A tutorial: a video's transcript or a page's text → its main points + steps.
+def _post_caption(url: str) -> dict:
+    """The post's title and caption, or {} when they can't be had."""
+    try:
+        return transcript.metadata(url)
+    except Exception:
+        return {}
+
+
+def _add_longform(db: Session, player_id: str, url: str, canonical: str, kind: str) -> dict:
+    """A tutorial or a recipe: a video's transcript or a page's text → its main
+    points + steps, or its ingredients + method.
 
     Kept apart from the clip path because both ends differ — a page is read rather
-    than transcribed, and the distillation names its own title (a long walkthrough
-    has no @handle worth labelling it by)."""
+    than transcribed, and the distillation names its own title (a walkthrough or a
+    dish has no @handle worth labelling it by)."""
     video = transcript.is_video(canonical)
+    # A recipe video's caption is read too: creators write the ingredients there
+    # and cook to music. It's a hint, never a requirement — if it can't be had the
+    # capture goes on with the speech alone.
+    post = _post_caption(url) if video and kind == "recipe" else {}
+    caption = post.get("caption", "")
     try:
         fetched = transcript.fetch(url) if video else transcript.scrape(url)
     except Exception as e:
-        raise TranscriptFailed(
-            "" if video else "Couldn't read that page — the site may be blocking readers, or be down."
-        ) from e
+        if len(caption) < 20:
+            raise TranscriptFailed(
+                "" if video else "Couldn't read that page — the site may be blocking readers, or be down."
+            ) from e
+        fetched = {"text": "", "source": transcript.source_of(canonical)}
     text = (fetched.get("text") or "").strip()
-    if len(text) < 20:
-        raise NoTranscript() if video else NoText()
-    page_title = fetched.get("title", "")
-    try:
-        distilled = llm.distill_tutorial(
-            text, kind="video" if video else "article", title=page_title,
+    if len(text) < 20 and len(caption) < 20:
+        if not video:
+            raise NoText()
+        raise NoTranscript(
+            "No speech or caption found in that video — nothing says what went in."
+            if kind == "recipe" else ""
         )
+    page_title = fetched.get("title", "") or post.get("title", "")
+    try:
+        distill = getattr(llm, _LONGFORM[kind])
+        extra = {"caption": caption} if kind == "recipe" else {}
+        distilled = distill(text, kind="video" if video else "article", title=page_title, **extra)
     except Exception as e:
         raise DistillFailed() from e
     source = fetched.get("source", "web")
@@ -228,12 +270,13 @@ def _add_tutorial(db: Session, player_id: str, url: str, canonical: str) -> dict
         player_id=player_id,
         source_url=canonical,
         source=source,
-        kind="tutorial",
+        kind=kind,
         title=(distilled.get("title") or page_title
                or (_title_for(url, source) if video else urlparse(canonical).netloc)),
         summary=distilled["summary"],
         takeaways=json.dumps(distilled["takeaways"]),
         steps=json.dumps(distilled.get("steps", [])),
+        ingredients=json.dumps(distilled.get("ingredients", [])),
         quotes="[]",
     )
     db.add(row)

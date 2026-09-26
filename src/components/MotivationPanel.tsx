@@ -6,6 +6,7 @@ import { FailedCaptures } from '@/components/FailedCaptures';
 import { CaptureCard } from '@/components/Inspire/CaptureCard';
 import { InsightCard, TipsCard } from '@/components/Inspire/InsightCards';
 import { PendingCard } from '@/components/Inspire/PendingCard';
+import { RecipeCard } from '@/components/Inspire/RecipeCard';
 import { TutorialCard } from '@/components/Inspire/TutorialCard';
 import { shared } from '@/components/Inspire/shared';
 import { Text, TextInput } from '@/components/ui/Text';
@@ -32,6 +33,11 @@ const VIEWS: Record<InsightKind, { plural: string; empty: string; Card: typeof I
     plural: 'tutorials',
     empty: 'No tutorials yet. Paste a long video or an article above — Arise keeps its main points and steps, ready to copy into another AI.',
     Card: TutorialCard,
+  },
+  recipe: {
+    plural: 'recipes',
+    empty: 'No recipes yet. Paste a cooking video or a recipe page above — Arise writes down the ingredients and method, and any ingredient can go on your grocery list.',
+    Card: RecipeCard,
   },
 };
 

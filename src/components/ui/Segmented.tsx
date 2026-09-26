@@ -9,7 +9,12 @@ interface Props<T extends string> {
   onChange: (next: T) => void;
 }
 
-/** A pill rail with a pill inside it — two or three mutually exclusive views. */
+/** A pill rail with a pill inside it — two to four mutually exclusive views.
+ *
+ * Up to three share the rail equally. Four at phone width leave a quarter each,
+ * which is narrower than a word like "Motivation" — so past three each pill is
+ * sized by its label and the spare room is shared out on top, rather than a long
+ * label being cut to fit a slot a short one didn't need. */
 export function Segmented<T extends string>({ options, value, onChange }: Props<T>) {
   return (
     <View style={styles.rail} accessibilityRole="tablist">
@@ -21,7 +26,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
             onPress={() => onChange(opt.value)}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
-            style={[styles.opt, on ? styles.optOn : null]}
+            style={[styles.opt, options.length > 3 ? styles.optFit : null, on ? styles.optOn : null]}
           >
             <Text style={[styles.label, { color: on ? clay[700] : text.secondary }]} numberOfLines={1}>
               {opt.label}
@@ -48,6 +53,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.pill,
   },
+  optFit: { flexBasis: 'auto', paddingHorizontal: 8 },
   optOn: { backgroundColor: neutral[100] },
   label: typography.button,
 });

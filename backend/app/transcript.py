@@ -21,6 +21,9 @@ _ENDPOINT = "https://api.supadata.ai/v1/transcript"
 # The same service reads a web page back as Markdown — what a written tutorial is
 # captured through, since there's nothing to transcribe.
 _SCRAPE_ENDPOINT = "https://api.supadata.ai/v1/web/scrape"
+# A post's own title and caption. A cooking Reel is often music over the food with
+# the whole recipe written underneath, which a transcript can't see.
+_METADATA_ENDPOINT = "https://api.supadata.ai/v1/metadata"
 
 # The shapes we can safely rebuild, and what to rebuild them as. Each pattern
 # captures the parts that identify the video; the template puts them back without
@@ -202,6 +205,25 @@ def fetch(url: str, timeout: float = 30.0) -> dict:
     out = parse(payload)
     out["source"] = source_of(target)
     return out
+
+
+def parse_metadata(payload: dict) -> dict:
+    """Pure: Supadata's metadata JSON → {title, caption}. Either may be ''."""
+    return {
+        "title": " ".join(str(payload.get("title", "") or "").split()),
+        "caption": str(payload.get("description", "") or "").strip(),
+    }
+
+
+def metadata(url: str, timeout: float = 15.0) -> dict:
+    """A video post's title and caption → {title, caption}. Same contract as
+    `fetch`: ValueError without a key, and any other error propagates."""
+    key = _api_key()
+    if not key:
+        raise ValueError("no Supadata key")
+    payload = net.get_json(_METADATA_ENDPOINT, params={"url": clean_url(url)},
+                           headers={"x-api-key": key}, timeout=timeout)
+    return parse_metadata(payload)
 
 
 def is_video(url: str) -> bool:

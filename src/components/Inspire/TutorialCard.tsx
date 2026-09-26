@@ -1,21 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { CardActions, cardStyles } from '@/components/Inspire/InsightCards';
+import { CopyButton, StepList, longform } from '@/components/Inspire/Longform';
 import { shared } from '@/components/Inspire/shared';
 import { Text } from '@/components/ui/Text';
 import type { ApiInsight } from '@/lib/api';
-import { copyOut, type CopyResult } from '@/lib/copyOut';
 import { tutorialMeta, tutorialText } from '@/lib/tutorial';
-import { accent, feedback, press, text, typography } from '@/theme';
-
-const COPY_LABELS: Record<CopyResult, string> = {
-  copied: 'Copied',
-  shared: 'Shared',
-  dismissed: 'Copy for AI',
-  failed: 'Couldn’t copy',
-};
+import { accent, text } from '@/theme';
 
 /** A captured tutorial: what it teaches (the header), its main points and the
  * steps in order — kept to hand on, so Copy puts the whole thing on the clipboard
@@ -32,26 +24,17 @@ export function TutorialCard({
   onToggle: () => void;
   onRemove: (id: string) => void;
 }) {
-  const [copied, setCopied] = useState<CopyResult | null>(null);
-
-  const copy = async () => {
-    const result = await copyOut(tutorialText(insight), insight.title);
-    setCopied(result);
-    setTimeout(() => setCopied((c) => (c === result ? null : c)), 2000);
-  };
-
-  const done = copied === 'copied' || copied === 'shared';
   const empty = insight.takeaways.length === 0 && insight.steps.length === 0;
 
   return (
     <View style={shared.card}>
       <Pressable style={cardStyles.rowHead} onPress={onToggle} hitSlop={4}>
         <Ionicons name="school-outline" size={16} color={accent} />
-        <View style={local.head}>
+        <View style={longform.head}>
           <Text style={cardStyles.rowSummary} numberOfLines={expanded ? undefined : 2}>
             {insight.title || insight.summary || 'Captured tutorial'}
           </Text>
-          <Text style={local.meta}>{tutorialMeta(insight)}</Text>
+          <Text style={longform.meta}>{tutorialMeta(insight)}</Text>
         </View>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={text.faint} />
       </Pressable>
@@ -74,35 +57,10 @@ export function TutorialCard({
             </View>
           ) : null}
 
-          {insight.steps.length > 0 ? (
-            <View style={cardStyles.takeaways}>
-              <Text style={cardStyles.sectionLabel}>STEPS</Text>
-              {insight.steps.map((s, i) => (
-                <View key={i} style={cardStyles.bulletRow}>
-                  <Text style={local.stepNum}>{i + 1}.</Text>
-                  <Text style={cardStyles.bulletText}>{s}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
+          <StepList label="STEPS" steps={insight.steps} />
 
           <CardActions sourceUrl={insight.source_url} id={insight.id} onRemove={onRemove}>
-            {!empty ? (
-              <Pressable
-                onPress={() => void copy()}
-                style={({ pressed }) => [cardStyles.actionBtn, pressed && { opacity: press.strong }]}
-                hitSlop={6}
-              >
-                <Ionicons
-                  name={done ? 'checkmark-circle' : 'copy-outline'}
-                  size={14}
-                  color={done ? feedback.success : accent}
-                />
-                <Text style={[cardStyles.actionText, { color: done ? feedback.success : accent }]}>
-                  {COPY_LABELS[copied ?? 'dismissed']}
-                </Text>
-              </Pressable>
-            ) : null}
+            {!empty ? <CopyButton body={() => tutorialText(insight)} title={insight.title} /> : null}
           </CardActions>
         </>
       ) : null}
@@ -110,8 +68,3 @@ export function TutorialCard({
   );
 }
 
-const local = StyleSheet.create({
-  head: { flex: 1, gap: 3 },
-  meta: { ...typography.small, color: text.faint },
-  stepNum: { ...typography.body, lineHeight: 21, color: accent, minWidth: 18 },
-});

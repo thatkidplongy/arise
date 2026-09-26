@@ -14,7 +14,7 @@ function recall(id: string): ApiRecall {
 function insight(over: Partial<ApiInsight>): ApiInsight {
   return {
     id: 'i1', source_url: 'u', source: 'youtube', kind: 'tips', title: 'YouTube', summary: 's',
-    takeaways: [], steps: [], quotes: [], created_at: '2026-08-01', ...over,
+    takeaways: [], steps: [], ingredients: [], quotes: [], created_at: '2026-08-01', ...over,
   };
 }
 

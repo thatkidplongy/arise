@@ -115,7 +115,10 @@ home screen (launchd service + Tailscale), continue to [Deploy](#deploy-always-o
   is set. (Videos with no speech — music- or text-only — have nothing to transcribe.)
   A third mode, **Tutorial**, takes a long video *or* a written guide / docs page and
   keeps its **main points** and **steps in order**, with a **Copy for AI** button that
-  puts the whole thing on the clipboard as Markdown.
+  puts the whole thing on the clipboard as Markdown. A fourth, **Recipe**, does the
+  same for a cooking video or recipe page — **ingredients with amounts** (read from
+  the caption too, where most cooking videos list them) and the **method** — and any
+  ingredient goes onto the Food tab's **grocery list** in a tap.
 - **Recall — remembering what you read** — reading a lot and keeping little is the
   usual problem, so Arise asks it back. Log what you read under **You → Learn** (a
   book and its chapters, a Notion page, something that landed at work); each night
