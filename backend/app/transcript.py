@@ -1,4 +1,5 @@
-"""Fetch a video's transcript from its URL via Supadata (TikTok, Reels, Shorts…).
+"""Fetch a video's transcript from its URL via Supadata (TikTok, Reels, Shorts…),
+or the text of a web page (a written tutorial) via the same service.
 
 Supadata is a hosted transcript API: we send a public video URL and it returns
 the spoken transcript as JSON. The free tier is 100 requests/month, no card. The
@@ -12,10 +13,14 @@ under launchd with no extra deps — the same contract as llm.py and books.py.
 
 import os
 import re
+import time
 
 from . import net
 
 _ENDPOINT = "https://api.supadata.ai/v1/transcript"
+# The same service reads a web page back as Markdown — what a written tutorial is
+# captured through, since there's nothing to transcribe.
+_SCRAPE_ENDPOINT = "https://api.supadata.ai/v1/web/scrape"
 
 # The shapes we can safely rebuild, and what to rebuild them as. Each pattern
 # captures the parts that identify the video; the template puts them back without
@@ -141,6 +146,46 @@ def parse(payload: dict) -> dict:
     }
 
 
+# How long to wait on a video Supadata answers with a job instead of its words.
+# Anything over ~20 minutes comes back that way (HTTP 202 + a jobId), which is
+# most of a real tutorial. Before this the job's reply was parsed as if it were
+# the transcript, found empty, and filed as "no speech" — a long video could
+# never be captured, and the ledger said it never would be.
+JOB_WAIT = 120.0
+_POLL_EVERY = 3.0
+
+# The states a job reports while it's still working. Anything else that isn't
+# "completed" is taken as having stopped.
+_JOB_WORKING = {"queued", "active", "processing", "pending"}
+
+
+def _job_result(payload: dict) -> dict:
+    """A finished job's transcript. The fields have turned up both at the top
+    level and under `result`, so either is read."""
+    inner = payload.get("result")
+    return inner if isinstance(inner, dict) else payload
+
+
+def _await_job(job_id: str, key: str, timeout: float, wait: float = JOB_WAIT,
+               sleep=time.sleep, clock=time.monotonic) -> dict:
+    """Poll a transcript job until it lands → the finished payload.
+
+    Raises ValueError if the job fails or is still going when `wait` runs out —
+    both are the retryable fetch_failed, which is right: a job that timed out
+    here has usually finished by the time the ledger tries it again."""
+    deadline = clock() + wait
+    while True:
+        payload = net.get_json(f"{_ENDPOINT}/{job_id}", headers={"x-api-key": key}, timeout=timeout)
+        status = str(payload.get("status", "")).lower()
+        if status == "completed":
+            return _job_result(payload)
+        if status not in _JOB_WORKING:
+            raise ValueError(f"transcript job {status or 'broke'}: {payload.get('error', '')}")
+        if clock() + _POLL_EVERY > deadline:
+            raise ValueError("transcript job still running")
+        sleep(_POLL_EVERY)
+
+
 def fetch(url: str, timeout: float = 30.0) -> dict:
     """Fetch a transcript for a public video URL → {lang, text, source}.
 
@@ -152,6 +197,38 @@ def fetch(url: str, timeout: float = 30.0) -> dict:
         raise ValueError("no Supadata key")
     target = clean_url(url)
     payload = net.get_json(_ENDPOINT, params={"url": target}, headers={"x-api-key": key}, timeout=timeout)
+    if payload.get("jobId"):
+        payload = _await_job(str(payload["jobId"]), key, timeout)
     out = parse(payload)
     out["source"] = source_of(target)
+    return out
+
+
+def is_video(url: str) -> bool:
+    """Whether a link is one of the video platforms, as opposed to a page to read."""
+    return source_of(url) != "web"
+
+
+def parse_page(payload: dict) -> dict:
+    """Pure: Supadata's web-scrape JSON → {title, text}. Testable offline."""
+    return {
+        "title": " ".join(str(payload.get("name", "") or "").split()),
+        "text": str(payload.get("content", "") or "").strip(),
+    }
+
+
+def scrape(url: str, timeout: float = 30.0) -> dict:
+    """Read a web page (an article, a docs page, a written tutorial) → {title, text,
+    source}, the text as Markdown with the links stripped.
+
+    Same key and the same contract as `fetch`: ValueError without a key, and any
+    transport/HTTP/parse error propagates for the caller to name."""
+    key = _api_key()
+    if not key:
+        raise ValueError("no Supadata key")
+    target = clean_url(url)
+    payload = net.get_json(_SCRAPE_ENDPOINT, params={"url": target, "noLinks": "true"},
+                           headers={"x-api-key": key}, timeout=timeout)
+    out = parse_page(payload)
+    out["source"] = "web"
     return out

@@ -264,9 +264,11 @@ class Insight(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     source_url: Mapped[str] = mapped_column(String)
     source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
-    # What kind of capture: 'motivation' (quotes + a daily nudge) or 'tips' (a
-    # practical playbook of steps). Drives which Gemini prompt distils it and where
-    # it lands in the Inspire tab. Only motivation quotes feed the Status nudge.
+    # What kind of capture: 'motivation' (quotes + a daily nudge), 'tips' (a
+    # practical playbook of steps) or 'tutorial' (a long video or an article's main
+    # points + steps, titled by the distiller). Drives which Gemini prompt distils
+    # it and where it lands in the Inspire tab. Only motivation quotes feed the
+    # Status nudge.
     kind: Mapped[str] = mapped_column(String, default="motivation")
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     summary: Mapped[str] = mapped_column(String, default="")
@@ -294,7 +296,7 @@ class CaptureFailure(Base):
     player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
     source_url: Mapped[str] = mapped_column(String)  # canonical (transcript.clean_url)
     source: Mapped[str] = mapped_column(String, default="web")  # tiktok|instagram|youtube|web
-    kind: Mapped[str] = mapped_column(String, default="motivation")  # motivation|tips
+    kind: Mapped[str] = mapped_column(String, default="motivation")  # motivation|tips|tutorial
     title: Mapped[str] = mapped_column(String, default="")  # @handle / short label
     # Which stage stopped it, from insights.REASONS — decides whether a retry is
     # worth spending an API call on (no_speech never is).

@@ -5,6 +5,7 @@ import { SystemPanel } from '@/components/SystemPanel';
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import type { ApiCaptureFailure, InsightKind } from '@/lib/api';
+import { viewOf } from '@/lib/capture';
 import { REASON_LABELS, describeAttempts, summariseSweep } from '@/lib/captures';
 import { useFailedCaptures } from '@/query/useFailedCaptures';
 import { TAP_MIN, accent, feedback, press, radius, surface, text, typography } from '@/theme';
@@ -76,8 +77,7 @@ function FailedCard({
 export function FailedCaptures({ kind }: { kind: InsightKind }) {
   const { failed, retry, retryingId, sweep, sweeping, lastSweep, forget } = useFailedCaptures();
 
-  const isTips = kind === 'tips';
-  const shown = failed.filter((f) => (isTips ? f.kind === 'tips' : f.kind !== 'tips'));
+  const shown = failed.filter((f) => viewOf(f.kind) === kind);
   if (shown.length === 0) return null;
 
   const retryable = shown.filter((f) => f.retryable).length;

@@ -480,3 +480,130 @@ def test_sweep_and_forget_over_http(client, monkeypatch):
     out = client.post("/insights/failed/retry").json()
     assert len(out["captured"]) == 1 and out["failed"] == 0
     assert out["untried"] == 0 and out["remaining"] == []
+
+
+# ── Tutorial mode: a long video or an article → its main points ──────────────
+
+
+def _tutorial_distill(t, kind="video", title="", **kw):
+    return {"title": f"T:{kind}:{title}", "summary": "How to set up Postgres.",
+            "takeaways": ["Use a role per app"], "steps": ["brew install postgresql"], "quotes": []}
+
+
+def test_tutorial_reads_an_article_through_the_scraper(db, monkeypatch):
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: pytest.fail("a page isn't transcribed"))
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "Postgres on a Mac", "text": "Step one: install it with brew.", "source": "web"})
+    seen = {}
+
+    def distill(t, **kw):
+        seen["text"] = t
+        return _tutorial_distill(t, **kw)
+
+    monkeypatch.setattr(llm, "distill_tutorial", distill)
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://example.com/pg", kind="tutorial")
+    assert out["kind"] == "tutorial"
+    assert out["title"] == "T:article:Postgres on a Mac"  # the page title reaches the model
+    assert out["takeaways"] == ["Use a role per app"]
+    assert out["steps"] == ["brew install postgresql"]
+    assert out["quotes"] == []
+    assert seen["text"] == "Step one: install it with brew."
+
+
+def test_tutorial_transcribes_a_video(db, monkeypatch):
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: pytest.fail("a video isn't scraped"))
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {
+        "lang": "en", "text": "Today we set up Postgres from scratch.", "source": "youtube"})
+    monkeypatch.setattr(llm, "distill_tutorial", _tutorial_distill)
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://youtu.be/dQw4w9WgXcQ", kind="tutorial")
+    assert out["title"] == "T:video:" and out["source"] == "youtube"
+
+
+def test_tutorial_falls_back_to_the_host_when_nothing_names_it(db, monkeypatch):
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "", "text": "Some real instructions here, long enough.", "source": "web"})
+    monkeypatch.setattr(llm, "distill_tutorial", lambda t, **kw: {
+        "title": "", "summary": "s", "takeaways": [], "steps": [], "quotes": []})
+    player = state.get_or_create_player(db)
+    out = insights.add_insight(db, player.id, "https://Docs.Example.com/x", kind="tutorial")
+    assert out["title"] == "docs.example.com"
+
+
+def test_an_empty_page_is_kept_to_try_again(db, monkeypatch):
+    """Unlike a silent video, a page behind a login can read differently later — so
+    it's retryable, never filed as no_speech."""
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {"title": "", "text": "", "source": "web"})
+    player = state.get_or_create_player(db)
+    with pytest.raises(insights.NoText):
+        insights.capture(db, player.id, "https://example.com/paywalled", kind="tutorial")
+    [row] = insights.list_failures(db, player.id)
+    assert row["kind"] == "tutorial" and row["reason"] == "fetch_failed" and row["retryable"]
+
+
+def test_a_tutorial_is_its_own_capture_of_a_link(db, monkeypatch):
+    monkeypatch.setattr(transcript, "fetch", lambda url, **kw: {
+        "lang": "en", "text": "How to meal prep in an hour.", "source": "youtube"})
+    monkeypatch.setattr(llm, "distill_tips", lambda t, **kw: {"summary": "t", "takeaways": ["x"], "quotes": []})
+    monkeypatch.setattr(llm, "distill_tutorial", _tutorial_distill)
+    player = state.get_or_create_player(db)
+    url = "https://youtu.be/dQw4w9WgXcQ"
+    a = insights.add_insight(db, player.id, url, kind="tips")
+    b = insights.add_insight(db, player.id, url, kind="tutorial")
+    assert a["id"] != b["id"]
+    assert insights.add_insight(db, player.id, url, kind="tutorial")["id"] == b["id"]
+
+
+def test_tutorials_never_feed_the_daily_nudge(db, monkeypatch):
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "", "text": "Some real instructions here, long enough.", "source": "web"})
+    monkeypatch.setattr(llm, "distill_tutorial", _tutorial_distill)
+    player = state.get_or_create_player(db)
+    insights.add_insight(db, player.id, "https://example.com/pg", kind="tutorial")
+    assert insights.daily_quote(db, player.id, DAY) is None
+
+
+def test_tutorial_capture_over_http(client, monkeypatch):
+    _enable(monkeypatch)
+    monkeypatch.setattr(transcript, "scrape", lambda url, **kw: {
+        "title": "Guide", "text": "Some real instructions here, long enough.", "source": "web"})
+    monkeypatch.setattr(llm, "distill_tutorial", _tutorial_distill)
+    r = client.post("/insights", json={"url": "https://example.com/pg", "kind": "tutorial"})
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "tutorial"
+    assert client.post("/insights", json={"url": "https://example.com/pg", "kind": "course"}).status_code == 422
+
+
+def _gemini(obj):
+    import json as _json
+    return {"candidates": [{"content": {"parts": [{"text": _json.dumps(obj)}]}}]}
+
+
+def test_tutorial_parse_keeps_a_long_walkthrough_whole():
+    """A clip is capped at six points; a real walkthrough runs twelve, and cutting it
+    to six drops half of what it taught."""
+    out = llm._parse_tutorial(_gemini({
+        "title": "Postgres", "summary": "s",
+        "takeaways": [f"point {i}" for i in range(20)] + ["  "],
+        "steps": [f"step {i}" for i in range(20)],
+    }))
+    assert out["takeaways"] == [f"point {i}" for i in range(llm.MAX_TUTORIAL_POINTS)]
+    assert len(out["steps"]) == llm.MAX_TUTORIAL_STEPS
+    assert out["quotes"] == []
+
+
+def test_distill_tutorial_sends_the_page_title_and_caps_the_source(monkeypatch):
+    sent = {}
+
+    def ask(parts, schema, temperature, timeout, retries=0, spend=0):
+        sent["parts"] = parts
+        return _gemini({"title": "t", "summary": "s", "takeaways": [], "steps": []})
+
+    monkeypatch.setattr(llm, "_ask", ask)
+    llm.distill_tutorial("x" * (llm.MAX_TUTORIAL_SOURCE + 500), kind="article", title="Guide")
+    texts = [p["text"] for p in sent["parts"]]
+    assert "PAGE TITLE: Guide" in texts
+    assert texts[-1].startswith("ARTICLE TEXT:\n")
+    assert len(texts[-1]) == len("ARTICLE TEXT:\n") + llm.MAX_TUTORIAL_SOURCE

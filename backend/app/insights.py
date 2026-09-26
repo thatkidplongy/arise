@@ -5,6 +5,10 @@ distil it (Gemini) into takeaways + pull-quotes, then store it. One quote
 resurfaces on the Status screen each day — a gentle nudge from what you watched,
 sitting next to your North Star.
 
+A third kind, `tutorial`, takes a long video *or* a written guide (read through
+Supadata's web scrape) and keeps its main points and steps — a reference to hand
+on, so it feeds neither the daily nudge nor anything else.
+
 Reads and the single write path both live here (personal scale). `daily_quote`
 is a pure derive-on-read: same day → same quote, rotating as the days pass.
 
@@ -17,6 +21,7 @@ sweep once the key is in place or the quota has rolled.
 import hashlib
 import json
 import re
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -47,6 +52,16 @@ class NoKey(CaptureError):
     message = "Capturing videos needs a Supadata key and a Gemini key on the server."
 
 
+class NoText(CaptureError):
+    """A page that came back with nothing to read — a paywall, a login wall, or a
+    page built entirely in script. Filed as fetch_failed rather than no_speech:
+    unlike a silent video, a page can read differently tomorrow."""
+
+    reason = "fetch_failed"
+    status = 422
+    message = "Couldn't read any text on that page — it may be behind a login or paywall."
+
+
 class NoTranscript(CaptureError):
     """The video had no usable spoken words (e.g. music-only, no captions). The one
     failure a retry can't fix — there is nothing there to distil."""
@@ -75,6 +90,14 @@ class DistillFailed(CaptureError):
 
 # Every reason but no_speech describes something outside the link that can clear.
 RETRYABLE_REASONS = {"no_key", "fetch_failed", "distill_failed", "failed"}
+
+# The three asks of a link. Anything else arriving is read as motivation, the
+# kind every capture was before there were others.
+KINDS = ("motivation", "tips", "tutorial")
+
+
+def _kind(kind: str) -> str:
+    return kind if kind in KINDS else "motivation"
 
 # What one sweep may spend. A retry is a Supadata call plus a Gemini call, and both
 # free tiers are small — better to walk a long ledger over a few sweeps than to
@@ -129,13 +152,13 @@ def list_insights(db: Session, player_id: str) -> list[dict]:
 
 def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation") -> dict:
     """Fetch + distil + persist one capture. `kind` is 'motivation' (quotes + a daily
-    nudge) or 'tips' (a practical playbook).
+    nudge), 'tips' (a practical playbook) or 'tutorial' (main points + steps).
 
     Every way this can fail is a `CaptureError` subclass, so the caller learns which
     stage stopped it (which decides whether retrying is worth an API call) without
     reading exception text. Use `capture` rather than this if the link should be
     remembered when it doesn't land."""
-    kind = "tips" if kind == "tips" else "motivation"
+    kind = _kind(kind)
     canonical = transcript.clean_url(url)
     # Idempotent per (url, kind): re-pasting a link under the same mode is a no-op
     # (no wasted Supadata/Gemini calls). The same video can still be kept once as
@@ -147,6 +170,8 @@ def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation")
     )
     if existing is not None:
         return to_out(existing)
+    if kind == "tutorial":
+        return _add_tutorial(db, player_id, url, canonical)
     try:
         fetched = transcript.fetch(url)
     except Exception as e:
@@ -168,6 +193,48 @@ def add_insight(db: Session, player_id: str, url: str, kind: str = "motivation")
         takeaways=json.dumps(distilled["takeaways"]),
         steps=json.dumps(distilled.get("steps", [])),
         quotes=json.dumps(distilled["quotes"]),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return to_out(row)
+
+
+def _add_tutorial(db: Session, player_id: str, url: str, canonical: str) -> dict:
+    """A tutorial: a video's transcript or a page's text → its main points + steps.
+
+    Kept apart from the clip path because both ends differ — a page is read rather
+    than transcribed, and the distillation names its own title (a long walkthrough
+    has no @handle worth labelling it by)."""
+    video = transcript.is_video(canonical)
+    try:
+        fetched = transcript.fetch(url) if video else transcript.scrape(url)
+    except Exception as e:
+        raise TranscriptFailed(
+            "" if video else "Couldn't read that page — the site may be blocking readers, or be down."
+        ) from e
+    text = (fetched.get("text") or "").strip()
+    if len(text) < 20:
+        raise NoTranscript() if video else NoText()
+    page_title = fetched.get("title", "")
+    try:
+        distilled = llm.distill_tutorial(
+            text, kind="video" if video else "article", title=page_title,
+        )
+    except Exception as e:
+        raise DistillFailed() from e
+    source = fetched.get("source", "web")
+    row = Insight(
+        player_id=player_id,
+        source_url=canonical,
+        source=source,
+        kind="tutorial",
+        title=(distilled.get("title") or page_title
+               or (_title_for(url, source) if video else urlparse(canonical).netloc)),
+        summary=distilled["summary"],
+        takeaways=json.dumps(distilled["takeaways"]),
+        steps=json.dumps(distilled.get("steps", [])),
+        quotes="[]",
     )
     db.add(row)
     db.commit()
@@ -274,7 +341,7 @@ def capture(db: Session, player_id: str, url: str, kind: str = "motivation") -> 
     The key gates sit here rather than in `add_insight` so a retry is held to the
     same bar as a fresh paste, and so a missing key is filed as the retryable thing
     it is instead of vanishing into a 503 the client can only show once."""
-    kind = "tips" if kind == "tips" else "motivation"
+    kind = _kind(kind)
     try:
         if not transcript.enabled():
             raise NoKey("Capturing videos needs a Supadata key (set ARISE_SUPADATA_API_KEY).")

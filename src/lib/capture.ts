@@ -70,10 +70,20 @@ export function duplicateOf(
   return null;
 }
 
-// Free-text filter across a capture's words (no creator/source attribution).
+// Free-text filter across a capture's words (no creator/source attribution). A
+// tutorial's title is searched too — it names the subject, where a clip's names
+// the account it came from.
 export function matches(i: ApiInsight, q: string): boolean {
   if (!q) return true;
-  return [i.summary, ...i.takeaways, ...i.steps, ...i.quotes].join(' ').toLowerCase().includes(q);
+  const title = i.kind === 'tutorial' ? [i.title] : [];
+  return [...title, i.summary, ...i.takeaways, ...i.steps, ...i.quotes].join(' ').toLowerCase().includes(q);
+}
+
+/** Which of Ember's views a capture is listed under. Anything this client doesn't
+ * recognise goes under Motivation, the kind every capture was before there were
+ * others — so it's never listed nowhere. */
+export function viewOf(kind: string): InsightKind {
+  return kind === 'tips' || kind === 'tutorial' ? kind : 'motivation';
 }
 
 /** Why the Capture button is greyed out, or null when it isn't.
@@ -98,6 +108,7 @@ export function describeCaptureBlock(
 /** What a capture in flight is doing, or that it didn't make it. */
 export function pendingTitle(working: boolean, kind: InsightKind): string {
   if (!working) return 'Couldn’t capture this one';
+  if (kind === 'tutorial') return 'Reading the tutorial…';
   return kind === 'tips' ? 'Pulling out the tips…' : 'Listening & distilling…';
 }
 

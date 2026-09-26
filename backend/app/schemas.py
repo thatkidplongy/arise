@@ -117,9 +117,11 @@ class InterviewModeIn(BaseModel):
 
 
 class InsightAddIn(BaseModel):
-    url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL")
-    kind: str = Field(default="motivation", pattern=r"^(motivation|tips)$",
-                      description="'motivation' (quotes + daily nudge) or 'tips' (a practical playbook)")
+    url: str = Field(min_length=8, description="A public TikTok / Reel / Short video URL, or for "
+                                                "a tutorial, any video or article URL")
+    kind: str = Field(default="motivation", pattern=r"^(motivation|tips|tutorial)$",
+                      description="'motivation' (quotes + daily nudge), 'tips' (a practical "
+                                  "playbook) or 'tutorial' (a long video or article's main points)")
 
 
 class LearningIn(BaseModel):
@@ -642,7 +644,7 @@ class InsightOut(BaseModel):
     id: str
     source_url: str
     source: str  # tiktok | instagram | youtube | web
-    kind: str  # motivation | tips
+    kind: str  # motivation | tips | tutorial
     title: str
     summary: str
     takeaways: list[str]
@@ -656,7 +658,7 @@ class CaptureFailureOut(BaseModel):
     id: str
     source_url: str
     source: str  # tiktok | instagram | youtube | web
-    kind: str  # motivation | tips
+    kind: str  # motivation | tips | tutorial
     title: str
     reason: str  # no_key | no_speech | fetch_failed | distill_failed | failed
     detail: str  # the line the card shows

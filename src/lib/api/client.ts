@@ -81,6 +81,10 @@ async function request<T>(
   }
 }
 
+/** How long one capture may take: the server waits up to two minutes on a long
+ * video's transcript job, then distils it. */
+const CAPTURE_TIMEOUT = 180000;
+
 export const api = {
   state: (base: string, token: string, day: string) =>
     request<ApiState>(base, `/state?day=${day}`, token),
@@ -255,7 +259,10 @@ export const api = {
       '/insights',
       token,
       { method: 'POST', body: JSON.stringify({ url, kind }) },
-      60000, // fetch a transcript + distil it — the slowest call in the app
+      // Fetch a transcript + distil it — the slowest call in the app. A video over
+      // ~20 minutes is a job the server waits on before it can distil anything, so
+      // a long tutorial needs well past the minute a clip does.
+      CAPTURE_TIMEOUT,
     ),
 
   removeInsight: (base: string, token: string, insightId: string) =>
@@ -267,7 +274,7 @@ export const api = {
   // A retry does the same work a fresh capture does, so it gets the same long
   // window rather than the default 8s.
   retryFailedCapture: (base: string, token: string, failureId: string) =>
-    request<ApiInsight>(base, `/insights/failed/${failureId}/retry`, token, { method: 'POST' }, 60000),
+    request<ApiInsight>(base, `/insights/failed/${failureId}/retry`, token, { method: 'POST' }, CAPTURE_TIMEOUT),
 
   // A sweep is several of those back to back (bounded server-side by SWEEP_MAX), so
   // it needs the longest window in the app.

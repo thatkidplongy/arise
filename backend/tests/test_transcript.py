@@ -135,3 +135,78 @@ def test_fetch_without_key_raises(monkeypatch):
     assert transcript.enabled() is False
     with pytest.raises(ValueError):
         transcript.fetch("https://www.tiktok.com/@x/video/1")
+
+
+# ── Long videos (a job to poll) and pages (a scrape) ─────────────────────────
+
+
+def _fake_net(monkeypatch, replies):
+    """Stand in for net.get_json: each call takes the next reply and records what
+    was asked for."""
+    calls = []
+
+    def get_json(url, params=None, headers=None, timeout=8.0):
+        calls.append((url, params))
+        return replies.pop(0)
+
+    monkeypatch.setattr(transcript.net, "get_json", get_json)
+    monkeypatch.setattr(transcript, "_api_key", lambda: "k")
+    return calls
+
+
+def test_fetch_waits_out_a_long_videos_job(monkeypatch):
+    """Over ~20 minutes Supadata answers with a jobId, not the words. Reading that
+    reply as the transcript found it empty and called a long video silent."""
+    calls = _fake_net(monkeypatch, [
+        {"jobId": "j1"},
+        {"status": "active"},
+        {"status": "completed", "content": [{"text": "First,"}, {"text": "install it."}], "lang": "en"},
+    ])
+    monkeypatch.setattr(transcript.time, "sleep", lambda s: None)
+    out = transcript.fetch("https://youtu.be/dQw4w9WgXcQ")
+    assert out["text"] == "First, install it."
+    assert out["source"] == "youtube"
+    assert [c[0] for c in calls[1:]] == [f"{transcript._ENDPOINT}/j1"] * 2
+
+
+def test_a_finished_job_is_read_under_result_too():
+    assert transcript._job_result({"status": "completed", "result": {"content": "hi"}}) == {"content": "hi"}
+    assert transcript._job_result({"status": "completed", "content": "hi"})["content"] == "hi"
+
+
+def test_a_failed_job_raises(monkeypatch):
+    _fake_net(monkeypatch, [{"jobId": "j1"}, {"status": "failed", "error": "private video"}])
+    with pytest.raises(ValueError, match="failed"):
+        transcript.fetch("https://youtu.be/dQw4w9WgXcQ")
+
+
+def test_a_job_that_outlasts_the_wait_raises_rather_than_spinning(monkeypatch):
+    now = [0.0]
+
+    def sleep(s):
+        now[0] += s
+
+    _fake_net(monkeypatch, [{"status": "active"}] * 100)
+    with pytest.raises(ValueError, match="still running"):
+        transcript._await_job("j1", "k", timeout=5, wait=10, sleep=sleep, clock=lambda: now[0])
+
+
+def test_scrape_reads_a_page_as_text_without_links(monkeypatch):
+    calls = _fake_net(monkeypatch, [{"name": "  Set up  Postgres ", "content": "# Install\n\nRun brew.\n"}])
+    out = transcript.scrape("https://Example.com/guides/postgres?ref=hn")
+    assert out == {"title": "Set up Postgres", "text": "# Install\n\nRun brew.", "source": "web"}
+    url, params = calls[0]
+    assert url == transcript._SCRAPE_ENDPOINT
+    assert params == {"url": "https://example.com/guides/postgres?ref=hn", "noLinks": "true"}
+
+
+def test_scrape_needs_the_key(monkeypatch):
+    monkeypatch.setattr(transcript, "_api_key", lambda: "")
+    with pytest.raises(ValueError):
+        transcript.scrape("https://example.com/a")
+
+
+def test_is_video_tells_a_page_from_a_platform():
+    assert transcript.is_video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert transcript.is_video("https://tiktok.com/@x/video/1")
+    assert not transcript.is_video("https://fastapi.tiangolo.com/tutorial/")

@@ -324,8 +324,18 @@ Paste a **TikTok, Reel, Short or YouTube** link and `POST /insights`
     chores), and an *optional* list of **steps** — concrete actions, present only
     when the video actually prescribes them. Each step is one-tap addable to your
     to-do list; takeaways are just there to keep. No pull-quotes.
+  - **Tutorial** (`llm.distill_tutorial`): for a full walkthrough — a long video,
+    or a written guide read through Supadata's **web scrape** instead of its
+    transcript endpoint (`transcript.scrape`; any non-video link is a page). The
+    model names it (`title`), says what it teaches, and keeps up to 12 **main
+    points** and 15 **steps** in order, with the real commands and numbers — so
+    the card's **Copy for AI** (`lib/tutorial.ts`) hands another model a
+    self-contained Markdown brief. Feeds neither the daily nudge nor Recall.
 
   Stored on the `insights` table (`takeaways`, `steps`, `quotes` as JSON).
+  A video over ~20 minutes comes back from Supadata as a **job** (202 + `jobId`),
+  which `transcript.fetch` polls for up to two minutes; it used to be read as an
+  empty transcript and filed, wrongly, as no speech.
 
 Only **motivation** quotes feed Status; one surfaces there each day (`insights.daily_quote`, chosen
 deterministically by the date — stable across a day, rotating as days pass),

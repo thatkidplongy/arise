@@ -6,14 +6,34 @@ import { FailedCaptures } from '@/components/FailedCaptures';
 import { CaptureCard } from '@/components/Inspire/CaptureCard';
 import { InsightCard, TipsCard } from '@/components/Inspire/InsightCards';
 import { PendingCard } from '@/components/Inspire/PendingCard';
+import { TutorialCard } from '@/components/Inspire/TutorialCard';
 import { shared } from '@/components/Inspire/shared';
 import { Text, TextInput } from '@/components/ui/Text';
 import type { InsightKind } from '@/lib/api';
-import { describeCaptureBlock, duplicateOf, matches } from '@/lib/capture';
+import { describeCaptureBlock, duplicateOf, matches, viewOf } from '@/lib/capture';
 import { useInsights } from '@/query/useInsights';
 import { useCaptures } from '@/store/useCaptures';
 import { useSystem } from '@/store/useSystem';
 import { radius, surface, text, typography } from '@/theme';
+
+/** How each view names its captures, draws them, and says it has none yet. */
+const VIEWS: Record<InsightKind, { plural: string; empty: string; Card: typeof InsightCard }> = {
+  motivation: {
+    plural: 'motivations',
+    empty: 'No motivation yet. Paste a talk that moved you — Arise keeps its takeaways and quotes, and one resurfaces on your Status.',
+    Card: InsightCard,
+  },
+  tips: {
+    plural: 'tips',
+    empty: 'No tips yet. Paste a how-to video above — Arise pulls out a summary and takeaways you can act on.',
+    Card: TipsCard,
+  },
+  tutorial: {
+    plural: 'tutorials',
+    empty: 'No tutorials yet. Paste a long video or an article above — Arise keeps its main points and steps, ready to copy into another AI.',
+    Card: TutorialCard,
+  },
+};
 
 export function MotivationPanel() {
   const state = useSystem((s) => s.state);
@@ -49,12 +69,13 @@ export function MotivationPanel() {
     setOpenIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
   const q = query.trim().toLowerCase();
-  const isTips = mode === 'tips';
-  // Motivation and Tips are separate views: the capture mode doubles as the
-  // active tab, so you only see (and add) one kind at a time.
-  const shownPending = pending.filter((p) => (isTips ? p.kind === 'tips' : p.kind !== 'tips'));
-  const shown = insights.filter((i) => (isTips ? i.kind === 'tips' : i.kind !== 'tips'));
+  const view = VIEWS[mode];
+  // Each kind is its own view: the capture mode doubles as the active tab, so you
+  // only see (and add) one kind at a time.
+  const shownPending = pending.filter((p) => viewOf(p.kind) === mode);
+  const shown = insights.filter((i) => viewOf(i.kind) === mode);
   const filtered = shown.filter((i) => matches(i, q));
+  const Card = view.Card;
 
   return (
     <>
@@ -85,7 +106,7 @@ export function MotivationPanel() {
             style={styles.searchInput}
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder={`Search ${shown.length} ${isTips ? 'tips' : 'motivations'}…`}
+            placeholder={`Search ${shown.length} ${view.plural}…`}
             placeholderTextColor={text.faint}
           />
           {query ? (
@@ -97,36 +118,22 @@ export function MotivationPanel() {
       ) : null}
 
       {loaded && shownPending.length === 0 && shown.length === 0 ? (
-        <Text style={shared.empty}>
-          {isTips
-            ? 'No tips yet. Paste a how-to video above — Arise pulls out a summary and takeaways you can act on.'
-            : 'No motivation yet. Paste a talk that moved you — Arise keeps its takeaways and quotes, and one resurfaces on your Status.'}
-        </Text>
+        <Text style={shared.empty}>{view.empty}</Text>
       ) : null}
 
       {q && filtered.length === 0 && shown.length > 0 ? (
-        <Text style={shared.empty}>No {isTips ? 'tips' : 'motivations'} match “{query}”.</Text>
+        <Text style={shared.empty}>No {view.plural} match “{query}”.</Text>
       ) : null}
 
-      {filtered.map((ins) =>
-        isTips ? (
-          <TipsCard
-            key={ins.id}
-            insight={ins}
-            expanded={openIds.includes(ins.id)}
-            onToggle={() => toggle(ins.id)}
-            onRemove={remove}
-          />
-        ) : (
-          <InsightCard
-            key={ins.id}
-            insight={ins}
-            expanded={openIds.includes(ins.id)}
-            onToggle={() => toggle(ins.id)}
-            onRemove={remove}
-          />
-        ),
-      )}
+      {filtered.map((ins) => (
+        <Card
+          key={ins.id}
+          insight={ins}
+          expanded={openIds.includes(ins.id)}
+          onToggle={() => toggle(ins.id)}
+          onRemove={remove}
+        />
+      ))}
     </>
   );
 }

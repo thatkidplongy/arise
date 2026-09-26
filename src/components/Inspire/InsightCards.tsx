@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { shared } from '@/components/Inspire/shared';
@@ -8,18 +8,22 @@ import type { ApiInsight } from '@/lib/api';
 import { useSystem } from '@/store/useSystem';
 import { accent, clay, feedback, press, radius, surface, text, typography } from '@/theme';
 
-/** The footer shared by both card kinds: open the original, or remove it. */
+/** The footer shared by every card kind: open the original, or remove it. A card
+ * with an action of its own puts it first, as `children`. */
 export function CardActions({
   sourceUrl,
   id,
   onRemove,
+  children,
 }: {
   sourceUrl: string;
   id: string;
   onRemove: (id: string) => void;
+  children?: ReactNode;
 }) {
   return (
     <View style={styles.actions}>
+      {children}
       {sourceUrl ? (
         <Pressable
           onPress={() => Linking.openURL(sourceUrl).catch(() => {})}
@@ -249,3 +253,6 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionText: { color: text.secondary, fontSize: 12, fontWeight: '600' },
 });
+
+/** Exported so TutorialCard draws its rows the same way these do. */
+export const cardStyles = styles;

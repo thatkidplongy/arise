@@ -408,17 +408,17 @@ export interface ApiHistoryItem {
 
 // ── Inspire (captured motivational videos → distilled insights) ──────────────
 
-export type InsightKind = 'motivation' | 'tips';
+export type InsightKind = 'motivation' | 'tips' | 'tutorial';
 
 export interface ApiInsight {
   id: string;
   source_url: string;
   source: string; // tiktok | instagram | youtube | web
-  kind: InsightKind; // 'motivation' (quotes + daily nudge) or 'tips' (a playbook)
-  title: string; // @handle / short label
+  kind: InsightKind; // 'motivation' (quotes + daily nudge), 'tips' (a playbook) or 'tutorial' (main points)
+  title: string; // @handle / short label; for a tutorial, what it teaches
   summary: string;
   takeaways: string[];
-  steps: string[]; // optional actions (tips only; empty for motivation)
+  steps: string[]; // optional actions (tips, and a tutorial's procedure in order)
   quotes: string[];
   created_at: string;
 }

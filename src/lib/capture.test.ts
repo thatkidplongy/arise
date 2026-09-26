@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ApiInsight } from '@/lib/api';
-import { canonical, describeCaptureBlock, duplicateOf, gateMessage, matches, pendingTitle } from '@/lib/capture';
+import { canonical, describeCaptureBlock, duplicateOf, gateMessage, matches, pendingTitle, viewOf } from '@/lib/capture';
 import type { PendingCapture } from '@/store/useCaptures';
 
 const insight = (over: Partial<ApiInsight>): ApiInsight =>
@@ -150,6 +150,34 @@ describe('pendingTitle', () => {
 
   it('says so plainly when it failed, whichever kind it was', () => {
     expect(pendingTitle(false, 'tips')).toBe(pendingTitle(false, 'motivation'));
+    expect(pendingTitle(false, 'tutorial')).toBe(pendingTitle(false, 'motivation'));
+  });
+
+  it('names a tutorial as something read', () => {
+    expect(pendingTitle(true, 'tutorial')).toMatch(/tutorial/i);
+  });
+});
+
+describe('viewOf', () => {
+  it('lists each kind under its own view', () => {
+    expect(viewOf('tips')).toBe('tips');
+    expect(viewOf('tutorial')).toBe('tutorial');
+    expect(viewOf('motivation')).toBe('motivation');
+  });
+
+  it('lists a kind it does not know under Motivation rather than nowhere', () => {
+    expect(viewOf('')).toBe('motivation');
+    expect(viewOf('course')).toBe('motivation');
+  });
+});
+
+describe('matches, for a tutorial', () => {
+  it('searches its title, which names the subject', () => {
+    expect(matches(insight({ kind: 'tutorial', title: 'Postgres on a Mac' }), 'postgres')).toBe(true);
+  });
+
+  it('still leaves a clip’s @handle out of the search', () => {
+    expect(matches(insight({ kind: 'motivation', title: '@postgres' }), 'postgres')).toBe(false);
   });
 });
 

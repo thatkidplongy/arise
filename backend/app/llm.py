@@ -565,6 +565,90 @@ def distill_tips(transcript: str, timeout: float = 25.0) -> dict:
     return _distill(_TIPS_PROMPT, transcript, timeout)
 
 
+# ── Distil a tutorial (a long video or a written one) into its main points ───────
+
+_TUTORIAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "summary": {"type": "string"},
+        "takeaways": {"type": "array", "items": {"type": "string"}},
+        "steps": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "summary", "takeaways", "steps"],
+}
+
+_TUTORIAL_PROMPT = (
+    "You distil a tutorial into its main points. The source is either the transcript "
+    "of a video walkthrough or the text of a written guide, article or docs page. The "
+    "person keeps these points instead of rewatching or rereading, and often pastes "
+    "them into another AI as context — so every line must be precise and stand on its "
+    "own, with the real names, commands, settings and numbers the tutorial uses. From "
+    "the source, return:\n"
+    "• title: a short plain name for what it teaches (under ~70 characters) — the "
+    "subject, not the author's headline or clickbait.\n"
+    "• summary: 1–2 plain sentences: what this teaches, and who or what it's for.\n"
+    "• takeaways: the MAIN POINTS, 3–12 of them, in the order the tutorial builds "
+    "them — the concepts, principles, gotchas and decisions it actually teaches. Each "
+    "one self-contained idea, stated as the substance ('Use a partial index when most "
+    "rows share one value'), never a description of it ('it talks about indexes'). "
+    "Scale the count to the material: a short guide gets few, a long course more. "
+    "Skip intros, sponsor reads, 'like and subscribe', and anything repeated.\n"
+    "• steps: the procedure it walks through, in order — 0–15 concrete actions, "
+    "including the exact command or setting where it gives one. Empty when it "
+    "explains rather than walks through; never pad it.\n"
+    "Plain voice: no hype, no filler, no first person. Invent nothing that isn't in "
+    "the source. If the source has no real substance, return empty arrays.\n"
+    "Return JSON only: {title, summary, takeaways[], steps[]}."
+)
+
+# Tutorials are the one capture long enough to need a room of their own: a real
+# walkthrough runs twelve or fifteen points where a clip runs four, and the prompt
+# asks for up to that many. Each line gets a little more room too, since a point
+# carrying the actual command runs longer than a line of advice.
+MAX_TUTORIAL_TITLE = 100
+MAX_TUTORIAL_POINTS = 12
+MAX_TUTORIAL_STEPS = 15
+MAX_TUTORIAL_LINE = 300
+# The most of a source that's sent. About two and a half hours of speech, or a long
+# docs page — past that it's a course, and the cap is a guard on a single request
+# rather than a promise to read all of one.
+MAX_TUTORIAL_SOURCE = 150_000
+
+
+def _parse_tutorial(payload: dict) -> dict:
+    """Pure: Gemini response JSON → {title, summary, takeaways[], steps[], quotes[]}.
+    `quotes` is always empty — a tutorial carries nothing to resurface as a nudge."""
+    data = json.loads(payload["candidates"][0]["content"]["parts"][0]["text"])
+
+    def lines(key: str, n: int) -> list[str]:
+        return [_clip(x, MAX_TUTORIAL_LINE) for x in (data.get(key) or []) if str(x).strip()][:n]
+
+    return {
+        "title": _clip(data.get("title", ""), MAX_TUTORIAL_TITLE),
+        "summary": _clip(data.get("summary", ""), MAX_SUMMARY),
+        "takeaways": lines("takeaways", MAX_TUTORIAL_POINTS),
+        "steps": lines("steps", MAX_TUTORIAL_STEPS),
+        "quotes": [],
+    }
+
+
+def distill_tutorial(source: str, kind: str = "video", title: str = "",
+                     timeout: float = 60.0) -> dict:
+    """One Gemini call → {title, summary, takeaways[], steps[], quotes[]} from a
+    tutorial. `kind` is 'video' (a transcript) or 'article' (a page's text); `title`
+    is the page's own title when there is one, as a hint.
+
+    A long source takes the model a while, so this waits longer than the clip
+    distillers and rides out a 429 the same way they do."""
+    label = "ARTICLE TEXT" if kind == "article" else "VIDEO TRANSCRIPT"
+    parts = [{"text": _TUTORIAL_PROMPT}]
+    if title:
+        parts.append({"text": "PAGE TITLE: " + title})
+    parts.append({"text": f"{label}:\n" + source.strip()[:MAX_TUTORIAL_SOURCE]})
+    return _parse_tutorial(_ask(parts, _TUTORIAL_SCHEMA, 0.3, timeout, retries=2))
+
+
 # Stored lengths for a distilled highlight. These are runaway guards, not display
 # budgets: `text` IS the answer the morning email asks for and the card reread weeks
 # later, so a cap tight enough to fire on an ordinary two-sentence idea silently ate
