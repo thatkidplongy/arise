@@ -45,7 +45,9 @@ bash deploy/uninstall.sh                                               # remove 
 ```
 
 It runs **tokenless** because Tailscale is the security boundary (the API is
-never on the public internet). To require a token anyway, uncomment the
+never on the public internet). uvicorn still binds `0.0.0.0`, so the backend
+itself refuses any peer that isn't this Mac or a tailnet address
+(`security.is_trusted_client`) — a phone or laptop on the same Wi-Fi gets a 403. To require a token anyway, uncomment the
 `EnvironmentVariables` block in `deploy/com.arise.backend.plist`, re-run
 `install.sh`, and set the same value in the app under Settings → System link.
 

@@ -2,14 +2,14 @@ import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .db import Base, SessionLocal, engine, ensure_schema
 from .routes import router
-from .security import verify_token
+from .security import is_trusted_client, verify_token
 from .seed import seed_quests
 
 # The exported web app (../../dist relative to this file: arise/dist).
@@ -39,6 +39,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Registered after CORS so it wraps it: a refused peer gets nothing, not even a
+# preflight answer.
+@app.middleware("http")
+async def refuse_untrusted_clients(request: Request, call_next):
+    host = request.client.host if request.client else None
+    if not is_trusted_client(host):
+        return JSONResponse(
+            {"detail": "Not reachable from this network"}, status_code=403
+        )
+    return await call_next(request)
 
 
 @app.get("/health")
@@ -94,4 +106,6 @@ if WEB_DIR.is_dir():
         # Unknown route: the SPA shell (client router resolves it). Always
         # revalidates so a fresh launch picks up a new build — the JS bundles it
         # points to are content-hashed and safe to cache.
-        return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+        return FileResponse(
+            WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"}
+        )

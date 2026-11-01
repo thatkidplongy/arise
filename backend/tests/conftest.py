@@ -41,6 +41,8 @@ def pytest_sessionfinish(session, exitstatus):
     Best-effort — a hard kill skips it, and the system temp dir is swept by the
     OS anyway."""
     shutil.rmtree(_SCRATCH, ignore_errors=True)
+
+
 # Keep the LLM off during tests regardless of the developer's shell env, so the
 # fallback paths are what's exercised.
 os.environ.pop("ARISE_LLM_API_KEY", None)
@@ -90,7 +92,11 @@ def craft_unparked(monkeypatch):
 def client():
     """A TestClient on a freshly-seeded database (lifespan seeds the quests)."""
     Base.metadata.drop_all(engine)
-    with TestClient(app) as c:  # startup runs create_all + ensure_schema + seed
+    # TestClient's default peer is the string "testclient", which the network
+    # guard rightly refuses; present as this Mac instead.
+    with TestClient(
+        app, client=("127.0.0.1", 50000)
+    ) as c:  # startup runs create_all + ensure_schema + seed
         yield c
     Base.metadata.drop_all(engine)
 
