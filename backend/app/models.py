@@ -156,6 +156,22 @@ class StepCheck(Base):
     step_index: Mapped[int] = mapped_column(Integer, primary_key=True)
 
 
+class TrainingChoice(Base):
+    """Which session the hunter said they're running on a given day — push, pull,
+    legs or the court.
+
+    Absent row means they haven't said, and the training week's default for that
+    weekday stands (quests.TRAINING_WEEK), so the board is never sitting empty
+    waiting to be answered. Kept per day rather than on the player because the
+    answer is only true for the day it was given."""
+
+    __tablename__ = "training_choices"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # client-local 'YYYY-MM-DD'
+    session: Mapped[str] = mapped_column(String)  # push | pull | legs | court
+
+
 class BodyProfile(Base):
     """One-time body inputs for the calorie/protein calculator (see nutrition.py).
     Targets are derived on read, never stored — the same derive-on-read contract

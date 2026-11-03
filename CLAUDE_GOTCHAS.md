@@ -13,6 +13,15 @@ Non-obvious things about this repo, kept short.
   If a slot's steps *are* the material rather than variety on top of it, it needs an
   entry in `STEP_CAPS` — otherwise content silently disappears off the card.
 
+- **Physical is a program, not a pool** (`quests.SESSIONS` + `TRAINING_WEEK`). `d-train`
+  has no entry in `POOLS` or `FLOORS` and never takes LLM content: the whole card is the
+  day's session — six program movements plus nought to two accessories, so `STEP_CAPS`
+  must stay at 8 or movements vanish off the bottom. The weekday table is only a
+  default; `TrainingChoice` overrides it per day, and `state.resolve_content` has to be
+  handed that choice or the card silently deals the weekday's session instead. Volume
+  lives in `SCHEMES`, indexed by the STR progression level — a scheme key that isn't in
+  that table is a `KeyError` on the day that movement comes up, not at import.
+
 - **Craft is a fixed weekly schedule; Japanese and drawing alternate every day**
   (`state._DAILY_ALWAYS` + `_DAILY_BY_WEEKDAY` + `_ALTERNATING`). `d-craft` lands
   Mon/Wed/Fri, the same Monday every Monday. `d-jp` and `d-sketch` take turns by the

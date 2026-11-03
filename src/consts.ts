@@ -19,6 +19,10 @@ export const JOURNAL_NOTE_MAX = 4000; // limits.JOURNAL_ENTRY
  * to finish the thought and trim rather than discovering the cap by being stopped. */
 export const NOTE_COUNT_FROM = 0.85;
 
+/** The slot whose card carries the training picker. Physical is the one quest that
+ * asks a question before it lists anything — which of the four sessions today is. */
+export const PHYSICAL_QUEST_ID = 'd-train';
+
 /** Each attribute's content band, named as the path it is: Shu (follow the form
  * exactly), Ha (bend it), Ri (make it your own). Indexed by `ApiProgression.band`,
  * which `progression.band_for` derives from the level (two levels a stage). */

@@ -15,12 +15,13 @@ prompts) so a quest tells you exactly what to do, not just its theme.
 
 Some daily slots also carry a *non-negotiable* floor (see FLOORS): a small core
 prepended to that day's steps and met every day regardless of the variant (e.g.
-push-ups + plank + an explosive core rep on the physical daily). The floor is
+settling before a sit, or naming the book before reading it). The floor is
 *leveled* — it climbs as the hunter shows up consistently (see progression.py),
-so there's no stagnation. Most floors start gentle so you can begin at zero; the
-physical floor is the exception on purpose — it starts at working volume (sets ×
-reps), because a floor too light to adapt to trains the habit but not the body. Where a quest is about learning, it points at a trusted
-source (see RESOURCES), matched to the variant. Grow and Craft are the exception:
+so there's no stagnation. Floors start gentle so you can begin at zero. Physical
+is the one slot with no floor and no pool at all: it's a program, the whole card
+dealt by the training week below, because a floor in front of a session you're
+already doing is the same movement twice. Where a quest is about learning, it
+points at a trusted source (see RESOURCES), matched to the variant. Grow and Craft are the exception:
 their source is the hunter's own book or notes, which no static table can know, so
 the card names that instead (see reading_resource and craft_floor) — one card, one
 source, always.
@@ -32,9 +33,11 @@ the complicated stuff — learn-how-to-learn before domains, principles before
 tactics.
 
 The pools are tuned to the hunter's real interests:
-  STR  badminton + strength, plyometrics, home workouts; push-ups/plank/core floor,
-       and a fixed 5 km on Mon/Wed/Fri (see ROADWORK). Diet is no longer a quest:
-       it's tracked on the Food screen, not asked about on the board
+  STR  a push/pull/legs split and the badminton court, dealt as a whole session of
+       six to eight movements at a volume that climbs with the level (see the
+       training week). The day asks which session you're running before it asks
+       for anything else. Diet is no longer a quest: it's tracked on the Food
+       screen, not asked about on the board
   CRE  drawing, dance, singing, music (FL Studio / instruments), photo & video
   SPI  calm, focus, self-reflection, breath & body — a grounded, reflective tone.
        Its daily is the evening look-back (Hansei), seen through one of six Japanese
@@ -71,50 +74,6 @@ from .models import QuestDef
 # first entry, so an unrotated read looks like the original quest.
 POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     # ── Daily ────────────────────────────────────────────────────────────────
-    "d-train": [  # STR — conditioning, plyo + home strength, at volumes that force adaptation
-        ("Hunter Conditioning", "Full-body circuit, real volume", [
-            "5 rounds: 15 jump squats, 12 push-ups, 40s plank",
-            "Rest 45s between rounds — no longer",
-            "Finish with 3 min jumping jacks or jump rope",
-        ]),
-        ("Plyo Burst", "Explosive lower-body plyometrics", [
-            "5 × 12 jump squats — full depth, max height",
-            "4 × 10 box or step jumps",
-            "4 × 30s pogo hops · rest 60s between",
-        ]),
-        ("Home Circuit", "No-equipment home workout", [
-            "5 rounds: 20 squats, 12 push-ups, 16 lunges (8/side), 45s plank",
-            "Rest 60s between rounds",
-        ]),
-        ("Legs & Lunges", "Lower-body strength", [
-            "5 × 20 bodyweight squats — slow down, drive up",
-            "4 × 12 reverse lunges per leg",
-            "4 × 20 calf raises + 3 × 15 glute bridges",
-        ]),
-        # The complement to the MWF 5K (see ROADWORK): running is quad- and
-        # calf-dominant, both legs in one plane, so what it leaves behind is
-        # hamstrings, glutes and single-leg control — which is also where runners
-        # get hurt. Unilateral and slow on purpose; the road already covers volume.
-        ("Hips & Hamstrings", "The bits running doesn't build", [
-            "4 × 8 single-leg RDLs per leg — slow down, hips square, feel the hamstring take it",
-            "4 × 10 Bulgarian split squats per leg — back foot on a chair, knee tracks over the toes",
-            "3 × 15 single-leg glute bridges + 3 × 20 side-lying leg raises per side",
-        ]),
-        ("Explosive Footwork", "Plyo footwork for the court", [
-            "8 × 15s split-step into lunge",
-            "6 × 30s fast feet (ladder or line)",
-            "4 × 10 jump lunges",
-        ]),
-        ("Push & Core", "Upper body and core", [
-            "5 × 12–15 push-ups (feet elevated or diamond once easy)",
-            "3 × 60s plank",
-            "3 × 20 slow bicycle crunches + 15 V-ups",
-        ]),
-        ("Jump Rope", "Rope conditioning intervals", [
-            "12 rounds: 45s skipping, 15s rest",
-            "Mix in high knees or double-unders if you can",
-        ]),
-    ],
     "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
         ("Daily Sketch", "20 min of drawing", [
             "5 min warm-up scribbles",
@@ -773,21 +732,6 @@ def focus_steps(stat: str, focus: str) -> list[str]:
 # floor-free (a single rotating action is the day's commitment) and progress by
 # content band instead.
 FLOORS: dict[str, list[list[str]]] = {
-    "d-train": [  # STR — real training volume + an explosive, home-only core rep (no equipment)
-        ["3 × 10 push-ups — chest to floor, rest 60s (drop to knees only when form breaks)",
-         "3 × 30s plank — braced flat, no sagging hips",
-         "3 × 10 tuck jumps — knees to chest, land soft and quiet"],
-        ["3 × 12 push-ups, rest 60s", "3 × 40s plank",
-         "3 × 12 tuck jumps + 20s fast mountain climbers"],
-        ["4 × 12 push-ups, rest 60s", "3 × 50s plank",
-         "3 × 12 tuck jumps + 12 explosive V-ups"],
-        ["4 × 15 push-ups — last set to failure", "3 × 60s plank",
-         "4 × 12 tuck jumps + 15 explosive V-ups"],
-        ["5 × 15 push-ups — last set to failure", "3 × 75s plank + 30s side plank each side",
-         "4 × 15 tuck jumps + 20 explosive V-ups"],
-        ["5 × 20 push-ups — last set to failure", "3 × 90s plank + 45s side plank each side",
-         "5 × 15 tuck jumps + 25 explosive V-ups — max intent, reset between"],  # cap
-    ],
     "d-meditate": [  # SPI — from a pause, toward a real sit
         ["Pause for 3 slow breaths before you begin"],
         ["Pause for 5 slow breaths before you begin"],
@@ -810,7 +754,10 @@ FLOORS: dict[str, list[list[str]]] = {
 # The emoji signals the medium: 📖 book · 🎥 YouTube · 🎧 audio/app · 🌐 site.
 RESOURCES: dict[str, str] = {
     # STR — technique worth studying, and how to eat for the body you're training
-    "Explosive Footwork": "🎥 Badminton Insight (YouTube)",
+    "Push Day": "🎥 Jeff Nippard (YouTube)",
+    "Pull Day": "🎥 Jeff Nippard (YouTube)",
+    "Leg Day": "🎥 Jeff Nippard (YouTube)",
+    "Court Session": "🎥 Badminton Insight (YouTube)",
     "Dungeon Raid: Badminton": "🎥 Badminton Insight (YouTube)",
     "Doubles Raid": "🎥 Badminton Insight (YouTube)",
     "New Technique": "🎥 Badminton Insight (YouTube)",
@@ -1101,7 +1048,7 @@ def priority_content(focus: str) -> tuple[str, str, list[str]]:
 # handakuten.
 # The evening look-back is three questions that only make sense together: what
 # happened, why, and the one change it leads to — trimmed to two, the change goes.
-STEP_CAPS: dict[str, int] = {"d-train": 5, "d-jp": 5, "d-hansei": 3}
+STEP_CAPS: dict[str, int] = {"d-train": 8, "d-jp": 5, "d-hansei": 3}
 _STEP_CAP_WITH_FLOOR = 3
 _STEP_CAP_BARE = 2
 
@@ -1450,28 +1397,189 @@ def hansei_echo(desc: str, change: str) -> str:
     return f"{desc}. Last night's change: “{change.strip()}” — did it happen?"
 
 
-# ── Roadwork: the fixed running days ─────────────────────────────────────────
-# Mon/Wed/Fri, with a rest day between each — the standard spacing for building
-# distance. Safe as a weekday rule because Physical is in `_DAILY_ALWAYS` and shows
-# every day: the run changes what the slot *contains*, never whether it appears.
+# ── The training week: push, pull, legs and the court ────────────────────────
 #
-# The run replaces the day's variant, not the floor — push-ups, plank and tuck
-# jumps still lead the card, so the non-negotiable stays non-negotiable.
-RUN_WEEKDAYS = (0, 2, 4)  # Mon, Wed, Fri
-ROADWORK: tuple[str, str, list[str]] = (
-    "Roadwork", "5 km on the road", [
-        "5 km run — conversational pace, then empty the tank over the last 500 m",
-        "Walk 5 min to come down, then stretch calves, quads and hip flexors while warm",
-    ],
+# Physical is a program now, not a daily draw. Four sessions exist — push, pull,
+# legs and badminton — and the week has a default shape: push Monday, pull
+# Wednesday, legs Friday, and the court on the four days between.
+#
+# The default is only a default. The card asks what today is before it asks for
+# anything else, because a plan that can't move is a plan that gets abandoned the
+# first time the court is booked out or the gym is shut. `session_for` resolves
+# the answer, falling back to the weekday when the hunter hasn't said.
+#
+# Each session deals its six program movements and then rotates nought to two
+# accessories in behind them, so a card is never shorter than six movements and
+# never longer than eight (STEP_CAPS). The six are the hunter's own PPL plan and
+# the accessories are the alternatives it lists — the names match the form
+# library exactly, so a movement on the card can be looked up and watched.
+#
+# Volume is the part that climbs. SCHEMES holds sets × reps per kind of movement
+# per progression level, which is the old floor's job moved into the lifts
+# themselves: the floor used to be push-ups and a plank in front of whatever the
+# day drew, which on a bench day meant pressing twice and on a court day meant
+# arriving at the warm-up already tired. The 5 km roadwork that owned Mon/Wed/Fri
+# is gone for the same reason — those are the lifting days now.
+
+# (name, scheme, cue) — the cue is the one thing that most often goes wrong.
+Lift = tuple[str, str, str]
+
+# Sets × reps by progression level, per kind of movement; index is the STR level
+# and the last entry is the cap. Working volume from level 0 on purpose — a single
+# set of eight trains the habit and not the body. A scheme with one entry is held
+# at every level: some of this is about showing up, not overloading.
+SCHEMES: dict[str, list[str]] = {
+    # the compounds a session is built around — load first, reps second
+    "heavy": ["3 × 8", "4 × 8", "4 × 8–10", "5 × 8", "5 × 8–10", "5 × 10, last set to failure"],
+    # isolation work, where the reps and the stretch do the job
+    "light": ["3 × 12", "3 × 15", "4 × 12", "4 × 15", "4 × 15–20", "5 × 15–20, last set to failure"],
+    # one limb at a time, so the count is per side
+    "single": ["3 × 8 per side", "3 × 10 per side", "4 × 8 per side",
+               "4 × 10 per side", "4 × 12 per side", "5 × 12 per side"],
+    # calves and shins answer to reps and a pause rather than to load
+    "calf": ["3 × 15", "3 × 20", "4 × 15", "4 × 20", "4 × 25", "5 × 25"],
+    # on court, measured in minutes: loosen up, then drill, then play
+    "warm": ["8 min", "10 min", "10 min", "12 min", "12 min", "15 min"],
+    "drill": ["10 min", "12 min", "15 min", "15 min", "20 min", "20 min"],
+    "play": ["30 min", "40 min", "45 min", "50 min", "60 min", "60 min"],
+    "burst": ["4 rounds", "5 rounds", "6 rounds", "6 rounds", "8 rounds", "8 rounds"],
+    "cool": ["5 min"],
+}
+
+PUSH_CORE: list[Lift] = [
+    ("Bench press", "heavy", "shoulder blades squeezed back; bar to the lower chest, then up over the shoulders"),
+    ("Incline DB press", "heavy", "lower until the dumbbells reach the upper chest, then press up and slightly in"),
+    ("Seated DB shoulder press", "heavy", "back flat on the pad with no arch, wrists stacked over the elbows"),
+    ("Lateral raise", "light", "lead with the elbows, slight fixed bend — stop at shoulder height"),
+    ("Rope pushdown", "light", "elbows pinned to your sides, spread the rope apart at the bottom"),
+    ("Overhead triceps extension", "light", "elbows point up and stay close to your head, only the forearms move"),
+]
+PUSH_EXTRA: list[Lift] = [
+    ("Push-up", "light", "one straight line head to heels, chest all the way to the floor"),
+    ("Dips", "heavy", "lean forward for chest, stay upright for triceps — upper arms to parallel"),
+    ("DB fly", "light", "fixed slight bend in the elbows, open until the chest stretches and no further"),
+    ("Overhead press", "heavy", "head back then through; squeeze the glutes so the lower back can't arch"),
+    ("Cable fly", "light", "hug a big tree — hands meet in front of the lower chest"),
+    ("Skull crusher", "light", "upper arms still and angled slightly back, bar to just behind the forehead"),
+]
+
+PULL_CORE: list[Lift] = [
+    ("Pull-up", "heavy", "drive the elbows down to your ribs; chin over the bar, then back to a full hang"),
+    ("Chest-supported row", "heavy", "chest stays on the pad — pull the elbows back and squeeze the blades"),
+    ("Seated cable row", "heavy", "lean forward at the stretch, sit tall as you pull to the belly"),
+    ("Face pull", "light", "elbows high and wide, hands finish beside your ears with the thumbs back"),
+    ("DB curl", "light", "elbows at your sides, no swing — lower it slower than you lifted it"),
+    ("External rotation", "light", "elbow glued to your side; the forearm swings out like a door, torso still"),
+]
+PULL_EXTRA: list[Lift] = [
+    ("Barbell row", "heavy", "hinge to about 45° with a flat back, bar to the lower ribs"),
+    ("Lat pulldown", "heavy", "lean back slightly, chest up, bar to the upper chest with elbows down and out"),
+    ("Single-arm DB row", "single", "back flat and supported on hand and knee, pull the dumbbell toward your hip"),
+    ("Hammer curl", "light", "palms face each other the whole rep, elbows stay at your sides"),
+    ("Straight-arm pulldown", "light", "arms stay nearly straight, sweep to the thighs and squeeze the lats"),
+    ("Reverse fly", "light", "hinge until the torso is nearly flat, lift wide and lead with the pinkies"),
+]
+
+LEGS_CORE: list[Lift] = [
+    ("Squat", "heavy", "bar over mid-foot the whole rep; knees out over the toes, hips to parallel or below"),
+    ("Romanian deadlift", "heavy", "hips travel back, knees keep a slight fixed bend, bar slides down the thighs"),
+    ("Bulgarian split squat", "single", "front knee tracks over the middle toes, drop straight down"),
+    ("Leg curl", "light", "hips pressed into the pad, curl all the way and lower slowly"),
+    ("Single-leg calf raise", "calf", "each leg — heel sinks below the step, then a one-second pause at the top"),
+    ("Tibialis raise", "calf", "back flat on the wall, heels planted forward, toes lift high and lower slowly"),
+]
+LEGS_EXTRA: list[Lift] = [
+    ("Leg press", "heavy", "lower back stays on the pad, knees to about 90°, no hard lockout"),
+    ("Lunge", "single", "front knee over the toes, back knee straight down toward the floor"),
+    ("Hip thrust", "heavy", "shins vertical at the top, chin tucked, squeeze the glutes hard"),
+    ("Goblet squat", "heavy", "dumbbell at the chest and torso tall, elbows tracking inside the knees"),
+    ("Leg extension", "light", "back against the pad, pause at the top, lower slowly"),
+    ("Deadlift", "heavy", "bar over mid-foot and dragging the shins; hips and shoulders rise together"),
+    ("Hip adduction (machine)", "light", "sit tall against the back pad, squeeze the knees together, open slowly"),
+]
+
+COURT_CORE: list[Lift] = [
+    ("Shadow footwork", "warm", "split-step, then all four corners and back to base every single time"),
+    ("Rally warm-up", "warm", "clears and drops until you're loose and the shuttle lands where you aimed"),
+    ("Multi-shuttle feeding", "drill", "one corner at a time, recover to base between every shot"),
+    ("Net and lift exchanges", "drill", "soft hands at the net, then lift deep and high — never flat"),
+    ("Match play", "play", "play the score, not the shot you feel like playing"),
+    ("Cool-down stretch", "cool", "calves, quads, hips and shoulders while you're still warm"),
+]
+COURT_EXTRA: list[Lift] = [
+    ("Split-step into lunge", "burst", "15s on, 45s off — the last split-step as sharp as the first"),
+    ("Fast feet", "burst", "30s on the ladder or a line, then walk it off"),
+    ("Jump lunges", "burst", "10 reps a round, landing soft and quiet"),
+    ("Smash repeats", "burst", "6 full-court smashes a round, recovering to base after each one"),
+    ("Serve practice", "drill", "low serve and flick to a target, until hitting it is boring"),
+    ("Weak-shot reps", "drill", "the shot you dodge in games — slow reps first, then at game speed"),
+    ("Jump rope", "burst", "45s skipping, 15s rest; double-unders when they come"),
+]
+
+# session key -> (title, desc, the six that are the program, the alternatives)
+SESSIONS: dict[str, tuple[str, str, list[Lift], list[Lift]]] = {
+    "push": ("Push Day", "Chest, shoulders and triceps", PUSH_CORE, PUSH_EXTRA),
+    "pull": ("Pull Day", "Back, rear delts and biceps", PULL_CORE, PULL_EXTRA),
+    "legs": ("Leg Day", "Quads, hamstrings, glutes and calves", LEGS_CORE, LEGS_EXTRA),
+    "court": ("Court Session", "Badminton — footwork, drills and games", COURT_CORE, COURT_EXTRA),
+}
+
+# The order the picker offers them in — the split first, then the court.
+SESSION_KEYS: tuple[str, ...] = ("push", "pull", "legs", "court")
+
+# The week's default shape, weekday-keyed like the rest of the board.
+TRAINING_WEEK: tuple[str, ...] = (
+    "push",   # Mon
+    "court",  # Tue
+    "pull",   # Wed
+    "court",  # Thu
+    "legs",   # Fri
+    "court",  # Sat
+    "court",  # Sun
 )
 
+# Nought to two accessories behind the six — which is what keeps a short session
+# short and stops every card being the maximum eight.
+_MAX_ACCESSORIES = 2
 
-def is_roadwork(quest_id: str, day: str) -> bool:
-    """Whether `quest_id` is Physical on one of its fixed running days — the day's
-    training is the 5 km rather than a pool variant. Both the content builder and
-    the generated-content guard in `state.resolve_content` ask this, so what counts
-    as a run day is decided in one place."""
-    return quest_id == "d-train" and date.fromisoformat(day).weekday() in RUN_WEEKDAYS
+
+def default_session(day: str) -> str:
+    """The session `day`'s weekday carries when the hunter hasn't said otherwise."""
+    return TRAINING_WEEK[date.fromisoformat(day).weekday()]
+
+
+def session_for(day: str, chosen: str = "") -> str:
+    """The session `day` is actually running: what the hunter picked for it, else
+    the weekday's default. An unknown pick is treated as no pick, so a stale client
+    can never put a session on the board that doesn't exist."""
+    return chosen if chosen in SESSIONS else default_session(day)
+
+
+def prescribe(lift: Lift, level: int) -> str:
+    """One line of the card: the movement, its volume at this level, and the cue."""
+    name, scheme, cue = lift
+    tiers = SCHEMES[scheme]
+    return f"{name} — {tiers[max(0, min(level, len(tiers) - 1))]} · {cue}"
+
+
+def accessories_for(session: str, day: str) -> list[Lift]:
+    """The accessories dealt behind the program on `day`, nought to two of them.
+    Deterministic per session and day, so a card can't reshuffle underneath a
+    half-ticked session, and keyed by session as well as day so switching from push
+    to court mid-morning deals the court its own."""
+    extra = SESSIONS[session][3]
+    count = _pick(f"d-train|{session}|count", day, _MAX_ACCESSORIES + 1)
+    start = _pick(f"d-train|{session}", day, len(extra))
+    return [extra[(start + i) % len(extra)] for i in range(count)]
+
+
+def training_content(day: str, level: int = 0, chosen: str = "") -> tuple[str, str, list[str], str]:
+    """The Physical card for `day`: the session being run, its six program movements
+    at the hunter's current volume, and the accessories the day deals behind them."""
+    session = session_for(day, chosen)
+    title, desc, core, _ = SESSIONS[session]
+    lifts = core + accessories_for(session, day)
+    return title, desc, [prescribe(lift, level) for lift in lifts], RESOURCES.get(title, "")
 
 
 def content_for(
@@ -1483,6 +1591,7 @@ def content_for(
     interview: bool = False,
     jp_step: int = 0,
     craft_source: str | None = None,
+    training: str = "",
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1492,8 +1601,13 @@ def content_for(
     stat's progression level — it climbs the floor and picks the content band.
     `interview` (Craft only) swaps in the interview-prep pool. `jp_step` is how far
     along the Japanese plan the hunter is; `craft_source` is the one thing Craft is
-    studying. `resource` points at a trusted place to learn (empty when there
-    isn't one)."""
+    studying; `training` is the session the hunter picked for today, if any.
+    `resource` points at a trusted place to learn (empty when there isn't one)."""
+    if quest.id == "d-train":
+        # Physical is a program: the session the day is running — what the hunter
+        # picked this morning, else the weekday's default — rather than a draw from
+        # a pool. See the training-week section.
+        return training_content(day, level, training)
     if quest.id == "d-jp":
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
@@ -1521,9 +1635,6 @@ def content_for(
         chosen = focus[_pick(quest.id, pk + "|focus", len(focus))]
         title = FOCUS_TITLES.get(quest.stat, "Personal Focus")
         return title, f"Your focus: {chosen}", focus_steps(quest.stat, chosen), ""
-    if is_roadwork(quest.id, day):
-        title, desc, variant = ROADWORK  # the run is the day's training, floor unchanged
-    else:
-        title, desc, variant = pool_variant(quest, day, progression.band_for(level), interview)
+    title, desc, variant = pool_variant(quest, day, progression.band_for(level), interview)
     steps = floor_for(quest, book, level, craft_source) + variant  # non-negotiables first, then variety
     return title, desc, steps, RESOURCES.get(title, "")

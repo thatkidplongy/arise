@@ -48,7 +48,7 @@ DAILY_BY_STAT: dict[str, str] = {
 # these counts the day as cleared (the rest is "and then some"). 0 → the area has
 # no floor (Creativity, Connection), so clearing means completing the daily.
 FLOOR_LEN: dict[str, int] = {
-    "d-train": 2,   # push-ups + plank
+    "d-train": 2,   # the session's two biggest movements
     "d-meditate": 1,
     "d-read": 1,    # read your chapter(s)
     "d-craft": 1,   # read the one source you're studying, and log it

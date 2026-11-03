@@ -161,6 +161,7 @@ export interface ApiState {
   };
   book_review: { pending: boolean; book: string };
   craft: ApiCraft; // where the system-design plan is, advanced by reading not dates
+  training: ApiTraining; // which session Physical is dealing today, and the picker for it
   studies: ApiStudy[]; // the study cards Learn shows — one per subject the day deals
   reading: ApiReading | null; // progress on the current book, or null when none set
   week_review: ApiWeekReview; // a gentle recap of the current ISO week
@@ -323,6 +324,21 @@ export interface ApiWeekReview {
 }
 
 /** Where you are in the system-design plan. Advanced by reading, never by a date. */
+/** One session the Physical card can be switched to. */
+export interface ApiTrainingOption {
+  key: TrainingSession;
+  label: string; // what the card is titled when it's running
+  detail: string; // the one line under it
+}
+
+/** What Physical is dealing today, and the picker that changes it. */
+export interface ApiTraining {
+  session: TrainingSession; // the session the card is dealing right now
+  default: TrainingSession; // what this weekday carries when nothing was said
+  chosen: boolean; // true once you've answered for this day
+  options: ApiTrainingOption[];
+}
+
 export interface ApiCraft {
   phase: number;
   phases: number;
@@ -357,6 +373,9 @@ export interface ApiStudy extends ApiCraft {
 }
 
 export type StudySubject = 'craft' | 'japanese' | 'sketch';
+
+/** The four sessions Physical deals — the push/pull/legs split, and the court. */
+export type TrainingSession = 'push' | 'pull' | 'legs' | 'court';
 
 /** One logged sitting of reading — what you read, in your own units. */
 export interface ApiReadingLog {

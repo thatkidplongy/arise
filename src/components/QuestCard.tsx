@@ -6,10 +6,11 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { Objectives } from '@/components/Quest/Objectives';
 import { QuestNote } from '@/components/Quest/QuestNote';
+import { TrainingPicker } from '@/components/Quest/TrainingPicker';
 import { useNoteEditor } from '@/components/Quest/useNoteEditor';
 import { RewardBand, SystemWindow } from '@/components/ui/SystemWindow';
 import { Text } from '@/components/ui/Text';
-import { QUEST_NOTE_MAX } from '@/consts';
+import { PHYSICAL_QUEST_ID, QUEST_NOTE_MAX } from '@/consts';
 import type { ApiQuest } from '@/lib/api';
 import { isWriteStep, resolveQuestProgress } from '@/lib/quests';
 import { useSystem } from '@/store/useSystem';
@@ -31,6 +32,8 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
   const addQuestNote = useSystem((s) => s.addQuestNote);
   const updateQuestNote = useSystem((s) => s.updateQuestNote);
   const removeQuestNote = useSystem((s) => s.removeQuestNote);
+  const setTraining = useSystem((s) => s.setTraining);
+  const training = useSystem((s) => s.state?.training);
   const [busy, setBusy] = useState(false);
 
   const shape = resolveQuestProgress(quest);
@@ -124,6 +127,17 @@ export function QuestCard({ quest, featured = false }: { quest: ApiQuest; featur
           </Text>
           <Text style={styles.desc}>{featured ? `${meta.label} · ${quest.desc}` : quest.desc}</Text>
         </View>
+
+        {/* Physical asks which session today is before it lists a single movement:
+            the plan has a weekday default, and the day doesn't always agree with
+            it. Gone once the quest is logged — that day's training happened. */}
+        {quest.id === PHYSICAL_QUEST_ID && training && !isDone ? (
+          <TrainingPicker
+            training={training}
+            disabled={busy}
+            onPick={(session) => run(() => setTraining(session))}
+          />
+        ) : null}
 
         {quest.resource && !isDone ? <Text style={styles.resource}>Learn: {quest.resource}</Text> : null}
 

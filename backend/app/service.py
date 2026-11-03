@@ -29,6 +29,7 @@ from .models import (
     ReadingLog,
     Reminder,
     StepCheck,
+    TrainingChoice,
     utcnow,
 )
 from .state import (
@@ -379,6 +380,27 @@ def set_book(db: Session, player: Player, current_book: str, day: str, chapters:
     db.commit()
 
 
+def set_training(db: Session, player: Player, day: str, session: str) -> None:
+    """Say which session today is running — push, pull, legs or the court.
+
+    Switching swaps the whole card, so any steps ticked against the session being
+    left are dropped: tick three movements of a push day, change your mind, and
+    those ticks would otherwise sit against whatever the court session holds at the
+    same three indexes. A completion already logged for the day is left alone —
+    that day's training happened, whatever it was."""
+    if session not in quests.SESSIONS:
+        raise HTTPException(status_code=400, detail="unknown training session")
+    row = db.get(TrainingChoice, {"player_id": player.id, "day": day})
+    if row and row.session == session:
+        return
+    if row:
+        row.session = session
+    else:
+        db.add(TrainingChoice(player_id=player.id, day=day, session=session))
+    _clear_step_checks(db, player, "d-train", day)
+    db.commit()
+
+
 def set_craft_source(db: Session, player: Player, source: str) -> None:
     """Set the one thing Craft is studying — a chapter, a Notion page. The quest names
     it and nothing else, so a sitting has one place to be rather than three."""
@@ -584,6 +606,11 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
         if q.id == "d-hansei":
             # The evening look-back walks six named principles in a fixed cycle and
             # reads back last night's change; a generated card would drop both.
+            continue
+        if q.id == "d-train":
+            # Physical is a program the hunter picks each morning (push, pull, legs
+            # or the court) and the session is the whole card. Generated variety here
+            # would answer a question they already answered.
             continue
         if q.id == "d-recall":
             # The cards are the hunter's own, and the app already knows which ones are

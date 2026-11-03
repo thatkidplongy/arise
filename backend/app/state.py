@@ -30,6 +30,7 @@ from .models import (
     QuestNote,
     Reminder,
     StepCheck,
+    TrainingChoice,
 )
 
 
@@ -204,6 +205,33 @@ def _craft_phase_num(player: Player) -> int:
     return max(1, min(player.craft_phase or 1, quests.LAST_CRAFT_PHASE))
 
 
+def training_choice(db: Session, player: Player, day: str) -> str:
+    """The session the hunter picked for `day`, or "" when they haven't said (or
+    said something this build doesn't know — a stale client can't put a session on
+    the board that doesn't exist)."""
+    row = db.get(TrainingChoice, {"player_id": player.id, "day": day})
+    chosen = row.session if row else ""
+    return chosen if chosen in quests.SESSIONS else ""
+
+
+def training_of(db: Session, player: Player, day: str) -> dict:
+    """The picker the Physical card carries: which session today is running, whether
+    that came from the hunter or from the weekday, and what it can be switched to.
+
+    `session` is always answered — the training week's default stands until it's
+    contradicted, so the board is never sitting empty waiting to be asked."""
+    chosen = training_choice(db, player, day)
+    return {
+        "session": quests.session_for(day, chosen),
+        "default": quests.default_session(day),
+        "chosen": bool(chosen),
+        "options": [
+            {"key": key, "label": quests.SESSIONS[key][0], "detail": quests.SESSIONS[key][1]}
+            for key in quests.SESSION_KEYS
+        ],
+    }
+
+
 def _weeks_since(anchor: str, day: str) -> int:
     """Weeks from an ISO-week anchor to `day`, 1-indexed (week 1 = the anchor week).
     0 when the anchor isn't set yet."""
@@ -224,6 +252,7 @@ def resolve_content(
     interview: bool,
     jp_step: int,
     craft_source: str,
+    training: str = "",
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a quest shows today: LLM-generated
     content if present (with the mandatory leveled floor re-applied), else the
@@ -233,14 +262,15 @@ def resolve_content(
     pk = quests.period_key(quest.cadence, day)
     floor = quests.floor_for(quest, book, level, craft_source)
     gen = gen_by.get((quest.id, pk))
-    # A run day is a plan, not a prompt for variety: generated content would quietly
-    # swap out the 5 km, and "every Mon/Wed/Fri" has to mean every Mon/Wed/Fri.
-    if gen is not None and not quests.is_roadwork(quest.id, day):
+    # Physical is a plan, not a prompt for variety: generated content would quietly
+    # swap out the session the hunter said they were running, which is the one thing
+    # the card asked them.
+    if gen is not None and quest.id != "d-train":
         steps = quests.cap_steps(floor + gen["steps"], len(floor), quest.id)
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
-        interview=interview, jp_step=jp_step, craft_source=craft_source,
+        interview=interview, jp_step=jp_step, craft_source=craft_source, training=training,
     )
     return title, desc, quests.cap_steps(steps, len(floor), quest.id), resource
 
@@ -258,6 +288,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     levels = progression_levels(db, player, day)
     jp_step = _jp_step(player)
     craft_source = player.craft_source
+    training = training_choice(db, player, day)
     titles: dict[str, str] = {}
     for quest in quest_defs(db):
         title, _, _, _ = resolve_content(
@@ -269,6 +300,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             interview=player.interview_mode,
             jp_step=jp_step,
             craft_source=craft_source,
+            training=training,
         )
         titles[quest.id] = title
     return titles
@@ -287,6 +319,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         interview=player.interview_mode,
         jp_step=_jp_step(player),
         craft_source=player.craft_source,
+        training=training_choice(db, player, day),
     )
     return steps
 
@@ -522,7 +555,8 @@ def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
 
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
-               levels=None, interview=False, jp_step=0, craft_source="", notes_by=None) -> dict:
+               levels=None, interview=False, jp_step=0, craft_source="", notes_by=None,
+               training="") -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -533,6 +567,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         interview=interview,
         jp_step=jp_step,
         craft_source=craft_source,
+        training=training,
     )
     if q.id == "d-hansei":
         desc = _hansei_echo(day, desc, notes_by or {})
@@ -1046,6 +1081,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
 
     checks_by = _step_checks_by(db, player)
     notes_by, reflections = _reflections_and_notes(db, player, defs)
+    training = training_choice(db, player, day)
 
     def undoable_id(quest: QuestDef) -> str | None:
         todays = [r for r in rows if r.quest_id == quest.id and r.day == day]
@@ -1070,6 +1106,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         },
         "book_review": {"pending": review_pending, "book": player.current_book},
         "craft": craft_of(db, player, day),
+        "training": training_of(db, player, day),
         "studies": studies_of(db, player, day),  # today's subjects: Japanese or drawing, plus Craft
         "reading": reading_view,
         "week_review": week_review_of(rows, defs, day),
@@ -1098,7 +1135,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.interview_mode, _jp_step(player),
-                       player.craft_source, notes_by)
+                       player.craft_source, notes_by, training)
             for q in defs
             if is_on_board(q, day)
         ],

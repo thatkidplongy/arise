@@ -19,7 +19,7 @@ from .schemas import (ActionResult, AvatarIn, AvatarOut, BodyOut, BodyProfileIn,
                       PlayerIn, PreferencesIn, QuestNoteIn, QuestNoteUpdateIn,
                       ReadingLogIn, ReminderIn, ReminderToggleIn, SkincareCheckIn,
                       SkincareProductOut, SkincareStepIn, StateOut, StepResult, StudyPieceIn,
-                      StepToggleIn)
+                      StepToggleIn, TrainingIn)
 
 router = APIRouter()
 
@@ -219,6 +219,16 @@ def review_book(body: BookReviewIn, day: str = Depends(query_day), db: Session =
     the answer to "did you finish it?" is the moment to say so."""
     events = service.review_book(db, player, body.finished, body.next_book, day)
     return {"events": events, "state": state.build_state(db, player, day)}
+
+
+@router.put("/training", response_model=StateOut)
+def set_training(body: TrainingIn, day: str = Depends(query_day),
+                 db: Session = Depends(get_db), player: Player = Depends(current_player)):
+    """Say what you're training today — push, pull, legs or badminton. The Physical
+    card deals that session; until you say, it deals the one the weekday carries.
+    Switching clears the steps you'd ticked against the session you're leaving."""
+    service.set_training(db, player, day, body.session)
+    return state.build_state(db, player, day)
 
 
 @router.put("/craft/source", response_model=StateOut)

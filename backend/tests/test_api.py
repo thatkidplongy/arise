@@ -59,15 +59,16 @@ def test_state_shape(client):
     q = _quest(s, "d-train")
     assert "steps" in q and "steps_done" in q and "resource" in q
     assert len(q["steps"]) == len(q["steps_done"])
-    # The physical daily always carries its non-negotiable floor (Lv0 → 3 × 10 push-ups).
-    assert "push-ups" in q["steps"][0]
-    # …and an explosive (plyometric) core rep is always on top, whatever the workout.
-    assert any("tuck jump" in st for st in q["steps"])
-    # Quests stay lean: ≤3 steps when there's a mandatory floor, ≤2 without one —
-    # except Physical, whose floor is three steps on its own, so it gets 5 and the
-    # day's actual training survives instead of being trimmed away (STEP_CAPS).
-    assert len(q["steps"]) == 5
-    assert q["steps"][3:] != []  # the variant, below the floor
+    # Physical is a whole session: six to eight movements, each with its volume and
+    # a cue, and the card is titled after the session the day is running (STEP_CAPS
+    # has to be wide enough to let all eight through).
+    assert 6 <= len(q["steps"]) <= 8
+    assert all(" — " in st and " · " in st for st in q["steps"])
+    assert q["title"] in {s[0] for s in quests.SESSIONS.values()}
+    # DAY is a Saturday, so the default is the court until it's told otherwise.
+    assert s["training"]["session"] == s["training"]["default"] == "court"
+    assert s["training"]["chosen"] is False
+    assert [o["key"] for o in s["training"]["options"]] == list(quests.SESSION_KEYS)
     # A non-floored daily (Creativity) caps at 2 — asked on one of its own days.
     sketch = _quest(client.get(f"/state?day={SKETCH_DAY}").json(), "d-sketch")
     assert sketch and len(sketch["steps"]) <= 2
@@ -337,6 +338,49 @@ def test_step_checklist_autocompletes_and_reverses(client):
     assert r["completed"] is False
     assert _quest(r["state"], "d-train")["done"] == 0
     assert r["state"]["player"]["total_xp"] == 0
+
+
+def test_saying_what_you_are_training_deals_that_session(client):
+    """The first thing the Physical card asks. DAY is a Saturday, so the week's
+    default is the court — answering 'legs' deals the leg session instead, and the
+    answer sticks for that day without touching any other."""
+    before = _state(client)
+    assert before["training"]["session"] == "court"
+    assert _quest(before, "d-train")["title"] == "Court Session"
+
+    r = client.put(f"/training?day={DAY}", json={"session": "legs"})
+    assert r.status_code == 200, r.text
+    after = r.json()
+    assert after["training"] == {**before["training"], "session": "legs", "chosen": True}
+    card = _quest(after, "d-train")
+    assert card["title"] == "Leg Day"
+    assert card["steps"][0].startswith("Squat — ")
+    assert 6 <= len(card["steps"]) <= 8
+    # It's the day that was answered, not the player: tomorrow still has its default.
+    tomorrow = (date.fromisoformat(DAY) + timedelta(days=1)).isoformat()
+    assert client.get(f"/state?day={tomorrow}").json()["training"]["chosen"] is False
+
+
+def test_switching_session_drops_the_steps_ticked_against_the_old_one(client):
+    """Tick three movements of a court session, then say it was actually push: those
+    ticks would otherwise sit against whatever push holds at the same indexes."""
+    for i in range(3):
+        client.post("/steps", json={"quest_id": "d-train", "step_index": i, "day": DAY})
+    assert sum(_quest(_state(client), "d-train")["steps_done"]) == 3
+
+    s = client.put(f"/training?day={DAY}", json={"session": "push"}).json()
+    assert not any(_quest(s, "d-train")["steps_done"])
+
+    # Saying the same thing twice is not a switch, so it can't wipe a part-done card.
+    client.post("/steps", json={"quest_id": "d-train", "step_index": 0, "day": DAY})
+    s = client.put(f"/training?day={DAY}", json={"session": "push"}).json()
+    assert _quest(s, "d-train")["steps_done"][0] is True
+
+
+def test_an_unknown_session_is_refused(client):
+    """A session the build doesn't have is a 400, not a card with nothing on it."""
+    assert client.put(f"/training?day={DAY}", json={"session": "yoga"}).status_code == 400
+    assert _state(client)["training"]["chosen"] is False
 
 
 @pytest.mark.usefixtures("craft_unparked")

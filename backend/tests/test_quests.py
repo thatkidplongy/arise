@@ -37,30 +37,24 @@ def test_daily_content_rotates_across_days():
 
 
 def test_daily_floor_is_always_present():
-    # The physical daily carries a non-negotiable floor (push-ups + plank + a core
-    # rep) that shows every day regardless of which conditioning variant is picked.
-    # At Lv0 it's the gentlest tier of FLOORS.
-    q = _q("d-train", "STR", "daily")
-    floor0 = quests.FLOORS["d-train"][0]
+    # The slots that still have a floor lead with it every day, whichever variant
+    # the period picked. Physical is not one of them any more — its whole card is
+    # the session (see the training-week tests below).
+    q = _q("d-meditate", "SPI", "daily")
+    floor0 = quests.FLOORS["d-meditate"][0]
     for d in range(10, 25):
         _, _, steps, _ = quests.content_for(q, f"2026-07-{d:02d}")
-        assert steps[: len(floor0)] == floor0  # floor comes first
-        assert any("plank" in s for s in steps)
-        # An explosive (plyometric) core rep is always on top, whatever the workout.
-        assert any("tuck jump" in s for s in steps)
+        assert steps[: len(floor0)] == floor0
 
 
 def test_floor_climbs_with_level():
     # Higher progression level → a harder floor (progressive overload).
-    q = _q("d-train", "STR", "daily")
-    lv0 = quests.content_for(q, "2026-07-18", level=0)[2]
-    lv5 = quests.content_for(q, "2026-07-18", level=5)[2]
-    floors = quests.FLOORS["d-train"]
-    assert lv0[: len(floors[0])] == floors[0]
-    assert lv5[: len(floors[5])] == floors[5]
-    assert "3 × 10 push-ups" in lv0[0] and "5 × 20 push-ups" in lv5[0]
+    q = _q("d-meditate", "SPI", "daily")
+    floors = quests.FLOORS["d-meditate"]
+    assert quests.content_for(q, "2026-07-18", level=0)[2][0] == floors[0][0]
+    assert quests.content_for(q, "2026-07-18", level=5)[2][0] == floors[5][0]
     # Beyond the cap it just holds at the top tier — no runaway numbers.
-    assert quests.content_for(q, "2026-07-18", level=99)[2][: len(floors[-1])] == floors[-1]
+    assert quests.content_for(q, "2026-07-18", level=99)[2][0] == floors[-1][0]
 
 
 def test_reading_floor_asks_rather_than_setting_a_quota():
@@ -138,6 +132,7 @@ def test_resource_matches_variant_title():
 def test_all_resource_keys_exist_as_variant_titles():
     pools = list(quests.POOLS.values()) + list(quests.INTERVIEW_POOLS.values()) + [quests.HANSEI_LENSES]
     titles = {v[0] for pool in pools for v in pool}
+    titles |= {session[0] for session in quests.SESSIONS.values()}  # Physical is a program, not a pool
     missing = [t for t in quests.RESOURCES if t not in titles]
     assert not missing, missing  # every citation maps to a real variant
 
@@ -382,82 +377,124 @@ def test_no_focus_uses_pool():
     assert not desc.startswith("Your focus:")
 
 
-def _train_card(day: str, level: int = 1) -> tuple[str, list[str]]:
+def _train_card(day: str, level: int = 1, training: str = "") -> tuple[str, list[str]]:
     """What the Physical card actually shows on `day` — content plus the slot's cap,
     the same pairing state.resolve_content applies."""
     q = _q("d-train", "STR", "daily")
-    title, _, steps, _ = quests.content_for(q, day, level=level)
+    title, _, steps, _ = quests.content_for(q, day, level=level, training=training)
     floor = quests.floor_for(q, level=level)
     return title, quests.cap_steps(steps, len(floor), "d-train")
 
 
-def test_physical_shows_the_days_training_and_not_just_the_floor():
-    # The regression this guards: d-train's floor is three steps on its own, so at
-    # the default cap of 3 the floor ate the whole budget and every variant was
-    # built and then trimmed away — a rotating title over an identical checklist.
-    floor = quests.floor_for(_q("d-train", "STR", "daily"), level=1)
-    assert len(floor) == 3
-    checklists = set()
-    for i in range(21):
-        day = (date(2026, 8, 25) + timedelta(days=i)).isoformat()
-        _, steps = _train_card(day)
-        assert steps[: len(floor)] == floor  # non-negotiables still lead
-        assert len(steps) == 5  # floor + two steps of real work
-        assert steps[len(floor):] != []
-        checklists.add(tuple(steps))
-    assert len(checklists) > 1  # the work below the floor actually changes
+def test_the_training_week_deals_push_pull_legs_and_the_court():
+    # The split the hunter actually runs: push Monday, pull Wednesday, legs Friday,
+    # and badminton on the four days between. Weekday-keyed, so the same Monday
+    # every Monday rather than a rotation that drifts.
+    expected = ["Push Day", "Court Session", "Pull Day", "Court Session",
+                "Leg Day", "Court Session", "Court Session"]
+    for i in range(28):
+        d = date(2026, 8, 24) + timedelta(days=i)  # a Monday
+        title, _ = _train_card(d.isoformat())
+        assert title == expected[d.weekday()]
 
 
-def test_roadwork_lands_on_every_mon_wed_fri_and_keeps_the_floor():
-    floor = quests.floor_for(_q("d-train", "STR", "daily"), level=1)
+def test_a_physical_card_is_never_shorter_than_six_or_longer_than_eight():
+    # Six program movements, then nought to two accessories behind them — and the
+    # cap has to be wide enough to let all eight through (STEP_CAPS).
+    lengths = set()
     for i in range(60):
-        d = date(2026, 8, 24) + timedelta(days=i)
-        title, steps = _train_card(d.isoformat())
-        is_mwf = d.weekday() in (0, 2, 4)
-        assert (title == "Roadwork") is is_mwf
-        if is_mwf:
-            # The run replaces the rotating variant, never the floor.
-            assert steps[: len(floor)] == floor
-            assert any("5 km run" in s for s in steps)
+        day = (date(2026, 8, 24) + timedelta(days=i)).isoformat()
+        for session in quests.SESSION_KEYS:
+            _, steps = _train_card(day, training=session)
+            assert 6 <= len(steps) <= 8
+            assert len(set(steps)) == len(steps)  # no movement dealt twice
+            lengths.add(len(steps))
+    assert lengths == {6, 7, 8}  # all three lengths actually occur
+
+
+def test_the_six_program_movements_lead_every_session():
+    # The accessories rotate; the program doesn't. Whatever the day, the first six
+    # lines are the hunter's own six lifts in their own order.
+    for session, (_, _, core, _) in quests.SESSIONS.items():
+        for i in range(14):
+            day = (date(2026, 8, 24) + timedelta(days=i)).isoformat()
+            _, steps = _train_card(day, training=session)
+            assert [s.split(" — ")[0] for s in steps[:6]] == [lift[0] for lift in core]
+
+
+def test_training_volume_climbs_with_level():
+    # The old leveled floor's job, moved into the lifts: sets × reps grow with the
+    # level, and hold at the cap rather than running away.
+    def bench(level: int) -> str:
+        _, steps = _train_card("2026-08-24", level=level, training="push")
+        return steps[0]
+
+    assert "3 × 8" in bench(0)
+    assert "5 × 10" in bench(5)
+    assert bench(99) == bench(5)
+    # Never a habit-sized set: the lightest tier is still working volume.
+    assert all(" × " in s for s in _train_card("2026-08-24", level=0, training="push")[1])
+
+
+def test_the_session_is_stable_through_the_day_and_varies_across_them():
+    # A card can't reshuffle underneath a half-ticked session, and the accessories
+    # behind the program still have to change day to day or it's one checklist.
+    day = "2026-08-25"
+    assert _train_card(day) == _train_card(day)
+    cards = {tuple(_train_card((date(2026, 8, 24) + timedelta(days=i)).isoformat(),
+                               training="court")[1]) for i in range(21)}
+    assert len(cards) > 1
+
+
+def test_the_day_can_be_told_it_is_a_different_session():
+    # The weekday is a default, not a rule — the court was booked out, so Monday is
+    # legs. An unknown answer falls back rather than dealing an empty card.
+    assert quests.default_session("2026-08-24") == "push"
+    assert quests.session_for("2026-08-24") == "push"
+    assert quests.session_for("2026-08-24", "legs") == "legs"
+    assert quests.session_for("2026-08-24", "yoga") == "push"
+    assert _train_card("2026-08-24", training="legs")[0] == "Leg Day"
 
 
 def test_other_slots_keep_the_lean_three_step_cap():
     # Raising Physical's cap must not bloat the rest — a floored slot is a plan,
     # not a checklist.
-    steps = ["a", "b", "c", "d", "e", "f"]
+    steps = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
     assert len(quests.cap_steps(steps, 2, "d-craft")) == 3
     assert len(quests.cap_steps(steps, 1, "d-read")) == 3
     assert len(quests.cap_steps(steps, 0, "d-sketch")) == 2  # floor-free slots stay at 2
-    assert len(quests.cap_steps(steps, 3, "d-train")) == 5
+    assert len(quests.cap_steps(steps, 0, "d-train")) == 8
 
 
-def test_hips_and_hamstrings_complements_the_running_days():
-    # Running is quad/calf dominant in one plane; the complement is unilateral
-    # posterior-chain work, and it has to lead the variant to survive the cap.
-    variant = next(v for v in quests.POOLS["d-train"] if v[0] == "Hips & Hamstrings")
-    assert "single-leg RDL" in variant[2][0]
-    assert "split squat" in variant[2][1]
+def test_every_movement_names_a_scheme_that_exists():
+    # A typo in a scheme key would be a KeyError on the card rather than at import,
+    # and only on the day that movement came up.
+    for _, _, core, extra in quests.SESSIONS.values():
+        for name, scheme, cue in core + extra:
+            assert scheme in quests.SCHEMES, (name, scheme)
+            assert name and cue
 
 
-def test_generated_content_cannot_replace_a_run_day():
-    """The guard `state.resolve_content` applies: on Mon/Wed/Fri the Physical slot
-    is a plan, so LLM-generated variety must not quietly swap the 5 km out. Any
-    other day, generated content wins as usual."""
+def test_generated_content_cannot_replace_the_session():
+    """The guard `state.resolve_content` applies: Physical is the one thing the card
+    asked the hunter, so LLM-generated variety must not quietly answer it again. Any
+    other slot, generated content wins as usual."""
     from app import state
 
     q = _q("d-train", "STR", "daily")
+    sketch = _q("d-sketch", "CRE", "daily")
     gen = {"title": "Invented Workout", "desc": "d", "steps": ["something else"], "resource": ""}
 
-    def resolve(day: str) -> str:
+    def resolve(quest, day: str) -> str:
         pk = quests.period_key("daily", day)
         return state.resolve_content(
-            q, day, prefs={}, gen_by={("d-train", pk): gen}, level=1, book="",
+            quest, day, prefs={}, gen_by={(quest.id, pk): gen}, level=1, book="",
             interview=False, jp_step=0, craft_source="",
         )[0]
 
-    assert resolve("2026-08-24") == "Roadwork"          # Monday — the plan holds
-    assert resolve("2026-08-26") == "Roadwork"          # Wednesday
-    assert resolve("2026-08-25") == "Invented Workout"  # Tuesday — generation still wins
+    assert resolve(q, "2026-08-24") == "Push Day"          # Monday — the plan holds
+    assert resolve(q, "2026-08-25") == "Court Session"     # and so does Tuesday
+    assert resolve(sketch, "2026-08-25") == "Invented Workout"  # elsewhere, generation wins
 
 
 def test_finishing_a_japanese_day_moves_the_plan_and_undo_puts_it_back(db):

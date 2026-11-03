@@ -17,6 +17,7 @@ import {
   type LearningKind,
   type RecallGrade,
   type StudySubject,
+  type TrainingSession,
 } from '@/lib/api';
 import { dateKey } from '@/lib/dates';
 import { isQuestDone } from '@/lib/quests';
@@ -167,6 +168,8 @@ export interface SystemStore {
   reviewCraftPhase: (done: boolean) => Promise<void>;
   finishStudyPiece: (subject: StudySubject, done: boolean) => Promise<void>;
   setCraftSource: (source: string) => Promise<void>;
+  /** Say which session Physical is dealing today — push, pull, legs or the court. */
+  setTraining: (session: TrainingSession) => Promise<void>;
   setInterviewMode: (enabled: boolean) => Promise<void>;
   searchBooks: (q: string) => Promise<ApiBook[]>;
   suggestBooks: () => Promise<ApiBookShelf[]>;
@@ -370,6 +373,7 @@ export const useSystemStore = create<SystemStore>()(
       finishStudyPiece: (subject, done) =>
         mutate((api, d) => api.finishStudyPiece(subject, done, d)),
       setCraftSource: (source) => mutate((api, d) => api.setCraftSource(source, d)),
+      setTraining: (session) => mutate((api, d) => api.setTraining(session, d)),
       // Not `mutate` like its neighbours: this one answers with events as well as
       // state, because saying you finished a book is what earns the achievement.
       reviewBook: async (finished, nextBook) => {

@@ -49,6 +49,11 @@ class CraftSourceIn(BaseModel):
     source: str = Field("", max_length=limits.CRAFT_SOURCE)
 
 
+class TrainingIn(BaseModel):
+    """Which session today is running — push, pull, legs or court."""
+    session: str = Field(..., max_length=16)
+
+
 class CraftPhaseIn(BaseModel):
     """Answer to the system-design phase check-in."""
     done: bool  # True → advance to the next phase; False → hold this one
@@ -80,6 +85,22 @@ class CraftOut(BaseModel):
     progress: float
     is_last: bool
     pending: bool  # the check-in is due
+
+
+class TrainingOptionOut(BaseModel):
+    """One session the Physical card can be switched to."""
+    key: str     # push | pull | legs | court
+    label: str   # what the card is titled when it's running
+    detail: str  # the one line under it
+
+
+class TrainingOut(BaseModel):
+    """The picker on the Physical card: which session today is running, where that
+    came from, and what else it could be."""
+    session: str          # what the card is dealing right now
+    default: str          # what this weekday carries when nothing was said
+    chosen: bool          # true once the hunter has answered for this day
+    options: list[TrainingOptionOut]
 
 
 class StudyOut(BaseModel):
@@ -919,6 +940,7 @@ class StateOut(BaseModel):
     today: TodayOut
     book_review: BookReviewOut
     craft: CraftOut
+    training: TrainingOut  # which session Physical is dealing today, and the picker for it
     studies: list[StudyOut]  # today's study cards — Japanese or drawing, plus Craft Mon/Wed/Fri
     reading: ReadingOut | None  # progress on the current book, or null when none set
     week_review: WeekReviewOut  # a gentle recap of the current ISO week

@@ -25,6 +25,7 @@ import type {
   RecallGrade,
   StepResult,
   StudySubject,
+  TrainingSession,
 } from './types';
 import type {
   ApiBody,
@@ -135,6 +136,12 @@ export const api = {
     request<ApiState>(base, `/book?day=${day}`, token, {
       method: 'PUT',
       body: JSON.stringify({ current_book: currentBook, chapters }),
+    }),
+
+  setTraining: (base: string, token: string, session: TrainingSession, day: string) =>
+    request<ApiState>(base, `/training?day=${day}`, token, {
+      method: 'PUT',
+      body: JSON.stringify({ session }),
     }),
 
   setCraftSource: (base: string, token: string, source: string, day: string) =>
