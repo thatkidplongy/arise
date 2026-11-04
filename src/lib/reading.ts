@@ -1,3 +1,6 @@
+import { dayMonth } from '@/lib/dates';
+import type { ApiPace } from '@/lib/api';
+
 /**
  * Reading is logged in the reader's own words — "5–7", "12", "the intro and ch 3".
  * These turn that label into the chapter count progress is measured in, so the
@@ -72,4 +75,40 @@ export function chapterSpan(markers: readonly string[]): string {
   const low = Math.min(...numbers);
   const high = Math.max(...numbers);
   return low === high ? `ch. ${low}` : `ch. ${low}–${high}`;
+}
+
+/**
+ * How a stretch of days reads to a person: "9 days", "3 weeks", "2 months".
+ *
+ * Rounded up the scale as it grows, because precision stops meaning anything past a
+ * fortnight — "47 days left" is a number you have to convert; "7 weeks" is one you
+ * already feel.
+ */
+export function describeSpan(days: number): string {
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day';
+  if (days < 14) return `${days} days`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 9) return `${weeks} weeks`;
+  const months = Math.round(days / 30);
+  return `${months} month${months === 1 ? '' : 's'}`;
+}
+
+/** The pace held so far, e.g. "3.5 chapters a week". */
+export function describePace(perWeek: number): string {
+  if (perWeek <= 0) return 'nothing logged yet';
+  const rounded = perWeek >= 10 ? Math.round(perWeek) : Math.round(perWeek * 10) / 10;
+  return `${rounded} chapter${rounded === 1 ? '' : 's'} a week`;
+}
+
+/**
+ * When the book lands at the pace being held: "about 3 weeks left — around 9 Aug".
+ *
+ * A book already at its last chapter is waiting on "Did you finish it?" rather than
+ * on more reading, so it says that instead of projecting a date.
+ */
+export function describeFinish(pace: ApiPace): string {
+  if (pace.chapters_left <= 0) return 'That’s the whole book by your count';
+  if (!pace.finish_by) return 'Not enough logged yet to say';
+  return `About ${describeSpan(pace.days_left)} left — around ${dayMonth(pace.finish_by)}`;
 }

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { chapterSpan, countChapters, describeChaptersRead, describeThreadBook } from '@/lib/reading';
+import {
+  chapterSpan,
+  countChapters,
+  describeChaptersRead,
+  describeFinish,
+  describePace,
+  describeSpan,
+  describeThreadBook,
+} from '@/lib/reading';
 
 describe('countChapters', () => {
   it('counts a single chapter', () => {
@@ -79,5 +87,49 @@ describe('chapterSpan', () => {
   it('says nothing when no source named a chapter', () => {
     expect(chapterSpan([])).toBe('');
     expect(chapterSpan(['', 'the intro'])).toBe('');
+  });
+});
+
+describe('describeSpan', () => {
+  it('counts days up to a fortnight, then rounds to the unit you feel', () => {
+    expect(describeSpan(0)).toBe('today');
+    expect(describeSpan(1)).toBe('1 day');
+    expect(describeSpan(9)).toBe('9 days');
+    expect(describeSpan(21)).toBe('3 weeks');
+    expect(describeSpan(60)).toBe('2 months');
+  });
+});
+
+describe('describePace', () => {
+  it('reads as chapters a week, and says so when there is no pace', () => {
+    expect(describePace(3.5)).toBe('3.5 chapters a week');
+    expect(describePace(1)).toBe('1 chapter a week');
+    expect(describePace(12.4)).toBe('12 chapters a week');
+    expect(describePace(0)).toBe('nothing logged yet');
+  });
+});
+
+describe('describeFinish', () => {
+  const pace = {
+    started: '2026-07-01',
+    days_in: 10,
+    chapters_left: 15,
+    per_week: 3.5,
+    days_left: 30,
+    finish_by: '2026-08-09',
+  };
+
+  it('names how long is left and roughly when', () => {
+    expect(describeFinish(pace)).toBe('About 4 weeks left — around 9 Aug');
+  });
+
+  it('stops projecting once the book is covered', () => {
+    expect(describeFinish({ ...pace, chapters_left: 0, days_left: 0, finish_by: '2026-07-10' })).toBe(
+      'That’s the whole book by your count',
+    );
+  });
+
+  it('says nothing rather than guessing when there is no projection', () => {
+    expect(describeFinish({ ...pace, finish_by: '' })).toBe('Not enough logged yet to say');
   });
 });

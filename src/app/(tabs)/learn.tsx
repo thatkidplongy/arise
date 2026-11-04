@@ -6,6 +6,7 @@ import { ConnectionPanel } from '@/components/ConnectionPanel';
 import { Markdown } from '@/components/Markdown';
 import { NoteEditorModal } from '@/components/NoteEditorModal';
 import { ReadingCard } from '@/components/ReadingCard';
+import { ReadingRecord } from '@/components/ReadingRecord';
 import { ReadingReview } from '@/components/ReadingReview';
 import { RecallBlock } from '@/components/Recall/RecallBlock';
 import { Screen } from '@/components/Screen';
@@ -210,6 +211,11 @@ export default function LearnScreen() {
               ask — and the check-in was on another tab. It shows itself only once
               the logged chapters cover the book, so it costs nothing until then. */}
           <ReadingReview />
+
+          {/* The pace, and the shelf behind it — how long this one is taking and how
+              long the last ones took. Under the card it reports on, because the
+              answer to "how long until I finish" is about the book you're holding. */}
+          <ReadingRecord />
 
           {/* What's being worked through today: Japanese or drawing, taking turns
               every day, and system design as well on Mon/Wed/Fri. It follows the

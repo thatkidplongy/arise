@@ -384,17 +384,41 @@ export interface ApiReadingLog {
   chapters: number;
 }
 
-/** Read-only progress on the current book, for the Status screen. */
+/** How the current book is going, and what that says about finishing it. */
+export interface ApiPace {
+  started: string; // the day the first sitting on it was logged
+  days_in: number; // calendar days from that day to today, inclusive
+  chapters_left: number;
+  per_week: number; // chapters a week so far, over calendar days not reading days
+  days_left: number; // at that pace, how many more days
+  finish_by: string; // the day that lands on ('' when there's nothing to project)
+}
+
+/** One book the reading log knows about — the record behind "how long does a book
+ * take me". */
+export interface ApiShelfBook {
+  book: string;
+  started: string;
+  last: string; // the most recent day a sitting was logged against it
+  days: number; // calendar days from the first sitting to the last, inclusive
+  sittings: number;
+  chapters: number;
+}
+
+/** Read-only progress on the current book, plus the shelf behind it. */
 export interface ApiReading {
   book: string;
   chapters: number; // the book's length; 0 = unknown
   books_finished: number;
   chapters_read: number; // chapters logged since this book began
-  days_read: number; // days the reading daily was done since this book began
+  days_read: number; // days a sitting was logged on since this book began
+  sittings: number; // times you sat down with it
   progress: number; // 0..1 — chapters_read / chapters; 0 when the length is unknown
   measure: 'chapters' | 'count'; // 'count' = no length set, so no bar to show
+  pace: ApiPace | null; // null with no sittings yet, or a book whose length isn't set
+  shelf: ApiShelfBook[]; // every book ever logged, the oldest start first
   logged_today: ApiReadingLog[];
-  done_today: boolean; // something logged today (or the reading daily ticked)
+  done_today: boolean; // something logged today
 }
 
 // ── Books (Open Library) ─────────────────────────────────────────────────────

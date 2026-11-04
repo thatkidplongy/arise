@@ -628,7 +628,7 @@ def _hansei_echo(day: str, desc: str, notes_by: dict[tuple[str, str], list[dict]
     return quests.hansei_echo(desc, changes[-1]) if changes else desc
 
 
-def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) -> dict | None:
+def reading_of(db: Session, player: Player, day: str) -> dict | None:
     """A read-only view of progress on the current book: how far in the logged
     chapters put you, from the hunter's own logging rather than a quota the app set.
 
@@ -647,13 +647,15 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) ->
     counts = reading.tally(logs, player.current_book_chapters)
     today = reading.on_day(logs, day)
 
-    read_days = {r.day for r in rows if r.quest_id == "d-read"}
-    if floor is not None:  # only count reading done since this book began
-        read_days = {d for d in read_days if d >= floor}
+    # Days read comes off the sittings, not off completions of the Grow quest: the
+    # quest is parked (see `_PARKED`) and the reading didn't stop with it. A day you
+    # logged a sitting is a day you read, whatever card was or wasn't on the board.
+    read_days = {log.day for log in logs}
     days_read = len(read_days)
 
     total = player.current_book_chapters
     progress = min(1.0, counts.chapters / total) if total > 0 else 0.0
+    going = reading.pace(logs, total, day)
 
     return {
         "book": book,
@@ -661,8 +663,11 @@ def reading_of(db: Session, player: Player, day: str, rows: list[Completion]) ->
         "books_finished": player.books_finished,
         "chapters_read": counts.chapters,
         "days_read": days_read,
+        "sittings": counts.sittings,
         "progress": round(progress, 3),
         "measure": "chapters" if total > 0 else "count",
+        "pace": going._asdict() if going else None,
+        "shelf": [b._asdict() for b in reading.shelf(reading.all_logs(db, player.id))],
         "logged_today": [
             {"id": log.id, "label": log.label, "chapters": log.chapters} for log in today
         ],
@@ -1096,7 +1101,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
     # about at all — there's nothing to compare against, so finishing it is something
     # only you can say (Learn → Reading → Finished it).
     week = game.week_key(day)
-    reading_view = reading_of(db, player, day, rows)
+    reading_view = reading_of(db, player, day)
     review_pending = bool(
         player.current_book
         and reading_view

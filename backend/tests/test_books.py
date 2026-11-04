@@ -495,3 +495,73 @@ def test_the_book_so_far_follows_the_book_you_are_actually_reading(client):
     client.post("/reading/log", json={"chapters": 1, "label": "1", "day": day})
     client.post(f"/book/review?day={day}", json={"finished": True, "next_book": ""})
     assert client.get(f"/state?day={day}").json()["thread"] is None
+
+
+def test_pace_says_how_long_is_left_at_the_pace_actually_held(client):
+    """'How long until I finish' is asked about real time, so the pace is over
+    calendar days — the days a book sits untouched are the ones that make the answer
+    longer."""
+    client.put("/book?day=2026-07-01", json={"current_book": "Deep Work", "chapters": 20})
+    client.post("/reading/log", json={"chapters": 5, "label": "1-5", "day": "2026-07-01"})
+
+    r = client.get("/state?day=2026-07-10").json()["reading"]
+    p = r["pace"]
+    assert p["started"] == "2026-07-01"
+    assert p["days_in"] == 10               # inclusive of both ends
+    assert p["chapters_left"] == 15
+    assert p["per_week"] == 3.5             # 5 chapters over 10 days
+    assert p["days_left"] == 30             # 15 left at half a chapter a day
+    assert p["finish_by"] == "2026-08-09"
+    # Reading more, sooner, brings it in.
+    client.post("/reading/log", json={"chapters": 5, "label": "6-10", "day": "2026-07-10"})
+    quicker = client.get("/state?day=2026-07-10").json()["reading"]["pace"]
+    assert quicker["days_left"] < p["days_left"]
+
+
+def test_pace_is_withheld_when_there_is_nothing_honest_to_say(client):
+    """No sittings yet, or a book whose length was never set — there's no 'left' to
+    measure, and the app has never been willing to invent a denominator."""
+    client.put("/book?day=2026-07-01", json={"current_book": "Deep Work", "chapters": 20})
+    assert client.get("/state?day=2026-07-01").json()["reading"]["pace"] is None
+
+    client.put("/book?day=2026-07-02", json={"current_book": "Some Book", "chapters": 0})
+    client.post("/reading/log", json={"chapters": 3, "label": "1-3", "day": "2026-07-02"})
+    assert client.get("/state?day=2026-07-02").json()["reading"]["pace"] is None
+
+
+def test_a_finished_book_projects_nothing_further(client):
+    """At or past the last chapter it's waiting on 'Did you finish it?', not on more
+    reading — so zero days left, not a date in the past."""
+    client.put("/book?day=2026-07-01", json={"current_book": "Deep Work", "chapters": 10})
+    client.post("/reading/log", json={"chapters": 10, "label": "1-10", "day": "2026-07-05"})
+    p = client.get("/state?day=2026-07-20").json()["reading"]["pace"]
+    assert p["chapters_left"] == 0 and p["days_left"] == 0
+    assert p["finish_by"] == "2026-07-20"
+
+
+def test_the_shelf_is_every_book_with_how_long_each_took(client):
+    """The record behind 'how long does a book take me' — grouped the way a person
+    groups them, oldest start first, and the one being read now included so the
+    comparison is live."""
+    client.put("/book?day=2026-07-01", json={"current_book": "Deep Work", "chapters": 20})
+    client.post("/reading/log", json={"chapters": 4, "label": "1-4", "day": "2026-07-01"})
+    client.post("/reading/log", json={"chapters": 4, "label": "5-8", "day": "2026-07-08"})
+    client.put("/book?day=2026-07-10", json={"current_book": "Meditations", "chapters": 12})
+    client.post("/reading/log", json={"chapters": 2, "label": "Book 1-2", "day": "2026-07-10"})
+
+    shelf = client.get("/state?day=2026-07-10").json()["reading"]["shelf"]
+    assert [b["book"] for b in shelf] == ["Deep Work", "Meditations"]
+    first = shelf[0]
+    assert first["started"] == "2026-07-01" and first["last"] == "2026-07-08"
+    assert first["days"] == 8 and first["sittings"] == 2 and first["chapters"] == 8
+
+
+def test_days_read_counts_sittings_not_the_parked_grow_quest(client):
+    """Grow is off the board (`state._PARKED`) and the reading didn't stop with it.
+    A day with a sitting on it is a day you read, whatever card was or wasn't dealt."""
+    client.put("/book?day=2026-07-01", json={"current_book": "Deep Work", "chapters": 20})
+    for d in ("2026-07-01", "2026-07-02", "2026-07-02"):
+        client.post("/reading/log", json={"chapters": 1, "label": "", "day": d})
+    r = client.get("/state?day=2026-07-02").json()["reading"]
+    assert r["days_read"] == 2 and r["sittings"] == 3
+    assert r["done_today"] is True

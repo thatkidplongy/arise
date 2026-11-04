@@ -565,17 +565,41 @@ class ReadingLogOut(BaseModel):
     chapters: int
 
 
+class PaceOut(BaseModel):
+    """How the current book is going, and what that says about finishing it."""
+    started: str       # the day the first sitting on it was logged
+    days_in: int       # calendar days from that day to today, inclusive
+    chapters_left: int
+    per_week: float    # chapters a week so far, over calendar days not reading days
+    days_left: int     # at that pace, how many more days
+    finish_by: str     # the day that lands on ('' when there's nothing to project)
+
+
+class ShelfBookOut(BaseModel):
+    """One book the reading log knows about — the record behind 'how long does a
+    book take me'."""
+    book: str
+    started: str
+    last: str      # the most recent day a sitting was logged against it
+    days: int      # calendar days from the first sitting to the last, inclusive
+    sittings: int
+    chapters: int
+
+
 class ReadingOut(BaseModel):
-    """Read-only progress on the current book, for the Status screen."""
+    """Read-only progress on the current book, plus the shelf behind it."""
     book: str
     chapters: int  # the book's length; 0 = unknown
     books_finished: int
     chapters_read: int  # how far in the logged chapters put you (furthest named wins)
-    days_read: int  # days the reading daily was done since this book began
+    days_read: int  # days a sitting was logged on since this book began
+    sittings: int  # times you sat down with it
     progress: float  # 0..1 — chapters_read / chapters; 0 when the length is unknown
     measure: str  # 'chapters' when the book's length is known, else 'count' (no bar)
+    pace: PaceOut | None  # null with no sittings yet, or a book whose length isn't set
+    shelf: list[ShelfBookOut]  # every book ever logged, the oldest start first
     logged_today: list[ReadingLogOut]
-    done_today: bool  # something logged today (or the reading daily ticked)
+    done_today: bool  # something logged today
 
 
 class StatOut(BaseModel):
