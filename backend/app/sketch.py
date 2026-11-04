@@ -16,9 +16,10 @@ from the part of you that draws symbols instead of what's in front of it.
   4. light       — value, the shapes shadows make, the full range
   5. from life   — the whole of it, on real subjects, over and over
 
-The Creativity daily stays a wide pool — drawing, music, photo, video — on purpose:
-this walk is the drawing thread inside it, worked on the days the board deals Sketch,
-and the quest is free to be a beat or a photo walk on any given one.
+The Creativity daily *is* this walk now (2026-11-04). It used to be a wide pool —
+drawing, music, singing, dance, photo, video — with this walk as the drawing thread
+inside it, which meant a drawing day could hand you a vocal warm-up instead. One
+subject, one position, one card.
 """
 
 from __future__ import annotations
@@ -322,6 +323,25 @@ def progress(position: int) -> dict:
         "position": at,
         "positions": len(PLAN),
     }
+
+
+def content(position: int) -> tuple[str, str, list[str], str]:
+    """The step being held, as the quest card shows it.
+
+    No day in the signature: the walk is a position, so every morning the board deals
+    drawing is a morning to work the step it is on, and the step changes when it is
+    finished. Same contract as `japanese.content`, because the board now draws both
+    walks the same way — the Creativity daily used to be a wide pool (music, singing,
+    photo, video) and the card would hand you a vocal warm-up on a drawing day.
+    """
+    step = step_at(position)
+    at = progress(position)
+    return (
+        step["title"],
+        f"{step['desc']} · {at['stage_label']} {at['done'] + 1}/{at['steps']}",
+        list(step["steps"]),
+        step["resource"],
+    )
 
 
 def next_position(position: int) -> int:

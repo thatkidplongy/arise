@@ -1,5 +1,7 @@
 """Quest reflection notes → the dated Journal."""
 
+import pytest
+
 DAY = "2026-07-18"
 NEXT_DAY = "2026-07-19"
 
@@ -8,11 +10,13 @@ def _quest(state, qid):
     return next(q for q in state["quests"] if q["id"] == qid)
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_quest_starts_with_no_notes(client):
     s = client.get(f"/state?day={DAY}").json()
     assert _quest(s, "d-read")["notes"] == []
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_note_saves_shows_on_quest_and_journal(client):
     s = client.post("/quest-notes", json={
         "quest_id": "d-read", "text": "Rich is income; wealthy is assets that pay you.", "day": DAY,
@@ -48,6 +52,7 @@ def test_note_rejects_empty(client):
     assert r.status_code == 422
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_note_edit_in_place(client):
     s = client.post("/quest-notes", json={"quest_id": "d-read", "text": "rough draft", "day": DAY}).json()
     nid = s["reflections"][0]["id"]
@@ -58,6 +63,7 @@ def test_note_edit_in_place(client):
     assert _quest(s, "d-read")["notes"][0]["text"] == "**Polished** takeaway"
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_note_delete(client):
     s = client.post("/quest-notes", json={"quest_id": "d-read", "text": "keep? no", "day": DAY}).json()
     nid = s["reflections"][0]["id"]
@@ -75,6 +81,7 @@ def test_newest_reflection_comes_first(client):
 # ── A reflection is a write-step's answer: undo the step, undo the note ───────
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_note_carries_its_step_and_unticking_removes_it(client):
     # A note written from step 0…
     s = client.post("/quest-notes", json={
@@ -89,6 +96,7 @@ def test_note_carries_its_step_and_unticking_removes_it(client):
     assert s["reflections"] == []
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_undo_completion_clears_the_quests_reflections(client):
     client.post("/quest-notes", json={
         "quest_id": "d-read", "text": "wealth is freedom from debt", "step_index": 0, "day": DAY,
@@ -103,6 +111,7 @@ def test_undo_completion_clears_the_quests_reflections(client):
     assert _quest(s, "d-read")["notes"] == []
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_unticking_a_step_leaves_notes_from_other_steps(client):
     # A note bound to step 0 and one with no step (older, standalone).
     client.post("/quest-notes", json={

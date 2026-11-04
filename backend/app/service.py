@@ -86,30 +86,39 @@ def _apply_completion(db: Session, player: Player, quest: QuestDef, day: str, ro
     if after_rank != before_rank:
         events.append({"type": "rank_up", "data": {"from": before_rank, "to": after_rank}})
 
-    _advance_japanese(db, player, quest)
+    _advance_walk(db, player, quest)
 
     events += unlock_achievements(db, player, after)
     return events
 
 
-def _retreat_japanese(db: Session, player: Player, quest: QuestDef) -> None:
-    """Undoing a Japanese quest puts the plan back where it was, so a mis-tap doesn't
-    cost a step. A row that wants a second sitting is what 'Undo last' is for."""
-    if quest.id != "d-jp":
+# The two walks and the module that owns each one's plan. Drawing joined when the
+# Creativity daily stopped being a wide pool and became the walk itself.
+_WALK_BY_QUEST = {"d-jp": ("japanese_step", japanese), "d-sketch": ("sketch_step", sketch)}
+
+
+def _retreat_walk(db: Session, player: Player, quest: QuestDef) -> None:
+    """Undoing a walk's quest puts its plan back where it was, so a mis-tap doesn't
+    cost a step. A step that wants a second sitting is what 'Undo last' is for."""
+    walk = _WALK_BY_QUEST.get(quest.id)
+    if walk is None:
         return
-    player.japanese_step = max(0, (player.japanese_step or 0) - 1)
+    field, _ = walk
+    setattr(player, field, max(0, (getattr(player, field) or 0) - 1))
 
 
-def _advance_japanese(db: Session, player: Player, quest: QuestDef) -> None:
-    """Finishing the Japanese quest moves the plan on one step.
+def _advance_walk(db: Session, player: Player, quest: QuestDef) -> None:
+    """Finishing a walk's quest moves its plan on one step.
 
-    Every appearance, because the quest is already on the three-day rotation — the
+    Every appearance, because the quest is already on the alternating rotation — the
     spacing is the rotation's, and consolidation is a step in the plan rather than a
-    day the plan skips. It used to advance only on dates it judged to be teaching days,
-    which put two three-day cycles out of phase and meant the plan never moved."""
-    if quest.id != "d-jp":
+    day the plan skips. Japanese used to advance only on dates it judged to be teaching
+    days, which put two cycles out of phase and meant the plan never moved."""
+    walk = _WALK_BY_QUEST.get(quest.id)
+    if walk is None:
         return
-    player.japanese_step = japanese.next_position(player.japanese_step or 0)
+    field, plan = walk
+    setattr(player, field, plan.next_position(getattr(player, field) or 0))
 
 
 def unlock_achievements(db: Session, player: Player, agg: dict) -> list[dict]:
@@ -157,7 +166,7 @@ def _remove_one_completion(db: Session, player: Player, quest: QuestDef, day: st
     row_day = row.day
     db.delete(row)
     db.flush()
-    _retreat_japanese(db, player, quest)
+    _retreat_walk(db, player, quest)
     _revoke_bonus_if_needed(db, player, row_day)
     return True
 
@@ -220,7 +229,7 @@ def undo_completion(db: Session, player: Player, completion_id: str, day: str) -
         pk = quests.period_key(quest.cadence, row_day)
         _clear_step_checks(db, player, quest_id, pk)
         _clear_quest_notes(db, player, quest_id, pk)
-        _retreat_japanese(db, player, quest)
+        _retreat_walk(db, player, quest)
 
     db.commit()
     return {"events": [], "state": build_state(db, player, day)}
@@ -589,8 +598,8 @@ def generate_quests(db: Session, player: Player, day: str) -> dict:
             # and achievements key on it — but it never reaches the board, so
             # generating content for it spends budget on a card no one sees.
             continue
-        if q.id == "d-jp":
-            continue  # Japanese follows a fixed phased plan, not the LLM
+        if q.id in ("d-jp", "d-sketch"):
+            continue  # both walks follow a fixed plan held at a position, not the LLM
         if q.id == "d-craft" and not player.interview_mode:
             # Craft's daily follows the 12-week system-design plan and points at the
             # hunter's own Notion pages, which the LLM has never seen — anything it

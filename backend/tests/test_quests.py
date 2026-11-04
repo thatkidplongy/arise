@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app import japanese, quests
+from app import japanese, quests, sketch
 from app.models import QuestDef
 
 
@@ -31,9 +31,26 @@ def test_content_is_deterministic_and_well_formed():
 
 
 def test_daily_content_rotates_across_days():
-    q = _q("d-sketch", "CRE", "daily")
+    # A pool slot draws a different variant each day. (Not Creativity any more — that
+    # one follows the drawing walk and holds its step until it's finished.)
+    q = _q("d-meditate", "SPI", "daily")
     titles = {quests.content_for(q, f"2026-07-{d:02d}")[0] for d in range(10, 25)}
     assert len(titles) > 1  # not the same every day
+
+
+def test_the_creativity_daily_is_the_drawing_walk():
+    """It used to be a wide pool — drawing, music, singing, dance, photo, video — so a
+    drawing day could hand you a vocal warm-up. One subject now, held at a position:
+    the card is whatever step `Player.sketch_step` is standing on, the same day after
+    day until that step is finished."""
+    q = _q("d-sketch", "CRE", "daily")
+    for step in (0, 4, sketch.LAST_STEP, sketch.LAST_STEP + 50):
+        titles = {quests.content_for(q, f"2026-07-{d:02d}", sketch_step=step)[0] for d in range(10, 25)}
+        assert titles == {sketch.step_at(step)["title"]}  # the date decides nothing
+    title, desc, steps, resource = quests.content_for(q, "2026-07-18", sketch_step=3)
+    assert title and steps and resource
+    assert sketch.progress(3)["stage_label"] in desc  # the card says where in the walk it is
+    assert "d-sketch" not in quests.POOLS  # no pool left to wander back into
 
 
 def test_daily_floor_is_always_present():
@@ -201,7 +218,7 @@ def test_craft_rotates_the_method_day_to_day():
     assert len(seen) > 1
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_systems_reps_land_exactly_once_a_week_on_a_day_craft_is_shown():
     """Architecture is only half of 'system thinking'. The other half needs a real
     system rather than a page, so the slot leaves the reading regularly.
@@ -475,14 +492,15 @@ def test_every_movement_names_a_scheme_that_exists():
             assert name and cue
 
 
-def test_generated_content_cannot_replace_the_session():
+def test_generated_content_cannot_replace_a_plan():
     """The guard `state.resolve_content` applies: Physical is the one thing the card
-    asked the hunter, so LLM-generated variety must not quietly answer it again. Any
-    other slot, generated content wins as usual."""
+    asked the hunter and drawing is a walk held at a position, so LLM-generated variety
+    must not quietly answer either. A pool slot still takes generated content."""
     from app import state
 
-    q = _q("d-train", "STR", "daily")
-    sketch = _q("d-sketch", "CRE", "daily")
+    train = _q("d-train", "STR", "daily")
+    draw = _q("d-sketch", "CRE", "daily")
+    sit = _q("d-meditate", "SPI", "daily")
     gen = {"title": "Invented Workout", "desc": "d", "steps": ["something else"], "resource": ""}
 
     def resolve(quest, day: str) -> str:
@@ -492,9 +510,10 @@ def test_generated_content_cannot_replace_the_session():
             interview=False, jp_step=0, craft_source="",
         )[0]
 
-    assert resolve(q, "2026-08-24") == "Push Day"          # Monday — the plan holds
-    assert resolve(q, "2026-08-25") == "Court Session"     # and so does Tuesday
-    assert resolve(sketch, "2026-08-25") == "Invented Workout"  # elsewhere, generation wins
+    assert resolve(train, "2026-08-24") == "Push Day"       # Monday — the plan holds
+    assert resolve(train, "2026-08-25") == "Court Session"  # and so does Tuesday
+    assert resolve(draw, "2026-08-25") == sketch.step_at(0)["title"]  # the step it's on
+    assert resolve(sit, "2026-08-25") == "Invented Workout"  # a pool slot still generates
 
 
 def test_finishing_a_japanese_day_moves_the_plan_and_undo_puts_it_back(db):

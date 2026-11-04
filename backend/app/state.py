@@ -241,6 +241,11 @@ def _weeks_since(anchor: str, day: str) -> int:
     return max(1, elapsed // 7 + 1)
 
 
+# Slots whose content is a plan the hunter is holding, not a theme to vary: the
+# session they said they were running, and the step each walk is standing on.
+_NEVER_GENERATED = frozenset({"d-train", "d-sketch"})
+
+
 def resolve_content(
     quest: QuestDef,
     day: str,
@@ -253,6 +258,7 @@ def resolve_content(
     jp_step: int,
     craft_source: str,
     training: str = "",
+    sketch_step: int = 0,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a quest shows today: LLM-generated
     content if present (with the mandatory leveled floor re-applied), else the
@@ -264,13 +270,15 @@ def resolve_content(
     gen = gen_by.get((quest.id, pk))
     # Physical is a plan, not a prompt for variety: generated content would quietly
     # swap out the session the hunter said they were running, which is the one thing
-    # the card asked them.
-    if gen is not None and quest.id != "d-train":
+    # the card asked them. Drawing is a walk held at a position, and would be handed
+    # a step it isn't on.
+    if gen is not None and quest.id not in _NEVER_GENERATED:
         steps = quests.cap_steps(floor + gen["steps"], len(floor), quest.id)
         return gen["title"], gen["desc"], steps, gen["resource"]
     title, desc, steps, resource = quests.content_for(
         quest, day, prefs.get(quest.stat), book, level,
         interview=interview, jp_step=jp_step, craft_source=craft_source, training=training,
+        sketch_step=sketch_step,
     )
     return title, desc, quests.cap_steps(steps, len(floor), quest.id), resource
 
@@ -289,6 +297,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
     jp_step = _jp_step(player)
     craft_source = player.craft_source
     training = training_choice(db, player, day)
+    sketch_step = _sketch_step(player)
     titles: dict[str, str] = {}
     for quest in quest_defs(db):
         title, _, _, _ = resolve_content(
@@ -301,6 +310,7 @@ def displayed_titles(db: Session, player: Player, day: str) -> dict[str, str]:
             jp_step=jp_step,
             craft_source=craft_source,
             training=training,
+            sketch_step=sketch_step,
         )
         titles[quest.id] = title
     return titles
@@ -320,6 +330,7 @@ def resolve_steps(db: Session, player: Player, quest: QuestDef, day: str) -> lis
         jp_step=_jp_step(player),
         craft_source=player.craft_source,
         training=training_choice(db, player, day),
+        sketch_step=_sketch_step(player),
     )
     return steps
 
@@ -382,7 +393,18 @@ def done_count(rows: list[Completion], quest: QuestDef, day: str) -> int:
 # in. The Mon/Wed/Fri row below is left as it was, so bringing Craft back is emptying
 # `_PARKED` and nothing else. Parked is not retired: the rows, completions and XP all
 # stay, and with no days dealt Craft's level freezes rather than easing down.
-_PARKED = frozenset({"d-craft", "w-craft", "s-craft"})
+#
+# Grow, the index cards and Hansei are parked too (2026-11-04): the day is Physical
+# plus the walk, and nothing else. Reading did not stop — the book, its chapters and
+# the whole shelf still live on Learn → Reading, which is where the progress is now —
+# it stopped being a card that asks. The cards keep coming back on their own ladder
+# (recall.py) and can be worked there whenever; the evening look-back is a thing to do,
+# not a thing to be marked on. Each keeps its rows and history, and returns by coming
+# back out of this set.
+_PARKED = frozenset({
+    "d-craft", "w-craft", "s-craft",
+    "d-read", "d-recall", "d-hansei",
+})
 _CRAFT_IDS = frozenset({"d-craft", "w-craft", "s-craft"})
 _DAILY_ALWAYS = ("d-train", "d-read", "d-recall", "d-hansei")
 _DAILY_BY_WEEKDAY: tuple[tuple[str, ...], ...] = (
@@ -442,12 +464,14 @@ def daily_days_per_week() -> dict[str, int]:
     drift."""
     out: dict[str, int] = {}
     for stat, qid in progression.DAILY_BY_STAT.items():
-        if qid in _DAILY_ALWAYS:
+        if qid in _PARKED:
+            out[stat] = 0  # never dealt → frozen, the same as an attribute with no daily
+        elif qid in _DAILY_ALWAYS:
             out[stat] = 7
         elif qid in _ALTERNATING:
             out[stat] = 7 // len(_ALTERNATING)
         else:
-            out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots and qid not in _PARKED)
+            out[stat] = sum(1 for slots in _DAILY_BY_WEEKDAY if qid in slots)
     return {stat: out.get(stat, 0) for stat in game.STAT_KEYS}
 
 
@@ -556,7 +580,7 @@ def snapshot(agg: dict, books_finished: int = 0) -> Snapshot:
 
 def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book="", gen_by=None,
                levels=None, interview=False, jp_step=0, craft_source="", notes_by=None,
-               training="") -> dict:
+               training="", sketch_step=0) -> dict:
     pk = quests.period_key(q.cadence, day)
     title, desc, steps, resource = resolve_content(
         q, day,
@@ -568,6 +592,7 @@ def _quest_out(q: QuestDef, day: str, rows, prefs, undoable_id, checks_by, book=
         jp_step=jp_step,
         craft_source=craft_source,
         training=training,
+        sketch_step=sketch_step,
     )
     if q.id == "d-hansei":
         desc = _hansei_echo(day, desc, notes_by or {})
@@ -1135,7 +1160,7 @@ def build_state(db: Session, player: Player, day: str) -> dict:
         "quests": [
             _quest_out(q, day, rows, prefs, undoable_id, checks_by, player.current_book, gen_by,
                        prog_levels, player.interview_mode, _jp_step(player),
-                       player.craft_source, notes_by, training)
+                       player.craft_source, notes_by, training, _sketch_step(player))
             for q in defs
             if is_on_board(q, day)
         ],

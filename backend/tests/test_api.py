@@ -45,7 +45,7 @@ def test_read_and_write_paths_resolve_identical_steps(client):
         assert checked > 0  # we actually exercised some quests
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_state_shape(client):
     s = _state(client)
     for key in ("player", "stats", "streak", "today", "book_review", "preferences", "quests", "achievements", "record"):
@@ -89,6 +89,7 @@ def test_state_shape(client):
     assert s["progression"]["STR"]["required"] == 3  # 3 days to earn the first level
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_reading_review_flow(client):
     # Set a book with its length — no review the same week it started.
     r = client.put("/book?day=2026-07-18", json={"current_book": "Atomic Habits", "chapters": 20})
@@ -214,7 +215,7 @@ def test_the_last_craft_phase_never_asks_to_move_on(client):
     assert craft["pending"] is False
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_interview_mode_toggles_craft_quests(client):
     # Asked on a Craft weekday, since the daily is only dealt on those.
     s = client.get(f"/state?day={CRAFT_DAY}").json()
@@ -235,6 +236,7 @@ def test_interview_mode_toggles_craft_quests(client):
     assert _quest(off, "w-craft")["title"] not in interview_titles
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_llm_off_by_default_and_generate_is_noop(client):
     s = _state(client)
     assert s["llm_enabled"] is False
@@ -244,6 +246,7 @@ def test_llm_off_by_default_and_generate_is_noop(client):
     assert _quest(r.json(), "d-read")["title"] == _quest(s, "d-read")["title"]
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_generated_content_overrides_pool_but_keeps_floor(client):
     import json as _json
 
@@ -294,10 +297,11 @@ def test_complete_then_conflict(client):
     assert r2.status_code == 409
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_one_attribute_counts_a_fraction_of_its_xp_toward_the_level(client):
     """Breadth (game.BREADTH_FROM): the Intelligence dailies alone pay their XP in
     full, but only the share of attributes they touched counts toward the level."""
-    day = "2026-09-28"  # a Japanese day: STR, SPI and three INT dailies
+    day = "2026-10-04"  # a Japanese Sunday: STR, SPI and three INT dailies, no Craft
     for qid in ("d-read", "d-recall", "d-jp"):
         assert client.post("/completions", json={"quest_id": qid, "day": day}).status_code == 200
     s = client.get(f"/state?day={day}").json()
@@ -383,7 +387,7 @@ def test_an_unknown_session_is_refused(client):
     assert _state(client)["training"]["chosen"] is False
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_the_daily_schedule_is_fixed_to_the_weekday(client):
     """The board used to rotate on the date's ordinal, so no weekday meant anything
     and the whole thing only repeated every 21 days. Craft is a weekly schedule now —
@@ -407,13 +411,20 @@ def test_the_daily_schedule_is_fixed_to_the_weekday(client):
     assert set().union(*week) | {"d-jp", "d-sketch"} == set(quests_dealt_in_a_week())
 
 
-def test_parked_craft_is_off_the_board_entirely(client):
+def test_parked_slots_are_off_the_board_entirely(client):
     """Parked means no card at all — not the daily on its weekdays, not the weekly or
     the side, and not Learn's system-design card, which follows the board."""
     s = client.get(f"/state?day={CRAFT_DAY}").json()
     assert not {q["id"] for q in s["quests"]} & {"d-craft", "w-craft", "s-craft"}
     assert "craft" not in {c["subject"] for c in s["studies"]}
-    assert s["today"]["dailies_total"] == 5  # a Craft weekday carries what any other does
+    # What's left of the daily board: Physical, and whichever walk the day carries.
+    from app.state import alternating_daily_id
+
+    assert {q["id"] for q in s["quests"] if q["cadence"] == "daily"} == {
+        "d-train", alternating_daily_id(CRAFT_DAY)
+    }
+    assert s["today"]["dailies_total"] == 2
+    assert not {q["id"] for q in s["quests"]} & {"d-read", "d-recall", "d-hansei"}
     assert s["craft_parked"] is True  # so the app hides interview mode, which only switches Craft
 
 
@@ -447,6 +458,7 @@ def test_badminton_weekly_is_single_checklist(client):
     assert r.status_code == 200
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_daily_clear_bonus(client):
     events = []
     for qid in DAILY_IDS:
@@ -526,6 +538,7 @@ def test_week_review_recaps_the_week(client):
     assert wr["week"].startswith("2026-W")
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_hansei_reads_last_nights_change_back(client):
     """The Kaizen loop: the change written on one evening's look-back is the line on
     the next evening's card — and only that step's answer, not the other two."""

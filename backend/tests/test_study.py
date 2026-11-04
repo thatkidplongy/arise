@@ -36,7 +36,7 @@ def _tick(client, day, subject, done=True):
     return r.json()
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_the_cards_follow_the_board(client):
     """The whole point: Learn used to show system design every morning, including the
     days the board isn't on it. Now the cards are whatever the day deals."""
@@ -60,7 +60,7 @@ def test_japanese_and_drawing_take_turns_every_day(client):
     assert walks[1] == "japanese" and walks[2] == "sketch"  # Tue 22nd, Wed 23rd
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_every_subject_answers_the_same_shape(client):
     """Three plans built differently underneath, one card drawing them."""
     keys = set(_study(client, CRAFT_DAY, "craft"))
@@ -112,7 +112,7 @@ def test_the_walks_hold_at_the_end_rather_than_running_out(client):
     assert card["is_last"] is True and card["piece"] == sketch.PLAN[-1]["title"]
 
 
-@pytest.mark.usefixtures("craft_unparked")
+@pytest.mark.usefixtures("nothing_parked")
 def test_the_tick_lands_on_the_card_it_came_from(client):
     """Monday carries two cards. Ticking system design moves Craft — and hands over the
     next chapter as the source — while the day's Japanese stays put, and vice versa."""

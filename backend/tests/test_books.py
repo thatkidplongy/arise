@@ -1,5 +1,7 @@
 """Unit tests for the Open Library parsers (pure, no network)."""
 
+import pytest
+
 from app import books, reading
 
 
@@ -419,6 +421,7 @@ def _plant_generated_reading_quest(day: str, title: str) -> None:
     session.close()
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_finishing_a_book_stops_the_quests_naming_it(client):
     """Rolling to the next book has to drop the personalised reading day with it.
 
@@ -441,6 +444,7 @@ def test_finishing_a_book_stops_the_quests_naming_it(client):
     assert "Atomic Habits" not in " ".join(q["steps"]) + q["desc"] + q["resource"]
 
 
+@pytest.mark.usefixtures("nothing_parked")
 def test_not_finished_keeps_the_personalised_reading_day(client):
     """Saying "not yet" changes nothing about the book, so the quest tuned to it
     stands — re-generating it would be a day's LLM call spent on no news."""

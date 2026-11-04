@@ -67,75 +67,13 @@ import hashlib
 
 from datetime import date
 
-from . import game, japanese, progression
+from . import game, japanese, progression, sketch
 from .models import QuestDef
 
 # slot id -> pool of (title, desc, steps) variants. The seeded content is the
 # first entry, so an unrotated read looks like the original quest.
 POOLS: dict[str, list[tuple[str, str, list[str]]]] = {
     # ── Daily ────────────────────────────────────────────────────────────────
-    "d-sketch": [  # CRE — drawing / music / singing / dance / photo / video
-        ("Daily Sketch", "20 min of drawing", [
-            "5 min warm-up scribbles",
-            "15 min on one subject of your choice",
-        ]),
-        ("Beat Lab", "20 min in FL Studio", [
-            "Lay an 8-bar drum groove",
-            "Add bass, then one melodic layer",
-            "Save the project even if unfinished",
-        ]),
-        ("Instrument Time", "20 min practice", [
-            "5 min warm-up (scales or chords)",
-            "10 min on a piece or riff",
-            "5 min play freely",
-        ]),
-        ("Photo Walk", "Shoot with intent", [
-            "Take 10 photos of one subject or theme",
-            "Vary angle, distance and light each shot",
-        ]),
-        ("Frame Work", "Film or edit a short clip", [
-            "Shoot or pick 20–30s of footage",
-            "Make one clean cut and one transition",
-        ]),
-        ("Gesture Warmup", "Quick figure sketches", [
-            "10 × 30s gesture poses",
-            "5 min slower structural sketch",
-        ]),
-        ("Sound Sketch", "Capture a musical idea", [
-            "Hum or play a 4-bar melody or loop",
-            "Record it before you lose it",
-        ]),
-        ("Daily Verse", "Write a short poem", [
-            "Freewrite 5 min on one image, moment, or feeling",
-            "Shape it into a few lines — any form, no rules",
-            "Read it aloud once",
-        ]),
-        ("Move Practice", "20 min learning to dance", [
-            "5 min warm-up: roll through neck, shoulders, hips, ankles",
-            "10 min drilling one move or an 8-count — slow, then up to speed",
-            "5 min freestyle to a song you love",
-        ]),
-        ("Rhythm & Groove", "Find the pocket", [
-            "Pick one song and count the beat out loud",
-            "Practise a simple bounce or groove on every count",
-            "Add one move on the offbeat",
-        ]),
-        ("Sing Practice", "15 min of singing", [
-            "5 min warm-up: lip trills and gentle scales",
-            "Sing through a song section, matching the pitch",
-            "Record one take and listen back for one thing to fix",
-        ]),
-        ("Pitch & Control", "15 min voice training", [
-            "Run scales slowly up and down your comfortable range",
-            "Hold steady notes — even tone, steady breath",
-            "Try one clean interval jump (e.g. do → sol)",
-        ]),
-        ("Memorise a Song", "Learn a song by heart", [
-            "Pick a song you love — a rap verse counts, and the wordier the better",
-            "Break it into lines; learn one small chunk at a time, looping the track",
-            "Perform it from memory with no lyrics on screen — stumbles are fine",
-        ]),
-    ],
     "d-meditate": [  # SPI — calm / focus / reflection / breath
         ("Inner Gate", "10 min meditation", [
             "2 min settling in, eyes closed",
@@ -762,35 +700,24 @@ RESOURCES: dict[str, str] = {
     "Doubles Raid": "🎥 Badminton Insight (YouTube)",
     "New Technique": "🎥 Badminton Insight (YouTube)",
     "Weak Spot": "🎥 Badminton Insight (YouTube)",
-    # CRE — drawing, music, photo/video, film
-    "Daily Sketch": "📖 Drawing on the Right Side of the Brain — Betty Edwards",
-    "Gesture Warmup": "🎥 Proko (YouTube)",
+    # CRE — the weekly piece and the side quest; the daily is the drawing walk,
+    # which carries its own source (Betty Edwards) on every step
     "Beyond the Comfort Zone": "🎥 Proko (YouTube)",
     "Finish a Piece": "🎥 Proko (YouTube)",
     "Full Render": "🎥 Proko (YouTube)",
-    "Beat Lab": "🎥 In The Mix (YouTube)",
     "Finish a Beat": "🎥 In The Mix (YouTube)",
     "New Sound": "🎥 In The Mix (YouTube)",
     "Cover It": "🎥 In The Mix (YouTube)",
-    "Instrument Time": "🌐 musictheory.net",
-    "Photo Walk": "🎥 Peter McKinnon (YouTube)",
-    "Frame Work": "🎥 Peter McKinnon (YouTube)",
     "Photo Set": "🎥 Peter McKinnon (YouTube)",
     "Short Edit": "🎥 Peter McKinnon (YouTube)",
     "Odd Angle": "🎥 Peter McKinnon (YouTube)",
     "Screen Study": "🎥 Every Frame a Painting (YouTube)",
-    "Daily Verse": "📖 A Poetry Handbook — Mary Oliver",
     "Finish a Poem": "🌐 Poetry Foundation (poetryfoundation.org)",
     "Poem from a Prompt": "🌐 Poetry Foundation (poetryfoundation.org)",
-    "Move Practice": "🎥 STEEZY (YouTube)",
-    "Rhythm & Groove": "🎥 STEEZY (YouTube)",
     "Learn a Routine": "🎥 1MILLION Dance Studio (YouTube)",
     "New Style": "🎥 STEEZY (YouTube)",
-    "Sing Practice": "🎥 New York Vocal Coaching (YouTube)",
-    "Pitch & Control": "🌐 Singing Carrots — pitch & ear training",
     "Perform a Song": "🎥 New York Vocal Coaching (YouTube)",
     "Sing Outside Your Lane": "🎥 New York Vocal Coaching (YouTube)",
-    "Memorise a Song": "🌐 Genius — lyrics & annotations (genius.com)",
     # SPI — meditation
     "Inner Gate": "📖 Mindfulness in Plain English — Bhante Gunaratana",
     "Body Scan": "🎧 Waking Up — Sam Harris",
@@ -1592,6 +1519,7 @@ def content_for(
     jp_step: int = 0,
     craft_source: str | None = None,
     training: str = "",
+    sketch_step: int = 0,
 ) -> tuple[str, str, list[str], str]:
     """The (title, desc, steps, resource) a slot should show from the handcrafted
     pool for the period containing `day`, with the mandatory floor prepended.
@@ -1602,6 +1530,7 @@ def content_for(
     `interview` (Craft only) swaps in the interview-prep pool. `jp_step` is how far
     along the Japanese plan the hunter is; `craft_source` is the one thing Craft is
     studying; `training` is the session the hunter picked for today, if any.
+    `jp_step` and `sketch_step` are how far along each walk the hunter is.
     `resource` points at a trusted place to learn (empty when there isn't one)."""
     if quest.id == "d-train":
         # Physical is a program: the session the day is running — what the hunter
@@ -1612,6 +1541,10 @@ def content_for(
         # Hiragana row by row, then katakana, words, sentence shape, kanji — held at
         # a position rather than paced by a calendar. See japanese.py.
         return japanese.content(jp_step)
+    if quest.id == "d-sketch":
+        # The other walk: seeing → spaces → proportion → light → from life, held at a
+        # position the same way. See sketch.py.
+        return sketch.content(sketch_step)
     if quest.id == "d-hansei":
         # The lens follows a fixed six-day cycle, not the pool hash — see HANSEI_LENSES.
         return hansei_content(day)

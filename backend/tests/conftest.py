@@ -80,9 +80,10 @@ def _fresh_llm_budget():
 
 
 @pytest.fixture
-def craft_unparked(monkeypatch):
-    """Craft is parked off the board for now (`state._PARKED`). The tests of how it
-    behaves when it's dealt run with it back on, so they still hold the day it returns."""
+def nothing_parked(monkeypatch):
+    """Craft, Grow, the index cards and Hansei are all parked off the board for now
+    (`state._PARKED`). The tests of how they behave when they're dealt run with the
+    whole deck back on, so they still hold the day any of them returns."""
     from app import state
 
     monkeypatch.setattr(state, "_PARKED", frozenset())
